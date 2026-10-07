@@ -1,0 +1,2588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>T.E.C-OS 节点原型 MVP v2</title>
+<style>
+  :root{
+    --bg:#e9e5d6; --card:#f5f2e8; --line:#2b2b26; --line2:#c0bcaa;
+    --text:#2b2b26; --muted:#5c584a; --faint:#8a8672;
+    /* 纸张纹理：细颗粒 + 零星纸屑（内联 SVG 噪波，无外部依赖） */
+    --paper-grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch' seed='11'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.8' intercept='0.1'/%3E%3CfeFuncG type='linear' slope='0.8' intercept='0.1'/%3E%3CfeFuncB type='linear' slope='0.8' intercept='0.1'/%3E%3CfeFuncA type='linear' slope='0' intercept='1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)'/%3E%3C/svg%3E");
+    --paper-fleck:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.38' numOctaves='3' stitchTiles='stitch' seed='29'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='-2' intercept='2.62'/%3E%3CfeFuncG type='linear' slope='-2' intercept='2.62'/%3E%3CfeFuncB type='linear' slope='-2' intercept='2.62'/%3E%3CfeFuncA type='linear' slope='0' intercept='1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='360' height='360' filter='url(%23f)'/%3E%3C/svg%3E");
+    --accent:#2b2b26; --danger:#2b2b26; --warn:#5c584a; --ok:#2b2b26;
+    --scene:#2b2b26; --item:#2b2b26; --char:#2b2b26; --clue:#2b2b26;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"SimSun","NSimSun","MS Mincho","MS Gothic",serif; font-size:12px;
+    background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden;
+  }
+  header{
+    height:52px; flex:0 0 52px; background:#2b2b26; color:var(--card); border-bottom:2px solid #2b2b26;
+    display:flex; align-items:center; gap:14px; padding:0 14px;
+  }
+  .brand{font-size:14px; font-weight:700; letter-spacing:2px; white-space:nowrap; color:var(--card)}
+  .brand small{font-weight:400; color:var(--line2); font-size:11px; margin-left:6px}
+  .crumbs{font-size:12px; color:var(--line2); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .crumbs b{color:var(--card); font-weight:500; text-decoration:underline}
+  .tools{display:flex; gap:7px; align-items:center}
+  button{
+    font-family:inherit; font-size:12px; padding:6px 11px; border-radius:0;
+    border:1px solid var(--line); background:var(--card); color:var(--text); cursor:pointer; white-space:nowrap;
+  }
+  button:hover{background:var(--text); color:var(--card); border-color:var(--text)}
+  button.primary{background:var(--text); border-color:var(--text); color:var(--card)}
+  button.primary:hover{background:var(--card); color:var(--text)}
+  button.danger{color:var(--text); text-decoration:underline}
+  button:disabled{opacity:.45; cursor:default}
+  /* header 内的按钮 / 开关：黑底上的奶油色小方块，hover 反色 */
+  header button{background:transparent; border:1px solid var(--card); color:var(--card)}
+  header button:hover{background:var(--card); color:var(--text); border-color:var(--card)}
+  header button.primary{background:var(--card); color:var(--text)}
+  header button.primary:hover{background:transparent; color:var(--card)}
+  header button.danger{color:var(--card)}
+  .tog{display:flex; align-items:center; gap:5px; font-size:12px; color:var(--muted);
+       border:1px solid var(--line); border-radius:0; padding:5px 9px; cursor:pointer; user-select:none; background:var(--card)}
+  .tog input{accent-color:var(--accent); cursor:pointer}
+  header .tog{background:transparent; border:1px solid var(--card); color:var(--card)}
+  header .tog input{accent-color:#e6e3d2}
+
+  main{flex:1; display:flex; min-height:0}
+  /* 桌布：暖象牙纸。细颗粒(soft-light，均值中性，不压暗底色) + 零星纸屑(multiply) + 大面积色斑 */
+  #stage{flex:1; position:relative; overflow:hidden; cursor:grab;
+    background-color:var(--bg);
+    background-image:
+      var(--paper-grain),
+      var(--paper-fleck),
+      radial-gradient(58% 48% at 14% 18%, rgba(176,166,138,.20), rgba(176,166,138,0) 68%),
+      radial-gradient(52% 44% at 82% 26%, rgba(198,189,162,.18), rgba(198,189,162,0) 70%),
+      radial-gradient(64% 56% at 58% 88%, rgba(164,157,134,.16), rgba(164,157,134,0) 72%),
+      /* 最后一层：纸边压暗，模拟一张被拍下来的纸。放在背景栈里，不会盖到节点和窗口上 */
+      radial-gradient(80% 70% at 50% 50%, rgba(112,104,82,0) 45%, rgba(112,104,82,.14) 100%);
+    background-size:200px 200px, 360px 360px, auto, auto, auto, auto;
+    background-repeat:repeat, repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    background-blend-mode:soft-light, multiply, normal, normal, normal, normal;
+  }
+  #stage.grabbing{cursor:grabbing}
+  #world{position:absolute; left:0; top:0; width:2000px; height:1300px; transform-origin:0 0}
+  #edges{position:absolute; left:0; top:0; width:2000px; height:1300px; overflow:visible; pointer-events:none}
+  #nodes{position:absolute; left:0; top:0; width:100%; height:100%}
+
+  .node{
+    position:absolute; background:var(--card); border:1px solid var(--line); border-radius:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:grab; user-select:none;
+    transition:left .34s cubic-bezier(.4,0,.2,1), top .34s cubic-bezier(.4,0,.2,1),
+               box-shadow .12s, border-color .12s, transform .12s;
+  }
+  .node:hover{box-shadow:3px 3px 0 rgba(43,43,38,.25)}
+  .node .n-title{font-size:12.5px; font-weight:500; line-height:1.2; text-align:center; padding:0 7px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+  .node .n-sub{font-size:10px; color:var(--faint); line-height:1.3; margin-top:2px}
+  .node.sel{outline:2px solid #2b2b26; outline-offset:2px; z-index:5}
+  .node.dim{opacity:.32}
+  .node.pop{animation:pop .45s ease}
+  @keyframes pop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+  .node.dragging{cursor:grabbing; box-shadow:4px 4px 0 rgba(43,43,38,.35); z-index:20; opacity:.92; transition:none}
+  .node.over{background:var(--text); color:var(--card); box-shadow:3px 3px 0 rgba(43,43,38,.25); transform:scale(1.06); z-index:10}
+  .node.over .n-sub{color:var(--line2)}
+  .node.bad{border-color:var(--text); background:var(--bg)}
+
+  .node.scene-node{width:152px; height:54px}
+  .node.scene-node .n-title::before{content:"■ "}
+  .node.ent-item .n-title::before{content:"□ "}
+  .node.ent-char .n-title::before{content:"● "}
+  .node.ent-clue .n-title::before{content:"▲ "}
+  .node.scene-node.unexplored{border-style:dashed; background:var(--bg); color:var(--muted)}
+  .node.scene-node.unexplored .n-title{color:var(--muted)}
+  .node.scene-node.collapsed{border-style:dashed; background:var(--bg)}
+  .mini-btn{position:absolute; top:-8px; left:-6px; width:18px; height:18px; border-radius:0;
+    background:var(--card); border:1px solid var(--line); color:var(--muted); font-size:11px; line-height:16px;
+    text-align:center; cursor:pointer; padding:0; z-index:6}
+  .mini-btn:hover{background:var(--text); color:var(--card); border-color:var(--text)}
+  .cap-btn{top:auto; left:auto; bottom:-8px; right:-6px; opacity:0; pointer-events:none}
+  .node:hover .cap-btn{opacity:1; pointer-events:auto}
+  .cap-btn.has-cap{opacity:1; pointer-events:auto; color:var(--text); font-weight:700}
+  .cap-btn:hover{background:var(--text); color:var(--card)}
+  .node.scene-node.hub{border:3px double #2b2b26}
+  .node.ent-node{width:130px; height:46px}
+  .node.ent-clue.got{background:var(--text); color:var(--card)}
+  .node.ent-clue.got .n-sub{color:var(--line2)}
+  .node.lit{border-color:#e3b341; background:#fffbeb;
+    box-shadow:0 0 14px 3px rgba(255,196,66,.55), 0 0 46px 14px rgba(255,214,120,.30)}
+  #glow{position:absolute; width:560px; height:560px; border-radius:50%; pointer-events:none; display:none;
+    background:radial-gradient(circle, rgba(255,213,110,.38) 0%, rgba(255,213,110,.15) 42%, transparent 68%)}
+  .pw-pop{position:absolute; width:190px; background:var(--card); border:1px solid var(--line); border-radius:0;
+    padding:10px; z-index:15; box-shadow:3px 3px 0 rgba(43,43,38,.25)}
+  .pw-pop .pw-title{font-size:12px; color:var(--muted); margin-bottom:7px}
+  .pw-pop .pw-row{display:flex; gap:6px}
+  .pw-pop input{flex:1; min-width:0; font-family:inherit; font-size:14px; padding:5px 8px;
+    border:1px solid var(--line); border-radius:0; letter-spacing:3px}
+  .pw-pop.shake{animation:shake .32s}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+  .bubble{position:absolute; width:230px; background:var(--card); border:1px solid var(--line); border-radius:0;
+    padding:9px 12px; font-size:12.5px; line-height:1.6; z-index:16; box-shadow:3px 3px 0 rgba(43,43,38,.25); cursor:pointer}
+  .narr-card{position:absolute; width:330px; background:var(--card); border:1px solid var(--line);
+    border-left:3px solid var(--line); border-radius:0; padding:13px 15px; font-size:12.5px; line-height:1.8;
+    z-index:16; box-shadow:3px 3px 0 rgba(43,43,38,.25); cursor:pointer; white-space:pre-wrap; animation:pop .45s ease}
+  #icons{position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none; z-index:24}
+  .desk-icon{position:absolute; width:64px; text-align:center; cursor:pointer; user-select:none; pointer-events:auto}
+  .desk-icon .icon-glyph{width:44px; height:44px; margin:0 auto; border:1px solid var(--line);
+    background:var(--card); font-size:20px; line-height:42px; box-shadow:2px 2px 0 rgba(43,43,38,.25)}
+  .desk-icon .icon-label{font-size:11px; margin-top:4px; color:var(--text); background:var(--bg);
+    padding:0 4px; display:inline-block; border:1px solid transparent}
+  .desk-icon.sel .icon-glyph{background:var(--text); color:var(--card)}
+  .desk-icon.over .icon-glyph{background:var(--text); color:var(--card); border-width:2px}
+  .desk-icon .badge{top:-6px; right:0}
+  .desk-icon.pulse .icon-glyph{animation:tecpulse 1.6s infinite}
+  @keyframes tecpulse{0%,100%{box-shadow:2px 2px 0 rgba(43,43,38,.25)}50%{box-shadow:2px 2px 0 rgba(43,43,38,.65); border-width:2px}}
+  .tec-win{position:absolute; right:14px; bottom:96px; width:300px;
+    background:var(--card); border:1px solid var(--line);
+    box-shadow:3px 3px 0 rgba(43,43,38,.25); z-index:25}
+  .tec-win .tec-lines{max-height:300px; overflow:auto; margin-bottom:8px}
+  .tec-win .tec-line{font-size:12px; line-height:1.7; padding:3px 0; border-bottom:1px dashed var(--line2)}
+  .tec-win .tec-hint{font-size:10.5px; color:var(--faint); margin-top:6px}
+  .bag-win{position:absolute; left:14px; bottom:96px; width:280px;
+    background:var(--card); border:1px solid var(--line); border-radius:0;
+    box-shadow:3px 3px 0 rgba(43,43,38,.25); z-index:25; cursor:grab}
+  .bag-win:active{cursor:grabbing}
+  .bag-win .syswin-body{max-height:300px; overflow:auto}
+  .bag-item{display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+    padding:6px 8px; border-radius:0; cursor:pointer; font-size:12.5px}
+  .bag-item:hover{background:var(--bg)}
+  .bag-item .src{color:var(--faint); font-size:10.5px; white-space:nowrap}
+  .bag-empty{color:var(--faint); font-size:12px; padding:4px 2px}
+  .goto-win{position:absolute; left:50%; top:80px; margin-left:-150px; width:300px;
+    background:var(--card); border:1px solid var(--line);
+    box-shadow:3px 3px 0 rgba(43,43,38,.25); z-index:25}
+  .goto-win .syswin-body{max-height:320px; overflow:auto}
+  .goto-item{display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+    padding:6px 8px; cursor:pointer; font-size:12.5px}
+  .goto-item:hover{background:var(--bg)}
+  .goto-item .st{color:var(--faint); font-size:10.5px; white-space:nowrap}
+  .infer-win{position:absolute; left:50%; top:70px; margin-left:-190px; width:380px;
+    background:var(--card); border:1px solid var(--line);
+    box-shadow:3px 3px 0 rgba(43,43,38,.25); z-index:25}
+  .infer-win .syswin-body{max-height:380px; overflow:auto}
+  .mx-slot{border:1px dashed var(--line2); padding:6px 8px; margin-bottom:6px}
+  .mx-slot.over{border:1px solid var(--text); background:var(--bg)}
+  .mx-sense{font-size:11px; font-weight:700; letter-spacing:2px; color:var(--muted); margin-bottom:4px}
+  .mx-clue{display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 4px}
+  .mx-clue .mx-x{cursor:pointer; color:var(--faint)}
+  .mx-clue .mx-x:hover{color:var(--text)}
+  .mx-ending{font-size:12px; color:var(--muted); padding:3px 2px; border-top:1px dashed var(--line2)}
+  .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
+  .memory{background:#dcd8c2; border:3px double #2b2b26}
+  .memory .syswin-bar{background:#2b2b26}
+  .memory .syswin-title{color:#e6e3d2}
+  .memory .syswin-rule{border-color:#8a8672}
+  .memory .syswin-x{border-color:#8a8672; color:#e6e3d2; background:transparent}
+  .mem-line{margin-bottom:6px}
+  .mem-line.talk{color:#5c584a}
+  #ending-overlay{position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(24,23,20,.97);
+    z-index:100; display:none; color:#e6e3d2; cursor:pointer; user-select:none}
+  #ending-overlay .eol{max-width:640px; margin:12vh auto 0; padding:0 26px; font-size:15px; line-height:2.1; white-space:pre-wrap}
+  #ending-overlay .eol .truename{font-size:26px; letter-spacing:6px; text-align:center; margin:20px 0}
+  #ending-overlay .eol .ebtn{display:inline-block; margin-top:28px; padding:8px 22px; border:1px solid #e6e3d2; cursor:pointer}
+  #ending-overlay .eol .ebtn:hover{background:#e6e3d2; color:#2b2b26}
+  #ending-overlay .eskip{position:absolute; right:18px; bottom:14px; font-size:11px; color:#8a8672}
+  #intro-backdrop{position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(43,43,38,.45); z-index:90}
+  .intro-win{position:absolute; left:50%; top:90px; margin-left:-210px; width:420px;
+    background:var(--card); border:1px solid var(--line); box-shadow:4px 4px 0 rgba(24,23,20,.4)}
+  .intro-win .syswin-body{padding:16px 18px; font-size:13px; line-height:1.9}
+  .intro-win .quiz-prog{font-size:11px; color:var(--faint); margin-bottom:8px; letter-spacing:2px}
+  .intro-win .quiz-q{font-weight:700; margin-bottom:10px}
+  .intro-win .quiz-opt{display:block; width:100%; text-align:left; margin-bottom:6px}
+  .intro-win input.intro-name{width:100%; font-family:inherit; font-size:14px; padding:7px 10px;
+    border:1px solid var(--line); background:var(--card); margin:10px 0}
+  .intro-win.shrink{transform:scale(.1); opacity:0; transition:transform .4s, opacity .4s}
+  .inv-cert{width:320px; max-width:100%; background:#efece0; border:1px solid var(--line);
+    border-radius:14px; overflow:hidden; box-shadow:3px 3px 0 rgba(43,43,38,.25);
+    font-size:14px; line-height:1.8; margin:0 auto}
+  .cert-head{background:#2b2b26; color:#e6e3d2; text-align:center; font-weight:700;
+    letter-spacing:3px; padding:10px 0; font-size:15px}
+  .cert-sec{padding:12px 14px; border-top:1px solid var(--line)}
+  .cert-sec.dashed{border-top:1px dashed var(--line)}
+  .cert-sec.cert-id{border-top:none; text-align:center}
+  .cert-photo{width:120px; height:120px; background:var(--card); margin:0 auto 10px;
+    border:1px solid var(--line); border-radius:4px; padding:6px;
+    display:grid; align-content:center; justify-content:center}
+  .cert-photo .px{width:18px; height:18px}
+  .cert-photo .px.on{background:#2b2b26}
+  .cert-name{font-size:24px; font-weight:700; letter-spacing:3px; margin-top:4px}
+  .cert-idno{font-size:14px; color:var(--muted); letter-spacing:1px; margin-top:5px}
+  .cert-frow{margin-top:8px; color:var(--muted); font-size:13.5px}
+  .cert-sense{font-size:21px; font-weight:700; letter-spacing:2px; text-align:center}
+  .cert-flavor{font-size:13px; color:var(--muted); margin-top:6px; text-align:center}
+  .cert-issue{display:flex; justify-content:space-between; align-items:center}
+  .cert-stamp{width:54px; height:54px; border:2px solid #2b2b26; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    font-size:10px; line-height:1.4; letter-spacing:1px; transform:rotate(-12deg); opacity:.75}
+  .cert-actions{margin-top:14px; text-align:center}
+  .cert-win{position:absolute; left:50%; top:70px; margin-left:-190px; width:380px;
+    background:var(--card); border:1px solid var(--line);
+    box-shadow:3px 3px 0 rgba(43,43,38,.25); z-index:25}
+  #inv-chip{border:1px solid var(--card); color:var(--card); font-size:11px; padding:4px 8px;
+    cursor:pointer; letter-spacing:1px; white-space:nowrap}
+  #inv-chip:hover{background:var(--card); color:var(--text)}
+  .bubble, .narr-card{cursor:grab}
+  .bubble:active, .narr-card:active{cursor:grabbing}
+  .syswin{overflow:hidden; padding:0}
+  .syswin-bar{display:flex; justify-content:center; align-items:center; position:relative;
+    background:var(--bg); border-bottom:1px solid var(--line); padding:4px 6px;
+    cursor:grab; user-select:none}
+  .syswin-bar:active{cursor:grabbing}
+  .syswin-rule{flex:1; min-width:12px; border-top:1px solid var(--line); margin:0 8px}
+  .syswin-title{font-family:inherit; font-size:10.5px; letter-spacing:2px; font-weight:700;
+    color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .syswin-x{position:absolute; right:4px; top:50%; transform:translateY(-50%);
+    width:16px; height:16px; line-height:14px; text-align:center;
+    border:1px solid var(--line); border-radius:0; background:var(--card);
+    color:var(--text); font-size:12px; cursor:pointer}
+  .syswin-x:hover{background:var(--text); color:var(--card)}
+  .syswin-body{padding:10px 12px}
+  .narr-card .syswin-body{max-height:360px; overflow:auto}
+  .bubble .syswin-body{max-height:240px; overflow:auto}
+
+  /* 复古单色滚动条：黑滑块 + 米白轨道（证物袋 / 叙事卡 / 日志 / 详情全局统一） */
+  *{scrollbar-width:thin; scrollbar-color:var(--text) var(--bg)}
+  ::-webkit-scrollbar{width:12px; height:12px}
+  ::-webkit-scrollbar-track{background:var(--bg); border-left:1px solid var(--line)}
+  ::-webkit-scrollbar-corner{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--text); border:2px solid var(--bg); border-radius:0}
+  ::-webkit-scrollbar-thumb:hover{background:#000}
+
+  .badge{
+    position:absolute; top:-8px; right:-6px; font-size:9.5px; line-height:1;
+    padding:3px 5px; border-radius:0; background:var(--text); border:1px solid var(--text);
+    color:var(--card); white-space:nowrap; pointer-events:none;
+  }
+  .badge.cond{color:var(--card); border-color:var(--text); background:var(--text)}
+  .badge.talk{color:var(--card); border-color:var(--text); background:var(--text)}
+  .badge.warn{color:var(--text); border:2px solid var(--text); background:var(--card)}
+  .badge.new{color:var(--card); background:var(--text); border-color:var(--text)}
+
+  #hint{
+    position:absolute; left:14px; top:14px; font-size:11px; color:var(--muted); line-height:1.7;
+    background:var(--card); border:1px solid var(--line); border-radius:0; padding:8px 11px;
+    pointer-events:none; max-width:520px; box-shadow:3px 3px 0 rgba(43,43,38,.25);
+  }
+  #hint kbd{font-family:inherit; background:var(--bg); border:1px solid var(--line); border-radius:0; padding:0 4px; font-size:10px}
+
+  #toast{
+    position:absolute; left:50%; top:14px; transform:translateX(-50%); max-width:560px;
+    background:var(--card); border:1px solid var(--line); border-left:3px solid var(--line);
+    border-radius:0; padding:11px 15px; font-size:13px; line-height:1.65;
+    box-shadow:3px 3px 0 rgba(43,43,38,.25); display:none; z-index:30;
+  }
+  #toast.fail{border-width:2px}
+  #toast b{color:var(--text); text-decoration:underline}
+
+  #verdict{
+    position:absolute; right:14px; top:14px; width:300px; background:var(--card);
+    border:1px solid var(--line); border-radius:0; padding:12px 14px; font-size:12px; line-height:1.6;
+    display:none; box-shadow:3px 3px 0 rgba(43,43,38,.25); z-index:30;
+  }
+  #verdict h4{font-size:12px; font-weight:700; letter-spacing:1px; margin-bottom:8px}
+  #verdict .vrow{display:flex; gap:8px; align-items:baseline; padding:3px 0}
+  #verdict .dot{width:7px; height:7px; border-radius:0; flex:0 0 7px; margin-top:5px}
+  #verdict code{font-family:inherit; font-size:11px; color:var(--muted)}
+  #verdict .close{float:right; cursor:pointer; color:var(--faint); font-size:14px; line-height:1; margin-top:-2px}
+
+  .detail-win{position:absolute; right:14px; top:60px; width:300px;
+    background:var(--card); border:1px solid var(--line); box-shadow:3px 3px 0 rgba(43,43,38,.25); z-index:22}
+  .detail-win .syswin-body{max-height:380px; overflow:auto; padding:12px 14px; font-size:13px; line-height:1.7}
+  #detail-body .dt{font-size:15px; font-weight:700; margin-bottom:2px}
+  #detail-body .dmeta{font-size:11px; color:var(--faint); margin-bottom:10px}
+  #detail-body .ddesc{color:var(--text); white-space:pre-wrap}
+  #detail-body .drow{font-size:12px; color:var(--muted); margin-top:9px; padding-top:8px; border-top:1px dashed var(--line2)}
+  #detail-body .empty{color:var(--faint); font-size:12px}
+
+  .log-win{position:absolute; right:14px; bottom:96px; width:320px;
+    background:var(--card); border:1px solid var(--line); box-shadow:3px 3px 0 rgba(43,43,38,.25); z-index:21}
+  .log-win .log-body{max-height:340px; overflow:auto; padding:8px 10px; font-size:12px; line-height:1.6}
+  #log div{padding:4px 5px; border-bottom:1px solid var(--line2); color:var(--text)}
+  #log div.sys{color:var(--text); font-weight:700}
+  #log div.sys::before{content:"▍ "}
+  #log div.warn{color:var(--muted)}
+  #log div.warn::before{content:"※ "}
+  #log div.err{background:var(--text); color:var(--card)}
+  #log div.cap{color:var(--text); text-decoration:underline}
+  #log div.act{background:var(--bg)}
+  #log div.act b{color:var(--text)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">T.E.C-OS<small>节点原型 v2 · 案件 A-001</small></div>
+  <div class="crumbs" id="crumbs"></div>
+  <div class="tools">
+    <label class="tog" title="关闭后，合成所用的道具不会消失，方便反复试">
+      <input type="checkbox" id="tg-consume" checked> 合成消耗
+    </label>
+    <label class="tog" title="选中节点时，淡化与它无关的节点和连线">
+      <input type="checkbox" id="tg-focus" checked> 聚焦选中
+    </label>
+    <button id="btn-relayout">自动布局</button>
+    <button id="btn-fit">适应窗口</button>
+    <button id="btn-undo">撤销</button>
+    <button id="btn-reset" class="danger">重置</button>
+    <button id="btn-reach" class="primary">检查可达性</button>
+  </div>
+</header>
+
+<main>
+  <div id="stage">
+    <div id="world">
+      <svg id="edges"></svg>
+      <div id="glow"></div>
+      <div id="nodes"></div>
+    </div>
+    <div id="hint">
+      <b>拖动节点</b> = 移动位置 &nbsp;·&nbsp; <b>拖到另一个节点上松手</b> = 组合使用 &nbsp;·&nbsp; <b>双击</b> = 展开 / 打开 / 折叠<br>
+      单击 = 详情 + 聚焦邻居 · 双击物品 = 使用/打开 · 捕 = 捕获隐藏线索 · 双击图标 = 打开应用 · 图标可拖动 · 拖节点到图标 = 归槽/收纳/分析/前往
+    </div>
+    <div id="icons">
+      <div class="desk-icon" id="infer-icon" data-app="infer"><div class="icon-glyph">◈</div><div class="icon-label">推演器</div></div>
+      <div class="desk-icon" id="goto-icon"  data-app="goto"><div class="icon-glyph">▤</div><div class="icon-label">档案</div></div>
+      <div class="desk-icon" id="bag-dock"   data-app="bag"><div class="icon-glyph">▣</div><div class="icon-label">证物袋</div></div>
+      <div class="desk-icon" id="tec-dock"   data-app="tec"><div class="icon-glyph">◉</div><div class="icon-label">TEC</div></div>
+      <div class="desk-icon" id="log-icon"><div class="icon-glyph">≡</div><div class="icon-label">日志</div></div>
+    </div>
+    <div id="toast"></div>
+    <div id="verdict"></div>
+    <div class="syswin detail-win" id="detail-win" style="display:none">
+      <div class="syswin-bar"><span class="syswin-rule"></span><span class="syswin-title">DETAIL // 节点详情</span><span class="syswin-rule"></span><span class="syswin-x" id="detail-x">×</span></div>
+      <div class="syswin-body" id="detail-body"><div class="empty">点选任意节点查看信息。</div></div>
+    </div>
+    <div class="syswin log-win" id="log-win">
+      <div class="syswin-bar"><span class="syswin-rule"></span><span class="syswin-title">SYS_LOGS // 因果追踪</span><span class="syswin-rule"></span><span class="syswin-x" id="log-x">×</span></div>
+      <div class="syswin-body log-body" id="log"></div>
+    </div>
+  </div>
+</main>
+<div id="ending-overlay"></div>
+
+<script type="application/json" id="gamedata">__GAME_DATA_A001__</script>
+<script>
+"use strict";
+const DATA   = JSON.parse(document.getElementById("gamedata").textContent);
+const SCENES = DATA.scenes || {};
+const ITEMS  = DATA.items  || {};
+const CHARS  = DATA.chars  || {};
+const CLUES  = DATA.clues  || {};
+/* 节点版跳过 T.E.C-OS 引导场景（那里教学的是原作命令行玩法），直接进入异动区域现场 */
+const START  = SCENES.SCENES_garden ? "SCENES_garden"
+             : (DATA.config && DATA.config.startScene) || Object.keys(SCENES)[0];
+
+/* 合成后视为可重复使用、不消耗的道具 */
+const REUSABLE_TOOLS = ["ITEM_shoudiantong", "ITEMS_htys", "ITEMS_cz", "ITEMS_changji"];
+/* 可以点亮的光源：双击执行命令后切换发光状态（光晕跟随节点） */
+const LIGHT_SOURCES = ["ITEM_taideng"];
+/* A-001 的日期闪回场景：首次展开时放 MEMORY 放映卡（换案件需更新） */
+const SCENE_MEMORY = ["SCENES_0602", "SCENES_0704"];
+/* 五感槽位名 */
+const SENSES = {vision:"视觉", hearing:"听觉", touch:"触觉", smell:"嗅觉", taste:"味觉"};
+const ENDINGS = DATA.endings || [];
+
+const stage = document.getElementById("stage");
+const world = document.getElementById("world");
+const svg   = document.getElementById("edges");
+const nodeLayer = document.getElementById("nodes");
+const detailBody = document.getElementById("detail-body");
+const logBox = document.getElementById("log");
+const crumbs = document.getElementById("crumbs");
+const verdict = document.getElementById("verdict");
+const toastEl = document.getElementById("toast");
+const btnUndo = document.getElementById("btn-undo");
+const tgConsume = document.getElementById("tg-consume");
+const tgFocus = document.getElementById("tg-focus");
+
+/* ============ 图状态 ============ */
+let G, history = [], view = {x:0, y:0, k:1};
+let sel = null;
+
+function blankGraph(){
+  return { nodes:{}, edges:[], explored:new Set(), captured:new Set(), tried:new Set(), talkProg:{}, tecProg:{}, lastScene:null, collapsed:new Set(), seenTexts:[],
+    matrix:{vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings:new Set() };
+}
+function snapshot(){
+  const nodes = {};
+  for (const k in G.nodes){ const n = G.nodes[k]; nodes[k] = { key:n.key, kind:n.kind, id:n.id, label:n.label, x:n.x, y:n.y, isScene:n.isScene, lit:n.lit, pinned:n.pinned, homeScene:n.homeScene, stored:n.stored, storedIn:n.storedIn, bagFrom:n.bagFrom }; }
+  return JSON.stringify({
+    nodes: nodes, edges: G.edges,
+    explored:[...G.explored], captured:[...G.captured], tried:[...G.tried],
+    talkProg: Object.assign({}, G.talkProg),
+    tecProg: Object.assign({}, G.tecProg), lastScene: G.lastScene,
+    collapsed: [...G.collapsed],
+    matrix: JSON.parse(JSON.stringify(G.matrix)), endings: [...G.endings]
+  });
+}
+function pushHistory(){ history.push(snapshot()); if (history.length > 60) history.shift(); }
+function restore(str){
+  const s = JSON.parse(str);
+  G = { nodes:s.nodes, edges:s.edges, explored:new Set(s.explored), captured:new Set(s.captured), tried:new Set(s.tried), talkProg: s.talkProg || {}, tecProg: s.tecProg || {}, lastScene: s.lastScene || null, collapsed: new Set(s.collapsed || []), seenTexts: G.seenTexts || [],
+    matrix: s.matrix || {vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings: new Set(s.endings || []) };
+  Object.values(G.nodes).forEach(n => { n.el = null; });
+  recomputeHidden();
+}
+
+/* ============ 工具 ============ */
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function stripTags(text){ return String(text || "").replace(TAG_RE, m => m); }
+function plain(text){
+  return String(text || "")
+    .replace(/\[(item|loc|char|clue):(.+?)\]/g, (m, k, id) => labelOf(k, id) || id)
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, "");
+}
+const TAG_RE = /\[(item|loc|char|clue):(.+?)\]/g;
+function parseTags(text){
+  const seen = {}, out = []; let m;
+  TAG_RE.lastIndex = 0;
+  while ((m = TAG_RE.exec(text || "")) !== null){
+    const kind = m[1], id = m[2].trim(), k = kind + ":" + id;
+    if (!seen[k]) { seen[k] = 1; out.push({kind, id}); }
+  }
+  return out;
+}
+function labelOf(kind, id){
+  if (kind === "loc")  return SCENES[id] ? SCENES[id].title : null;
+  if (kind === "item") return ITEMS[id]  ? ITEMS[id].label  : (id.startsWith("DATA_") ? id.replace(/^DATA_/, "") : null);
+  if (kind === "char") return CHARS[id]  ? CHARS[id].name   : null;
+  if (kind === "clue") return CLUES[id]  ? CLUES[id].label  : null;
+  return null;
+}
+function findReactable(kind, id){
+  if (kind === "item") return ITEMS[id];
+  if (kind === "char") return CHARS[id];
+  if (kind === "clue") return CLUES[id];
+  return null;
+}
+function kindName(k){ return { item:"物品", char:"角色", clue:"线索", loc:"场景" }[k] || k; }
+function nodeByKey(kind, id){ return G.nodes[kind + ":" + id]; }
+function edgeBetween(aId, bId, kind){
+  return G.edges.some(e => e.kind === kind && ((e.a === aId && e.b === bId) || (e.a === bId && e.b === aId)));
+}
+
+function log(msg, kind){
+  const d = document.createElement("div");
+  if (kind) d.className = kind;
+  d.innerHTML = msg;
+  logBox.appendChild(d);
+  logBox.scrollTop = logBox.scrollHeight;
+  if (!logWinOpen){ logUnread++; updateLogBadge(); }
+}
+/* 详情 / 日志窗口可见性（引擎内变量，兼容无头环境） */
+let detailWinOpen = false, logWinOpen = true, logUnread = 0;
+function setDetailWin(open){
+  detailWinOpen = open;
+  document.getElementById("detail-win").style.display = open ? "block" : "none";
+}
+function setLogWin(open){
+  logWinOpen = open;
+  document.getElementById("log-win").style.display = open ? "block" : "none";
+  if (open){ logUnread = 0; updateLogBadge(); }
+}
+function toggleDetailWin(){ setDetailWin(!detailWinOpen); }
+function toggleLogWin(){ setLogWin(!logWinOpen); }
+function updateLogBadge(){
+  const icon = document.getElementById("log-icon");
+  if (!icon) return;
+  let b = icon.querySelector(".badge");
+  if (logUnread > 0){
+    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    b.textContent = logUnread;
+  } else if (b) b.remove();
+}
+let toastTimer = null;
+function toast(html, fail){
+  toastEl.innerHTML = html;
+  toastEl.className = fail ? "fail" : "";
+  toastEl.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.style.display = "none"; }, fail ? 3200 : 6000);
+}
+
+/* ============ 反应索引 ============ */
+/* 数据语义：目标.presentReactions[工具] / 目标.itemReactions[工具] / 目标.reactions[工具] */
+function lookupReaction(ownerKind, ownerId, toolId){
+  const owner = findReactable(ownerKind, ownerId);
+  if (!owner) return null;
+  for (const f of ["presentReactions", "itemReactions", "reactions"]){
+    const tbl = owner[f];
+    if (tbl && tbl[toolId]) return { field:f, react:tbl[toolId] };
+  }
+  return null;
+}
+
+/* ============ 场景解析 ============ */
+function sceneTags(sid){
+  const s = SCENES[sid];
+  if (!s) return [];
+  return parseTags(s.content).filter(t => t.kind !== "loc" && labelOf(t.kind, t.id) &&
+    !(t.kind === "char" && t.id === "CHARS_TEC"));
+}
+function sceneLocs(sid){
+  const s = SCENES[sid];
+  if (!s) return [];
+  return parseTags(s.content).filter(t => t.kind === "loc" && SCENES[t.id]).map(t => t.id);
+}
+
+/* 场景入/出边统计（用于枢纽标记） */
+const inbound = {}, outbound = {};
+for (const sid in SCENES){ inbound[sid] = 0; outbound[sid] = 0; }
+for (const sid in SCENES) sceneLocs(sid).forEach(t => { outbound[sid]++; inbound[t] = (inbound[t] || 0) + 1; });
+const isHub = sid => (inbound[sid] + outbound[sid]) >= 5;
+
+/* 条件入口统计 */
+const condRoutes = {};
+for (const iid in ITEMS){
+  (function walk(o){
+    if (Array.isArray(o)) return o.forEach(walk);
+    if (o && typeof o === "object"){
+      for (const k in o){
+        if (k === "scene" && typeof o[k] === "string" && SCENES[o[k]]) (condRoutes[o[k]] = condRoutes[o[k]] || []).push(iid);
+        else walk(o[k]);
+      }
+    }
+  })(ITEMS[iid]);
+}
+
+/* ============ 图操作 ============ */
+function ensureNode(kind, id, opts){
+  const key = kind + ":" + id;
+  if (G.nodes[key]) return G.nodes[key];
+  const o = opts || {};
+  G.nodes[key] = {
+    key, kind, id,
+    label: o.label || labelOf(kind, id) || id,
+    x: o.x, y: o.y, fresh: true,
+    isScene: kind === "loc"
+  };
+  return G.nodes[key];
+}
+function link(aKey, bKey, kind){
+  if (!G.nodes[aKey] || !G.nodes[bKey]) return;
+  if (edgeBetween(aKey, bKey, kind)) return;
+  G.edges.push({ a:aKey, b:bKey, kind });
+}
+
+/* 揭示一个场景的内容（可重复调用，幂等） */
+function revealScene(sid, silent){
+  const s = SCENES[sid];
+  if (!s) return 0;
+  const sn = ensureNode("loc", sid, { label: s.title || sid });
+  const firstTime = !G.explored.has(sid);
+  G.explored.add(sid);
+  G.lastScene = sid;
+
+  const home = { x: sn.x, y: sn.y };
+  let added = 0;
+
+  sceneTags(sid).forEach((t, i) => {
+    const existed = !!nodeByKey(t.kind, t.id);
+    const en = ensureNode(t.kind, t.id, { x: home.x, y: home.y });
+    if (!en.homeScene) en.homeScene = sid;
+    if (!existed) added++;
+    link(sn.key, en.key, "entity");
+  });
+
+  sceneLocs(sid).forEach(tid => {
+    const existed = !!nodeByKey("loc", tid);
+    const tn = ensureNode("loc", tid, { label: SCENES[tid].title || tid });
+    if (!tn.homeScene) tn.homeScene = sid;
+    if (!existed) added++;
+    link(sn.key, tn.key, "move");
+  });
+
+  if (!silent){
+    log("展开场景 <b>" + esc(s.title || sid) + "</b>：" + sceneTags(sid).length + " 个对象、" +
+        sceneLocs(sid).length + " 个出口", "sys");
+    if (!added && !silent) log("（此场景的节点此前已经出现在画布上了）", "sys");
+  }
+  unstoreScene(sid);   /* 展开场景时取回存放在这里的节点 */
+  layout();          /* 必须重新布局，否则新节点没有坐标 */
+  render();
+  if (firstTime && !silent) renarrScene(sid);
+  if (((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[sid]) log("TEC 似乎有话要说（双击 TEC 图标）", "sys");
+  updateTecBadge();
+  return added;
+}
+
+/* 生成一批物品节点（由合成产出） */
+function spawnItems(ids, nearKey){
+  const src = G.nodes[nearKey];
+  const sx = src ? src.x : 900, sy = src ? src.y : 600;
+  ids.forEach((iid, i) => {
+    const n = ensureNode("item", iid, { x: sx + 60 + i * 26, y: sy + 60 + i * 26 });
+    n.fresh = true;
+    n.homeScene = (G.nodes[nearKey] || {}).homeScene || null;
+  });
+}
+
+/* ============ 合成：拖 A 到 B ============ */
+function attemptCombo(toolKey, targetKey){
+  const tool = G.nodes[toolKey], target = G.nodes[targetKey];
+  if (!tool || !target || toolKey === targetKey) return;
+  if (tool.hidden || target.hidden || tool.stored || target.stored) return;
+
+  const triedKey = toolKey + ">" + targetKey;
+  pushHistory();
+
+  /* 1) 场景 ← 场景：视为"前往" */
+  if (tool.isScene && target.isScene){
+    if (sceneLocs(tool.id).indexOf(target.id) >= 0 || sceneLocs(target.id).indexOf(tool.id) >= 0){
+      revealScene(target.id);
+      log("前往场景 <b>" + esc(target.label) + "</b>", "act");
+      return;
+    }
+    fail(tool, target, "这两个场景之间没有直接通路");
+    return;
+  }
+
+  /* 2) 目标直接有反应表 */
+  let owner = null, hit = lookupReaction(target.kind, target.id, tool.id);
+  if (hit) owner = target;
+
+  /* 3) 反向：工具自己是反应表的所有者 */
+  if (!hit){
+    hit = lookupReaction(tool.kind, tool.id, target.id);
+    if (hit) owner = tool;
+  }
+
+  /* 3.5) 目标的 useItem 命令正好需要这个工具（如 黑胶 → 唱机） */
+  if (!hit && target.kind === "item"){
+    const ucmds = (ITEMS[target.id] || {}).commands || [];
+    const uc = ucmds.find(c => c.type === "useItem" && c.requiredItem === tool.id);
+    if (uc){ hit = { field:"useItem", react:{ text:uc.successMessage || "", results:uc.onSuccess || {} } }; owner = target; }
+  }
+
+  /* 4) 目标是场景：扫描场景内的物品 / 角色 */
+  if (!hit && target.isScene){
+    for (const t of sceneTags(target.id)){
+      const h = lookupReaction(t.kind, t.id, tool.id);
+      if (h){ hit = h; owner = nodeByKey(t.kind, t.id) || ensureNode(t.kind, t.id); break; }
+    }
+  }
+  if (!hit && tool.isScene){
+    for (const t of sceneTags(tool.id)){
+      const h = lookupReaction(t.kind, t.id, target.id);
+      if (h){ hit = h; owner = nodeByKey(t.kind, t.id) || ensureNode(t.kind, t.id); break; }
+    }
+  }
+
+  if (!hit){
+    fail(tool, target, "「" + plain(target.label) + "」对「" + plain(tool.label) + "」没有反应");
+    G.tried.add(triedKey);
+    link(toolKey, targetKey, "tried");
+    return;
+  }
+
+  /* 命中 */
+  const react = hit.react;
+  const text = react.text || react.message || "";
+  noteSeen(text);
+  const results = react.results || {};
+  G.tried.add(triedKey);
+
+  const toolLabel = plain(tool.label), targetLabel = plain(owner ? owner.label : target.label);
+
+  /* 应用结果 */
+  const gained = [];
+  if (results.scene && SCENES[results.scene]){
+    const isNew = !nodeByKey("loc", results.scene);
+    const sn = ensureNode("loc", results.scene, { label: SCENES[results.scene].title });
+    sn.fresh = true;
+    if (isNew) link(owner ? owner.key : targetKey, sn.key, "cond");
+    gained.push("新场景「" + sn.label + "」");
+  }
+  const newItems = (results.items || []).concat(react.onSuccess && react.onSuccess.items || []);
+  if (newItems.length){
+    spawnItems(newItems, owner ? owner.key : targetKey);
+    newItems.forEach(i => gained.push("「" + (labelOf("item", i) || i) + "」"));
+  }
+  /* 文本里的 [clue:x] 自动生成线索节点 */
+  parseTags(text).forEach(t => {
+    if (t.kind === "clue" && CLUES[t.id] && !nodeByKey("clue", t.id)){
+      const cn = ensureNode("clue", t.id, {});
+      cn.fresh = true;
+      link(owner ? owner.key : targetKey, cn.key, "entity");
+      gained.push("线索「" + cn.label + "」");
+    }
+  });
+  /* 反应文本里出现的线索同时计入已捕获（与 runCommand 的 gotClues 行为一致） */
+  gotClues(text);
+
+  /* 消耗：与角色对话/询问不消耗任何东西 */
+  const consume = tgConsume.checked && !(owner && owner.kind === "char");
+  const killed = [];
+  if (consume){
+    const keepTool = REUSABLE_TOOLS.indexOf(tool.id) >= 0 || tool.kind === "clue";
+    if (!keepTool){ killed.push(tool); }
+    if (target !== tool && !target.isScene && target.key !== (owner && owner.key)) killed.push(target);
+    else if (owner && owner.kind === "item" && owner.id !== tool.id && REUSABLE_TOOLS.indexOf(owner.id) < 0) killed.push(owner);
+  }
+  const killedSet = {};
+  killed.forEach(k => { if (!killedSet[k.key]){ killedSet[k.key] = 1; deleteNode(k.key); } });
+
+  /* 反馈 */
+  let html = "<b>" + esc(toolLabel) + " → " + esc(targetLabel) + "</b><br>" + esc(plain(text));
+  if (gained.length) html += "<br><span style='color:#2b2b26'>获得：" + esc(gained.join("、")) + "</span>";
+  if (killed.length) html += "<br><span style='color:#8a8672'>消耗：" + esc(killed.map(k => plain(k.label)).join("、")) + "</span>";
+  toast(html, false);
+  log("组合 <b>" + esc(toolLabel) + "</b> ⇒ <b>" + esc(targetLabel) + "</b>：" + esc(plain(text)) +
+      (gained.length ? "　［获得 " + esc(gained.join("、")) + "］" : "") +
+      (killed.length ? "　［消耗 " + esc(killed.map(k => plain(k.label)).join("、")) + "］" : ""), "act");
+
+  layout();
+  render();
+  selectNode(owner ? owner.key : targetKey);
+}
+
+function fail(tool, target, msg){
+  toast(esc(msg), true);
+  log("组合失败：" + esc(msg), "warn");
+}
+
+function deleteNode(key){
+  delete G.nodes[key];
+  G.edges = G.edges.filter(e => e.a !== key && e.b !== key);
+  if (sel === key){ sel = null; setDetailWin(false); }
+}
+
+/* ============ 捕获：提取节点的 hiddenClue ============ */
+function capturableClues(n){
+  const data = n.isScene ? SCENES[n.id] : n.kind === "char" ? CHARS[n.id] : n.kind === "item" ? ITEMS[n.id] : null;
+  if (!data || !data.hiddenClue) return [];
+  const ids = new Set(data.hiddenClue.ids || []);
+  parseTags(data.hiddenClue.text || "").forEach(t => { if (t.kind === "clue") ids.add(t.id); });
+  return [...ids].filter(id => CLUES[id]);
+}
+function attemptCapture(key){
+  const n = G.nodes[key];
+  if (!n || n.kind === "clue") return;
+  const data = n.isScene ? SCENES[n.id] : n.kind === "char" ? CHARS[n.id] : ITEMS[n.id];
+  const hc = (data && data.hiddenClue) || {};
+  const all = capturableClues(n);
+  const fresh = all.filter(id => !G.captured.has(id));
+  if (!fresh.length){
+    if (all.length){ toast("<b>" + esc(n.label) + "</b><br>线索已经捕获过了", true); log("「" + esc(n.label) + "」没有新的可捕获线索", "warn"); }
+    else { toast("<b>" + esc(n.label) + "</b><br>没有可捕获的线索", true); log("「" + esc(n.label) + "」没有可捕获的线索", "warn"); G.tried.add("cap:" + key); }
+    return;
+  }
+  pushHistory();
+  fresh.forEach(id => {
+    const cn = ensureNode("clue", id, {});
+    cn.fresh = true;
+    link(key, cn.key, "entity");
+    G.captured.add(id);
+  });
+  const text = plain(hc.text || "");
+  if (text) showBubble(n, "CAPTURE // " + n.label, text);
+  log("捕获「" + esc(n.label) + "」的隐藏线索：" + esc(fresh.map(id => CLUES[id].label).join("、")) + (text ? "——" + esc(text) : ""), "cap");
+  layout(); render(); selectNode(key);
+}
+
+/* ============ 场景折叠收纳 ============ */
+function recomputeHidden(){
+  Object.values(G.nodes).forEach(n => { n.hidden = false; });
+  let changed = true;
+  while (changed){
+    changed = false;
+    G.collapsed.forEach(sid => {
+      const sceneKey = "loc:" + sid;
+      Object.values(G.nodes).forEach(n => {
+        if (n.stored || n.hidden || n.pinned || n.key === sceneKey) return;
+        if (n.homeScene !== sid) return;
+        /* 只要还有一条边连着"会保持可见"的节点，就不藏（被用到别处的节点会留下） */
+        const exported = G.edges.some(e => {
+          if (e.a !== n.key && e.b !== n.key) return false;
+          const other = G.nodes[e.a === n.key ? e.b : e.a];
+          return other && !other.hidden && !other.stored && other.key !== sceneKey && other.homeScene !== sid;
+        });
+        if (!exported){ n.hidden = true; changed = true; }
+      });
+    });
+  }
+}
+function toggleCollapse(sid){
+  if (!G.explored.has(sid)) return;
+  pushHistory();
+  if (G.collapsed.has(sid)){ G.collapsed.delete(sid); unstoreScene(sid); } else G.collapsed.add(sid);
+  closeBubble(); closeNarr(); closePwPop(); closeTecWin();
+  recomputeHidden(); layout(); render();
+  log((G.collapsed.has(sid) ? "收起场景「" : "展开场景「") + esc(SCENES[sid].title || sid) + "」", "sys");
+}
+
+/* ============ 节点收纳：把节点放回场景（现场=仓库，画布=线索板） ============ */
+function storeNode(key, sid){
+  const n = G.nodes[key];
+  if (!n || n.isScene || n.stored) return false;
+  pushHistory();
+  n.stored = true; n.storedIn = sid; n.homeScene = sid; n.pinned = false;
+  closeBubble(); closePwPop();
+  log("已把「" + esc(n.label) + "」放回「" + esc(SCENES[sid].title || sid) + "」", "sys");
+  recomputeHidden(); layout(); render();
+  return true;
+}
+function storeAll(sid){
+  const keys = Object.values(G.nodes).filter(n =>
+    !n.isScene && !n.stored && !n.hidden && !n.pinned && n.homeScene === sid).map(n => n.key);
+  if (!keys.length){ log("「" + esc(SCENES[sid].title || sid) + "」没有可收回的节点", "warn"); return; }
+  pushHistory();
+  keys.forEach(k => { const n = G.nodes[k]; n.stored = true; n.storedIn = sid; });
+  log("已把 " + keys.length + " 个节点收回「" + esc(SCENES[sid].title || sid) + "」（钉住的保留在画布上）", "sys");
+  recomputeHidden(); layout(); render();
+}
+function unstoreScene(sid){
+  const sn = G.nodes["loc:" + sid];
+  let i = 0;
+  Object.values(G.nodes).forEach(n => {
+    if (!n.stored || n.storedIn !== sid) return;
+    n.stored = false; n.hidden = false; n.fresh = true;
+    if (sn){ n.x = sn.x + 60 + (i % 4) * 40; n.y = sn.y + 60 + Math.floor(i / 4) * 40; }
+    i++;
+  });
+  if (i) log("从「" + esc(SCENES[sid].title || sid) + "」取回 " + i + " 个节点", "sys");
+}
+
+/* ============ 证物袋：随身携带的收纳 dock（与场景收纳共用 stored 机制） ============ */
+let bagWinEl = null;
+function closeBagWin(){ if (bagWinEl){ bagWinEl.remove(); bagWinEl = null; } }
+function bagItems(){ return Object.values(G.nodes).filter(n => n.stored && n.storedIn === "BAG"); }
+
+function bagStore(key){
+  const n = G.nodes[key];
+  if (!n || n.isScene || n.stored) return false;
+  pushHistory();
+  n.bagFrom = n.homeScene || null;   /* 记住来源场景，用于清单标注 */
+  n.stored = true; n.storedIn = "BAG"; n.pinned = false;
+  log("已把「" + esc(n.label) + "」收入证物袋", "sys");
+  recomputeHidden(); layout(); render(); refreshBagWin();
+  return true;
+}
+function bagTake(key){
+  const n = G.nodes[key];
+  if (!n || n.storedIn !== "BAG") return false;
+  pushHistory();
+  n.stored = false; n.storedIn = null; n.hidden = false; n.fresh = true;
+  /* 取回到袋子附近的画布位置（屏幕坐标换算成世界坐标） */
+  const dock = document.getElementById("bag-dock");
+  const r = dock.getBoundingClientRect();
+  const wpt = toWorld(r.left + r.width / 2, r.top - 40);
+  n.x = wpt.x; n.y = wpt.y;
+  log("从证物袋取出「" + esc(n.label) + "」", "sys");
+  layout(); render(); refreshBagWin();
+  return true;
+}
+function toggleBagWin(){
+  if (bagWinEl){ closeBagWin(); return; }
+  const w = makeWindow("STORAGE // 证物袋", closeBagWin);
+  w.el.classList.add("bag-win");
+  stage.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  bagWinEl = w.el;
+  refreshBagWin();
+}
+function refreshBagWin(){
+  if (!bagWinEl) return;
+  const body = bagWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  const items = bagItems();
+  if (!items.length){
+    const d = document.createElement("div");
+    d.className = "bag-empty";
+    d.textContent = "（空）把画布上的节点拖到袋子上收纳";
+    body.appendChild(d);
+    return;
+  }
+  items.forEach(n => {
+    const d = document.createElement("div");
+    d.className = "bag-item";
+    const label = document.createElement("span"); label.textContent = n.label;
+    const src = document.createElement("span"); src.className = "src";
+    src.textContent = n.bagFrom && SCENES[n.bagFrom] ? "来自 " + SCENES[n.bagFrom].title : "";
+    d.appendChild(label); d.appendChild(src);
+    d.addEventListener("click", () => bagTake(n.key));
+    body.appendChild(d);
+  });
+}
+function updateBagBadge(){
+  const dock = document.getElementById("bag-dock");
+  if (!dock) return;
+  const cnt = bagItems().length;
+  let b = dock.querySelector(".badge");
+  if (cnt > 0){
+    if (!b){ b = document.createElement("span"); b.className = "badge cond"; dock.appendChild(b); }
+    b.textContent = cnt + " 件";
+  } else if (b) b.remove();
+}
+
+/* ============ 布局：力导向（拖拽不改变位置） ============ */
+let layoutTimer = null, edgeTimer = null;
+function layout(){
+  const list = Object.values(G.nodes).filter(n => !n.hidden && !n.stored);
+  if (!list.length) return;
+  const W = 2000, H = 1300;
+
+  const seed = n => {
+    if (n.x != null) return;
+    if (n.isScene){
+      const i = Object.keys(G.nodes).filter(k => G.nodes[k].isScene).indexOf(n.key);
+      n.x = 200 + (i % 5) * 380;
+      n.y = 160 + Math.floor(i / 5) * 300;
+    } else {
+      n.x = 700 + (Math.random() - .5) * 420;
+      n.y = 560 + (Math.random() - .5) * 420;
+    }
+  };
+  list.forEach(seed);
+
+  const R = n => n.isScene ? 80 : 68;
+  const free = n => !n.pinned;
+  for (let it = 0; it < 260; it++){
+    for (let i = 0; i < list.length; i++){
+      const a = list[i];
+      for (let j = i + 1; j < list.length; j++){
+        const b = list[j];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 1){ dx = Math.random() - .5; dy = Math.random() - .5; d2 = 1; }
+        const d = Math.sqrt(d2), ux = dx / d, uy = dy / d;
+        const rep = 30000 / d2;
+        if (free(a)){ a.x -= ux * rep; a.y -= uy * rep; }
+        if (free(b)){ b.x += ux * rep; b.y += uy * rep; }
+        const min = R(a) + R(b) + 14;
+        if (d < min){
+          const push = (min - d) / 2;
+          if (free(a)){ a.x -= ux * push; a.y -= uy * push; }
+          if (free(b)){ b.x += ux * push; b.y += uy * push; }
+        }
+      }
+    }
+    G.edges.forEach(e => {
+      const a = G.nodes[e.a], b = G.nodes[e.b];
+      if (!a || !b) return;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+      const rest = e.kind === "entity" ? 185 : e.kind === "move" ? 300 : 150;
+      const f = (d - rest) * 0.014;
+      if (free(a)){ a.x += ux * f; a.y += uy * f; }
+      if (free(b)){ b.x -= ux * f; b.y -= uy * f; }
+    });
+    list.forEach(n => { if (free(n)){ n.x += (W / 2 - n.x) * 0.0022; n.y += (H / 2 - n.y) * 0.0022; } });
+  }
+  list.forEach(n => {
+    if (n.pinned) return;                  /* 手动摆过的节点不再动 */
+    n.x = Math.max(60, Math.min(W - 220, n.x));
+    n.y = Math.max(50, Math.min(H - 120, n.y));
+  });
+}
+
+/* ============ 渲染 ============ */
+const NODE_W = { loc:152, item:130, char:130, clue:130 };
+const NODE_H = { loc:54, item:46, char:46, clue:46 };
+
+function render(){
+  nodeLayer.innerHTML = "";
+  svg.innerHTML = "";
+
+  Object.values(G.nodes).forEach(n => {
+    if (n.hidden || n.stored){ n.el = null; return; }
+    const el = document.createElement("div");
+    const kindCls = n.isScene ? "scene-node" : "ent-node ent-" + n.kind;
+    let cls = "node " + kindCls;
+    if (n.isScene && !G.explored.has(n.id)) cls += " unexplored";
+    if (n.isScene && G.collapsed.has(n.id)) cls += " collapsed";
+    if (n.isScene && isHub(n.id)) cls += " hub";
+    if (n.kind === "clue" && G.captured.has(n.id)) cls += " got";
+    if (n.fresh) cls += " pop";
+    if (n.lit) cls += " lit";
+    el.className = cls;
+    if (!isFinite(n.x)) n.x = 200 + Math.random() * 1600;
+    if (!isFinite(n.y)) n.y = 120 + Math.random() * 1000;
+    el.style.left = n.x + "px";
+    el.style.top  = n.y + "px";
+    el.dataset.key = n.key;
+
+    let sub = n.isScene ? (G.collapsed.has(n.id) ? "已折叠 · 双击展开" : (G.explored.has(n.id) ? "已探索" : "未探索 · 双击展开")) : kindName(n.kind);
+    if (n.kind === "clue" && G.captured.has(n.id)) sub = "线索 · 已捕获";
+    el.innerHTML = "<div class='n-title'>" + esc(n.label) + "</div><div class='n-sub'>" + esc(sub) + "</div>";
+
+    if (n.isScene && !G.explored.has(n.id) && condRoutes[n.id] && !inbound[n.id]){
+      const b = document.createElement("span"); b.className = "badge cond"; b.textContent = "条件进入"; el.appendChild(b);
+    } else if (n.isScene && !G.explored.has(n.id) && inbound[n.id] === 0 && !sceneLocs(n.id).length){
+      const b = document.createElement("span"); b.className = "badge warn"; b.textContent = "无文本入口"; el.appendChild(b);
+    }
+    if (n.fresh){
+      const b = document.createElement("span"); b.className = "badge new"; b.textContent = "新"; el.appendChild(b);
+    }
+    if (n.kind === "char"){
+      const unread = charTalkQueue(n).length - (G.talkProg[n.key] || 0);
+      if (unread > 0){ const b = document.createElement("span"); b.className = "badge talk"; b.textContent = "对话 " + unread; el.appendChild(b); }
+    }
+    if (n.isScene && G.explored.has(n.id) && !G.collapsed.has(n.id)){
+      const mb = document.createElement("span");
+      mb.className = "mini-btn";
+      mb.title = "把未钉住的内容物全部收回这个场景";
+      mb.textContent = "⤓";
+      mb.addEventListener("pointerdown", e => e.stopPropagation());
+      mb.addEventListener("click", e => { e.stopPropagation(); storeAll(n.id); });
+      el.appendChild(mb);
+    }
+    if (n.isScene && G.collapsed.has(n.id)){
+      const storedCnt = Object.values(G.nodes).filter(x => x.stored && x.storedIn === n.id).length;
+      if (storedCnt > 0){ const b = document.createElement("span"); b.className = "badge cond"; b.textContent = "存放 " + storedCnt; el.appendChild(b); }
+    }
+    if (n.kind !== "clue"){
+      const hasCap = capturableClues(n).some(id => !G.captured.has(id));
+      const cb = document.createElement("span");
+      cb.className = "mini-btn cap-btn" + (hasCap ? " has-cap" : "");
+      cb.title = "捕获隐藏的线索";
+      cb.textContent = "捕";
+      cb.addEventListener("pointerdown", e => e.stopPropagation());
+      cb.addEventListener("click", e => { e.stopPropagation(); attemptCapture(n.key); });
+      el.appendChild(cb);
+    }
+
+    attachInteractions(el, n);
+    nodeLayer.appendChild(el);
+    n.el = el;
+    n.fresh = false;
+  });
+
+  paintEdges();
+  clearInterval(edgeTimer);
+  let t0 = Date.now();
+  edgeTimer = setInterval(() => { paintEdges(); if (Date.now() - t0 > 420) clearInterval(edgeTimer); }, 40);
+  updateCrumbs();
+  updateTecBadge();
+  updateBagBadge();
+  /* 重建 DOM 后恢复选中态并重挂聚焦淡化 */
+  if (sel && G.nodes[sel] && G.nodes[sel].el) G.nodes[sel].el.classList.add("sel"); else sel = null;
+  applyFocus();
+}
+function paintEdges(){
+  svg.innerHTML = "";
+  const focusSel = (tgFocus.checked && sel && G.nodes[sel]) ? sel : null;
+  G.edges.forEach(e => {
+    const a = G.nodes[e.a], b = G.nodes[e.b];
+    if (!a || !b || !a.el || !b.el || a.hidden || b.hidden || a.stored || b.stored) return;
+    const A = center(a.el), B = center(b.el);
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2 - Math.min(70, Math.abs(B.x - A.x) * 0.16);
+    p.setAttribute("d", "M" + A.x + " " + A.y + " Q" + mx + " " + my + " " + B.x + " " + B.y);
+    p.setAttribute("fill", "none");
+    if (e.kind === "tried"){ p.setAttribute("stroke", "#b8b49e"); p.setAttribute("stroke-width", 1);
+      p.setAttribute("stroke-dasharray", "3 4"); p.setAttribute("opacity", .55); }
+    else if (e.kind === "move"){ p.setAttribute("stroke", "#2b2b26"); p.setAttribute("stroke-width", 1.6); }
+    else if (e.kind === "cond"){ p.setAttribute("stroke", "#2b2b26"); p.setAttribute("stroke-width", 1.6);
+      p.setAttribute("stroke-dasharray", "5 4"); }
+    else { p.setAttribute("stroke", "#8a8672"); p.setAttribute("stroke-width", 1.3); }
+    if (focusSel && e.a !== focusSel && e.b !== focusSel) p.setAttribute("opacity", .12);
+    svg.appendChild(p);
+  });
+  paintGlow();
+}
+function center(el){
+  return { x: parseFloat(el.style.left) + el.offsetWidth / 2,
+           y: parseFloat(el.style.top)  + el.offsetHeight / 2 };
+}
+function updateCrumbs(){
+  const total = Object.keys(G.nodes).length;
+  const visible = Object.values(G.nodes).filter(n => !n.hidden && !n.stored).length;
+  crumbs.innerHTML = "节点 <b>" + visible + "/" + total + "</b> · 已展开场景 <b>" +
+    G.explored.size + "/" + Object.keys(SCENES).length + "</b> · 已试组合 <b>" + G.tried.size +
+    "</b> · 捕获线索 <b>" + G.captured.size + "</b> · 结局 <b>" + G.endings.size + "/" + ENDINGS.length + "</b>";
+}
+
+/* ============ 节点交互 ============ */
+function attachInteractions(el, n){
+  let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0, ghost = null, overEl = null;
+
+  el.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    dragging = true; moved = false;
+    sx = e.clientX; sy = e.clientY;
+    ox = parseFloat(el.style.left) || 0;
+    oy = parseFloat(el.style.top)  || 0;
+    try { el.setPointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+
+  el.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+    moved = true;
+    el.classList.add("dragging");
+
+    /* 节点跟手移动 */
+    el.style.left = (ox + dx / view.k) + "px";
+    el.style.top  = (oy + dy / view.k) + "px";
+
+    if (!ghost){
+      ghost = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      ghost.setAttribute("stroke", "#2b2b26");
+      ghost.setAttribute("stroke-width", 2);
+      ghost.setAttribute("stroke-dasharray", "6 5");
+      ghost.setAttribute("fill", "none");
+      ghost.setAttribute("opacity", .85);
+      svg.appendChild(ghost);
+    }
+    const A = center(el);
+    const P = toWorld(e.clientX, e.clientY);
+    ghost.setAttribute("d", "M" + A.x + " " + A.y + " L" + P.x + " " + P.y);
+    paintEdges();
+
+    /* 命中测试不用 elementFromPoint，免得被正在拖的节点自己挡住 */
+    const hit = hitTest(e.clientX, e.clientY, el);
+    if (hit !== overEl){
+      if (overEl) overEl.classList.remove("over");
+      overEl = hit;
+      if (overEl) overEl.classList.add("over");
+    }
+
+    /* 桌面图标命中高亮（固定优先级 bag > tec > infer > goto） */
+    ["bag-dock","tec-dock","infer-icon","goto-icon"].forEach(id => {
+      const ic = document.getElementById(id);
+      if (!ic) return;
+      const r = ic.getBoundingClientRect();
+      ic.classList.toggle("over",
+        e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+    });
+    /* 逻辑阵列槽位命中高亮（拖线索且窗口打开时） */
+    if (inferWinEl && n.kind === "clue"){
+      inferWinEl.querySelectorAll(".mx-slot").forEach(s => {
+        const r = s.getBoundingClientRect();
+        s.classList.toggle("over",
+          e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+      });
+    }
+  });
+
+  el.addEventListener("pointerup", e => {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove("dragging");
+    if (ghost){ ghost.remove(); ghost = null; }
+    const target = overEl;
+    if (overEl) overEl.classList.remove("over");
+    overEl = null;
+
+    /* 桌面图标命中判定（固定优先级 bag > tec > infer > goto；任何路径清掉 over 高亮） */
+    let iconHit = null;
+    ["bag-dock","tec-dock","infer-icon","goto-icon"].forEach(id => {
+      const ic = document.getElementById(id);
+      if (!ic) return;
+      const r = ic.getBoundingClientRect();
+      const inside = moved && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      if (inside && !iconHit) iconHit = id;
+      ic.classList.remove("over");
+    });
+
+    if (!moved){ selectNode(n.key); return; }
+
+    if (iconHit){
+      /* 松手落在桌面图标上 → 对应功能，自己弹回原位 */
+      el.style.left = ox + "px";
+      el.style.top  = oy + "px";
+      paintEdges();
+      if (iconHit === "bag-dock") bagStore(n.key);
+      else if (iconHit === "tec-dock") tecConsult(n.key);
+      else if (iconHit === "infer-icon"){
+        if (n.kind === "clue") assignClue(n.key, (CLUES[n.id] || {}).type);
+        else toast("只有线索能进推演器", true);
+      } else if (iconHit === "goto-icon"){
+        if (n.isScene) gotoScene(n.id);
+        else toast("只有场景能进档案", true);
+      }
+      return;
+    }
+
+    /* 松手落在逻辑阵列的感官槽上 → 归槽，自己弹回原位 */
+    if (inferWinEl && n.kind === "clue"){
+      const slot = inferWinEl.querySelectorAll(".mx-slot").find(s => {
+        const r = s.getBoundingClientRect();
+        return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      });
+      inferWinEl.querySelectorAll(".mx-slot").forEach(s => s.classList.remove("over"));
+      if (slot){
+        el.style.left = ox + "px";
+        el.style.top  = oy + "px";
+        paintEdges();
+        assignClue(n.key, slot.dataset.sense);
+        return;
+      }
+    }
+
+    if (target && target.dataset.key){
+      /* 松手落在别的节点上 → 组合（落在折叠场景上 → 放回现场），自己被弹回原位 */
+      const tn = G.nodes[target.dataset.key];
+      el.style.left = ox + "px";
+      el.style.top  = oy + "px";
+      paintEdges();
+      if (tn && tn.isScene && G.collapsed.has(tn.id)){ storeNode(n.key, tn.id); return; }
+      attemptCombo(n.key, target.dataset.key);
+      return;
+    }
+    /* 松手落在空白处 → 就停在这里，并锁定，之后自动布局不再挪它 */
+    n.x = Math.max(60, Math.min(2000 - 220, parseFloat(el.style.left) || n.x));
+    n.y = Math.max(50, Math.min(1300 - 120, parseFloat(el.style.top)  || n.y));
+    n.pinned = true;
+    el.style.left = n.x + "px";
+    el.style.top  = n.y + "px";
+    paintEdges();
+    updateCrumbs();
+  });
+
+  el.addEventListener("dblclick", () => {
+    if (n.isScene){
+      if (G.collapsed.has(n.id) || G.explored.has(n.id)){ toggleCollapse(n.id); selectNode(n.key); return; }
+      revealScene(n.id); selectNode(n.key); return;
+    }
+    runPrimary(n);
+  });
+}
+
+/* 屏幕坐标命中测试：取「离光标最近」的那个节点，避免多节点重叠时选错 */
+function hitTest(cx, cy, excludeEl){
+  let best = null, bestD = Infinity;
+  Object.values(G.nodes).forEach(n => {
+    if (!n.el || n.el === excludeEl) return;
+    const r = n.el.getBoundingClientRect();
+    if (cx < r.left - 10 || cx > r.right + 10 || cy < r.top - 10 || cy > r.bottom + 10) return;
+    const d = Math.hypot(cx - (r.left + r.right) / 2, cy - (r.top + r.bottom) / 2);
+    if (d < bestD){ bestD = d; best = n.el; }
+  });
+  return best;
+}
+
+function toWorld(cx, cy){
+  const r = stage.getBoundingClientRect();
+  return { x: (cx - r.left - view.x) / view.k, y: (cy - r.top - view.y) / view.k };
+}
+function applyView(){
+  world.style.transform = "translate(" + view.x + "px," + view.y + "px) scale(" + view.k + ")";
+}
+
+/* 双击物品 / 线索的主行为 */
+function runPrimary(n){
+  if (n.kind === "clue"){
+    if (G.captured.has(n.id)){ log("线索「" + esc(n.label) + "」已经捕获过了", "warn"); return; }
+    pushHistory(); G.captured.add(n.id);
+    log("已捕获线索「" + esc(n.label) + "」", "cap");
+    render(); selectNode(n.key);
+    return;
+  }
+  if (n.kind === "char"){
+    const ch = CHARS[n.id] || {};
+    const queue = charTalkQueue(n);
+    const prog = G.talkProg[n.key] || 0;
+    if (!queue.length){ toast("<b>" + esc(ch.name || n.id) + "</b><br>（暂无对话文本）"); return; }
+    const line = queue[Math.min(prog, queue.length - 1)];
+    if (prog < queue.length){
+      pushHistory();
+      G.talkProg[n.key] = prog + 1;
+      gotClues(line);
+      log("<b>" + esc(ch.name || n.id) + "</b>：" + esc(plain(line)), "sys");
+    }
+    showBubble(n, "DIALOG // " + (ch.name || n.id), plain(line));
+    render();
+    selectNode(n.key);
+    return;
+  }
+  /* 物品：有命令就跑第一条，否则显示描述 */
+  const it = ITEMS[n.id] || {};
+  const cmds = it.commands || [];
+  if (!cmds.length){
+    toast("<b>" + esc(n.label) + "</b><br>" + esc(plain(it.desc || "（没有更多信息）")));
+    return;
+  }
+  runCommand(n, cmds[0]);
+}
+
+/* ============ 物品命令 ============ */
+function runCommand(n, cmd){
+  const it = ITEMS[n.id] || {};
+  const t = cmd.type;
+
+  if (t === "text"){
+    toast("<b>" + esc(n.label) + "</b><br>" + esc(plain(cmd.value || cmd.message || "")));
+    gotClues(plain(cmd.value || ""));
+    noteSeen(cmd.value || cmd.message || "");
+    log("「" + esc(n.label) + "」：" + esc(plain(cmd.value || "")), "sys");
+    if (LIGHT_SOURCES.indexOf(n.id) >= 0){
+      pushHistory();
+      n.lit = !n.lit;
+      log("「" + esc(n.label) + "」" + (n.lit ? "被点亮了，暖黄的光晕在画布上散开" : "熄灭了"), n.lit ? "act" : "sys");
+      render();
+    }
+    return;
+  }
+  if (t === "choice"){ spawnChoiceNodes(n, cmd); return; }
+  if (t === "password"){ openPasswordPop(n); return; }
+  if (t === "useItem"){
+    const need = cmd.requiredItem;
+    const needLabel = labelOf("item", need) || need;
+    const have = nodeByKey("item", need);
+    if (!have){
+      toast("<b>" + esc(n.label) + "</b><br>" + esc(cmd.failMessage || "缺少所需物品：" + needLabel), true);
+      log("「" + esc(n.label) + "」需要「" + esc(needLabel) + "」，但画布上还没有这个节点", "warn");
+      noteSeen(cmd.failMessage || "");
+      return;
+    }
+    pushHistory();
+    toast("<b>" + esc(cmd.label || "使用") + "</b><br>" + esc(plain(cmd.successMessage || "")));
+    log("「" + esc(n.label) + "」使用「" + esc(needLabel) + "」：" + esc(plain(cmd.successMessage || "")), "act");
+    gotClues(cmd.successMessage || "");
+    noteSeen(cmd.successMessage || "");
+    if (cmd.onSuccess) applyPayload(cmd.onSuccess, n.key);
+    if (tgConsume.checked && REUSABLE_TOOLS.indexOf(need) < 0){
+      deleteNode("item:" + need);
+      log("　［消耗 " + esc(needLabel) + "］", "sys");
+    }
+    layout(); render(); selectNode(n.key);
+    return;
+  }
+  if (t === "conditional"){
+    const conds = cmd.conditions || [];
+    const missing = conds.filter(c => !G.captured.has(c.clue));
+    if (missing.length){
+      const m = missing[0];
+      toast("<b>" + esc(n.label) + "</b><br>" + esc(m.failMessage || "条件不足"), true);
+      log("「" + esc(n.label) + "」条件不足，缺线索：" + esc(labelOf("clue", m.clue) || m.clue), "warn");
+      noteSeen(m.failMessage || "");
+      return;
+    }
+    pushHistory();
+    toast("<b>" + esc(cmd.label || "") + "</b><br>" + esc(plain(cmd.successMessage || "")));
+    log("「" + esc(n.label) + "」：" + esc(plain(cmd.successMessage || "")), "act");
+    noteSeen(cmd.successMessage || "");
+    if (cmd.onSuccess) applyPayload(cmd.onSuccess, n.key);
+    layout(); render(); selectNode(n.key);
+    return;
+  }
+  toast("<b>" + esc(n.label) + "</b><br>（暂不支持的命令类型：" + esc(t) + "）", true);
+}
+
+function applyPayload(payload, nearKey){
+  if (!payload) return;
+  if (payload.items) spawnItems(payload.items, nearKey);
+  if (payload.scene && SCENES[payload.scene]){
+    const sn = ensureNode("loc", payload.scene, { label: SCENES[payload.scene].title });
+    sn.fresh = true;
+  }
+  gotClues(payload.message || payload.text || "");
+  noteSeen(payload.message || payload.text || "");
+}
+function gotClues(text){
+  parseTags(text).forEach(t => {
+    if (t.kind === "clue" && CLUES[t.id]){
+      if (!nodeByKey("clue", t.id)){ const cn = ensureNode("clue", t.id, {}); cn.fresh = true; }
+      G.captured.add(t.id);
+    }
+  });
+}
+
+/* ============ 光源光晕 ============ */
+function paintGlow(){
+  const g = document.getElementById("glow");
+  if (!g) return;
+  const lamp = Object.values(G.nodes).filter(n => n.lit)[0];
+  if (!lamp || !lamp.el){ g.style.display = "none"; return; }
+  const c = center(lamp.el);
+  g.style.display = "block";
+  g.style.left = (c.x - 280) + "px";
+  g.style.top  = (c.y - 280) + "px";
+}
+
+/* ============ 节点上的密码弹窗 ============ */
+let pwPop = null, pwTarget = null;
+function closePwPop(){ if (pwPop){ pwPop.remove(); pwPop = null; pwTarget = null; } }
+function openPasswordPop(n){
+  closePwPop();
+  const cmd = (ITEMS[n.id].commands || []).find(c => c.type === "password");
+  if (!cmd) return;
+  const w = makeWindow("LOCK // " + n.label, closePwPop);
+  const pop = w.el;
+  pop.className = "pw-pop syswin";
+  const hint = document.createElement("div");
+  hint.className = "pw-title";
+  hint.textContent = (cmd.label || "输入密码") + "（四位数字）";
+  const row = document.createElement("div");
+  row.className = "pw-row";
+  const input = document.createElement("input");
+  input.id = "pw-in";
+  input.maxLength = 4;
+  input.placeholder = "····";
+  input.setAttribute("inputmode", "numeric");
+  const ok = document.createElement("button");
+  ok.className = "primary";
+  ok.id = "pw-ok";
+  ok.textContent = "确定";
+  row.appendChild(input); row.appendChild(ok);
+  w.body.appendChild(hint); w.body.appendChild(row);
+  pop.style.left = (n.x + NODE_W[n.kind] / 2 - 95) + "px";
+  pop.style.top  = (n.y + NODE_H[n.kind] + 10) + "px";
+  pop.addEventListener("pointerdown", e => e.stopPropagation());
+  makeFloatDraggable(pop, true);
+  world.appendChild(pop);
+  pwPop = pop; pwTarget = n.id;
+  ok.addEventListener("click", () => window.__pw(n.id));
+  input.addEventListener("keydown", e => { if (e.key === "Enter") window.__pw(n.id); });
+  if (input.focus) input.focus();
+  selectNode(n.key);
+}
+
+/* ============ 选项命令：把选项弹成画布上的节点 ============ */
+function spawnChoiceNodes(n, cmd){
+  const opts = cmd.options || [];
+  if (!opts.length) return;
+  pushHistory();
+  const added = [];
+  opts.forEach((o, i) => {
+    if (o.message){ log(esc(plain(o.message)), "sys"); noteSeen(o.message); }
+    const r = o.results || {};
+    if (r.scene && SCENES[r.scene]){
+      const existed = !!nodeByKey("loc", r.scene);
+      const sn = ensureNode("loc", r.scene, { label: SCENES[r.scene].title });
+      if (!existed){
+        sn.x = n.x + (i - (opts.length - 1) / 2) * 190;
+        sn.y = n.y + 110;
+        sn.fresh = true;
+        added.push("「" + sn.label + "」");
+      }
+      link(n.key, sn.key, "cond");
+    } else {
+      applyPayload(r, n.key);
+    }
+  });
+  toast("<b>" + esc(cmd.label || n.label) + "</b><br>" +
+    (added.length ? "弹出了 " + esc(added.join("、")) + "，双击它们继续探索" : "选项节点已经在画布上了，双击它们继续探索"));
+  log("「" + esc(n.label) + "」" + esc(cmd.label || "选项") + "：" + (added.length ? "出现 " + esc(added.join("、")) : "选项节点已在画布上"), "act");
+  layout(); render(); selectNode(n.key);
+}
+
+/* ============ 统一系统窗口：标题栏（拖动把手）+ × 关闭 + 内容区 ============ */
+function makeWindow(titleText, onClose){
+  const el = document.createElement("div");
+  el.className = "syswin";
+  const bar = document.createElement("div");
+  bar.className = "syswin-bar";
+  const rule1 = document.createElement("span");
+  rule1.className = "syswin-rule";
+  const title = document.createElement("span");
+  title.className = "syswin-title";
+  title.textContent = titleText;
+  const rule2 = document.createElement("span");
+  rule2.className = "syswin-rule";
+  const x = document.createElement("span");
+  x.className = "syswin-x";
+  x.textContent = "×";
+  x.title = "关闭";
+  x.addEventListener("pointerdown", e => { if (e) e.stopPropagation(); });
+  x.addEventListener("click", e => { if (e) e.stopPropagation(); onClose(); });
+  bar.appendChild(rule1); bar.appendChild(title); bar.appendChild(rule2); bar.appendChild(x);
+  const body = document.createElement("div");
+  body.className = "syswin-body";
+  el.appendChild(bar); el.appendChild(body);
+  return { el, bar, body };
+}
+
+/* ============ 浮层通用拖动（元素自身 pointer 捕获模式，可指定把手） ============ */
+function makeFloatDraggable(el, inWorld, handle){
+  const h = handle || el;
+  let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  h.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    /* 交互子元素（按钮/输入框/清单项/× 关闭钮）不启动拖动——否则 setPointerCapture 会吞掉它们的 click */
+    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.syswin-x")) return;
+    /* CSS 定位的浮窗（right/bottom/margin 居中），首次拖动时换算成 left/top，并清掉 margin 防止跳位 */
+    if (el.style.left === "" || el.style.left == null){
+      const r = el.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+      el.style.left = (r.left - sr.left) + "px"; el.style.top = (r.top - sr.top) + "px";
+      el.style.right = "auto"; el.style.bottom = "auto"; el.style.margin = "0";
+    }
+    dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
+    ox = parseFloat(el.style.left) || 0; oy = parseFloat(el.style.top) || 0;
+    try { el.setPointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+  h.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const k = inWorld ? view.k : 1;
+    if (!moved && Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) < 5) return;
+    moved = true; el._dragged = true;
+    /* 弹窗的 pop 缩放动画未结束时拖动会让光标对不上，开始拖动即定格到最终形态 */
+    if (el.style.animation !== "none") el.style.animation = "none";
+    el.style.left = (ox + (e.clientX - sx) / k) + "px";
+    el.style.top  = (oy + (e.clientY - sy) / k) + "px";
+  });
+  h.addEventListener("pointerup", () => { dragging = false; });
+}
+
+/* ============ 角色对话队列 + 锚定气泡 ============ */
+function charTalkQueue(n){
+  const ch = CHARS[n.id] || {};
+  const norm = arr => (arr || []).map(o => typeof o === "string" ? o : (o && o.text) || "").filter(Boolean);
+  const base = norm((ch.talkQueue && ch.talkQueue.length) ? ch.talkQueue :
+                    ((ch.defaultTalks && ch.defaultTalks.length) ? ch.defaultTalks : ch.lines));
+  const scene = norm((ch.sceneTalks || {})[n.homeScene]);
+  return base.concat(scene);
+}
+let bubbleEl = null;
+function closeBubble(){ if (bubbleEl){ bubbleEl.remove(); bubbleEl = null; } }
+function showBubble(n, titleText, text){
+  closeBubble();
+  const w = makeWindow(titleText, closeBubble);
+  const b = w.el;
+  b.className = "bubble syswin";
+  w.body.textContent = text;
+  makeFloatDraggable(b, true);
+  world.appendChild(b);
+  const bubTop = clampFloatY(n.y - b.offsetHeight - 12, b.offsetHeight);
+  b.style.top = bubTop + "px";
+  b.style.left = avoidHint(clampFloatX(n.x + NODE_W[n.kind] / 2 - b.offsetWidth / 2, b.offsetWidth), bubTop) + "px";
+  bubbleEl = b;
+}
+
+/* 浮窗初始位置避开左上角操作提示区 */
+function avoidHint(x, y){
+  const hint = document.getElementById("hint");
+  if (!hint) return x;
+  const hr = hint.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+  const hintRight = (hr.right - sr.left - view.x) / view.k;
+  const hintBottom = (hr.bottom - sr.top - view.y) / view.k;
+  if (y < hintBottom && x < hintRight) return hintRight + 12;
+  return x;
+}
+
+/* 浮窗初始位置收拢到当前可视范围内（世界坐标），避免标题栏被裁掉 */
+function clampFloatX(x, w){
+  const stageW = stage.getBoundingClientRect().width || 1200;
+  const minX = (8 - view.x) / view.k, maxX = (stageW - 8 - view.x) / view.k - (w || 200);
+  return Math.max(minX, Math.min(Math.max(minX, maxX), x));
+}
+function clampFloatY(y, h){
+  const stageH = stage.getBoundingClientRect().height || 700;
+  const minY = (8 - view.y) / view.k, maxY = (stageH - 8 - view.y) / view.k - (h || 100);
+  return Math.max(minY, Math.min(Math.max(minY, maxY), y));
+}
+
+/* ============ 场景首次展开叙事卡 ============ */
+function narrText(html){
+  return String(html || "")
+    .replace(/\[(item|loc|char|clue):(.+?)\]/g, (m, k, id) => labelOf(k, id) || id)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "").trim();
+}
+let narrEl = null;
+function closeNarr(){ if (narrEl){ narrEl.remove(); narrEl = null; } memoryPlay = null; }
+function showNarrCard(n, s){
+  closeNarr();
+  const text = narrText(s.content || s.desc || "");
+  if (!text) return;
+  const w = makeWindow("SCENE_FEED // " + (s.title || n.id), closeNarr);
+  const c = w.el;
+  c.className = "narr-card syswin";
+  w.body.textContent = text;
+  makeFloatDraggable(c, true);
+  world.appendChild(c);
+  const narrTop = clampFloatY(n.y - c.offsetHeight - 14, c.offsetHeight);
+  c.style.top = narrTop + "px";
+  c.style.left = avoidHint(clampFloatX(n.x + NODE_W[n.kind] / 2 - c.offsetWidth / 2, c.offsetWidth), narrTop) + "px";
+  narrEl = c;
+  /* 全文只留在卡片里；日志只记一行事件，不再镜像正文（去重） */
+  log("〔场景〕<b>" + esc(s.title || "") + "</b>：叙事卡已放映", "sys");
+}
+
+/* 重看场景叙事（详情窗按钮与测试钩子共用同一入口） */
+function renarrScene(sid){
+  const node = G.nodes["loc:" + sid];
+  if (!node) return;
+  const s = SCENES[sid] || {};
+  if (SCENE_MEMORY.indexOf(sid) >= 0) showMemoryCard(node, s); else showNarrCard(node, s);
+}
+
+/* ============ TEC 对话窗口（桌面图标应用） ============ */
+const tecHistory = [];   /* 页面会话级，不进 G/快照 */
+let tecWinEl = null;
+function closeTecWin(){ if (tecWinEl){ tecWinEl.remove(); tecWinEl = null; } }
+function tecSay(text){
+  tecHistory.push(text);
+  log("<b>TEC</b>：" + esc(text), "sys");
+  if (tecWinEl){
+    const lines = tecWinEl.querySelector(".tec-lines");
+    if (lines){
+      const d = document.createElement("div");
+      d.className = "tec-line";
+      d.textContent = text;
+      lines.appendChild(d);
+    }
+  }
+}
+function toggleTecWin(){
+  if (tecWinEl){ closeTecWin(); return; }
+  const w = makeWindow("TEC // 对话", closeTecWin);
+  w.el.classList.add("tec-win");
+  const lines = document.createElement("div");
+  lines.className = "tec-lines";
+  tecHistory.forEach(t => {
+    const d = document.createElement("div");
+    d.className = "tec-line"; d.textContent = t;
+    lines.appendChild(d);
+  });
+  w.body.appendChild(lines);
+  const tb = document.createElement("button");
+  tb.id = "tec-talk-btn"; tb.className = "primary"; tb.textContent = "[ 交谈 ]";
+  tb.addEventListener("click", () => tecTalk());
+  w.body.appendChild(tb);
+  const hint = document.createElement("div");
+  hint.className = "tec-hint";
+  hint.textContent = "拖节点到 TEC 图标上让我分析";
+  w.body.appendChild(hint);
+  stage.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  tecWinEl = w.el;
+}
+
+function tecTalk(){
+  const tec = CHARS["CHARS_TEC"] || {};
+  const ctx = G.lastScene;
+  const st = (tec.sceneTalks || {})[ctx] || [];
+  const prog = G.tecProg[ctx] || 0;
+  let line;
+  if (prog < st.length){
+    pushHistory();
+    G.tecProg[ctx] = prog + 1;
+    line = plain(st[prog].text || "");
+    gotClues(st[prog].text || "");
+  } else {
+    const def = (tec.defaultTalks && tec.defaultTalks.length) ? tec.defaultTalks : (tec.talkQueue || []);
+    if (!def.length){ if (!tecWinEl) toggleTecWin(); tecSay("（暂无更多提示）"); return; }
+    const idx = G.tecProg._def || 0;
+    G.tecProg._def = idx + 1;
+    line = plain(def[idx % def.length].text || "");
+  }
+  if (!tecWinEl) toggleTecWin();
+  tecSay(line);
+  updateTecBadge();
+}
+
+/* 拖节点到 TEC 图标：TEC 对该节点的反应 */
+function tecConsult(toolKey){
+  const tool = G.nodes[toolKey];
+  if (!tool) return false;
+  const hit = lookupReaction("char", "CHARS_TEC", tool.id);
+  pushHistory();
+  if (!tecWinEl) toggleTecWin();
+  if (hit){
+    const text = plain(hit.react.text || hit.react.message || "");
+    tecSay("（分析 " + tool.label + "）" + text);
+    gotClues(hit.react.text || hit.react.message || "");
+    noteSeen(hit.react.text || hit.react.message || "");
+  } else {
+    tecSay("关于「" + plain(tool.label) + "」，我暂时没有更多线索。试试把它和别的节点组合。");
+    log("TEC 对「" + esc(tool.label) + "」没有特别的反应", "warn");
+    G.tried.add(toolKey + ">tec-dock");
+  }
+  return !!hit;
+}
+
+function updateTecBadge(){
+  const dock = document.getElementById("tec-dock");
+  if (!dock) return;
+  const tec = CHARS["CHARS_TEC"] || {};
+  let unread = 0;
+  G.explored.forEach(sid => {
+    const st = (tec.sceneTalks || {})[sid];
+    if (st) unread += Math.max(0, st.length - (G.tecProg[sid] || 0));
+  });
+  let b = dock.querySelector(".badge");
+  if (unread > 0){
+    if (!b){ b = document.createElement("span"); b.className = "badge talk"; dock.appendChild(b); }
+    b.textContent = "提示 " + unread;
+    dock.classList.add("pulse");
+  } else {
+    if (b) b.remove();
+    dock.classList.remove("pulse");
+  }
+}
+
+/* ============ 选中聚焦（dim 非邻居） ============ */
+function applyFocus(){
+  const on = tgFocus.checked && sel && G.nodes[sel];
+  const keep = {};
+  if (on){
+    keep[sel] = 1;
+    G.edges.forEach(e => {
+      if (e.a === sel) keep[e.b] = 1;
+      if (e.b === sel) keep[e.a] = 1;
+    });
+  }
+  G._dimKeys = [];
+  Object.values(G.nodes).forEach(n => {
+    if (!n.el) return;
+    const dim = on && !keep[n.key];
+    n.el.classList.toggle("dim", dim);
+    if (dim) G._dimKeys.push(n.key);
+  });
+  paintEdges();
+}
+function clearSelection(){
+  sel = null;
+  nodeLayer.querySelectorAll(".node.sel").forEach(e => e.classList.remove("sel"));
+  document.querySelectorAll(".desk-icon.sel").forEach(x => x.classList.remove("sel"));
+  detailBody.innerHTML = "<div class='empty'>点选任意节点查看信息。</div>";
+  setDetailWin(false);
+  applyFocus();
+}
+
+/* ============ GOTO // 前往：听说过的场景索引 ============ */
+/* seenTexts 不进 snapshot：已经"听说过"的知识不随撤销丢失 */
+function noteSeen(text){
+  if (!text) return;
+  G.seenTexts.push(String(text));
+  if (G.seenTexts.length > 200) G.seenTexts.shift();
+}
+function heardScenes(){
+  const known = new Set(G.explored);
+  Object.keys(G.nodes).forEach(k => { if (k.startsWith("loc:")) known.add(k.slice(4)); });
+  G.explored.forEach(sid => sceneLocs(sid).forEach(t => known.add(t)));
+  G.seenTexts.forEach(txt => {
+    parseTags(txt).forEach(t => { if (t.kind === "loc" && SCENES[t.id]) known.add(t.id); });
+    for (const id in SCENES){
+      const t = SCENES[id].title;
+      if (t && t.length >= 2 && txt.indexOf(t) >= 0) known.add(id);
+    }
+  });
+  return [...known].filter(id => SCENES[id]);
+}
+function gotoScene(sid){
+  const isNew = !nodeByKey("loc", sid);
+  if (isNew) pushHistory();
+  const sn = ensureNode("loc", sid, { label: SCENES[sid].title });
+  if (isNew){ sn.fresh = true; layout(); }
+  render();
+  const r = stage.getBoundingClientRect();
+  view.x = r.width / 2 - (sn.x + 76) * view.k;
+  view.y = r.height / 2 - (sn.y + 27) * view.k;
+  applyView();
+  selectNode(sn.key);
+  log("前往「" + esc(SCENES[sid].title || sid) + "」", "act");
+}
+let gotoWinEl = null;
+function closeGotoWin(){ if (gotoWinEl){ gotoWinEl.remove(); gotoWinEl = null; } }
+function toggleGotoWin(){
+  if (gotoWinEl){ closeGotoWin(); return; }
+  const w = makeWindow("ARCHIVE // 档案", closeGotoWin);
+  w.el.classList.add("goto-win");
+  stage.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  gotoWinEl = w.el;
+  refreshGotoWin();
+}
+function refreshGotoWin(){
+  if (!gotoWinEl) return;
+  const body = gotoWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  const list = heardScenes();
+  if (!list.length){
+    const d = document.createElement("div");
+    d.className = "bag-empty";
+    d.textContent = "（还没有听说任何场景）";
+    body.appendChild(d);
+    return;
+  }
+  list.forEach(sid => {
+    const d = document.createElement("div");
+    d.className = "goto-item";
+    const label = document.createElement("span"); label.textContent = SCENES[sid].title || sid;
+    const st = document.createElement("span"); st.className = "st";
+    st.textContent = (G.explored.has(sid) ? "已展开" : "未展开") + " · " + (nodeByKey("loc", sid) ? "在画布" : "未在画布");
+    d.appendChild(label); d.appendChild(st);
+    d.addEventListener("click", () => { gotoScene(sid); closeGotoWin(); });
+    body.appendChild(d);
+  });
+}
+
+/* ============ INFERENCE_MATRIX // 逻辑阵列 ============ */
+let inferWinEl = null;
+function closeInferWin(){ if (inferWinEl){ inferWinEl.remove(); inferWinEl = null; } }
+function toggleInferWin(){
+  if (inferWinEl){ closeInferWin(); return; }
+  const w = makeWindow("INFERENCE // 推演器", closeInferWin);
+  w.el.classList.add("infer-win");
+  stage.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  inferWinEl = w.el;
+  refreshInferWin();
+}
+function refreshInferWin(){
+  if (!inferWinEl) return;
+  const body = inferWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  Object.keys(SENSES).forEach(sense => {
+    const slot = document.createElement("div");
+    slot.className = "mx-slot";
+    slot.dataset.sense = sense;
+    const head = document.createElement("div");
+    head.className = "mx-sense";
+    head.textContent = SENSES[sense];
+    slot.appendChild(head);
+    G.matrix[sense].forEach(cid => {
+      const chip = document.createElement("div");
+      chip.className = "mx-clue";
+      const lb = document.createElement("span"); lb.textContent = (CLUES[cid] || {}).label || cid;
+      const rx = document.createElement("span"); rx.className = "mx-x"; rx.textContent = "×";
+      rx.addEventListener("click", () => {
+        pushHistory();
+        G.matrix[sense] = G.matrix[sense].filter(x => x !== cid);
+        render(); refreshInferWin();
+      });
+      chip.appendChild(lb); chip.appendChild(rx);
+      slot.appendChild(chip);
+    });
+    body.appendChild(slot);
+  });
+  const inMatrix = id => Object.keys(G.matrix).some(s => G.matrix[s].indexOf(id) >= 0);
+  ENDINGS.forEach(e => {
+    const d = document.createElement("div");
+    d.className = "mx-ending";
+    const matched = (e.recipe || []).filter(inMatrix).length;
+    const name = e.isTrueCapture && !G.endings.has(e.id) ? "真名捕获：？？？" : e.name;
+    d.textContent = name + "  " + matched + "/" + (e.recipe || []).length;
+    body.appendChild(d);
+  });
+  const btn = document.createElement("button");
+  btn.className = "primary mx-sync";
+  btn.textContent = "[ SYNC_MATRIX_INFERENCE ]";
+  btn.addEventListener("click", executeInference);
+  body.appendChild(btn);
+}
+function assignClue(clueKey, sense){
+  const n = G.nodes[clueKey];
+  if (!n || n.kind !== "clue") return false;
+  const c = CLUES[n.id];
+  if (!c || c.type !== sense){ toast("「" + esc(n.label) + "」的感官类型不是" + SENSES[sense], true); return false; }
+  if (G.matrix[sense].indexOf(n.id) >= 0) return false;
+  pushHistory();
+  G.matrix[sense].push(n.id);
+  log("「" + esc(n.label) + "」归入" + SENSES[sense] + "槽位", "sys");
+  render(); refreshInferWin();
+  return true;
+}
+function executeInference(){
+  const inMatrix = new Set();
+  Object.keys(G.matrix).forEach(s => G.matrix[s].forEach(id => inMatrix.add(id)));
+  const hit = ENDINGS.find(e => {
+    const r = e.recipe || [];
+    return r.length === inMatrix.size && r.every(id => inMatrix.has(id));
+  });
+  if (hit){ refreshInferWin(); triggerEnding(hit); }
+  else { toast("配方不匹配，再想想", true); log("推演失败：当前阵列不匹配任何结局配方", "warn"); }
+}
+
+/* ============ 结局演出（步进状态机：setTimeout 自动推进 / 点击跳过 / 钩子手动推进） ============ */
+let endingState = null;
+function triggerEnding(ending){
+  G.endings.add(ending.id);
+  log("<b>结局达成：" + esc(ending.name) + "</b>", "cap");
+  endingState = { ending, step: 0, stages: buildStages(ending) };
+  playEndingStage();
+}
+function buildStages(e){
+  const st = [];
+  (e.lines || []).forEach(l => st.push({ html: esc(l.text), delay: l.delay || 1200 }));
+  if (e.isTrueCapture && e.truename) st.push({ html: "<div class='truename'>真名已识别<br>『" + esc(e.truename) + "』</div>", delay: 2000 });
+  st.push({ html: esc(e.message || ""), delay: 1600 });
+  st.push({ html: "<div style='text-align:center'><span class='ebtn'>" + (e.isTrueCapture ? "确认捕获" : "收下这份记录") + "</span></div>", final: true });
+  return st;
+}
+function playEndingStage(){
+  const st = endingState; if (!st) return;
+  const overlay = document.getElementById("ending-overlay");
+  if (st.step >= st.stages.length){ closeEnding(); return; }
+  const stage = st.stages[st.step];
+  const eol = overlay.querySelector(".eol") || (function(){ const d = document.createElement("div"); d.className = "eol"; overlay.appendChild(d); return d; })();
+  const div = document.createElement("div");
+  div.innerHTML = stage.html;
+  eol.appendChild(div);
+  overlay.style.display = "block";
+  st.step++;
+  if (!stage.final) st.timer = setTimeout(playEndingStage, stage.delay);
+}
+function closeEnding(){
+  const overlay = document.getElementById("ending-overlay");
+  overlay.style.display = "none";
+  overlay.innerHTML = "";
+  endingState = null;
+  updateCrumbs();
+}
+
+/* ============ 记忆场景放映卡（A-001 日期闪回） ============ */
+let memoryPlay = null;
+function showMemoryCard(n, s){
+  closeNarr();
+  const w = makeWindow("MEMORY // " + (s.title || n.id), closeNarr);
+  const c = w.el;
+  c.className = "narr-card memory syswin";
+  makeFloatDraggable(c, true, w.bar);
+  world.appendChild(c);
+  c.style.left = (n.x + NODE_W[n.kind] / 2 - c.offsetWidth / 2) + "px";
+  c.style.top  = (n.y - c.offsetHeight - 14) + "px";
+  narrEl = c;
+  const lines = narrText(s.content || s.desc || "").split("\n").map(t => t.trim()).filter(Boolean);
+  sceneTags(n.id).forEach(t => {
+    if (t.kind !== "char") return;
+    const ch = CHARS[t.id];
+    const st = ch && (ch.sceneTalks || {})[n.id];
+    (st || []).forEach(l => lines.push("——" + (ch.name || t.id) + "：" + plain(l.text || "")));
+  });
+  log("<b>" + esc(s.title || "") + "</b>（记忆放映）", "sys");
+  memoryPlay = { el: c, body: w.body, lines: lines, idx: 0 };
+  playMemoryLine();
+}
+function playMemoryLine(){
+  const mp = memoryPlay;
+  if (!mp || !narrEl || mp.el !== narrEl){ memoryPlay = null; return; }
+  if (mp.idx >= mp.lines.length){ memoryPlay = null; return; }
+  const d = document.createElement("div");
+  d.textContent = mp.lines[mp.idx];
+  d.className = mp.lines[mp.idx].startsWith("——") ? "mem-line talk" : "mem-line";
+  mp.body.appendChild(d);
+  mp.idx++;
+  if (mp.idx < mp.lines.length) mp.timer = setTimeout(playMemoryLine, 700);
+}
+
+/* ============ 详情面板 ============ */
+function selectNode(key){
+  const n = G.nodes[key];
+  if (!n) { detailBody.innerHTML = "<div class='empty'>节点已不存在。</div>"; return; }
+  nodeLayer.querySelectorAll(".node.sel").forEach(e => e.classList.remove("sel"));
+  if (n.el) n.el.classList.add("sel");
+  sel = key;
+  if (!detailWinOpen) setDetailWin(true);   /* 选中节点时自动弹出详情窗 */
+
+  let html = "<div class='dt'>" + esc(n.label) + "</div>";
+  html += "<div class='dmeta'>" + (n.isScene ? "场景" : kindName(n.kind)) + " · " + n.key + "</div>";
+
+  if (n.isScene){
+    const s = SCENES[n.id] || {};
+    const ins = Object.keys(SCENES).filter(x => sceneLocs(x).indexOf(n.id) >= 0).map(x => SCENES[x].title);
+    html += "<div class='drow'>文本入口：" + (ins.length ? esc(ins.join("、")) : "<span style='color:#2b2b26'>无</span>") + "</div>";
+    html += "<div class='drow'>出口：" + (sceneLocs(n.id).length ? esc(sceneLocs(n.id).map(x => SCENES[x].title).join("、")) : "无") + "</div>";
+    html += "<div class='drow'>状态：" + (G.explored.has(n.id) ? "已展开" : "未展开") + "</div>";
+    const storedLabels = Object.values(G.nodes).filter(x => x.stored && x.storedIn === n.id).map(x => x.label);
+    html += "<div class='drow'>现场存放：" + (storedLabels.length ? esc(storedLabels.join("、")) + "（展开场景取回）" : "无") + "</div>";
+    /* 正文只在叙事卡里出现一次；详情窗只给结构信息 + 回看入口（去重） */
+    if (G.explored.has(n.id)) html += "<div class='drow'><button id='dt-renarr'>[ 重看场景叙事 ]</button></div>";
+    detailBody.innerHTML = html;
+    const rb = document.getElementById("dt-renarr");
+    if (rb) rb.addEventListener("click", () => renarrScene(n.id));
+    applyFocus();
+    return;
+  }
+
+  if (n.kind === "clue"){
+    const c = CLUES[n.id] || {};
+    html += "<div class='ddesc'>" + esc(plain(c.desc || "（无描述）")) + "</div>";
+    html += "<div class='drow'>感官类型：" + (SENSES[c.type] || c.type || "未知") + "</div>";
+    html += "<div class='drow'>状态：" + (G.captured.has(n.id) ? "已捕获" : "未捕获") + "</div>";
+    detailBody.innerHTML = html;
+    applyFocus();
+    return;
+  }
+  if (n.kind === "char"){
+    const c = CHARS[n.id] || {};
+    html += "<div class='ddesc'>" + esc(plain(c.desc || "（无描述）")) + "</div>";
+    html += "<div class='drow'>对话进度：" + (G.talkProg[n.key] || 0) + "/" + charTalkQueue(n).length + "</div>";
+    const seen = new Set();
+    ["presentReactions","itemReactions","reactions"].forEach(f => Object.keys(c[f] || {}).forEach(k => seen.add(k)));
+    if (seen.size){
+      const names = [...seen].map(k => labelOf("item", k) || labelOf("clue", k) || k);
+      html += "<div class='drow'>对这些东西有反应：" + esc(names.join("、")) + "</div>";
+    }
+    detailBody.innerHTML = html;
+    applyFocus();
+    return;
+  }
+
+  /* 物品 */
+  const it = ITEMS[n.id] || {};
+  /* 无命令的物品：描述已由「双击 → 提示条」呈现，详情窗不再复读；
+     有命令的物品：双击跑的是命令，描述没有别的出口，保留在此（去重但不丢内容） */
+  if ((it.commands || []).length) html += "<div class='ddesc'>" + esc(plain(it.desc || "（无描述）")) + "</div>";
+  if (n.homeScene && SCENES[n.homeScene]) html += "<div class='drow'>来源：" + esc(SCENES[n.homeScene].title) + "</div>";
+  const outs = [];
+  for (const f in (it.presentReactions || {})) outs.push({ tool:f, r:it.presentReactions[f] });
+  if (outs.length){
+    html += "<div class='drow'>与这些东西存在反应：" +
+      esc(outs.map(o => labelOf("item", o.tool) || labelOf("clue", o.tool) || o.tool).join("、")) + "</div>";
+  }
+  const cond = condRoutes[n.id];
+  if (cond) html += "<div class='drow'>参与条件跳转</div>";
+  detailBody.innerHTML = html;
+  applyFocus();
+}
+
+window.__reveal = function(sid){ revealScene(sid); selectNode("loc:" + sid); };
+window.__cmd = function(id, i){ const n = nodeByKey("item", id); if (n) runCommand(n, (ITEMS[id].commands || [])[i]); };
+window.__choice = function(id, ci, oi){
+  const n = nodeByKey("item", id);
+  const cmd = (ITEMS[id].commands || [])[ci];
+  const opt = (cmd.options || [])[oi];
+  if (!n || !opt) return;
+  pushHistory();
+  if (opt.message){ log(esc(plain(opt.message)), "sys"); noteSeen(opt.message); }
+  const r = opt.results || {};
+  if (r.scene && SCENES[r.scene]){
+    const isNew = !nodeByKey("loc", r.scene);
+    const sn = ensureNode("loc", r.scene, { label: SCENES[r.scene].title });
+    sn.fresh = true;
+    link(n.key, sn.key, "cond");
+    revealScene(r.scene);
+    toast("<b>" + esc(opt.label) + "</b><br>展开场景「" + esc(sn.label) + "」", false);
+    layout(); render();
+    selectNode(sn.key);
+    return;
+  }
+  applyPayload(r, n.key);
+  layout(); render(); selectNode(n.key);
+};
+window.__pw = function(id){
+  const n = nodeByKey("item", id);
+  const cmd = (ITEMS[id].commands || []).find(c => c.type === "password");
+  const input = document.getElementById("pw-in");
+  if (!n || !cmd) return;
+  const v = (input && input.value || "").trim();
+  if (v !== String(cmd.value)){
+    toast("<b>" + esc(n.label) + "</b><br>密码不对。", true);
+    log("「" + esc(n.label) + "」密码 " + esc(v || "(空)") + " 不正确", "warn");
+    if (pwPop){ pwPop.classList.remove("shake"); void pwPop.offsetWidth; pwPop.classList.add("shake"); }
+    return;
+  }
+  pushHistory();
+  closePwPop();
+  const os = cmd.onSuccess || {};
+  toast("<b>" + esc(cmd.label) + "</b><br>" + esc(plain(os.message || "打开了。")));
+  log("「" + esc(n.label) + "」已打开：" + esc(plain(os.message || "")), "act");
+  noteSeen(os.message || "");
+  if (os.items){
+    spawnItems(os.items, n.key);
+    log("　［获得 " + esc(os.items.map(i => labelOf("item", i) || i).join("、")) + "］", "sys");
+  }
+  gotClues(os.message || "");
+  if (tgConsume.checked){ deleteNode(n.key); }
+  layout(); render();
+  if (G.nodes[n.key]) selectNode(n.key); else updateCrumbs();
+};
+
+/* ============ 画布平移 / 缩放 ============ */
+(function(){
+  let panning = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  stage.addEventListener("pointerdown", e => {
+    /* 窗口/浮层/图标上不触发平移与清除选中（操作不穿透） */
+    if (e.target.closest(".node") || e.target.closest(".syswin, #toast, #verdict, .desk-icon")) return;
+    /* 点空白不再收浮窗（文本框用 × 关闭），只清除选中/聚焦 */
+    clearSelection();
+    panning = true; sx = e.clientX; sy = e.clientY; ox = view.x; oy = view.y;
+    stage.classList.add("grabbing");
+  });
+  stage.addEventListener("pointermove", e => {
+    if (!panning) return;
+    view.x = ox + (e.clientX - sx); view.y = oy + (e.clientY - sy); applyView();
+  });
+  window.addEventListener("pointerup", () => { panning = false; stage.classList.remove("grabbing"); });
+  stage.addEventListener("wheel", e => {
+    /* 光标在窗口/浮层上时滚轮交给窗口自己的滚动条，不触发画布缩放 */
+    const t = e.target;
+    if (t && t.closest && t.closest(".syswin, #toast, #verdict")) return;
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const k2 = Math.max(.35, Math.min(1.8, view.k * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+    view.x = mx - (mx - view.x) * (k2 / view.k);
+    view.y = my - (my - view.y) * (k2 / view.k);
+    view.k = k2; applyView();
+  }, { passive: false });
+})();
+
+function fit(){
+  const keys = Object.keys(G.nodes).filter(k => !G.nodes[k].hidden && !G.nodes[k].stored);
+  if (!keys.length) return;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  keys.forEach(k => {
+    const n = G.nodes[k];
+    x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+    x1 = Math.max(x1, n.x + NODE_W[n.kind]); y1 = Math.max(y1, n.y + NODE_H[n.kind]);
+  });
+  const r = stage.getBoundingClientRect();
+  const pad = 60;
+  const k = Math.max(.35, Math.min(1.3, Math.min((r.width - pad * 2) / (x1 - x0), (r.height - pad * 2) / (y1 - y0))));
+  view.k = k;
+  view.x = (r.width - (x1 - x0) * k) / 2 - x0 * k;
+  view.y = (r.height - (y1 - y0) * k) / 2 - y0 * k;
+  applyView();
+}
+
+/* ============ 桌面图标：单击选中 / 拖动移动 / 双击打开 / 拖节点直达功能 ============ */
+function openApp(app){
+  if (app === "infer") toggleInferWin();
+  else if (app === "goto") toggleGotoWin();
+  else if (app === "bag") toggleBagWin();
+  else if (app === "tec") toggleTecWin();
+  else if (app === "log") toggleLogWin();
+}
+function selectIcon(el){
+  document.querySelectorAll(".desk-icon.sel").forEach(x => x.classList.remove("sel"));
+  el.classList.add("sel");
+}
+function attachIcon(el, app){
+  app = app || el.dataset.app;
+  let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  el.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    dragging = true; moved = false;
+    sx = e.clientX; sy = e.clientY;
+    ox = parseFloat(el.style.left) || 0; oy = parseFloat(el.style.top) || 0;
+    try { el.setPointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+  el.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    if (!moved && Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) < 5) return;
+    moved = true;
+    const r = stage.getBoundingClientRect();
+    el.style.left = Math.max(0, Math.min((r.width || 1200) - 64, ox + e.clientX - sx)) + "px";
+    el.style.top  = Math.max(0, Math.min((r.height || 800) - 64, oy + e.clientY - sy)) + "px";
+  });
+  el.addEventListener("pointerup", e => {
+    if (!dragging) return;
+    dragging = false;
+    if (!moved) selectIcon(el);
+  });
+  el.addEventListener("dblclick", () => openApp(app));
+}
+/* 默认站位：左侧竖排（避开左上 hint）；位置不进撤销栈、重置不回位 */
+[["infer-icon","infer"],["goto-icon","goto"],["bag-dock","bag"],["tec-dock","tec"],["log-icon","log"]].forEach(([id, app], i) => {
+  const el = document.getElementById(id);
+  el.style.left = "18px"; el.style.top = (180 + i * 85) + "px";
+  attachIcon(el, app);
+});
+/* 详情 / 日志静态窗口：× 与拖动 */
+document.getElementById("detail-x").addEventListener("click", () => clearSelection());
+document.getElementById("log-x").addEventListener("click", () => setLogWin(false));
+makeFloatDraggable(document.getElementById("detail-win"), false);
+makeFloatDraggable(document.getElementById("log-win"), false);
+setDetailWin(false);
+setLogWin(true);
+
+/* ============ 按钮 ============ */
+document.getElementById("btn-fit").addEventListener("click", fit);
+document.getElementById("ending-overlay").addEventListener("click", () => {
+  if (!endingState) return;
+  const cur = endingState.stages[endingState.step - 1];
+  if (cur && cur.final){ closeEnding(); return; }
+  clearTimeout(endingState.timer);
+  playEndingStage();
+});
+tgFocus.addEventListener("change", applyFocus);
+document.getElementById("btn-relayout").addEventListener("click", () => {
+  Object.values(G.nodes).forEach(n => { n.pinned = false; });
+  layout(); render();
+  log("已重新自动布局（手动摆过的位置被清除）", "sys");
+});
+document.getElementById("btn-undo").addEventListener("click", () => {
+  if (!history.length){ log("没有可撤销的操作", "warn"); return; }
+  restore(history.pop());
+  layout(); render();
+  log("已撤销上一步", "sys");
+});
+document.getElementById("btn-reset").addEventListener("click", () => {
+  history = []; boot();
+  log("已重置为初始状态", "sys");
+});
+document.getElementById("btn-reach").addEventListener("click", () => {
+  const total = Object.keys(SCENES).length;
+  const adj = {};
+  Object.keys(SCENES).forEach(s => sceneLocs(s).forEach(t => (adj[s] = adj[s] || []).push(t)));
+  const seen = new Set([START]), q = [START];
+  while (q.length){ const c = q.shift(); (adj[c] || []).forEach(n => { if (!seen.has(n)){ seen.add(n); q.push(n); } }); }
+  const extra = new Set(Object.keys(condRoutes));
+  const bad = Object.keys(SCENES).filter(s => !seen.has(s) && !extra.has(s));
+
+  let html = "<span class='close' onclick=\"document.getElementById('verdict').style.display='none'\">×</span>";
+  html += "<h4>可达性检查 · " + total + " 个场景</h4>";
+  html += "<div class='vrow'><span class='dot' style='background:#2b2b26'></span><div>沿文本链接可达 <b>" + seen.size + "</b> 个</div></div>";
+  html += "<div class='vrow'><span class='dot' style='background:#5c584a'></span><div>需条件触发才能进 <b>" + extra.size + "</b> 个</div></div>";
+  html += "<div class='vrow'><span class='dot' style='background:#8a8672'></span><div>只能靠「前往」命令进 <b>" + bad.length + "</b> 个</div></div>";
+  if (bad.length){
+    html += "<div style='margin-top:8px;padding-top:8px;border-top:1px solid #e8eaed'>";
+    bad.forEach(s => { html += "<div style='margin:2px 0'>· " + esc(SCENES[s].title) + " <code>" + s + "</code></div>"; });
+    html += "</div>";
+  }
+  verdict.innerHTML = html;
+  verdict.style.display = "block";
+  log("可达性：文本可达 " + seen.size + " / 条件 " + extra.size + " / 孤岛 " + bad.length +
+      (bad.length ? " → " + bad.map(s => SCENES[s].title).join("、") : ""), bad.length ? "err" : "sys");
+});
+
+/* ============ 适性测试 + 调查员证（开场流程） ============ */
+const store = (typeof localStorage !== "undefined") ? localStorage : null;
+let investigator = null;
+try { if (store){ const raw = store.getItem("tec_investigator"); if (raw) investigator = JSON.parse(raw); } } catch(_){}
+
+const SENSE_FLAVOR = {
+  vision:  "你习惯先看清，再行动。",
+  hearing: "世界的背面，总有声音先抵达你。",
+  touch:   "你相信手的判断，胜过眼睛。",
+  smell:   "气味是不会说谎的证人。",
+  taste:   "真相的味道，你尝一口就知道。"
+};
+const QUIZ = [
+  { q: "进入一片漆黑的异动区域，你首先依靠什么？", opts: [
+    ["vision","眯起眼睛寻找微光"],["hearing","屏息聆听最细微的声响"],["touch","伸出手触摸前方的空气"],
+    ["smell","分辨空气中气味的变化"],["taste","舌尖抵住上颚，尝一尝空气的味道"] ]},
+  { q: "一份被水浸透的档案，你最先注意到什么？", opts: [
+    ["vision","字迹晕染开的形状"],["hearing","纸页翻动时的脆响"],["touch","纸张潮湿的重量"],
+    ["smell","霉菌与墨水的气味"],["taste","墨水淡淡的苦涩（别想歪，是用鼻子旁边的那点想象力）"] ]},
+  { q: "以下哪种异常最让你不安？", opts: [
+    ["vision","镜子里慢半拍的自己"],["hearing","反复倒放的人声"],["touch","没有来源的冰冷触碰"],
+    ["smell","凭空出现的花香"],["taste","嘴里突然泛起的铁锈味"] ]}
+];
+function genInvId(){
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let a = "", n = "";
+  for (let i = 0; i < 2; i++) a += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 4; i++) n += Math.floor(Math.random() * 10);
+  return "TEC-" + a + "-" + n;
+}
+
+let introWinEl = null, introState = null, introBackdropEl = null;
+function closeIntroLight(){
+  if (introWinEl){ introWinEl.remove(); introWinEl = null; }
+  if (introBackdropEl){ introBackdropEl.remove(); introBackdropEl = null; }
+  introState = null;
+}
+function openIntro(){
+  closeIntroLight();
+  const bd = document.createElement("div");
+  bd.id = "intro-backdrop";
+  (document.body || stage).appendChild(bd);
+  introBackdropEl = bd;
+  const w = makeWindow("APTITUDE // 调查员适性测试", () => {});
+  w.el.classList.add("intro-win");
+  const x = w.bar.querySelector(".syswin-x");
+  if (x) x.style.display = "none";   /* 开场测试必须完成，不允许关闭 */
+  bd.appendChild(w.el);
+  introWinEl = w.el;
+  introState = { step: "name", name: "", nameInput: null, answers: [], card: null };
+  renderIntro();
+}
+function renderIntro(){
+  if (!introWinEl || !introState) return;
+  const body = introWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  const st = introState;
+  if (st.step === "name"){
+    const p = document.createElement("div");
+    p.textContent = "在接入异动区域之前，T.E.C-OS 需要登记你的信息，并完成一次简短的适性测试。";
+    body.appendChild(p);
+    const input = document.createElement("input");
+    input.className = "intro-name";
+    input.placeholder = "请输入姓名";
+    input.maxLength = 12;
+    input.value = st.name || "";
+    input.addEventListener("input", e => { st.name = e.target.value; });
+    body.appendChild(input);
+    st.nameInput = input;
+    const btn = document.createElement("button");
+    btn.className = "primary";
+    btn.textContent = "[ 开始测试 ]";
+    btn.addEventListener("click", beginQuiz);
+    body.appendChild(btn);
+    return;
+  }
+  if (st.step === "card"){
+    body.appendChild(buildCert(st.card));
+    const btn = document.createElement("button");
+    btn.className = "primary mx-sync";
+    btn.textContent = "[ 确认领证 ]";
+    btn.addEventListener("click", confirmCard);
+    body.appendChild(btn);
+    return;
+  }
+  const qi = st.step, q = QUIZ[qi];
+  const prog = document.createElement("div");
+  prog.className = "quiz-prog";
+  prog.textContent = "第 " + (qi + 1) + " / " + QUIZ.length + " 问";
+  body.appendChild(prog);
+  const qt = document.createElement("div");
+  qt.className = "quiz-q";
+  qt.textContent = q.q;
+  body.appendChild(qt);
+  q.opts.forEach((o, i) => {
+    const b = document.createElement("button");
+    b.className = "quiz-opt";
+    b.textContent = o[1];
+    b.addEventListener("click", () => answerQuestion(i));
+    body.appendChild(b);
+  });
+}
+function setIntroName(v){
+  if (!introState) return;
+  introState.name = v;
+  if (introState.nameInput) introState.nameInput.value = v;
+}
+function beginQuiz(){
+  if (!introState) return;
+  const v = String((introState.nameInput && introState.nameInput.value) || introState.name || "").trim();
+  if (!v){
+    if (introWinEl){ introWinEl.classList.remove("shake"); void introWinEl.offsetWidth; introWinEl.classList.add("shake"); }
+    return;
+  }
+  introState.name = v;
+  introState.step = 0;
+  renderIntro();
+}
+function answerQuestion(i){
+  if (!introState || typeof introState.step !== "number") return;
+  const q = QUIZ[introState.step];
+  const opt = q && q.opts[i];
+  if (!opt) return;
+  introState.answers.push(opt[0]);
+  if (introState.step < QUIZ.length - 1){ introState.step++; renderIntro(); }
+  else finishQuiz();
+}
+function finishQuiz(){
+  const counts = {};
+  let best = null, bestN = 0;
+  introState.answers.forEach(s => {   /* 平局取先达到的（按答题顺序） */
+    counts[s] = (counts[s] || 0) + 1;
+    if (counts[s] > bestN){ bestN = counts[s]; best = s; }
+  });
+  introState.card = { name: introState.name, id: genInvId(), sense: best,
+    date: new Date().toISOString().slice(0, 10) };
+  introState.step = "card";
+  const t = introWinEl.querySelector(".syswin-title");
+  if (t) t.textContent = "INVESTIGATOR // 调查员证";
+  renderIntro();
+}
+function confirmCard(){
+  if (!introState || !introState.card) return;
+  investigator = introState.card;
+  try { if (store) store.setItem("tec_investigator", JSON.stringify(investigator)); } catch(_){}
+  if (introWinEl) introWinEl.classList.add("shrink");
+  setTimeout(finishIntro, 420);   /* stub 的 setTimeout 是 noop：测试用 __intro.finish() 收尾 */
+}
+function finishIntro(){
+  if (!introState) return;
+  closeIntroLight();
+  mountInvChip();
+  const sn = G.nodes["loc:" + START];
+  if (sn) showNarrCard(sn, SCENES[START]);
+  log("调查员 <b>" + esc(investigator.name) + "</b>（" + esc(investigator.id) + "）已接入 T.E.C-OS", "sys");
+}
+
+/* 由编号确定性生成的 5×5 镜像像素识别图（div 网格，不用 canvas；cell 为每格边长 px） */
+function genAvatar(id, cell){
+  const px = cell || 18;
+  let h = 0;
+  const s = String(id || "");
+  for (let i = 0; i < s.length; i++){ h = (h * 31 + s.charCodeAt(i)) >>> 0; }
+  const grid = [];
+  for (let y = 0; y < 5; y++){
+    for (let x = 0; x < 3; x++){
+      h = (h * 1103515245 + 12345) >>> 0;
+      grid[y * 5 + x] = grid[y * 5 + (4 - x)] = (h >>> 16) & 1;
+    }
+  }
+  const box = document.createElement("div");
+  box.className = "cert-photo";
+  box.style.gridTemplateColumns = "repeat(5, " + px + "px)";
+  box.style.gridTemplateRows = "repeat(5, " + px + "px)";
+  grid.forEach(on => {
+    const d = document.createElement("div");
+    d.className = "px" + (on ? " on" : "");
+    d.style.width = px + "px"; d.style.height = px + "px";
+    box.appendChild(d);
+  });
+  return box;
+}
+
+/* 调查员证（发证 / 回看共用）：头部色带 + 身份区（头像+字段）+ 倾向区 + 签发区 */
+function buildCert(c){
+  const wrap = document.createElement("div");
+  wrap.className = "inv-cert";
+  const head = document.createElement("div");
+  head.className = "cert-head"; head.textContent = "T.E.C-OS 调查员证";
+  wrap.appendChild(head);
+
+  const sec1 = document.createElement("div");
+  sec1.className = "cert-sec cert-id";
+  sec1.appendChild(genAvatar(c.id, 20));
+  const fields = document.createElement("div");
+  fields.className = "cert-fields";
+  const nm = document.createElement("div"); nm.className = "cert-name"; nm.textContent = c.name;
+  const idn = document.createElement("div"); idn.className = "cert-idno"; idn.textContent = c.id;
+  const lv = document.createElement("div"); lv.className = "cert-frow"; lv.textContent = "等级：初级调查员";
+  fields.appendChild(nm); fields.appendChild(idn); fields.appendChild(lv);
+  sec1.appendChild(fields);
+  wrap.appendChild(sec1);
+
+  const sec2 = document.createElement("div");
+  sec2.className = "cert-sec dashed";
+  const sn = document.createElement("div"); sn.className = "cert-sense";
+  sn.textContent = (SENSES[c.sense] || c.sense) + "主导型";
+  const fl = document.createElement("div"); fl.className = "cert-flavor";
+  fl.textContent = SENSE_FLAVOR[c.sense] || "";
+  sec2.appendChild(sn); sec2.appendChild(fl);
+  wrap.appendChild(sec2);
+
+  const sec3 = document.createElement("div");
+  sec3.className = "cert-sec dashed cert-issue";
+  const dt = document.createElement("div"); dt.textContent = "签发日期：" + c.date;
+  const stamp = document.createElement("div"); stamp.className = "cert-stamp";
+  stamp.innerHTML = "T.E.C<br>核准";
+  sec3.appendChild(dt); sec3.appendChild(stamp);
+  wrap.appendChild(sec3);
+  return wrap;
+}
+
+/* 顶栏徽标 + 证件回看 */
+let invChipEl = null, invReviewEl = null;
+function mountInvChip(){
+  if (!investigator) return;
+  if (!invChipEl){
+    invChipEl = document.createElement("span");
+    invChipEl.id = "inv-chip";
+    invChipEl.addEventListener("click", openCardReview);
+    const brand = document.querySelector(".brand");
+    if (brand && brand.parentNode && brand.parentNode.insertBefore) brand.parentNode.insertBefore(invChipEl, brand.nextSibling);
+    else stage.appendChild(invChipEl);
+  }
+  invChipEl.textContent = "▣ " + investigator.name + " · " + investigator.id;
+}
+function closeInvReview(){ if (invReviewEl){ invReviewEl.remove(); invReviewEl = null; } }
+function openCardReview(){
+  if (!investigator) return;
+  closeInvReview();
+  const w = makeWindow("INVESTIGATOR // 调查员证", closeInvReview);
+  w.el.classList.add("cert-win");
+  w.body.appendChild(buildCert(investigator));
+  const btn = document.createElement("button");
+  btn.textContent = "[ 重新测试 ]";
+  btn.addEventListener("click", () => {
+    try { if (store) store.removeItem("tec_investigator"); } catch(_){}
+    investigator = null;
+    if (invChipEl){ invChipEl.remove(); invChipEl = null; }
+    closeInvReview();
+    openIntro();
+  });
+  const actions = document.createElement("div");
+  actions.className = "cert-actions";
+  actions.appendChild(btn);
+  w.body.appendChild(actions);
+  stage.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  invReviewEl = w.el;
+}
+
+/* ============ 启动 ============ */
+function boot(){
+  G = blankGraph();
+  closePwPop();
+  closeBubble();
+  closeNarr();
+  closeTecWin();
+  closeBagWin();
+  closeGotoWin();
+  closeInferWin();
+  view = { x: 40, y: 20, k: 1 };
+  applyView();
+  logBox.innerHTML = "";
+  setDetailWin(false);
+  detailBody.innerHTML = "<div class='empty'>点选任意节点查看信息。</div>";
+  const sn = ensureNode("loc", START, { label: SCENES[START].title || START, x: 1000, y: 620 });
+  revealScene(START, true);
+  layout();
+  render();
+  fit();
+  mountInvChip();
+  if (investigator) showNarrCard(sn, SCENES[START]);
+  else openIntro();
+  log("已载入案件 A-001：双击 <b>场景节点</b> 展开里面的东西，把节点 <b>拖到另一个节点上</b> 组合使用。", "sys");
+  log("提示：起始场景就是「植物学家的花园」。双击「书桌」等场景节点继续展开，拖动手电筒到黑影上试试。", "sys");
+}
+
+/* 测试钩子（供 verify.js 无头驱动） */
+window.__combo = (a, b) => attemptCombo(a, b);
+window.__talk = key => { const n = G.nodes[key]; if (n) runPrimary(n); };
+window.__tec = key => tecConsult(key);
+window.__tecTalk = () => tecTalk();
+window.__collapse = sid => toggleCollapse(sid);
+window.__store = (key, sid) => storeNode(key, sid);
+window.__storeAll = sid => storeAll(sid);
+window.__bag = key => bagStore(key);
+window.__bagTake = key => bagTake(key);
+window.__bagToggle = () => toggleBagWin();
+window.__cap = key => attemptCapture(key);
+window.__noteSeen = t => noteSeen(t);
+window.__goto = sid => gotoScene(sid);
+window.__gotoList = () => heardScenes();
+window.__mxAssign = (k, s) => assignClue(k, s);
+window.__infer = () => executeInference();
+window.__playStep = () => { if (memoryPlay) playMemoryLine(); else if (endingState) playEndingStage(); };
+window.__intro = {
+  step: () => introState && introState.step,
+  name: v => setIntroName(v),
+  begin: () => beginQuiz(),
+  answer: i => answerQuestion(i),
+  confirm: () => confirmCard(),
+  finish: () => finishIntro()
+};
+window.__select = key => key ? selectNode(key) : clearSelection();
+window.__closeFloats = () => { closeBubble(); closeNarr(); closePwPop(); };
+window.__renarr = sid => renarrScene(sid);
+window.__hit   = (cx, cy) => { const e = hitTest(cx, cy, null); return e ? e.dataset.key : null; };
+window.__dump  = () => ({
+  nodes: Object.keys(G.nodes),
+  lit: Object.keys(G.nodes).filter(k => G.nodes[k].lit),
+  talk: Object.assign({}, G.talkProg),
+  tec: { prog: Object.assign({}, G.tecProg), lastScene: G.lastScene },
+  hidden: Object.keys(G.nodes).filter(k => G.nodes[k].hidden),
+  stored: Object.keys(G.nodes).filter(k => G.nodes[k].stored),
+  bag: bagItems().map(n => n.key),
+  collapsed: [...G.collapsed],
+  dim: G._dimKeys || [],
+  sel: sel,
+  floats: { bubble: !!bubbleEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, detail: detailWinOpen, logs: logWinOpen },
+  matrix: JSON.parse(JSON.stringify(G.matrix)),
+  endings: [...G.endings],
+  endingOverlay: !!endingState,
+  investigator: investigator ? { name: investigator.name, id: investigator.id, sense: investigator.sense } : null,
+  intro: !!introWinEl,
+  edges: G.edges.map(e => e.kind + ":" + e.a + ">" + e.b),
+  explored: [...G.explored], captured: [...G.captured], tried: [...G.tried],
+  history: history.length,
+  pos: (() => { const o = {}; for (const k in G.nodes){
+    o[k] = { x: Math.round(G.nodes[k].x), y: Math.round(G.nodes[k].y), pinned: !!G.nodes[k].pinned }; } return o; })()
+});
+
+boot();
+</script>
+</body>
+</html>
