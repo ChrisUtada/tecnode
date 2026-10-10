@@ -1,0 +1,37 @@
+# ─── 无头浏览器 / CDP 调试残留 ───────────────────────────────
+_cdp_profile*/
+_cdp*.cjs
+_cdp*.html
+connect-cdp.*
+cdp-*.log
+
+# ─── 一次性补丁与生成脚本 ───────────────────────────────────
+_patch_*.py
+_mk_*.py
+_sync_tpl.py
+_verify_dbg.js
+_dump.html
+_geo.html
+
+# ─── 截图 / 测试页 / 预览页 ─────────────────────────────────
+shot-*.png
+screenshot-*
+case-*-check.png
+index-*
+check-*.html
+cert-avatar-demo.*
+avatar.b64
+
+# ─── 备份与日志 ─────────────────────────────────────────────
+*.bak
+*.bak[0-9]*
+*.orig
+*.rej
+*.log
+verify-out.txt
+
+# ─── 环境 ───────────────────────────────────────────────────
+.workbuddy/
+node_modules/
+.DS_Store
+Thumbs.db

@@ -87,6 +87,13 @@ global.document = {
   querySelectorAll: () => []
 };
 global.window = { addEventListener(){} };
+/* 内存版 localStorage：让「各存各档」的持久化路径在无头环境里也真实跑一遍 */
+const _ls = {};
+global.localStorage = {
+  getItem: k => (k in _ls ? _ls[k] : null),
+  setItem: (k, v) => { _ls[k] = String(v); },
+  removeItem: k => { delete _ls[k]; }
+};
 global.requestAnimationFrame = fn => fn();
 global.setTimeout = () => 0;
 global.clearTimeout = () => {};
@@ -668,6 +675,236 @@ window.__reveal('SCENES_garden');
 window.__select('item:ITEMS_zhiwu');
 dh = ids['detail-body']._html || '';
 assert('有命令物品：详情保留描述（唯一出口）', dh.indexOf('自生自灭') >= 0);
+
+console.log('\n=== 24. 案件库：切案 / 会话态隔离 / 各存各档 ===');
+ids['btn-reset']._ev.click[0]();
+const fresh = window.__dump().nodes.length;   /* 一个案件的「全新开局」节点数（起始场景 + 随行角色） */
+
+/* 案件地图：地址列表 + 副标题 + 当前标记 */
+const mapDbl = () => document.getElementById('map-icon')._ev.dblclick[0]();
+const mapText = sel => document.getElementById('desktop').querySelectorAll(sel).map(n => n.textContent);
+mapDbl();
+assert('地图为每个案件列出地址', mapText('.map-note').length === 2);
+assert('第19节真结局把下一案解锁了（连锁）', window.__caseInfo().unlocked.indexOf('A002') >= 0);
+assert('解锁案件的副标题不再是加密提示', mapText('.map-note')[1].indexOf('已解锁') >= 0);
+assert('已解锁但数据未装载 → 标为「待接入」', mapText('.map-state').indexOf('待接入') >= 0);
+assert('待接入案的副标题说明数据未装载', mapText('.map-note')[1].indexOf('待装载') >= 0);
+assert('地图标出当前案件', mapText('.map-state').indexOf('当前') >= 0);
+mapDbl();
+
+/* 先在 A-001 里做出进度：展开场景 + 一次抽屉选择（会进撤销栈） */
+window.__reveal('SCENE_shuzhuo');
+window.__reveal('SCENES_choutiyi');
+window.__goto('SCENES_garden');
+window.__choice('ITEM_chouti', 0, 0);
+const a1nodes = window.__dump().nodes.length;
+assert('A-001 已有进度（多节点）', a1nodes > fresh);
+assert('A-001 已有撤销栈', window.__dump().history > 0);
+assert('开局案件为 A-001', window.__caseInfo().id === 'A001');
+assert('A-001 标题已挂到案件窗', window.__caseInfo().title === 'CASE A-001 // 植物学家的花园');
+assert('A-001 起始场景已装载', window.__caseInfo().sceneTitle === '植物学家的花园');
+
+/* 注册 A-002 数据（克隆 A-001 但改一处可见标识）并解锁 */
+const d2 = JSON.parse(JSON.stringify(window.__caseDataOf('A001')));
+d2.config.caseTitle = '废弃温室';
+d2.scenes.SCENES_garden.title = '废弃温室';
+window.__registerCase('A002', d2);
+window.__unlockCase('A002');
+assert('A-002 数据已注册', window.__caseInfo().registered.indexOf('A002') >= 0);
+assert('A-002 已解锁', window.__caseInfo().unlocked.indexOf('A002') >= 0);
+
+/* 守卫：当前案 / 未知案 / 未注册案都切不动 */
+assert('切到当前案是空操作', window.__switchCase('A001') === false);
+assert('未知案件切不动', window.__switchCase('A999') === false);
+window.__registerCase('A004', JSON.parse(JSON.stringify(d2)));
+assert('未解锁案件切不动', window.__switchCase('A004') === false);
+mapDbl();
+assert('数据装载后改为「可进入」', mapText('.map-state').indexOf('可进入') >= 0);
+mapDbl();
+
+/* 把图标挪歪，验证切案会复位 */
+const inferTop0 = document.getElementById('infer-icon').style.top;
+document.getElementById('infer-icon').style.top = '999px';
+
+/* 切到 A-002 */
+assert('切到 A-002 成功', window.__switchCase('A002') === true);
+const ci = window.__caseInfo();
+assert('当前案变为 A-002', ci.id === 'A002');
+assert('案件窗标题跟随切换', ci.title === 'CASE A-002 // 废弃温室');
+assert('A-002 的场景数据已装载', ci.sceneTitle === '废弃温室');
+assert('会话态已清（撤销栈归零）', window.__dump().history === 0);
+assert('新桌面为全新开局', window.__dump().nodes.length === fresh);
+assert('图标站位已复位', document.getElementById('infer-icon').style.top === inferTop0);
+assert('刚进入的地址被记为点亮', ci.lastEntered === 'A002');
+
+/* 在 A-002 里做出自己的进度 */
+window.__reveal('SCENE_shuzhuo');
+window.__reveal('SCENES_choutier');
+const a2nodes = window.__dump().nodes.length;
+assert('A-002 已产生自己的进度', a2nodes > fresh && a2nodes !== a1nodes);
+
+/* 回访 A-001：应还原它自己的档 */
+assert('回访 A-001 成功', window.__switchCase('A001') === true);
+const back = window.__caseInfo();
+assert('当前案变回 A-001', back.id === 'A001');
+assert('标题跟随回访', back.title === 'CASE A-001 // 植物学家的花园');
+assert('场景数据换回 A-001', back.sceneTitle === '植物学家的花园');
+assert('A-001 进度被续上（节点数一致）', window.__dump().nodes.length === a1nodes);
+assert('A-001 恢复后撤销栈是新会话', window.__dump().history === 0);
+assert('解锁进度不因切案丢失', window.__caseInfo().unlocked.indexOf('A002') >= 0);
+
+/* 再回 A-002：它的档同样在 */
+window.__switchCase('A002');
+assert('A-002 进度被续上（节点数一致）', window.__dump().nodes.length === a2nodes);
+
+/* 重置只清当前案，不动别的案 */
+ids['btn-reset']._ev.click[0]();
+assert('重置后仍停留在 A-002', window.__caseInfo().id === 'A002');
+assert('A-002 已被重置为全新开局', window.__dump().nodes.length === fresh);
+window.__switchCase('A001');
+assert('A-001 的旧档未被重置波及', window.__dump().nodes.length === a1nodes);
+window.__switchCase('A002');
+assert('A-002 确实被重置（回到全新开局）', window.__dump().nodes.length === fresh);
+window.__switchCase('A001');
+
+console.log('\n=== 25. 模板与成品一致性 ===');
+/* _template.html 由 index.html 生成（只把 gamedata 换成占位符）。
+   这里做结构比对，防止改了成品忘了同步模板 —— 曾经真的漏过调查员证那一段。 */
+const tpl = fs.readFileSync(path.join(__dirname, '_template.html'), 'utf8');
+const normTemplate = s => s.replace(/(<script type="application\/json" id="gamedata">)[\s\S]*?(<\/script>)/, (m, a, b) => a + '@@DATA@@' + b);
+const dA = normTemplate(html).split('\n');
+const dB = normTemplate(tpl).split('\n');
+let firstBad = -1;
+for (let i = 0; i < Math.max(dA.length, dB.length); i++){
+  if (dA[i] !== dB[i]){ firstBad = i; break; }
+}
+assert('_template.html 与 index.html 只差数据占位符' +
+       (firstBad < 0 ? '' : '（首个不同行 ' + (firstBad + 1) + '）'), firstBad < 0);
+
+console.log('\n=== 26. HTML 结构（嵌套层级） ===');
+/* DOM stub 不解析 HTML，所以上面 183 项断言全都看不见「div 关错位置」这类错误。
+   这里用 div 栈做静态结构检查 —— 曾经因为少写一个 </div>，把图标连同日志窗一起关进了案件窗里。 */
+const bare = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+const depthAt = {};
+let depth = 0, underflow = false;
+const tags = bare.matchAll(/<div\b([^>]*)>|<\/div>/gi);
+for (const m of tags){
+  if (m[0].toLowerCase().startsWith('</')){
+    depth--;
+    if (depth < 0){ underflow = true; break; }
+  } else {
+    const idm = /id="([^"]+)"/.exec(m[1] || '');
+    if (idm) depthAt[idm[1]] = depth;
+    depth++;
+  }
+}
+assert('<div> 开闭配平（收尾 depth = ' + depth + '）', !underflow && depth === 0);
+assert('#icons 是 #case-win 的兄弟（都在 #desktop 下）', depthAt['icons'] === depthAt['case-win']);
+assert('#log-win 也在 #desktop 下', depthAt['log-win'] === depthAt['case-win']);
+assert('#detail-win 也在 #desktop 下', depthAt['detail-win'] === depthAt['case-win']);
+assert('#stage 在 #case-win 内一层', depthAt['stage'] === depthAt['case-win'] + 1);
+assert('#world 与 #hint 都在 #stage 内', depthAt['world'] === depthAt['stage'] + 1 && depthAt['hint'] === depthAt['stage'] + 1);
+
+console.log('\n=== 27. 案件窗离屏：– 收起 -> 右下角卡片 / × 关闭 -> 「案件地图」图标 ===');
+/* 静态结构：两个落点各有归宿。DOM stub 不解析 HTML，结构断言只能查源码。 */
+assert('落点 A：#case-dock 卡片存在且有 .on 样式', /id="case-dock"/.test(html) && /#case-dock\.on\{/.test(html));
+assert('落点 A：卡片含 glyph / 案号 / 案名 / 副标题',
+  /cd-glyph/.test(html) && /id="cd-code"/.test(html) && /id="cd-title"/.test(html) && /id="cd-sub"/.test(html));
+assert('落点 B：#map-icon（案件地图图标）在桌面图标栏里', /id="map-icon"/.test(html));
+assert('标题栏同时有最小化 #case-min 与关闭 #case-x', /id="case-min"/.test(html) && /id="case-x"/.test(html) && /\.syswin-min\{/.test(html));
+assert('两条路是分开的函数（parkCase / stowCase / closeCase）',
+  /function parkCase\(p\)/.test(html) && /function stowCase\(\)\{ return parkCase\("dock"\); \}/.test(html)
+  && /function closeCase\(\)\{ return parkCase\("icon"\); \}/.test(html));
+assert('拖动排除表覆盖了地图地址卡', /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x"\)/.test(html));
+/* 触发 stub 里注册的事件处理器 */
+const fire = (el, t, o) => (el._ev[t] || []).forEach(f => f(Object.assign(
+  { button: 0, clientX: 0, clientY: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o)));
+const badgeOf = () => { const i = document.getElementById('map-icon'); return (i && i.querySelector) ? i.querySelector('.badge') : null; };
+const dockOf  = () => document.getElementById('case-dock');
+const dockOn  = () => { const d = dockOf(); return !!(d && d.classList && d.classList.contains('on')); };
+
+ids['btn-reset']._ev.click[0]();
+const ci0 = window.__caseInfo();
+assert('进入案件时案件窗是开着的', ci0.open === true);
+assert('案件窗未被隐藏', document.getElementById('case-win').style.display !== 'none');
+assert('开着的时候两个落点都是空的', ci0.held === false && ci0.dock === false && !badgeOf() && !dockOn());
+
+/* 做出进度（会进撤销栈） */
+window.__reveal('SCENE_shuzhuo');
+window.__choice('ITEM_chouti', 0, 0);
+const n1 = window.__dump().nodes.length;
+assert('已产生进度', n1 > 1 && window.__dump().history > 0);
+
+/* ---- × 关闭：存盘 -> 缩进桌面左侧的「案件地图」图标 ---- */
+assert('关闭案件窗成功', window.__closeCase() === true);
+const ci2 = window.__caseInfo();
+assert('关闭后案件窗隐藏', ci2.open === false && document.getElementById('case-win').style.display === 'none');
+assert('关闭后仍停留在同一个案', ci2.id === 'A001');
+assert('关闭落在「案件地图」图标上（held=true）', ci2.held === true);
+assert('关闭不走右下角卡片（dock=false 且卡片没亮）', ci2.dock === false && !dockOn());
+assert('案件地图图标打了「已关闭」角标', !!badgeOf() && badgeOf().textContent === '已关闭');
+assert('关闭后不弹案件地图', document.getElementById('desktop').querySelectorAll('.map-win').length === 0);
+/* 关闭状态下，案件地图应把本案标成「进入」而不是「当前」 */
+mapDbl();
+assert('关闭状态在地图上标为「进入」', mapText('.map-state')[0] === '进入');
+assert('地图副标题标记「有存档」', mapText('.map-note')[0].indexOf('有存档') >= 0);
+mapDbl();
+assert('查完地图后地图窗已关掉', document.getElementById('desktop').querySelectorAll('.map-win').length === 0);
+assert('撤销栈已随离屏清空', window.__dump().history === 0);
+assert('重复关闭是空操作', window.__closeCase() === false);
+const rawSave = JSON.parse(_ls['tec_case_A001']);
+assert('存档里记住了镜头位置', !!rawSave.__view && isFinite(rawSave.__view.k));
+
+/* 关闭状态下，画布上的操作应被拦下（否则会把案件窗又弹回来） */
+ids['btn-reset']._ev.click[0]();
+assert('关闭时「重置」被拦下，案件窗没被弹回来', window.__caseInfo().open === false && window.__caseInfo().held === true);
+
+/* 从地图点本案那行：展开、角标消失、进度续上 */
+assert('从案件地图展开成功', window.__switchCase('A001') === true);
+const ci3 = window.__caseInfo();
+assert('案件窗重新打开', ci3.open === true && document.getElementById('case-win').style.display !== 'none');
+assert('展开后「已关闭」角标消失', ci3.held === false && !badgeOf());
+assert('重新进入后进度续上（节点数一致）', window.__dump().nodes.length === n1);
+assert('重新进入后撤销栈是新会话', window.__dump().history === 0);
+/* 开着的本案在地图上应标回「当前」 */
+mapDbl();
+assert('展开状态在地图上标回「当前」', mapText('.map-state')[0] === '当前');
+mapDbl();
+
+/* ---- – 收起：走桌面右下角的独立卡片，不碰「案件地图」图标 ---- */
+window.__reveal('SCENE_shuzhuo');
+const nMin = window.__dump().nodes.length;
+fire(ids['case-min'], 'click', {});
+const ci4 = window.__caseInfo();
+assert('点最小化：案件窗离屏', ci4.open === false);
+assert('最小化落在右下角卡片上（dock=true 且卡片亮着）', ci4.dock === true && dockOn());
+assert('最小化不碰「案件地图」图标（held=false 且无角标）', ci4.held === false && !badgeOf());
+assert('卡片上写着案号与案名', ids['cd-code'].textContent === 'CASE A-001' && ids['cd-title'].textContent.length > 0);
+assert('卡片副标题标明进度已保存', ids['cd-sub'].textContent.indexOf('进度已保存') >= 0);
+assert('最小化也存了档', _ls['tec_case_A001'] != null);
+assert('从卡片再展开，进度还在', (window.__switchCase('A001'), window.__dump().nodes.length === nMin));
+assert('再展开后卡片熄掉、角标也没有', !dockOn() && window.__caseInfo().dock === false && !badgeOf());
+
+/* 卡片可拖动：right/bottom 定位换算成 left/top，且"拖动过的那一次单击"不误展开 */
+fire(ids['case-min'], 'click', {});
+fire(dockOf(), 'pointerdown', { clientX: 900, clientY: 500 });
+assert('卡片拖动时把 right/bottom 换成了 left/top', dockOf().style.right === 'auto' && dockOf().style.bottom === 'auto');
+fire(dockOf(), 'pointermove', { clientX: 800, clientY: 420 });
+fire(dockOf(), 'pointerup', {});
+fire(dockOf(), 'click', {});
+assert('拖完紧跟的单击不误展开案件', window.__caseInfo().open === false && window.__caseInfo().dock === true);
+fire(dockOf(), 'pointerdown', { clientX: 800, clientY: 420 });   /* 下一次按下会复位 moved */
+fire(dockOf(), 'click', {});
+assert('原地单击卡片能展开，且进度还在', window.__caseInfo().open === true && window.__dump().nodes.length === nMin);
+assert('从卡片展开后卡片熄掉', !dockOn());
+
+/* 离屏状态下也能直接切到别的案（没有"上一个案"要存） */
+window.__closeCase();
+assert('关闭后切到 A-002 成功', window.__switchCase('A002') === true);
+assert('切案后案件窗是开着的', window.__caseInfo().open === true && window.__caseInfo().id === 'A002');
+assert('切案后两个落点都清空',
+  window.__caseInfo().held === false && window.__caseInfo().dock === false && !badgeOf() && !dockOn());
+assert('切回 A-001 后仍能续上它自己的档', (window.__switchCase('A001'), window.__dump().nodes.length === n1));
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

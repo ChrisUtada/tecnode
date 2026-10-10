@@ -50,6 +50,14 @@
   header .tog input{accent-color:#e6e3d2}
 
   main{flex:1; display:flex; min-height:0}
+  /* 桌面层：固定外壳（图标 / 浮窗）都挂在这里，不随案件窗口变化 */
+  #desktop{flex:1; position:relative; overflow:hidden; background:var(--bg)}
+  /* 案件窗口：默认最大化，把画布装进一扇窗；标题栏显示案件编号与名称 */
+  #case-win{position:absolute; left:100px; right:16px; top:14px; bottom:16px; z-index:1;
+    background:var(--card); border:1px solid var(--line);
+    box-shadow:3px 3px 0 rgba(43,43,38,.25); display:flex; flex-direction:column; overflow:hidden}
+  #case-win .case-bar{cursor:default}
+  #case-win .case-bar .syswin-title{letter-spacing:2px}
   /* 桌布：暖象牙纸。细颗粒(soft-light，均值中性，不压暗底色) + 零星纸屑(multiply) + 大面积色斑 */
   #stage{flex:1; position:relative; overflow:hidden; cursor:grab;
     background-color:var(--bg);
@@ -206,9 +214,10 @@
   .cert-sec{padding:12px 14px; border-top:1px solid var(--line)}
   .cert-sec.dashed{border-top:1px dashed var(--line)}
   .cert-sec.cert-id{border-top:none; text-align:center}
-  .cert-photo{width:120px; height:120px; background:var(--card); margin:0 auto 10px;
+  .cert-photo{width:156px; height:156px; background:var(--card); margin:0 auto 10px;
     border:1px solid var(--line); border-radius:4px; padding:6px;
-    display:grid; align-content:center; justify-content:center}
+    display:flex; align-items:center; justify-content:center; overflow:hidden}
+  .cert-photo img{width:144px; height:144px; image-rendering:pixelated; display:block}
   .cert-photo .px{width:18px; height:18px}
   .cert-photo .px.on{background:#2b2b26}
   .cert-name{font-size:24px; font-weight:700; letter-spacing:3px; margin-top:4px}
@@ -217,13 +226,60 @@
   .cert-sense{font-size:21px; font-weight:700; letter-spacing:2px; text-align:center}
   .cert-flavor{font-size:13px; color:var(--muted); margin-top:6px; text-align:center}
   .cert-issue{display:flex; justify-content:space-between; align-items:center}
-  .cert-stamp{width:54px; height:54px; border:2px solid #2b2b26; border-radius:50%;
+  .cert-stamp{width:58px; height:58px; border:2.5px solid #c0392b; border-radius:50%;
     display:flex; align-items:center; justify-content:center; text-align:center;
-    font-size:10px; line-height:1.4; letter-spacing:1px; transform:rotate(-12deg); opacity:.75}
+    color:#c0392b; font-size:11px; font-weight:700; line-height:1.25; letter-spacing:1px;
+    transform:rotate(-12deg); opacity:.85; box-shadow:inset 0 0 0 1px rgba(192,57,43,.3)}
   .cert-actions{margin-top:14px; text-align:center}
   .cert-win{position:absolute; left:50%; top:70px; margin-left:-190px; width:380px;
     background:var(--card); border:1px solid var(--line);
     box-shadow:3px 3px 0 rgba(43,43,38,.25); z-index:25}
+  /* 案件地图（CASE MAP）：外壳固定，每案一个地址卡 */
+  .map-win{position:absolute; left:50%; top:90px; margin-left:-210px; width:420px;
+    background:var(--card); border:1px solid var(--line);
+    box-shadow:3px 3px 0 rgba(43,43,38,.25); z-index:25}
+  .map-win .syswin-body{max-height:360px; overflow:auto}
+  .map-tip{font-size:12.5px; color:var(--muted); line-height:1.7; margin-bottom:10px}
+  .map-card{display:flex; align-items:center; gap:10px; border:1px solid var(--line);
+    background:var(--card); padding:10px 12px; margin-bottom:8px}
+  .map-card.locked{opacity:.55; border-style:dashed}
+  .map-card.clickable{cursor:pointer}
+  .map-card.clickable:hover{background:var(--bg)}
+  .map-glyph{width:34px; height:34px; border:1px solid var(--line); display:flex;
+    align-items:center; justify-content:center; font-size:16px; flex:0 0 auto}
+  .map-meta{flex:1; min-width:0}
+  .map-title{font-size:13.5px; font-weight:700; letter-spacing:.5px}
+  .map-note{font-size:11.5px; color:var(--muted); margin-top:2px}
+  .map-state{font-size:11px; border:1px solid var(--line); padding:2px 6px; flex:0 0 auto}
+  .map-state.on{background:var(--text); color:var(--card)}
+  .map-state.lock{border-style:dashed; color:var(--muted)}
+  .map-state.pend{border-style:dotted; color:var(--muted)}
+  /* 刚进入过的案件地址：保留点亮标记，回访地图时可见 */
+  .map-card.ignite{border-color:#c0392b}
+  .map-card.ignite .map-glyph{color:#c0392b; border-color:#c0392b}
+  /* 切案过场：案件窗淡出 / 淡入。收起 / 展开是带位移缩放的，走 JS 内联过渡（见 closeCase / enterCase） */
+  #case-win{transition:opacity .18s ease}
+  #case-win.case-switching{opacity:0}
+  /* 案件离屏有两个落点（互斥）：
+     – 收起 → 桌面右下角的案件卡片 #case-dock（右侧浮窗都锚在 bottom:96px，底部这条 96px 是空的，不会打架）
+     × 关闭 → 桌面左侧的「案件地图」图标 #map-icon（图标用 .badge 打一个「已关闭」角标）
+     卡片只用 visibility 隐藏、保留布局，方便随时量取收缩目标点 */
+  #case-dock{position:absolute; right:16px; bottom:14px; width:170px;
+    display:flex; align-items:center; gap:9px; padding:8px 10px; text-align:left; cursor:pointer;
+    background:var(--card); border:1px solid var(--line); box-shadow:3px 3px 0 rgba(43,43,38,.25);
+    opacity:0; visibility:hidden; pointer-events:none; transition:opacity .2s ease; z-index:23}
+  #case-dock.on{opacity:1; visibility:visible; pointer-events:auto}
+  #case-dock:hover{background:var(--bg)}
+  #case-dock .cd-glyph{width:32px; height:32px; border:1px solid var(--line); display:flex;
+    align-items:center; justify-content:center; font-size:15px; flex:0 0 auto}
+  #case-dock .cd-meta{min-width:0; flex:1}
+  #case-dock .cd-code{font-size:9.5px; letter-spacing:1px; font-weight:700; line-height:1.1}
+  #case-dock .cd-title{font-size:11.5px; margin-top:1px; line-height:1.2;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #case-dock .cd-sub{font-size:9.5px; color:var(--muted); margin-top:2px; line-height:1.1;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .goto-foot{margin-top:10px; padding-top:8px; border-top:1px dashed var(--line2); text-align:center}
+  .goto-back{font:inherit; font-size:12px; letter-spacing:1px; cursor:pointer}
   #inv-chip{border:1px solid var(--card); color:var(--card); font-size:11px; padding:4px 8px;
     cursor:pointer; letter-spacing:1px; white-space:nowrap}
   #inv-chip:hover{background:var(--card); color:var(--text)}
@@ -242,6 +298,12 @@
     border:1px solid var(--line); border-radius:0; background:var(--card);
     color:var(--text); font-size:12px; cursor:pointer}
   .syswin-x:hover{background:var(--text); color:var(--card)}
+  /* 最小化：只有案件窗有（把案件缩成桌面右下角的案件卡片）。位置排在 × 左边 */
+  .syswin-min{position:absolute; right:24px; top:50%; transform:translateY(-50%);
+    width:16px; height:16px; line-height:14px; text-align:center;
+    border:1px solid var(--line); border-radius:0; background:var(--card);
+    color:var(--text); font-size:12px; cursor:pointer}
+  .syswin-min:hover{background:var(--text); color:var(--card)}
   .syswin-body{padding:10px 12px}
   .narr-card .syswin-body{max-height:360px; overflow:auto}
   .bubble .syswin-body{max-height:240px; overflow:auto}
@@ -326,6 +388,9 @@
     <label class="tog" title="选中节点时，淡化与它无关的节点和连线">
       <input type="checkbox" id="tg-focus" checked> 聚焦选中
     </label>
+    <label class="tog" title="双击展开场景时，若节点或新内容超出视野，自动平移使其可见（不缩放，可直接拖动打断）">
+      <input type="checkbox" id="tg-reveal" checked> 展开自动居中
+    </label>
     <button id="btn-relayout">自动布局</button>
     <button id="btn-fit">适应窗口</button>
     <button id="btn-undo">撤销</button>
@@ -335,7 +400,10 @@
 </header>
 
 <main>
-  <div id="stage">
+  <div id="desktop">
+    <div id="case-win">
+      <div class="syswin-bar case-bar"><span class="syswin-rule"></span><span class="syswin-title" id="case-title">CASE A-001 // 植物学家的花园</span><span class="syswin-rule"></span><span class="syswin-min" id="case-min" title="收起：把案件缩成桌面右下角的案件卡片（进度会保存，点卡片即可展开）">–</span><span class="syswin-x" id="case-x" title="关闭：把案件放进桌面左侧的「案件地图」图标（进度会保存，进案件地图即可展开）">×</span></div>
+      <div id="stage">
     <div id="world">
       <svg id="edges"></svg>
       <div id="glow"></div>
@@ -344,13 +412,24 @@
     <div id="hint">
       <b>拖动节点</b> = 移动位置 &nbsp;·&nbsp; <b>拖到另一个节点上松手</b> = 组合使用 &nbsp;·&nbsp; <b>双击</b> = 展开 / 打开 / 折叠<br>
       单击 = 详情 + 聚焦邻居 · 双击物品 = 使用/打开 · 捕 = 捕获隐藏线索 · 双击图标 = 打开应用 · 图标可拖动 · 拖节点到图标 = 归槽/收纳/分析/前往
-    </div>
+      </div><!-- /#hint -->
+      </div><!-- /#stage -->
+    </div><!-- /#case-win -->
     <div id="icons">
       <div class="desk-icon" id="infer-icon" data-app="infer"><div class="icon-glyph">◈</div><div class="icon-label">推演器</div></div>
       <div class="desk-icon" id="goto-icon"  data-app="goto"><div class="icon-glyph">▤</div><div class="icon-label">档案</div></div>
       <div class="desk-icon" id="bag-dock"   data-app="bag"><div class="icon-glyph">▣</div><div class="icon-label">证物袋</div></div>
       <div class="desk-icon" id="tec-dock"   data-app="tec"><div class="icon-glyph">◉</div><div class="icon-label">TEC</div></div>
       <div class="desk-icon" id="log-icon"><div class="icon-glyph">≡</div><div class="icon-label">日志</div></div>
+      <div class="desk-icon" id="map-icon"  data-app="map"><div class="icon-glyph">▦</div><div class="icon-label">案件地图</div></div>
+    </div>
+    <div id="case-dock" title="案件已收起：单击展开，按住可拖动">
+      <div class="cd-glyph">▣</div>
+      <div class="cd-meta">
+        <div class="cd-code" id="cd-code">CASE A-001</div>
+        <div class="cd-title" id="cd-title">植物学家的花园</div>
+        <div class="cd-sub" id="cd-sub">进度已保存 · 点此展开</div>
+      </div>
     </div>
     <div id="toast"></div>
     <div id="verdict"></div>
@@ -362,33 +441,44 @@
       <div class="syswin-bar"><span class="syswin-rule"></span><span class="syswin-title">SYS_LOGS // 因果追踪</span><span class="syswin-rule"></span><span class="syswin-x" id="log-x">×</span></div>
       <div class="syswin-body log-body" id="log"></div>
     </div>
-  </div>
+  </div><!-- /#desktop -->
 </main>
 <div id="ending-overlay"></div>
 
 <script type="application/json" id="gamedata">__GAME_DATA_A001__</script>
 <script>
 "use strict";
-const DATA   = JSON.parse(document.getElementById("gamedata").textContent);
-const SCENES = DATA.scenes || {};
-const ITEMS  = DATA.items  || {};
-const CHARS  = DATA.chars  || {};
-const CLUES  = DATA.clues  || {};
-/* 节点版跳过 T.E.C-OS 引导场景（那里教学的是原作命令行玩法），直接进入异动区域现场 */
-const START  = SCENES.SCENES_garden ? "SCENES_garden"
-             : (DATA.config && DATA.config.startScene) || Object.keys(SCENES)[0];
+/* ===== 案件数据（可切换）=====
+   每个案件一份与 <script id="gamedata"> 同构的数据对象。applyCaseData() 负责把数据
+   装进下面这些模块级绑定，因此它们必须是 let（切换案件时整体替换）。 */
+let DATA, SCENES, ITEMS, CHARS, CLUES, START, ENDINGS;
+let REUSABLE_TOOLS, LIGHT_SOURCES, SCENE_MEMORY;
 
-/* 合成后视为可重复使用、不消耗的道具 */
-const REUSABLE_TOOLS = ["ITEM_shoudiantong", "ITEMS_htys", "ITEMS_cz", "ITEMS_changji"];
-/* 可以点亮的光源：双击执行命令后切换发光状态（光晕跟随节点） */
-const LIGHT_SOURCES = ["ITEM_taideng"];
-/* A-001 的日期闪回场景：首次展开时放 MEMORY 放映卡（换案件需更新） */
-const SCENE_MEMORY = ["SCENES_0602", "SCENES_0704"];
+function applyCaseData(data){
+  DATA   = data || {};
+  SCENES = DATA.scenes || {};
+  ITEMS  = DATA.items  || {};
+  CHARS  = DATA.chars  || {};
+  CLUES  = DATA.clues  || {};
+  /* 节点版跳过 T.E.C-OS 引导场景（那里教学的是原作命令行玩法），直接进入异动区域现场 */
+  START  = SCENES.SCENES_garden ? "SCENES_garden"
+         : (DATA.config && DATA.config.startScene) || Object.keys(SCENES)[0];
+  ENDINGS = DATA.endings || [];
+  const cfg = DATA.config || {};
+  /* 合成后视为可重复使用、不消耗的道具 */
+  REUSABLE_TOOLS = cfg.reusableTools || ["ITEM_shoudiantong", "ITEMS_htys", "ITEMS_cz", "ITEMS_changji"];
+  /* 可以点亮的光源：双击执行命令后切换发光状态（光晕跟随节点） */
+  LIGHT_SOURCES  = cfg.lightSources  || ["ITEM_taideng"];
+  /* 日期闪回场景：首次展开时放 MEMORY 放映卡 */
+  SCENE_MEMORY   = cfg.memoryScenes  || ["SCENES_0602", "SCENES_0704"];
+}
+applyCaseData(JSON.parse(document.getElementById("gamedata").textContent));
 /* 五感槽位名 */
 const SENSES = {vision:"视觉", hearing:"听觉", touch:"触觉", smell:"嗅觉", taste:"味觉"};
-const ENDINGS = DATA.endings || [];
 
 const stage = document.getElementById("stage");
+/* 桌面层：外壳（图标 / 各类应用窗口 / 浮窗）都挂这里；画布仍以 #stage 为视口基准 */
+const desktopEl = document.getElementById("desktop");
 const world = document.getElementById("world");
 const svg   = document.getElementById("edges");
 const nodeLayer = document.getElementById("nodes");
@@ -400,6 +490,7 @@ const toastEl = document.getElementById("toast");
 const btnUndo = document.getElementById("btn-undo");
 const tgConsume = document.getElementById("tg-consume");
 const tgFocus = document.getElementById("tg-focus");
+const tgReveal = document.getElementById("tg-reveal");
 
 /* ============ 图状态 ============ */
 let G, history = [], view = {x:0, y:0, k:1};
@@ -585,12 +676,13 @@ function revealScene(sid, silent){
 
   const home = { x: sn.x, y: sn.y };
   let added = 0;
+  const newKeys = [];
 
   sceneTags(sid).forEach((t, i) => {
     const existed = !!nodeByKey(t.kind, t.id);
     const en = ensureNode(t.kind, t.id, { x: home.x, y: home.y });
     if (!en.homeScene) en.homeScene = sid;
-    if (!existed) added++;
+    if (!existed){ added++; newKeys.push(en.key); }
     link(sn.key, en.key, "entity");
   });
 
@@ -598,7 +690,7 @@ function revealScene(sid, silent){
     const existed = !!nodeByKey("loc", tid);
     const tn = ensureNode("loc", tid, { label: SCENES[tid].title || tid });
     if (!tn.homeScene) tn.homeScene = sid;
-    if (!existed) added++;
+    if (!existed){ added++; newKeys.push(tn.key); }
     link(sn.key, tn.key, "move");
   });
 
@@ -610,7 +702,11 @@ function revealScene(sid, silent){
   unstoreScene(sid);   /* 展开场景时取回存放在这里的节点 */
   layout();          /* 必须重新布局，否则新节点没有坐标 */
   render();
-  if (firstTime && !silent) renarrScene(sid);
+  if (firstTime && !silent){
+    renarrScene(sid);
+    /* 首次展开：只在「场景节点 + 本次新内容」超出视野时平移，使其可见 */
+    ensureVisible([sn.key].concat(newKeys));
+  }
   if (((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[sid]) log("TEC 似乎有话要说（双击 TEC 图标）", "sys");
   updateTecBadge();
   return added;
@@ -886,7 +982,7 @@ function toggleBagWin(){
   if (bagWinEl){ closeBagWin(); return; }
   const w = makeWindow("STORAGE // 证物袋", closeBagWin);
   w.el.classList.add("bag-win");
-  stage.appendChild(w.el);
+  desktopEl.appendChild(w.el);
   makeFloatDraggable(w.el, false);
   bagWinEl = w.el;
   refreshBagWin();
@@ -1274,6 +1370,54 @@ function applyView(){
   world.style.transform = "translate(" + view.x + "px," + view.y + "px) scale(" + view.k + ")";
 }
 
+/* ============ 展开后的「确保可见」（ensure-visible）============
+   仅在目标节点或本次新内容超出/贴边时才平移镜头使其进入视野；已在视野内则不动。
+   只平移不缩放；缓动期间玩家一拖动/滚动即打断。 */
+let viewAnim = null;
+const __now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+/* 用 setTimeout 逐帧推进（不用 rAF）：无头 stub 里 setTimeout 是 no-op，既不动画也不会递归爆炸；
+   浏览器里 16ms 一帧足以平滑 240ms 的位移。 */
+const __schedule = cb => setTimeout(() => cb(__now()), 16);
+function cancelViewAnim(){ if (viewAnim != null){ try{ clearTimeout(viewAnim); }catch(_){} viewAnim = null; } }
+function animateViewTo(tx, ty, ms){
+  cancelViewAnim();
+  const sx = view.x, sy = view.y, t0 = __now();
+  ms = ms || 240;
+  const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  const step = () => {
+    const t = Math.min(1, (__now() - t0) / ms);
+    view.x = sx + (tx - sx) * ease(t);
+    view.y = sy + (ty - sy) * ease(t);
+    applyView();
+    if (t < 1) viewAnim = __schedule(step); else viewAnim = null;
+  };
+  viewAnim = __schedule(step);
+}
+function nodeBox(n){
+  return { x0: n.x, y0: n.y, x1: n.x + (NODE_W[n.kind] || 130), y1: n.y + (NODE_H[n.kind] || 46) };
+}
+function ensureVisible(keys, pad){
+  if (tgReveal && !tgReveal.checked) return false;
+  pad = pad == null ? 72 : pad;
+  const list = (keys || []).map(k => G.nodes[k]).filter(n => n && !n.hidden && !n.stored);
+  if (!list.length) return false;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  list.forEach(n => {
+    const b = nodeBox(n);
+    x0 = Math.min(x0, b.x0); y0 = Math.min(y0, b.y0);
+    x1 = Math.max(x1, b.x1); y1 = Math.max(y1, b.y1);
+  });
+  const r = stage.getBoundingClientRect();
+  if (!r || !r.width || !r.height) return false;   /* 无头/隐藏环境：无法判断视口，不主动动镜头 */
+  const sx0 = x0 * view.k + view.x, sy0 = y0 * view.k + view.y;
+  const sx1 = x1 * view.k + view.x, sy1 = y1 * view.k + view.y;
+  /* 已经完全在视野内（含留白）→ 不动镜头 */
+  if (sx0 >= pad && sy0 >= pad && sx1 <= r.width - pad && sy1 <= r.height - pad) return false;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  animateViewTo(r.width / 2 - cx * view.k, r.height / 2 - cy * view.k, 240);
+  return true;
+}
+
 /* 双击物品 / 线索的主行为 */
 function runPrimary(n){
   if (n.kind === "clue"){
@@ -1504,11 +1648,12 @@ function makeFloatDraggable(el, inWorld, handle){
   let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
   h.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
-    /* 交互子元素（按钮/输入框/清单项/× 关闭钮）不启动拖动——否则 setPointerCapture 会吞掉它们的 click */
-    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.syswin-x")) return;
+    /* 交互子元素（按钮/输入框/清单项/× 关闭钮）不启动拖动——否则 setPointerCapture 会把 click
+       重定向到窗口自身，行内可点的清单项永远收不到 click。新增可点清单项时记得往这里加。 */
+    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x")) return;
     /* CSS 定位的浮窗（right/bottom/margin 居中），首次拖动时换算成 left/top，并清掉 margin 防止跳位 */
     if (el.style.left === "" || el.style.left == null){
-      const r = el.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+      const r = el.getBoundingClientRect(), sr = desktopEl.getBoundingClientRect();
       el.style.left = (r.left - sr.left) + "px"; el.style.top = (r.top - sr.top) + "px";
       el.style.right = "auto"; el.style.bottom = "auto"; el.style.margin = "0";
     }
@@ -1650,7 +1795,7 @@ function toggleTecWin(){
   hint.className = "tec-hint";
   hint.textContent = "拖节点到 TEC 图标上让我分析";
   w.body.appendChild(hint);
-  stage.appendChild(w.el);
+  desktopEl.appendChild(w.el);
   makeFloatDraggable(w.el, false);
   tecWinEl = w.el;
 }
@@ -1786,7 +1931,15 @@ function toggleGotoWin(){
   if (gotoWinEl){ closeGotoWin(); return; }
   const w = makeWindow("ARCHIVE // 档案", closeGotoWin);
   w.el.classList.add("goto-win");
-  stage.appendChild(w.el);
+  const foot = document.createElement("div");
+  foot.className = "goto-foot";
+  const back = document.createElement("button");
+  back.className = "goto-back";
+  back.textContent = "[ 返回案件库 ]";
+  back.addEventListener("click", () => { closeGotoWin(); openMapWin(); });
+  foot.appendChild(back);
+  w.el.appendChild(foot);
+  desktopEl.appendChild(w.el);
   makeFloatDraggable(w.el, false);
   gotoWinEl = w.el;
   refreshGotoWin();
@@ -1823,7 +1976,7 @@ function toggleInferWin(){
   if (inferWinEl){ closeInferWin(); return; }
   const w = makeWindow("INFERENCE // 推演器", closeInferWin);
   w.el.classList.add("infer-win");
-  stage.appendChild(w.el);
+  desktopEl.appendChild(w.el);
   makeFloatDraggable(w.el, false);
   inferWinEl = w.el;
   refreshInferWin();
@@ -1898,6 +2051,8 @@ function executeInference(){
 let endingState = null;
 function triggerEnding(ending){
   G.endings.add(ending.id);
+  /* 只有捕获「真名」（真结局）才点亮下一案的地址 */
+  if (ending.isTrueCapture) unlockNextCase(CASE_ID);
   log("<b>结局达成：" + esc(ending.name) + "</b>", "cap");
   endingState = { ending, step: 0, stages: buildStages(ending) };
   playEndingStage();
@@ -2095,6 +2250,7 @@ window.__pw = function(id){
   stage.addEventListener("pointerdown", e => {
     /* 窗口/浮层/图标上不触发平移与清除选中（操作不穿透） */
     if (e.target.closest(".node") || e.target.closest(".syswin, #toast, #verdict, .desk-icon")) return;
+    cancelViewAnim();   /* 玩家开始平移 → 接管镜头，打断自动居中 */
     /* 点空白不再收浮窗（文本框用 × 关闭），只清除选中/聚焦 */
     clearSelection();
     panning = true; sx = e.clientX; sy = e.clientY; ox = view.x; oy = view.y;
@@ -2109,6 +2265,7 @@ window.__pw = function(id){
     /* 光标在窗口/浮层上时滚轮交给窗口自己的滚动条，不触发画布缩放 */
     const t = e.target;
     if (t && t.closest && t.closest(".syswin, #toast, #verdict")) return;
+    cancelViewAnim();   /* 玩家缩放 → 接管镜头 */
     e.preventDefault();
     const r = stage.getBoundingClientRect();
     const mx = e.clientX - r.left, my = e.clientY - r.top;
@@ -2144,6 +2301,7 @@ function openApp(app){
   else if (app === "bag") toggleBagWin();
   else if (app === "tec") toggleTecWin();
   else if (app === "log") toggleLogWin();
+  else if (app === "map") toggleMapWin();
 }
 function selectIcon(el){
   document.querySelectorAll(".desk-icon.sel").forEach(x => x.classList.remove("sel"));
@@ -2164,7 +2322,7 @@ function attachIcon(el, app){
     if (!dragging) return;
     if (!moved && Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) < 5) return;
     moved = true;
-    const r = stage.getBoundingClientRect();
+    const r = desktopEl.getBoundingClientRect();
     el.style.left = Math.max(0, Math.min((r.width || 1200) - 64, ox + e.clientX - sx)) + "px";
     el.style.top  = Math.max(0, Math.min((r.height || 800) - 64, oy + e.clientY - sy)) + "px";
   });
@@ -2175,22 +2333,44 @@ function attachIcon(el, app){
   });
   el.addEventListener("dblclick", () => openApp(app));
 }
-/* 默认站位：左侧竖排（避开左上 hint）；位置不进撤销栈、重置不回位 */
-[["infer-icon","infer"],["goto-icon","goto"],["bag-dock","bag"],["tec-dock","tec"],["log-icon","log"]].forEach(([id, app], i) => {
-  const el = document.getElementById(id);
-  el.style.left = "18px"; el.style.top = (180 + i * 85) + "px";
-  attachIcon(el, app);
-});
+/* 默认站位：桌面层左侧竖排。
+   图标现在在案件窗之外的独立栏里，不用再避开画布左上角的 hint，所以从桌面顶部开始排；
+   桌面高度不够时压缩间距，避免最后一个图标被 #desktop{overflow:hidden} 裁掉。
+   位置不进撤销栈、重置不回位。 */
+const ICON_LAYOUT = [["infer-icon","infer"],["goto-icon","goto"],["bag-dock","bag"],["tec-dock","tec"],["log-icon","log"],["map-icon","map"]];
+const ICON_LEFT = 18, ICON_TOP = 16, ICON_PITCH = 85, ICON_H = 64;
+function resetIconPositions(){
+  const n = ICON_LAYOUT.length;
+  const H = (desktopEl.getBoundingClientRect().height) || 600;
+  const pitch = Math.max(ICON_H + 6, Math.min(ICON_PITCH, Math.floor((H - ICON_TOP - 12) / n)));
+  ICON_LAYOUT.forEach(([id], i) => {
+    const el = document.getElementById(id);
+    if (el && el.style){ el.style.left = ICON_LEFT + "px"; el.style.top = (ICON_TOP + i * pitch) + "px"; }
+  });
+}
+ICON_LAYOUT.forEach(([id, app]) => attachIcon(document.getElementById(id), app));
+resetIconPositions();
 /* 详情 / 日志静态窗口：× 与拖动 */
 document.getElementById("detail-x").addEventListener("click", () => clearSelection());
 document.getElementById("log-x").addEventListener("click", () => setLogWin(false));
+/* × 关闭 = 把案件放进桌面左侧的「案件地图」图标（进度存进本案的档，进案件地图即可再展开） */
+document.getElementById("case-x").addEventListener("click", e => {
+  if (e && e.stopPropagation) e.stopPropagation();
+  closeCase();
+});
+/* – 收起 = 把案件缩成桌面右下角的案件卡片（可拖动，点卡片展开） */
+document.getElementById("case-min").addEventListener("click", e => {
+  if (e && e.stopPropagation) e.stopPropagation();
+  stowCase();
+});
+attachDock(document.getElementById("case-dock"));
 makeFloatDraggable(document.getElementById("detail-win"), false);
 makeFloatDraggable(document.getElementById("log-win"), false);
 setDetailWin(false);
 setLogWin(true);
 
 /* ============ 按钮 ============ */
-document.getElementById("btn-fit").addEventListener("click", fit);
+document.getElementById("btn-fit").addEventListener("click", () => { if (requireCase()) fit(); });
 document.getElementById("ending-overlay").addEventListener("click", () => {
   if (!endingState) return;
   const cur = endingState.stages[endingState.step - 1];
@@ -2200,21 +2380,27 @@ document.getElementById("ending-overlay").addEventListener("click", () => {
 });
 tgFocus.addEventListener("change", applyFocus);
 document.getElementById("btn-relayout").addEventListener("click", () => {
+  if (!requireCase()) return;
   Object.values(G.nodes).forEach(n => { n.pinned = false; });
   layout(); render();
   log("已重新自动布局（手动摆过的位置被清除）", "sys");
 });
 document.getElementById("btn-undo").addEventListener("click", () => {
+  if (!requireCase()) return;
   if (!history.length){ log("没有可撤销的操作", "warn"); return; }
   restore(history.pop());
   layout(); render();
   log("已撤销上一步", "sys");
 });
 document.getElementById("btn-reset").addEventListener("click", () => {
-  history = []; boot();
+  if (!requireCase()) return;
+  history = [];
+  clearCaseState(CASE_ID);   /* 重置也清掉本案存档，避免下次回访又续上旧进度 */
+  boot();
   log("已重置为初始状态", "sys");
 });
 document.getElementById("btn-reach").addEventListener("click", () => {
+  if (!requireCase()) return;
   const total = Object.keys(SCENES).length;
   const adj = {};
   Object.keys(SCENES).forEach(s => sceneLocs(s).forEach(t => (adj[s] = adj[s] || []).push(t)));
@@ -2243,6 +2429,382 @@ document.getElementById("btn-reach").addEventListener("click", () => {
 const store = (typeof localStorage !== "undefined") ? localStorage : null;
 let investigator = null;
 try { if (store){ const raw = store.getItem("tec_investigator"); if (raw) investigator = JSON.parse(raw); } } catch(_){}
+
+/* ============ 案件库 / 案件地图（元进度）============
+   解锁进度独立存档（key tec_progress），不会被「重置案件」清除。
+   解锁条件：只有在本案捕获「真名」（真结局）后，才点亮下一个案件地址。 */
+/* 案件数据注册表：id -> gamedata。未注册 = 数据尚未装载（地图上显示「待接入」） */
+const CASE_DATA = { A001: DATA };
+let CASE_ID = "A001";
+const CASES = [
+  { id: "A001", code: "CASE A-001", title: "植物学家的花园", note: "异动区域 · 已解锁" },
+  { id: "A002", code: "CASE A-002", title: "？？？？？？", note: "加密 · 需在 A-001 捕获真名后解锁" }
+];
+const PROG_KEY = "tec_progress";
+let progress = { unlocked: ["A001"], completed: [], last: "A001" };
+try { if (store){ const raw = store.getItem(PROG_KEY); if (raw) progress = Object.assign(progress, JSON.parse(raw)); } } catch(_){}
+if (!Array.isArray(progress.unlocked) || !progress.unlocked.length) progress.unlocked = ["A001"];
+if (!Array.isArray(progress.completed)) progress.completed = [];
+function saveProgress(){ try { if (store) store.setItem(PROG_KEY, JSON.stringify(progress)); } catch(_){} }
+function caseById(id){ return CASES.find(c => c.id === id) || null; }
+function caseUnlocked(id){ return progress.unlocked.indexOf(id) >= 0; }
+function unlockCase(id){
+  if (caseUnlocked(id)) return false;
+  progress.unlocked.push(id); saveProgress();
+  const c = caseById(id);
+  log("<b>新案件地址已解锁：" + esc(c ? c.code : id) + "</b>", "cap");
+  return true;
+}
+function unlockNextCase(fromId){
+  const i = CASES.findIndex(c => c.id === fromId);
+  const next = i >= 0 ? CASES[i + 1] : null;
+  if (next) unlockCase(next.id);
+}
+let mapWinEl = null;
+function closeMapWin(){ if (mapWinEl){ mapWinEl.remove(); mapWinEl = null; } }
+function toggleMapWin(){ if (mapWinEl){ closeMapWin(); return; } openMapWin(); }
+function openMapWin(){
+  closeMapWin();
+  const w = makeWindow("CASE MAP // 案件地图", closeMapWin);
+  w.el.classList.add("map-win");
+  const tip = document.createElement("div");
+  tip.className = "map-tip";
+  tip.textContent = "每个地址对应一宗案件。在本案捕获「真名」后，下一案的地址才会点亮。案件窗的「–」收起会落到桌面右下角的案件卡片上，「×」关闭则收进本图标；两种情况进度都会自动保存，在这里点本案那行就能展开。";
+  w.body.appendChild(tip);
+  CASES.forEach(c => {
+    const unlocked = caseUnlocked(c.id);
+    const row = document.createElement("div");
+    row.className = "map-card" + (unlocked ? "" : " locked");
+    const glyph = document.createElement("div");
+    glyph.className = "map-glyph"; glyph.textContent = unlocked ? "▦" : "▨";
+    const meta = document.createElement("div");
+    meta.className = "map-meta";
+    const t = document.createElement("div");
+    t.className = "map-title";
+    t.textContent = c.code + " · " + (unlocked ? caseTitleOf(c.id) : "？？？？？？");
+    const s = document.createElement("div");
+    s.className = "map-note"; s.textContent = caseNoteOf(c.id);
+    meta.appendChild(t); meta.appendChild(s);
+    const state = document.createElement("div");
+    const loadable = unlocked && !!CASE_DATA[c.id];
+    const isHere = c.id === CASE_ID;
+    if (!unlocked){ state.className = "map-state lock"; state.textContent = "加密"; }
+    else if (isHere){ state.className = "map-state on"; state.textContent = caseOpen ? "当前" : "进入"; }
+    else if (!loadable){ state.className = "map-state pend"; state.textContent = "待接入"; }
+    else { state.className = "map-state"; state.textContent = "可进入"; }
+    row.appendChild(glyph); row.appendChild(meta); row.appendChild(state);
+    row.dataset.case = c.id;
+    if (c.id === lastEnteredCase) row.classList.add("ignite");
+    /* 已经开着的本案不用再点；有地址的行都能进 */
+    if (unlocked && !(isHere && caseOpen)){
+      row.classList.add("clickable");
+      row.addEventListener("click", () => enterCase(c.id));
+    }
+    w.body.appendChild(row);
+  });
+  desktopEl.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  mapWinEl = w.el;
+}
+
+/* ==== 案件存档（各存各档）与切换 ====
+   每个案件一份独立存档：tec_case_<id> = snapshot()（与撤销栈同构）。
+   切换 = 存当前案 -> 载目标案数据 -> 清会话态 -> 重建（有档续档，无档全新开局）。 */
+const CASE_STORE_PREFIX = "tec_case_";
+let lastEnteredCase = null;
+let switchingCase = false;
+/* 案件窗是否开着：关掉 = 回到案件地图，进度存进本案的档 */
+let caseOpen = true;
+function caseStoreKey(id){ return CASE_STORE_PREFIX + id; }
+function saveCaseState(id){
+  try {
+    if (!store) return;
+    /* 在快照基础上额外记住镜头位置，回访时原位恢复（老存档没有 __view 就退回 fit） */
+    const snap = JSON.parse(snapshot());
+    snap.__view = { x: view.x, y: view.y, k: view.k };
+    store.setItem(caseStoreKey(id), JSON.stringify(snap));
+  } catch(_){}
+}
+function loadCaseState(id){
+  try { if (store){ const raw = store.getItem(caseStoreKey(id)); if (raw) return raw; } } catch(_){}
+  return null;
+}
+function clearCaseState(id){
+  try { if (store) store.removeItem(caseStoreKey(id)); } catch(_){}
+}
+function hasCaseSave(id){
+  try { if (store) return store.getItem(caseStoreKey(id)) != null; } catch(_){}
+  return false;
+}
+function setCaseWinVisible(v){
+  const cw = document.getElementById("case-win");
+  if (cw && cw.style) cw.style.display = v ? "" : "none";
+  caseOpen = !!v;
+}
+/* 案件窗关着的时候，画布上的操作全部拦下 —— 否则是在操作一个看不见的画布 */
+function requireCase(){
+  if (caseOpen) return true;
+  toast("当前不在案件中，请先把它展开（右下角的案件卡片，或案件地图里的本案那行）");
+  return false;
+}
+
+/* ==== 案件窗离屏后的两个落点（互斥）====
+   – 收起（最小化）：缩成桌面右下角的案件卡片 #case-dock，可拖动，点卡片展开
+   × 关闭：缩进桌面左侧的「案件地图」图标 #map-icon，图标打「已关闭」角标，进案件地图展开
+   案件窗在屏幕上时两者都为 false。 */
+let caseHeld = false;     /* 挂在「案件地图」图标上（× 关闭） */
+let caseDockOn = false;   /* 停在右下角卡片上（– 收起） */
+
+/* ---- 落点 A：右下角案件卡片 ---- */
+function updateCaseDock(){
+  const c = caseById(CASE_ID);
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  set("cd-code", c ? c.code : CASE_ID);
+  set("cd-title", caseTitleOf(CASE_ID));
+  set("cd-sub", hasCaseSave(CASE_ID) ? "进度已保存 · 点此展开" : "点此展开");
+}
+function showCaseDock(v){
+  caseDockOn = !!v;
+  const d = document.getElementById("case-dock");
+  if (!d || !d.classList) return;
+  if (v) updateCaseDock();
+  d.classList.toggle("on", !!v);
+}
+/* 右下角卡片可拖动：按住拖动 = 挪位置（拖动过的那一次不展开），原地单击 = 展开案件。
+   它原来是靠 right/bottom 定位的，首次按下时换算成 left/top。
+   注意 moved 要在 pointerdown 复位 —— 这样"拖完紧跟的 click"被吞掉，下一次正常单击又能用。 */
+function attachDock(el){
+  if (!el || !el.addEventListener) return;
+  let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  el.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    if (el.style.left === "" || el.style.left == null){
+      const r = el.getBoundingClientRect(), sr = desktopEl.getBoundingClientRect();
+      el.style.left = (r.left - sr.left) + "px";
+      el.style.top  = (r.top  - sr.top ) + "px";
+      el.style.right = "auto"; el.style.bottom = "auto";
+    }
+    dragging = true; moved = false;
+    sx = e.clientX; sy = e.clientY;
+    ox = parseFloat(el.style.left) || 0; oy = parseFloat(el.style.top) || 0;
+    try { el.setPointerCapture(e.pointerId); } catch(_){}
+    if (e.stopPropagation) e.stopPropagation();
+  });
+  el.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    if (!moved && Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) < 5) return;
+    moved = true;
+    const r = desktopEl.getBoundingClientRect();
+    const w = el.offsetWidth || 170, h = el.offsetHeight || 56;
+    el.style.left = Math.max(0, Math.min((r.width  || 1200) - w, ox + e.clientX - sx)) + "px";
+    el.style.top  = Math.max(0, Math.min((r.height ||  800) - h, oy + e.clientY - sy)) + "px";
+  });
+  el.addEventListener("pointerup", () => { dragging = false; });
+  el.addEventListener("click", () => { if (!moved) enterCase(CASE_ID); });
+}
+/* 收缩 / 展开的位移与缩放：把案件窗和右下角卡片的中心对上。
+   卡片只用 visibility 隐藏、保留布局盒，所以隐藏时也量得到（这是选它当落点的一个原因）。 */
+function caseDockMotion(){
+  const cw = document.getElementById("case-win"), d = document.getElementById("case-dock");
+  if (!cw || !d || typeof cw.getBoundingClientRect !== "function") return null;
+  if (typeof d.getBoundingClientRect !== "function") return null;
+  const w = cw.getBoundingClientRect(), r = d.getBoundingClientRect();
+  if (!w.width || !w.height || !r.width || !r.height) return null;
+  const dx = (r.left + r.width / 2) - (w.left + w.width / 2);
+  const dy = (r.top + r.height / 2) - (w.top + w.height / 2);
+  const s  = Math.max(.05, Math.min(r.width / w.width, r.height / w.height));
+  return { s: s, tf: "translate(" + dx + "px," + dy + "px) scale(" + s + ")" };
+}
+
+/* ---- 落点 B：「案件地图」图标 ---- */
+function updateMapBadge(){
+  const icon = document.getElementById("map-icon");
+  if (!icon || !icon.querySelector) return;
+  let b = icon.querySelector(".badge");
+  if (caseHeld){
+    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    b.textContent = "已关闭";
+  } else if (b) b.remove();
+}
+function setCaseHeld(v){
+  caseHeld = !!v;
+  updateMapBadge();
+}
+/* 把案件窗和「案件地图」图标的图形（.icon-glyph，不含下面的文字标签）中心对上。
+   无头 stub 不解析 HTML、取不到 .icon-glyph，就退回整个图标元素（它有 offsetWidth/Height，照样解得出来）。 */
+function caseIconMotion(){
+  const cw = document.getElementById("case-win");
+  const icon = document.getElementById("map-icon");
+  if (!cw || !icon || typeof cw.getBoundingClientRect !== "function") return null;
+  const anchor = (icon.querySelector && icon.querySelector(".icon-glyph")) || icon;
+  if (typeof anchor.getBoundingClientRect !== "function") return null;
+  const w = cw.getBoundingClientRect(), r = anchor.getBoundingClientRect();
+  if (!w.width || !w.height || !r.width || !r.height) return null;
+  const dx = (r.left + r.width / 2) - (w.left + w.width / 2);
+  const dy = (r.top + r.height / 2) - (w.top + w.height / 2);
+  const s  = Math.max(.05, Math.min(r.width / w.width, r.height / w.height));
+  return { s: s, tf: "translate(" + dx + "px," + dy + "px) scale(" + s + ")" };
+}
+
+/* ---- 两个落点的统一开关 ---- */
+function caseParkPoint(p){
+  if (p === "dock"){ setCaseHeld(false); showCaseDock(true); }
+  else { showCaseDock(false); setCaseHeld(true); }
+}
+function caseParkMotion(p){ return (p === "dock") ? caseDockMotion() : caseIconMotion(); }
+/* 当前案件落在哪（案件窗开着时返回 null） */
+function caseParkedAt(){ return caseOpen ? null : (caseDockOn ? "dock" : (caseHeld ? "icon" : null)); }
+function caseMotionReset(){
+  const cw = document.getElementById("case-win");
+  if (!cw) return;
+  if (cw.style){
+    cw.style.transition = ""; cw.style.transform = ""; cw.style.transformOrigin = ""; cw.style.opacity = "";
+  }
+  if (cw.classList) cw.classList.remove("case-switching");
+}
+/* 离屏：从当前位置缩到寄存落点上（目标点由 caseParkMotion 给） */
+function caseMotionApply(tf){
+  const cw = document.getElementById("case-win");
+  if (!cw || !cw.style) return;
+  cw.style.transition = "transform .26s cubic-bezier(.4,0,.2,1), opacity .26s ease";
+  cw.style.transformOrigin = "50% 50%";
+  cw.style.transform = tf;
+  cw.style.opacity = "0";
+}
+/* 展开：从寄存落点放大回原位（窗口要已经显示出来，才量得到目标位置）。p = "dock" | "icon" */
+function caseMotionPlayIn(p){
+  const cw = document.getElementById("case-win");
+  if (!cw || !cw.style) return;
+  const m = caseParkMotion(p);
+  if (!m) return;
+  cw.style.transition = "none";
+  cw.style.transformOrigin = "50% 50%";
+  cw.style.transform = m.tf;
+  cw.style.opacity = "0";
+  if (typeof cw.getBoundingClientRect === "function") cw.getBoundingClientRect();   /* 强制回流，让起始态生效 */
+  cw.style.transition = "transform .26s cubic-bezier(.4,0,.2,1), opacity .26s ease";
+  cw.style.transform = "none";
+  cw.style.opacity = "1";
+  const t = setTimeout(caseMotionReset, 300);
+  if (!t) caseMotionReset();
+}
+/* 案件标题：优先用案件数据自己声明的 config.caseTitle，否则退回案件库里的占位名 */
+function caseTitleOf(id){
+  const c = caseById(id);
+  if (!c) return id;
+  const d = CASE_DATA[id];
+  return (d && d.config && d.config.caseTitle) || c.title || "？？？？？？";
+}
+/* 案件副标题：未解锁时用案件库里的加密提示，解锁后用数据自带说明（或通用文案） */
+function caseNoteOf(id){
+  const c = caseById(id);
+  if (!c) return "";
+  if (!caseUnlocked(id)) return c.note;
+  const d = CASE_DATA[id];
+  if (!d) return "地址已解锁 · 案件数据待装载";
+  const base = (d.config && d.config.caseNote) || "异动区域 · 已解锁";
+  return hasCaseSave(id) ? base + " · 有存档" : base;
+}
+/* 外壳上的案件标识（案件窗标题栏 + 顶栏副标题） */
+function updateCaseChrome(){
+  const c = caseById(CASE_ID);
+  if (!c) return;
+  const title = document.getElementById("case-title");
+  if (title) title.textContent = c.code + " // " + caseTitleOf(CASE_ID);
+  const sub = (typeof document.querySelector === "function") ? document.querySelector(".brand small") : null;
+  if (sub) sub.textContent = "节点原型 v2 · 案件 " + c.code.replace(/^CASE\s+/, "");
+}
+/* 从案件地图进入案件：
+   已经开着本案 -> 空操作；开着别的案 -> 存旧案 + 换档；本来关着 -> 不存，直接续档。 */
+function enterCase(id){
+  if (switchingCase) return false;
+  if (caseOpen && id === CASE_ID) return false;
+  const c = caseById(id);
+  if (!c) return false;
+  if (!caseUnlocked(id)){ toast("该案件地址尚未解密"); return false; }
+  if (!CASE_DATA[id]){ toast("案件 <b>" + esc(c.code) + "</b> 的数据尚未装载"); return false; }
+  const cw = document.getElementById("case-win");
+  /* 本来已经离屏：从它当时落下的地方（右下角卡片 / 案件地图图标）放大展开回来 */
+  if (!caseOpen){
+    const p = caseParkedAt() || "icon";
+    doEnterCase(id, null);
+    caseMotionPlayIn(p);
+    return true;
+  }
+  const from = CASE_ID;
+  const swap = () => {
+    switchingCase = false;
+    if (cw && cw.classList) cw.classList.remove("case-switching");
+    doEnterCase(id, from);
+  };
+  /* 屏上有案就先淡出再换档。无定时器的环境（无头驱动）立即同步换档。 */
+  if (cw && cw.classList){
+    cw.classList.remove("case-switching");
+    cw.classList.add("case-switching");
+    switchingCase = true;
+    const t = setTimeout(swap, 180);
+    if (!t) swap();
+  } else swap();
+  return true;
+}
+function doEnterCase(id, from){
+  const c = caseById(id);
+  const snap = loadCaseState(id);    /* 先把目标案的档读出来，再存旧案，免得两边撞在一起 */
+  if (from) saveCaseState(from);     /* 1. 存上一个案 */
+  applyCaseData(CASE_DATA[id]);      /* 2. 载目标案数据 */
+  CASE_ID = id;
+  progress.last = id; saveProgress();
+  /* 3. 清会话态：撤销栈 / TEC 对话 / 图标位置 */
+  history = [];
+  tecHistory.length = 0;
+  resetIconPositions();
+  closeMapWin();
+  lastEnteredCase = id;
+  /* 4. 清掉两个寄存落点、打开案件窗、重建：有档续档，无档全新开局 */
+  showCaseDock(false);
+  setCaseHeld(false);
+  caseMotionReset();
+  setCaseWinVisible(true);
+  boot({ fromSnapshot: snap });
+  log("已进入案件 <b>" + esc(c.code) + " // " + esc(caseTitleOf(id)) + "</b>", "sys");
+}
+/* 案件窗离屏：p = "dock"（– 收起 → 右下角卡片）/ "icon"（× 关闭 → 「案件地图」图标）。
+   两条路都先存盘、都不弹案件地图，只是落点不同。 */
+function parkCase(p){
+  if (!caseOpen || switchingCase) return false;
+  const c = caseById(CASE_ID);
+  const cw = document.getElementById("case-win");
+  const finish = () => {
+    switchingCase = false;
+    caseMotionReset();
+    saveCaseState(CASE_ID);          /* 离开现场，先把进度存进本案的档 */
+    setCaseWinVisible(false);
+    caseParkPoint(p);
+    history = [];
+    tecHistory.length = 0;
+    /* 浮层都锚在画布上，画布一藏就没意义了，一起收掉 */
+    closeBubble(); closeNarr(); closePwPop();
+    clearSelection();
+    setDetailWin(false);
+    log(p === "dock"
+      ? "已把案件 <b>" + esc(c ? c.code : CASE_ID) + "</b> 收起到桌面右下角的卡片：进度已保存，点卡片即可展开。"
+      : "已把案件 <b>" + esc(c ? c.code : CASE_ID) + "</b> 关闭到桌面「案件地图」图标：进度已保存，进案件地图即可展开。", "sys");
+  };
+  /* 收缩动画：落点先亮出来当靶子，案件窗再缩过去 */
+  const m = caseParkMotion(p);
+  if (cw && cw.style && m){
+    caseParkPoint(p);
+    caseMotionApply(m.tf);
+    switchingCase = true;
+    const t = setTimeout(finish, 280);
+    if (!t) finish();
+  } else finish();
+  return true;
+}
+/* – 收起：缩成右下角的案件卡片 */
+function stowCase(){ return parkCase("dock"); }
+/* × 关闭：缩进「案件地图」图标 */
+function closeCase(){ return parkCase("icon"); }
 
 const SENSE_FLAVOR = {
   vision:  "你习惯先看清，再行动。",
@@ -2433,7 +2995,13 @@ function buildCert(c){
 
   const sec1 = document.createElement("div");
   sec1.className = "cert-sec cert-id";
-  sec1.appendChild(genAvatar(c.id, 20));
+  const avBox = document.createElement("div");
+  avBox.className = "cert-photo";
+  const avImg = document.createElement("img");
+  avImg.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAADz0lEQVR4Ae2ZPUwUURDHT6OJhRgLC04TlHhCzq/EwspSY7RAC+2kshAKUIJeARZqIRSnBIUC7dXKAmmM0dLKwsSvC3gGJdGjsDBiYWKhssf/jje3s7N7O7tajM3svHn7Zu7/fju8XTMZ+2cKmAKmgClgCpgCpoApYAqYAqaAKZC2AmvSTsjlO39l4jcX8xu/fa0/ldrX+iW3sboCqexCPV3jFcg5fOiIE3z2/KnjS05SRBlBgvKpEXT89NnAHnNj9KZT6qWhi46/a88Bx+ccbZKMIE7plfF1QrzpMHoLFnj/9iUuPfv5U9mz27bnnHHqhCWH3qflG0GCkuoESeSgHokczAN5IAk+4tQiv1YvMoKowsRXJ4isn+F2XupBiGM96mM8LImYH9UaQYJiagTh2UePADlcfrrz5flFbmrgOMjCesgfeFOEoBEkiKVGEM2Dd6tce+tKqJtOCfQf3J8OjCMI8qbuFjGkao0gQU51gnrPFbyUkxNXPTs+NiWUEC+MPH391XzaJBlBwv6oEYS/Hj3d1V4Tlpzduc2BJb4rfwuMh80TuEhA0AgKEGc5pEaQkIcNS4SwN6YUMIIEodW+KE4/KXlfDOvnHiFzQmGci04ezav8NiNI2CgTyAQSFBDCsZ/Tn48Kzv9WfMgPCyndMHqGO1r3ova0naWR+s1/rzacKMb6jfaIOXI2OmrnoMrr79XV81UzMNjrXXAnXYkclIp5HEk0D+rI7tuEJWJZI0iQL9bzubw27UHYwVcHB4TUbnj/i3FnoNn7KTnWgxxZ9Z3YBKEkkASCsJPwMY+zmI941PswH+vEJQd1WA+CEoxVI4iuD6LWt211Qr8Wvjh+VIdbT4sYWo8RRBUhvto5iKxbc0EM3Xn0jB3Dwd+sP45Uz1PoLVgY68JPyhpBgrKJ9SDkRS+Cr22T6j2o0wiCEow1gRhhMGwCQQnGJt6DkFe7FyXde1C3EQQlGJsaQTT//PUe50skjVO//fKdf1KrEUR3gviJn6RJvppLT8a1wH92YQQJG5I6QRtbWnx7D31Xo+9auO/H0lKqvcgIEghS341jXV2+hJRnZ71SFisV35K+3qu+tSO45Yz/W35rNutNyXV2YqpjH8/MqP4mI8iRt9GJrTZHDFKBHPggaHTsIYY8OzR4yvG5OAjCZI4kxOMSZQRBScY2TRDIoYQweWrDFwqTtevVF3vzbavdzJvSguPDuVXsw2UoC8KaJckIEmRu+hwUlRyhjsTCces0goStidyDch0dvuccIU9DmPYi2lukeMOCIQfKc3ORfrMRJAj7B+RdBEAX+P7+AAAAAElFTkSuQmCC";
+  avImg.alt = "avatar";
+  avBox.appendChild(avImg);
+  sec1.appendChild(avBox);
   const fields = document.createElement("div");
   fields.className = "cert-fields";
   const nm = document.createElement("div"); nm.className = "cert-name"; nm.textContent = c.name;
@@ -2472,7 +3040,7 @@ function mountInvChip(){
     invChipEl.addEventListener("click", openCardReview);
     const brand = document.querySelector(".brand");
     if (brand && brand.parentNode && brand.parentNode.insertBefore) brand.parentNode.insertBefore(invChipEl, brand.nextSibling);
-    else stage.appendChild(invChipEl);
+    else desktopEl.appendChild(invChipEl);
   }
   invChipEl.textContent = "▣ " + investigator.name + " · " + investigator.id;
 }
@@ -2496,13 +3064,14 @@ function openCardReview(){
   actions.className = "cert-actions";
   actions.appendChild(btn);
   w.body.appendChild(actions);
-  stage.appendChild(w.el);
+  desktopEl.appendChild(w.el);
   makeFloatDraggable(w.el, false);
   invReviewEl = w.el;
 }
 
 /* ============ 启动 ============ */
-function boot(){
+function boot(opts){
+  opts = opts || {};
   G = blankGraph();
   closePwPop();
   closeBubble();
@@ -2511,11 +3080,27 @@ function boot(){
   closeBagWin();
   closeGotoWin();
   closeInferWin();
+  closeMapWin();
   view = { x: 40, y: 20, k: 1 };
   applyView();
   logBox.innerHTML = "";
   setDetailWin(false);
   detailBody.innerHTML = "<div class='empty'>点选任意节点查看信息。</div>";
+  updateCaseChrome();
+  /* 续档：直接恢复目标案快照（不重放起始场景的叙事卡） */
+  if (opts.fromSnapshot){
+    let saved = null;
+    try { saved = JSON.parse(opts.fromSnapshot).__view || null; } catch(_){}
+    restore(opts.fromSnapshot);
+    render();
+    /* 存档里带了镜头就原位恢复，否则兜底 fit */
+    if (saved && isFinite(saved.x) && isFinite(saved.y) && isFinite(saved.k)){
+      view = { x: saved.x, y: saved.y, k: saved.k };
+      applyView();
+    } else fit();
+    mountInvChip();
+    return;
+  }
   const sn = ensureNode("loc", START, { label: SCENES[START].title || START, x: 1000, y: 620 });
   revealScene(START, true);
   layout();
@@ -2524,8 +3109,10 @@ function boot(){
   mountInvChip();
   if (investigator) showNarrCard(sn, SCENES[START]);
   else openIntro();
-  log("已载入案件 A-001：双击 <b>场景节点</b> 展开里面的东西，把节点 <b>拖到另一个节点上</b> 组合使用。", "sys");
-  log("提示：起始场景就是「植物学家的花园」。双击「书桌」等场景节点继续展开，拖动手电筒到黑影上试试。", "sys");
+  const _cc = caseById(CASE_ID);
+  const _code = (_cc ? _cc.code : CASE_ID).replace(/^CASE\s+/, "");
+  log("已载入案件 <b>" + esc(_code) + "</b>：双击 <b>场景节点</b> 展开里面的东西，把节点 <b>拖到另一个节点上</b> 组合使用。", "sys");
+  if (CASE_ID === "A001") log("提示：起始场景就是「植物学家的花园」。双击「书桌」等场景节点继续展开，拖动手电筒到黑影上试试。", "sys");
 }
 
 /* 测试钩子（供 verify.js 无头驱动） */
@@ -2558,6 +3145,23 @@ window.__select = key => key ? selectNode(key) : clearSelection();
 window.__closeFloats = () => { closeBubble(); closeNarr(); closePwPop(); };
 window.__renarr = sid => renarrScene(sid);
 window.__hit   = (cx, cy) => { const e = hitTest(cx, cy, null); return e ? e.dataset.key : null; };
+window.__switchCase = id => enterCase(id);
+window.__closeCase = () => closeCase();
+window.__registerCase = (id, data) => { CASE_DATA[id] = data; };
+window.__caseDataOf = id => CASE_DATA[id];
+window.__unlockCase = id => unlockCase(id);
+window.__caseInfo = () => ({
+  id: CASE_ID,
+  open: caseOpen,
+  held: caseHeld,
+  dock: caseDockOn,
+  registered: Object.keys(CASE_DATA),
+  lastEntered: lastEnteredCase,
+  unlocked: progress.unlocked.slice(),
+  title: (document.getElementById("case-title") || {}).textContent,
+  start: START,
+  sceneTitle: (SCENES[START] || {}).title || null
+});
 window.__dump  = () => ({
   nodes: Object.keys(G.nodes),
   lit: Object.keys(G.nodes).filter(k => G.nodes[k].lit),
