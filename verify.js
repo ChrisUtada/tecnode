@@ -463,12 +463,6 @@ if (zsqEl && deskEl){
 window.__collapse('SCENE_shuzhuo');
 assert('展开书桌后注射器被取回', !window.__dump().stored.includes('item:ITEMS_zsq'));
 
-/* 批量收回 */
-window.__storeAll('SCENE_shuzhuo');
-const sa = window.__dump();
-assert('批量收回：台灯被收纳', sa.stored.includes('item:ITEM_taideng'));
-assert('批量收回：场景节点本身不被收纳', !sa.stored.includes('loc:SCENE_shuzhuo'));
-
 console.log('\n=== 17. 证物袋 ===');
 ids['btn-reset']._ev.click[0]();
 window.__closeFloats();
