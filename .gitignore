@@ -1,11 +1,13 @@
 # ─── 无头浏览器 / CDP 调试残留 ───────────────────────────────
 _cdp_profile*/
+.cdp_profile_tec/
 _cdp*.cjs
 _cdp*.html
 connect-cdp.*
 cdp-*.log
 
 # ─── 一次性补丁与生成脚本 ───────────────────────────────────
+_*.py
 _patch_*.py
 _mk_*.py
 _sync_tpl.py
@@ -19,8 +21,13 @@ screenshot-*
 case-*-check.png
 index-*
 check-*.html
+_flash-*.png
+_flash-*.html
+_crop-*.png
+frm-*.png
 cert-avatar-demo.*
 avatar.b64
+avatar_b64.txt
 
 # ─── 备份与日志 ─────────────────────────────────────────────
 *.bak

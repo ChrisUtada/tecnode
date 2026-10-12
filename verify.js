@@ -16,6 +16,8 @@ function mkEl(tag){
     value: '', checked: false, isConnected: true,
     offsetWidth: 140, offsetHeight: 48, scrollTop: 0, scrollHeight: 0,
     appendChild(c){ c.parentNode = el; el.children.push(c); return c; },
+    insertBefore(c, ref){ c.parentNode = el; const i = el.children.indexOf(ref); if (i >= 0) el.children.splice(i, 0, c); else el.children.push(c); return c; },
+    cloneNode(){ const c = mkEl(el.tagName); c._classes = new Set(el._classes); c._html = el._html; c._text = el._text; return c; },
     removeChild(c){ el.children = el.children.filter(x => x !== c); return c; },
     remove(){ if (el.parentNode) el.parentNode.removeChild(el); el.isConnected = false; },
     addEventListener(t, f){ (el._ev[t] = el._ev[t] || []).push(f); },
@@ -522,6 +524,24 @@ assert('见过文案后听说门的后面', window.__gotoList().includes('SCENES
 window.__goto('SCENES_mdhm');
 assert('前往生成场景节点', window.__dump().nodes.includes('loc:SCENES_mdhm'));
 
+console.log('\n=== 18b. TEC 拖入分析：延迟后提取线索 / 无线索提示 ===');
+ids['btn-reset']._ev.click[0]();
+window.__closeFloats();
+window.__reveal('SCENE_shuzhuo');
+window.__choice('ITEM_chouti', 0, 0);
+window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
+window.__reveal('SCENES_body');
+assert('TEC 分析入口已暴露（window.__analyze）', typeof window.__analyze === 'function');
+const anBefore = window.__dump().captured.length;
+assert('TEC 分析 loc:SCENES_body 返回 true', window.__analyze('loc:SCENES_body') === true);
+assert('分析完成（无头同步）后提取到线索 CLUES_V_luheng', window.__dump().captured.includes('CLUES_V_luheng'));
+assert('分析产生线索节点（可拖出使用）', window.__dump().nodes.includes('clue:CLUES_V_luheng'));
+assert('分析确实新增了捕获', window.__dump().captured.length > anBefore);
+const anMid = window.__dump().captured.length;
+assert('无新线索可捕获时走到「无线索」分支且返回 true', window.__analyze('loc:SCENES_body') === true && window.__dump().captured.length === anMid);
+assert('线索节点拒绝被再次分析', window.__analyze('clue:CLUES_V_luheng') === false);
+assert('分析后 TEC 对话窗处于打开态', window.__dump().floats.tec === true);
+
 console.log('\n=== 19. 结局系统 + 记忆放映 ===');
 ids['btn-reset']._ev.click[0]();
 window.__closeFloats();
@@ -607,7 +627,7 @@ assert('TEC 交谈推进提示进度', window.__dump().tec.prog['SCENES_body'] =
 
 console.log('\n=== 22. 侧边栏图标化 ===');
 ids['btn-reset']._ev.click[0]();
-assert('日志窗默认开启', window.__dump().floats.logs === true);
+assert('日志窗默认关闭', window.__dump().floats.logs === false);
 assert('详情窗默认关闭', window.__dump().floats.detail === false);
 assert('aside 已从源码移除', html.indexOf('<aside') < 0);
 window.__select('loc:SCENES_garden');
@@ -797,7 +817,7 @@ assert('#icons 是 #case-win 的兄弟（都在 #desktop 下）', depthAt['icons
 assert('#log-win 也在 #desktop 下', depthAt['log-win'] === depthAt['case-win']);
 assert('#detail-win 也在 #desktop 下', depthAt['detail-win'] === depthAt['case-win']);
 assert('#stage 在 #case-win 内一层', depthAt['stage'] === depthAt['case-win'] + 1);
-assert('#world 与 #hint 都在 #stage 内', depthAt['world'] === depthAt['stage'] + 1 && depthAt['hint'] === depthAt['stage'] + 1);
+assert('#world 在 #stage 内', depthAt['world'] === depthAt['stage'] + 1);
 
 console.log('\n=== 27. 案件窗离屏：– 收起 -> 右下角卡片 / × 关闭 -> 「案件地图」图标 ===');
 /* 静态结构：两个落点各有归宿。DOM stub 不解析 HTML，结构断言只能查源码。 */
@@ -809,7 +829,7 @@ assert('标题栏同时有最小化 #case-min 与关闭 #case-x', /id="case-min"
 assert('两条路是分开的函数（parkCase / stowCase / closeCase）',
   /function parkCase\(p\)/.test(html) && /function stowCase\(\)\{ return parkCase\("dock"\); \}/.test(html)
   && /function closeCase\(\)\{ return parkCase\("icon"\); \}/.test(html));
-assert('拖动排除表覆盖了地图地址卡', /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x"\)/.test(html));
+assert('拖动排除表覆盖了地图地址卡与 TEC 头像', /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.tec-avatar"\)/.test(html));
 /* 触发 stub 里注册的事件处理器 */
 const fire = (el, t, o) => (el._ev[t] || []).forEach(f => f(Object.assign(
   { button: 0, clientX: 0, clientY: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o)));
