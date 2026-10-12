@@ -531,6 +531,46 @@ window.__store('item:ITEMS_zsq', 'SCENES_garden');
 const bs = window.__dump();
 assert('场景收纳与证物袋互不干扰', bs.stored.includes('item:ITEMS_zsq') && !bs.bag.includes('item:ITEMS_zsq'));
 
+/* ---- 拖到「证物袋窗口」上也能收纳：窗口开着时，窗口本身也是一个落点 ----
+   stub 里窗口没有内联 left/top（定位来自 CSS 类），矩形会退化成 (0,0,140,48)，而
+   #bag-dock 被 resetIconPositions 摆在 (18,156)，两者本来就不重叠。为了证明命中的
+   确实是「窗口」而不是「图标」，这里把窗口显式挪到一块空地上，并先断言落点不在
+   证物袋图标矩形内 —— 否则这条测试会因为命中 bag-dock 而假通过。 */
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+window.__closeFloats();
+const bagWinNode = () => document.getElementById('desktop').querySelector('.bag-win');
+ids['bag-dock']._ev.dblclick[0]();
+assert('证物袋窗口已打开（供拖入）', window.__dump().floats.bag === true && !!bagWinNode());
+const bwNode = bagWinNode();
+const bwDragEl = findEl('item:ITEMS_zsq');
+if (bwNode && bwDragEl){
+  bwNode.style.left = '640px'; bwNode.style.top = '420px';   /* 挪到避开整列图标的空地 */
+  const bwr = bwNode.getBoundingClientRect();
+  const bwx = bwr.left + bwr.width / 2, bwy = bwr.top + bwr.height / 2;
+  const bdockRect = ids['bag-dock'].getBoundingClientRect();
+  assert('落点避开证物袋图标（否则测不出「拖进窗口」这条路径）',
+    !(bwx >= bdockRect.left && bwx <= bdockRect.right && bwy >= bdockRect.top && bwy <= bdockRect.bottom));
+  const mkEv = o => Object.assign({ button: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o);
+  bwDragEl._ev.pointerdown[0](mkEv({ clientX: 0, clientY: 0 }));
+  bwDragEl._ev.pointermove[0](mkEv({ clientX: 40, clientY: 30 }));
+  bwDragEl._ev.pointermove[0](mkEv({ clientX: bwx, clientY: bwy }));
+  assert('拖到证物袋窗口上时窗口高亮（悬停与判决共用同一份清单）', bwNode._classes.has('over'));
+  bwDragEl._ev.pointerup[0](mkEv({ clientX: bwx, clientY: bwy }));
+  assert('拖到证物袋窗口里：注射器被收纳', window.__dump().bag.includes('item:ITEMS_zsq'));
+  assert('拖入窗口后离开画布（stored）', window.__dump().stored.includes('item:ITEMS_zsq'));
+  assert('窗口内容当场刷新（清单里出现 1 条）', bwNode.querySelectorAll('.bag-item').length === 1);
+  assert('落定后窗口的高亮被清掉', !bwNode._classes.has('over'));
+} else {
+  errs++; console.log('  ✗ 找不到证物袋窗口或注射器节点元素');
+}
+
+/* 反例：窗口关掉之后就不再是落点（否则窗口虽不在、命中框还在，拖过去会莫名其妙被收纳） */
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+window.__closeFloats();
+assert('重置后证物袋窗口已关掉', window.__dump().floats.bag === false && !bagWinNode());
+
 console.log('\n=== 18. 捕获 + 前往 ===');
 ids['btn-reset']._ev.click[0]();
 window.__reveal('SCENES_garden');   /* 「手电筒 → 黑影」的目标黑影在花园里 */
@@ -1100,6 +1140,24 @@ assert('悬停高亮与松手判决共用同一份 nodeDropTargets()',
   (html.match(/nodeDropTargets\(\)\.forEach\(id => \{/g) || []).length === 2);
 assert('拖节点悬停到收起卡片上有高亮（与窗内头像同一套虚线）',
   /#tec-chip\.over\{[^}]*outline:2px dashed var\(--text\)/.test(html));
+/* 证物袋窗口也是落点：窗口开着时把节点拖到窗口上 = 收纳。
+   顺序必须排在最前 —— .bag-win（z25）盖在 #icons（z24）之上，被盖住的区域要判给
+   「看得见的窗口」，否则拖物品到窗口上会落进底下那张被遮住的图标（推演器 / 档案）。 */
+assert('证物袋窗口进了落点清单，且排在图标之前（z 序：窗口 25 > 图标 24）',
+  /function nodeDropTargets\(\)\{[^}]*if \(bagWinEl\) list\.push\("bag-win"\)/.test(html)
+  && html.indexOf('if (bagWinEl) list.push("bag-win")') < html.indexOf('list.push("bag-dock","tec-dock"'));
+assert('窗口是「只在开着时才算落点」（关窗后不再是落点）',
+  /if \(bagWinEl\) list\.push\("bag-win"\)/.test(html)
+  && /\.bag-win\{position:absolute/.test(html));
+assert('拖进窗口与拖到图标上走同一条收纳路由（bagStore）',
+  /iconHit === "bag-dock" \|\| iconHit === "bag-win"\) bagStore\(n\.key\);/.test(html));
+assert('证物袋窗口有悬停高亮样式（与卡片 / 助手头像同一套虚线）',
+  /\.bag-win\.over\{[^}]*outline:2px dashed var\(--text\)/.test(html));
+assert('落点元素解析走 dropTargetEl()（窗口取 bagWinEl，其余按 id），两处调用都在',
+  /function dropTargetEl\(id\)\{/.test(html)
+  && /id === "bag-win" \? bagWinEl : document\.getElementById\(id\)/.test(html)
+  && (html.match(/const ic = dropTargetEl\(id\);/g) || []).length === 2);
+assert('空袋提示把「窗口内」也说清楚', html.indexOf('或本窗口内）收纳') >= 0);
 /* 最小化的顺滑关键：先亮落点卡片、再让窗口缩过去（否则窗口缩没、卡片才淡入 = 闪一下） */
 const iMinTec = html.indexOf('function minTecWin(){');
 const minTecBody = iMinTec < 0 ? '' : html.slice(iMinTec, html.indexOf('\n}', iMinTec) + 2);

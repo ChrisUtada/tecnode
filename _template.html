@@ -192,6 +192,9 @@
     box-shadow:var(--win-shadow); z-index:25; cursor:grab; overflow:hidden}
   .bag-win:active{cursor:grabbing}
   .bag-win .syswin-body{max-height:300px; overflow:auto}
+  /* 拖节点悬停在证物袋窗口上：与 #tec-chip.over / .tec-avatar.over 同一套虚线高亮
+     （outline 画在本元素盒子外侧，不受自身 overflow:hidden 影响） */
+  .bag-win.over{outline:2px dashed var(--text); outline-offset:3px}
   .bag-item{display:flex; justify-content:space-between; align-items:baseline; gap:8px;
     padding:6px 8px; border-radius:var(--r-btn); cursor:pointer; font-size:12.5px; transition:background .12s, box-shadow .12s}
   .bag-item:hover{background:var(--bg); box-shadow:var(--press)}
@@ -1077,7 +1080,7 @@ function refreshBagWin(){
   if (!items.length){
     const d = document.createElement("div");
     d.className = "bag-empty";
-    d.textContent = "（空）把画布上的节点拖到袋子上收纳";
+    d.textContent = "（空）把画布上的节点拖到袋子上（或本窗口内）收纳";
     body.appendChild(d);
     return;
   }
@@ -1388,7 +1391,7 @@ function attachInteractions(el, n){
 
     /* 桌面图标命中高亮（固定优先级 bag > tec > infer > goto） */
     nodeDropTargets().forEach(id => {
-      const ic = document.getElementById(id);
+      const ic = dropTargetEl(id);
       if (!ic) return;
       const r = ic.getBoundingClientRect();
       ic.classList.toggle("over",
@@ -1429,7 +1432,7 @@ function attachInteractions(el, n){
     /* 桌面图标命中判定（固定优先级 bag > tec > infer > goto；任何路径清掉 over 高亮） */
     let iconHit = null;
     nodeDropTargets().forEach(id => {
-      const ic = document.getElementById(id);
+      const ic = dropTargetEl(id);
       if (!ic) return;
       const r = ic.getBoundingClientRect();
       const inside = moved && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
@@ -1442,7 +1445,7 @@ function attachInteractions(el, n){
     if (iconHit){
       /* 松手落在桌面图标上 → 对应功能，自己弹回原位 */
       springBack(el, ox, oy);
-      if (iconHit === "bag-dock") bagStore(n.key);
+      if (iconHit === "bag-dock" || iconHit === "bag-win") bagStore(n.key);
       else if (iconHit === "tec-dock" || iconHit === "tec-avatar" || iconHit === "tec-chip") tecAnalyze(n.key);
       else if (iconHit === "infer-icon"){
         if (n.kind === "clue") assignClue(n.key, (CLUES[n.id] || {}).type);
@@ -2211,10 +2214,21 @@ function initTecChip(){
 /* 节点可以拖到哪几个"外挂落点"上（悬停高亮 + 松手命中共用一份清单）。
    收起态才把右下角助手卡片加进来：卡片即使熄着也保留布局盒，不加这道门，
    窗口开着时拖节点划过卡片所在位置会被误判成"拖到了 TEC"。 */
+/* 顺序即命中优先级。证物袋窗口排在最前：它在图标层之上（.bag-win z-index:25 > #icons z-index:24），
+   窗口开着时会盖住左侧图标栏，按「看得见的最上面那个算数」的口径，被盖住的区域应判给窗口，
+   而不是底下那张看不见的图标（否则拖物品到窗口上会莫名其妙落进被遮住的推演器 / 档案）。
+   代价：窗口盖住的图标在窗口开着时点不到 —— 窗口可以拖走，这是可接受的取舍。 */
 function nodeDropTargets(){
-  const list = ["bag-dock","tec-dock","infer-icon","goto-icon","tec-avatar"];
+  const list = [];
+  if (bagWinEl) list.push("bag-win");                                    /* 只在证物袋窗口开着时才是落点 */
+  list.push("bag-dock","tec-dock","infer-icon","goto-icon","tec-avatar");
   if (tecChipOn) list.push("tec-chip");
   return list;
+}
+/* 落点元素解析：除证物袋窗口外都是静态图标 / 头像，按 id 取即可；
+   证物袋窗口是每次开窗临时建的，没有稳定的 DOM 查询入口，直接引用 bagWinEl（关窗即置 null）。 */
+function dropTargetEl(id){
+  return id === "bag-win" ? bagWinEl : document.getElementById(id);
 }
 function tecAnalyzingEl(){ return tecWinEl ? tecWinEl.querySelector(".tec-analyzing") : null; }
 function tecClearAnalyzing(){ const e = tecAnalyzingEl(); if (e) e.remove(); }
