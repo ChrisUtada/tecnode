@@ -884,6 +884,13 @@ assert('落定后桌布高亮被清掉', !boardEl._classes.has('over'));
 /* 推演器图标角标显示已归位条数 */
 const ib = ids['infer-icon'].querySelector('.badge');
 assert('推演器图标角标显示 1 条', !!ib && ib.textContent === '1 条');
+/* chip 上的 × 能把线索拿下桌布（排除表放行 click，否则被窗口拖拽的 pointer capture 吃掉）。
+   注意：归位后 refreshInferWin 重建了桌布，要重新取元素（手里旧的 boardEl 已离树） */
+const chipX = iwEl20.querySelector('.mx-board').querySelector('.mx-chip');
+assert('桌布上的线索 chip 带 ×', !!chipX && !!chipX.querySelector('.mx-x'));
+chipX.querySelector('.mx-x')._ev.click[0]();
+assert('点 × 后线索从桌布移除', !window.__dump().matrix.vision.includes('CLUES_V_luheng'));
+assert('移除后推演器图标角标消失', !ids['infer-icon'].querySelector('.badge'));
 /* TEC 窗口 */
 ids['tec-dock']._ev.dblclick[0]();
 assert('双击 TEC 图标开对话窗', window.__dump().floats.tec === true);
@@ -1190,7 +1197,7 @@ assert('TEC 对话窗也接线了"点框内任意位置推进"（挂在窗口根
   && !/av\.addEventListener\("click", \(\) => tecTalk\(\)\)/.test(html));
 assert('_dragged 的复位在拖动排除表之前（真机里从被排除的子元素上起手也会复位）',
   html.indexOf('el._dragged = false;') > 0
-  && html.indexOf('el._dragged = false;') < html.indexOf('closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec")'));
+  && html.indexOf('el._dragged = false;') < html.indexOf('closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip")'));
 assert('气泡与记忆放映卡都接线了"点击推进"，且用 _dragged 挡掉拖过的那次点击',
   /c\.addEventListener\("click", \(\) => \{ if \(!c\._dragged\) advanceMemory\(\); \}\)/.test(html)
   && /if \(b\._dragged\) return;/.test(html) && /advanceMemory/.test(html));
@@ -1213,8 +1220,8 @@ assert('标题栏同时有最小化 #case-min 与关闭 #case-x', /id="case-min"
 assert('两条路是分开的函数（parkCase / stowCase / closeCase）',
   /function parkCase\(p\)/.test(html) && /function stowCase\(\)\{ return parkCase\("dock"\); \}/.test(html)
   && /function closeCase\(\)\{ return parkCase\("icon"\); \}/.test(html));
-assert('拖动排除表覆盖了地图地址卡 / TEC 头像 / TEC 最小化键 / 阵列执行者',
-  /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.syswin-min,\.tec-avatar,\.mx-exec"\)/.test(html));
+assert('拖动排除表覆盖了地图地址卡 / TEC 头像 / TEC 最小化键 / 阵列执行者与线索 chip',
+  /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.syswin-min,\.tec-avatar,\.mx-exec,\.mx-chip"\)/.test(html));
 /* 触发 stub 里注册的事件处理器 */
 const fire = (el, t, o) => (el._ev[t] || []).forEach(f => f(Object.assign(
   { button: 0, clientX: 0, clientY: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o)));

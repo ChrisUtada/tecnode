@@ -1838,9 +1838,9 @@ function makeFloatDraggable(el, inWorld, handle){
        会一直留着上一次拖窗口的 true，那些元素自己的"点击"就被误吞了（真机才有；DOM stub 的
        closest() 恒返回 null，排除表在 stub 里等于不存在，所以这条测不出来）。 */
     el._dragged = false;
-    /* 交互子元素（按钮/输入框/清单项/× 关窗键/阵列执行者）不启动拖动——否则 setPointerCapture 会把 click
-       重定向到窗口自身，行内可点的清单项永远收不到 click。新增可点清单项时记得往这里加。 */
-    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec")) return;
+    /* 交互子元素（按钮/输入框/清单项/× 关窗键/阵列执行者与线索 chip）不启动拖动——否则 setPointerCapture
+       会把 click 重定向到窗口自身，行内可点的清单项永远收不到 click。新增可点清单项时记得往这里加。 */
+    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip")) return;
     /* CSS 定位的浮窗（right/bottom/margin 居中），首次拖动时换算成 left/top，并清掉 margin 防止跳位 */
     if (el.style.left === "" || el.style.left == null){
       const r = el.getBoundingClientRect(), sr = desktopEl.getBoundingClientRect();
