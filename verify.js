@@ -837,7 +837,13 @@ const mx = window.__dump().matrix;
 assert('五感归槽完成',
   mx.vision.includes('CLUES_V_luheng') && mx.hearing.includes('CLUES_nm') &&
   mx.touch.includes('CLUES_mc') && mx.taste.includes('CLUES_CBKW') && mx.smell.includes('CLUES_xds'));
-window.__infer();
+/* 长按中央执行者激活推演（无头环境 pointerdown 即完成蓄力） */
+const iwEl19 = document.getElementById('desktop').querySelector('.infer-win');
+const execEl = iwEl19 && iwEl19.querySelector('.mx-exec');
+assert('中央执行者在桌布上', !!execEl);
+const hintEl = iwEl19 && iwEl19.querySelector('.mx-exec-hint');
+assert('五感俱足时提示长按激活', !!hintEl && hintEl.textContent.indexOf('长按激活') >= 0);
+execEl._ev.pointerdown[0]({ button: 0 });
 assert('真结局触发', window.__dump().endingOverlay === true && window.__dump().endings.includes('TRUE_E'));
 for (let i = 0; i < 10; i++) window.__playStep();
 assert('演出步进完毕自动关闭', window.__dump().endingOverlay === false);
@@ -863,8 +869,21 @@ window.__choice('ITEM_chouti', 0, 0);
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
 window.__reveal('SCENES_body');
 window.__cap('loc:SCENES_body');
-window.__mxAssign('clue:CLUES_V_luheng', 'vision');
-assert('线索归入推演器', window.__dump().matrix.vision.includes('CLUES_V_luheng'));
+/* 拖线索落到桌布上 = 归位到它自己的感官（真实拖放路径；stub 里桌布矩形退化成 140×48，
+   先给个内联位置再测，与证物袋窗口的测法同款） */
+const iwEl20 = document.getElementById('desktop').querySelector('.infer-win');
+const boardEl = iwEl20 && iwEl20.querySelector('.mx-board');
+assert('桌布在阵列窗里', !!boardEl);
+boardEl.style.left = '400px'; boardEl.style.top = '120px';
+const clueEl20 = findEl('clue:CLUES_V_luheng');
+assert('线索节点在画布上', !!clueEl20);
+const bdr = boardEl.getBoundingClientRect();
+dragTo(clueEl20, bdr.left + bdr.width / 2, bdr.top + bdr.height / 2);
+assert('拖线索上桌布归位（自动归入视觉）', window.__dump().matrix.vision.includes('CLUES_V_luheng'));
+assert('落定后桌布高亮被清掉', !boardEl._classes.has('over'));
+/* 推演器图标角标显示已归位条数 */
+const ib = ids['infer-icon'].querySelector('.badge');
+assert('推演器图标角标显示 1 条', !!ib && ib.textContent === '1 条');
 /* TEC 窗口 */
 ids['tec-dock']._ev.dblclick[0]();
 assert('双击 TEC 图标开对话窗', window.__dump().floats.tec === true);
@@ -1171,7 +1190,7 @@ assert('TEC 对话窗也接线了"点框内任意位置推进"（挂在窗口根
   && !/av\.addEventListener\("click", \(\) => tecTalk\(\)\)/.test(html));
 assert('_dragged 的复位在拖动排除表之前（真机里从被排除的子元素上起手也会复位）',
   html.indexOf('el._dragged = false;') > 0
-  && html.indexOf('el._dragged = false;') < html.indexOf('closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar")'));
+  && html.indexOf('el._dragged = false;') < html.indexOf('closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec")'));
 assert('气泡与记忆放映卡都接线了"点击推进"，且用 _dragged 挡掉拖过的那次点击',
   /c\.addEventListener\("click", \(\) => \{ if \(!c\._dragged\) advanceMemory\(\); \}\)/.test(html)
   && /if \(b\._dragged\) return;/.test(html) && /advanceMemory/.test(html));
@@ -1194,8 +1213,8 @@ assert('标题栏同时有最小化 #case-min 与关闭 #case-x', /id="case-min"
 assert('两条路是分开的函数（parkCase / stowCase / closeCase）',
   /function parkCase\(p\)/.test(html) && /function stowCase\(\)\{ return parkCase\("dock"\); \}/.test(html)
   && /function closeCase\(\)\{ return parkCase\("icon"\); \}/.test(html));
-assert('拖动排除表覆盖了地图地址卡 / TEC 头像 / TEC 最小化键',
-  /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.syswin-min,\.tec-avatar"\)/.test(html));
+assert('拖动排除表覆盖了地图地址卡 / TEC 头像 / TEC 最小化键 / 阵列执行者',
+  /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.syswin-min,\.tec-avatar,\.mx-exec"\)/.test(html));
 /* 触发 stub 里注册的事件处理器 */
 const fire = (el, t, o) => (el._ev[t] || []).forEach(f => f(Object.assign(
   { button: 0, clientX: 0, clientY: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o)));

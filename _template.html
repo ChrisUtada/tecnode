@@ -208,17 +208,44 @@
     padding:6px 8px; border-radius:var(--r-btn); cursor:pointer; font-size:12.5px; transition:background .12s, box-shadow .12s}
   .goto-item:hover{background:var(--bg); box-shadow:var(--press)}
   .goto-item .st{color:var(--faint); font-size:10.5px; white-space:nowrap}
-  .infer-win{position:absolute; left:50%; top:70px; margin-left:-190px; width:380px;
+  /* 阵列桌布：大版纸面窗——执行者居中，线索环绕五感锚点，虚线连向中央（与主舞台同一张"纸"） */
+  .infer-win{position:absolute; left:50%; top:40px; margin-left:-320px; width:640px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
-  .infer-win .syswin-body{max-height:380px; overflow:auto}
-  .mx-slot{border:1px dashed var(--line2); border-radius:var(--r-btn); padding:6px 8px; margin-bottom:6px}
-  .mx-slot.over{border:1px solid var(--text); background:var(--bg); box-shadow:var(--press)}
-  .mx-sense{font-size:11px; font-weight:700; letter-spacing:2px; color:var(--muted); margin-bottom:4px}
-  .mx-clue{display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 4px}
-  .mx-clue .mx-x{cursor:pointer; color:var(--faint)}
-  .mx-clue .mx-x:hover{color:var(--text)}
-  .mx-ending{font-size:12px; color:var(--muted); padding:3px 2px; border-top:1px dashed var(--line2)}
+  .infer-win .syswin-body{padding:0}
+  /* 桌布本体：与 #stage 共用纸纹变量；整块都是线索落点。尺寸与 JS 的 MX_W/MX_H 对应，改动要同步 */
+  .mx-board{position:relative; width:640px; height:460px; overflow:hidden;
+    background-color:var(--bg);
+    background-image:var(--paper-grain), var(--paper-fleck);
+    background-size:200px 200px, 360px 360px; background-repeat:repeat, repeat;
+    background-blend-mode:soft-light, multiply}
+  .mx-board.over{outline:2px dashed var(--text); outline-offset:-6px}
+  .mx-links{position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none}
+  .mx-links line{stroke:var(--text); stroke-width:1.5; stroke-dasharray:5 5; opacity:.55}
+  .mx-board.charging .mx-links line{animation:mxflow .5s linear infinite; opacity:.9}
+  @keyframes mxflow{from{stroke-dashoffset:0}to{stroke-dashoffset:-20}}
+  /* 感官锚点：五感环绕中央排布，归位的线索 chip 叠在锚点下方 */
+  .mx-anchor{position:absolute; width:140px; margin-left:-70px; text-align:center}
+  .mx-anchor-label{font-size:10.5px; font-weight:700; letter-spacing:2px; color:var(--muted)}
+  .mx-chip{display:flex; justify-content:space-between; gap:6px; margin-top:4px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-btn);
+    padding:3px 7px; font-size:11.5px; box-shadow:var(--raise-sm); text-align:left}
+  .mx-chip .mx-x{cursor:pointer; color:var(--faint)}
+  .mx-chip .mx-x:hover{color:var(--text)}
+  /* 中央执行者：长按 2.5s 激活归因（蓄力环绕头像转满一圈） */
+  .mx-exec{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); text-align:center;
+    cursor:pointer; user-select:none; padding:6px}
+  .mx-exec .mx-avatar{width:72px; height:72px; border-radius:14px; overflow:hidden; margin:0 auto;
+    border:1px solid var(--edge); box-shadow:var(--raise); background:var(--face-hi)}
+  .mx-exec .mx-avatar img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  .mx-exec-label{font-size:10.5px; font-weight:700; letter-spacing:2px; color:var(--muted); margin-top:4px}
+  .mx-exec-hint{font-size:10.5px; color:var(--faint); margin-top:2px; white-space:nowrap}
+  .mx-exec::before{content:""; position:absolute; left:50%; top:6px; width:84px; height:84px;
+    transform:translateX(-50%); border-radius:999px; border:2px dashed var(--line2); opacity:0; pointer-events:none}
+  .mx-exec.charging::before{opacity:1; border-color:var(--text); animation:mxspin 2.5s linear forwards}
+  @keyframes mxspin{from{transform:translateX(-50%) rotate(0)}to{transform:translateX(-50%) rotate(360deg)}}
+  /* 结局清单：弱化存在，收在桌布左下角 */
+  .mx-endings{position:absolute; left:10px; bottom:8px; font-size:10.5px; color:var(--faint); line-height:1.7}
   .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
   .memory{background:#dcd8c2; border:3px double #2b2b26; border-radius:var(--r-win); box-shadow:var(--win-shadow)}
   .memory .syswin-bar{background:#2b2b26}
@@ -1107,6 +1134,17 @@ function updateBagBadge(){
     b.textContent = cnt + " 件";
   } else if (b) b.remove();
 }
+/* 推演器图标角标：桌布上已归位的线索数（与证物袋角标同一套） */
+function updateInferBadge(){
+  const icon = document.getElementById("infer-icon");
+  if (!icon) return;
+  const cnt = Object.keys(G.matrix).reduce((s, k) => s + G.matrix[k].length, 0);
+  let b = icon.querySelector(".badge");
+  if (cnt > 0){
+    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    b.textContent = cnt + " 条";
+  } else if (b) b.remove();
+}
 
 /* ============ 布局：力导向（拖拽不改变位置） ============ */
 let layoutTimer = null, edgeTimer = null;
@@ -1225,6 +1263,7 @@ function render(){
   updateCrumbs();
   updateTecBadge();
   updateBagBadge();
+  updateInferBadge();
   /* 重建 DOM 后恢复选中态并重挂聚焦淡化 */
   if (sel && G.nodes[sel] && G.nodes[sel].el) G.nodes[sel].el.classList.add("sel"); else sel = null;
   applyFocus();
@@ -1399,13 +1438,12 @@ function attachInteractions(el, n){
       ic.classList.toggle("over",
         e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
     });
-    /* 逻辑阵列槽位命中高亮（拖线索且窗口打开时） */
-    if (inferWinEl && n.kind === "clue"){
-      inferWinEl.querySelectorAll(".mx-slot").forEach(s => {
-        const r = s.getBoundingClientRect();
-        s.classList.toggle("over",
-          e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
-      });
+    /* 阵列桌布命中高亮（窗口开着时整块桌布都是线索落点） */
+    const mxBd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
+    if (mxBd){
+      const r = mxBd.getBoundingClientRect();
+      mxBd.classList.toggle("over", !!(n.kind === "clue" &&
+        e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom));
     }
   });
 
@@ -1459,16 +1497,15 @@ function attachInteractions(el, n){
       return;
     }
 
-    /* 松手落在逻辑阵列的感官槽上 → 归槽，自己弹回原位 */
-    if (inferWinEl && n.kind === "clue"){
-      const slot = inferWinEl.querySelectorAll(".mx-slot").find(s => {
-        const r = s.getBoundingClientRect();
-        return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-      });
-      inferWinEl.querySelectorAll(".mx-slot").forEach(s => s.classList.remove("over"));
-      if (slot){
+    /* 松手落在阵列桌布上 → 线索归位（归入它自己的感官），自己弹回原位 */
+    const mxBdUp = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
+    if (mxBdUp){
+      mxBdUp.classList.remove("over");
+      const r = mxBdUp.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom){
         springBack(el, ox, oy);
-        assignClue(n.key, slot.dataset.sense);
+        if (n.kind === "clue") assignClue(n.key, (CLUES[n.id] || {}).type);
+        else toast("只有线索能上桌布", true);
         return;
       }
     }
@@ -1801,9 +1838,9 @@ function makeFloatDraggable(el, inWorld, handle){
        会一直留着上一次拖窗口的 true，那些元素自己的"点击"就被误吞了（真机才有；DOM stub 的
        closest() 恒返回 null，排除表在 stub 里等于不存在，所以这条测不出来）。 */
     el._dragged = false;
-    /* 交互子元素（按钮/输入框/清单项/× 关闭钮）不启动拖动——否则 setPointerCapture 会把 click
+    /* 交互子元素（按钮/输入框/清单项/× 关窗键/阵列执行者）不启动拖动——否则 setPointerCapture 会把 click
        重定向到窗口自身，行内可点的清单项永远收不到 click。新增可点清单项时记得往这里加。 */
-    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar")) return;
+    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec")) return;
     /* CSS 定位的浮窗（right/bottom/margin 居中），首次拖动时换算成 left/top，并清掉 margin 防止跳位 */
     if (el.style.left === "" || el.style.left == null){
       const r = el.getBoundingClientRect(), sr = desktopEl.getBoundingClientRect();
@@ -2483,11 +2520,19 @@ function refreshGotoWin(){
 }
 
 /* ============ INFERENCE_MATRIX // 逻辑阵列 ============ */
+/* ============ 逻辑阵列：桌布式推演窗 ============
+   桌布几何与 CSS .mx-board 的尺寸对应（DOM stub 里 offsetWidth 是常量，量不出真尺寸时退回这两个值） */
+const MX_W = 640, MX_H = 460;
+/* 五感锚点：环绕中央执行者的方位（桌布宽高的分数） */
+const MX_ANCHORS = { vision:[.50,.08], hearing:[.80,.26], touch:[.70,.72], smell:[.30,.72], taste:[.20,.26] };
+/* 执行者头像：暂借 TEC 的（同风格同尺寸），新头像做好只改这一行 */
+const EXECUTOR_AVATAR_B64 = TEC_AVATAR_B64;
+
 let inferWinEl = null;
 function closeInferWin(){ if (inferWinEl){ inferWinEl.remove(); inferWinEl = null; } }
 function toggleInferWin(){
   if (inferWinEl){ closeInferWin(); return; }
-  const w = makeWindow("INFERENCE // 推演器", closeInferWin);
+  const w = makeWindow("INFERENCE // 逻辑阵列", closeInferWin);
   w.el.classList.add("infer-win");
   desktopEl.appendChild(w.el);
   makeFloatDraggable(w.el, false);
@@ -2499,29 +2544,74 @@ function refreshInferWin(){
   const body = inferWinEl.querySelector(".syswin-body");
   if (!body) return;
   body.innerHTML = "";
+
+  const total = Object.keys(SENSES).reduce((sum, s) => sum + G.matrix[s].length, 0);
+  const full = Object.keys(SENSES).every(s => G.matrix[s].length > 0);
+
+  const board = document.createElement("div");
+  board.className = "mx-board";
+  body.appendChild(board);
+  const bw = board.offsetWidth || MX_W, bh = board.offsetHeight || MX_H;
+  const cx = bw / 2, cy = bh / 2;
+
+  /* 连线层铺在最底：chip 落位后把虚线画到中央执行者 */
+  const links = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  links.setAttribute("class", "mx-links");
+  links.setAttribute("width", bw); links.setAttribute("height", bh);
+  board.appendChild(links);
+  const linkTo = (x1, y1) => {
+    const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    ln.setAttribute("x1", x1); ln.setAttribute("y1", y1);
+    ln.setAttribute("x2", cx); ln.setAttribute("y2", cy);
+    links.appendChild(ln);
+  };
+
+  /* 五感锚点 + 归位线索 chip（同感官按序向下叠；连线终点用解析坐标，不量 DOM） */
   Object.keys(SENSES).forEach(sense => {
-    const slot = document.createElement("div");
-    slot.className = "mx-slot";
-    slot.dataset.sense = sense;
-    const head = document.createElement("div");
-    head.className = "mx-sense";
-    head.textContent = SENSES[sense];
-    slot.appendChild(head);
-    G.matrix[sense].forEach(cid => {
+    const a = MX_ANCHORS[sense];
+    const ax = a[0] * bw, ay = a[1] * bh;
+    const anchor = document.createElement("div");
+    anchor.className = "mx-anchor";
+    anchor.style.left = ax + "px"; anchor.style.top = ay + "px";
+    const lb = document.createElement("div");
+    lb.className = "mx-anchor-label"; lb.textContent = SENSES[sense];
+    anchor.appendChild(lb);
+    board.appendChild(anchor);
+    G.matrix[sense].forEach((cid, i) => {
       const chip = document.createElement("div");
-      chip.className = "mx-clue";
-      const lb = document.createElement("span"); lb.textContent = (CLUES[cid] || {}).label || cid;
+      chip.className = "mx-chip";
+      const name = document.createElement("span"); name.textContent = (CLUES[cid] || {}).label || cid;
       const rx = document.createElement("span"); rx.className = "mx-x"; rx.textContent = "×";
       rx.addEventListener("click", () => {
         pushHistory();
         G.matrix[sense] = G.matrix[sense].filter(x => x !== cid);
         render(); refreshInferWin();
       });
-      chip.appendChild(lb); chip.appendChild(rx);
-      slot.appendChild(chip);
+      chip.appendChild(name); chip.appendChild(rx);
+      anchor.appendChild(chip);
+      linkTo(ax, ay + 31 + i * 28);   /* chip 中心的解析坐标：锚点下方第 i 条的近似中点 */
     });
-    body.appendChild(slot);
   });
+
+  /* 中央执行者：长按激活归因 */
+  const exec = document.createElement("div");
+  exec.className = "mx-exec";
+  exec.title = "长按 2.5 秒激活归因";
+  const av = document.createElement("div"); av.className = "mx-avatar";
+  const img = document.createElement("img");
+  img.src = "data:image/png;base64," + EXECUTOR_AVATAR_B64;
+  img.alt = "执行者"; img.draggable = false;
+  av.appendChild(img);
+  const elb = document.createElement("div"); elb.className = "mx-exec-label"; elb.textContent = "执 行 者";
+  const hint = document.createElement("div"); hint.className = "mx-exec-hint";
+  hint.textContent = !total ? "把捕获的线索拖上桌布" : full ? "五感俱足 · 长按激活归因" : "已归位 " + total + " 条 · 继续献上";
+  exec.appendChild(av); exec.appendChild(elb); exec.appendChild(hint);
+  exec.addEventListener("pointerdown", riteStart);
+  board.appendChild(exec);
+
+  /* 结局清单：弱化存在，收在左下角 */
+  const ends = document.createElement("div");
+  ends.className = "mx-endings";
   const inMatrix = id => Object.keys(G.matrix).some(s => G.matrix[s].indexOf(id) >= 0);
   ENDINGS.forEach(e => {
     const d = document.createElement("div");
@@ -2529,13 +2619,45 @@ function refreshInferWin(){
     const matched = (e.recipe || []).filter(inMatrix).length;
     const name = e.isTrueCapture && !G.endings.has(e.id) ? "真名捕获：？？？" : e.name;
     d.textContent = name + "  " + matched + "/" + (e.recipe || []).length;
-    body.appendChild(d);
+    ends.appendChild(d);
   });
-  const btn = document.createElement("button");
-  btn.className = "primary mx-sync";
-  btn.textContent = "[ SYNC_MATRIX_INFERENCE ]";
-  btn.addEventListener("click", executeInference);
-  body.appendChild(btn);
+  board.appendChild(ends);
+}
+/* 长按蓄力：pointerdown 起 2.5s 完成 → executeInference；pointerup / pointerleave 提前 = 中断复位。
+   无头环境 setTimeout 返回 0 就立即完成（与 enterCase 换档的兜底同款）。 */
+let riteTimer = null;
+function riteEnd(commit){
+  if (riteTimer){ clearTimeout(riteTimer); riteTimer = null; }
+  if (inferWinEl){
+    const ex = inferWinEl.querySelector(".mx-exec");
+    if (ex){
+      ex.classList.remove("charging");
+      if (ex._riteOff){
+        ex.removeEventListener("pointerup", ex._riteOff);
+        ex.removeEventListener("pointerleave", ex._riteOff);
+        ex._riteOff = null;
+      }
+    }
+    const bd = inferWinEl.querySelector(".mx-board");
+    if (bd) bd.classList.remove("charging");
+  }
+  if (commit) executeInference();
+}
+function riteStart(e){
+  if (e && e.button !== 0) return;
+  if (!inferWinEl || riteTimer) return;
+  const ex = inferWinEl.querySelector(".mx-exec");
+  if (!ex) return;
+  ex.classList.add("charging");
+  const bd = inferWinEl.querySelector(".mx-board");
+  if (bd) bd.classList.add("charging");
+  const t = setTimeout(() => riteEnd(true), 2500);
+  if (!t){ riteEnd(true); return; }
+  riteTimer = t;
+  const off = () => riteEnd(false);
+  ex._riteOff = off;
+  ex.addEventListener("pointerup", off);
+  ex.addEventListener("pointerleave", off);
 }
 function assignClue(clueKey, sense){
   const n = G.nodes[clueKey];
