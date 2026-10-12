@@ -153,7 +153,7 @@
   .bubble{position:absolute; width:230px; background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     padding:9px 12px; font-size:12.5px; line-height:1.6; z-index:16; box-shadow:var(--win-shadow); cursor:pointer}
   .narr-card{position:absolute; width:330px; background:var(--card); border:1px solid var(--edge);
-    border-left:4px solid var(--line); border-radius:var(--r-win); padding:13px 15px; font-size:12.5px; line-height:1.8;
+    border-radius:var(--r-win); padding:13px 15px; font-size:12.5px; line-height:1.8;
     z-index:16; box-shadow:var(--win-shadow); cursor:pointer; white-space:pre-wrap; animation:pop .45s ease}
   #icons{position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none; z-index:24}
   .desk-icon{position:absolute; width:64px; text-align:center; cursor:pointer; user-select:none; pointer-events:auto}
@@ -161,18 +161,24 @@
   .desk-icon .icon-glyph{width:44px; height:44px; margin:0 auto; border:1px solid var(--edge);
     background:linear-gradient(150deg,var(--face-hi) 0%,var(--card) 52%,var(--face-lo) 100%);
     border-radius:var(--r-sm); font-size:20px; line-height:42px; color:var(--text);
-    box-shadow:var(--raise); transition:box-shadow .14s, transform .14s, background .14s}
+    box-shadow:var(--raise); transition:box-shadow .14s, transform .14s}
   .desk-icon:hover .icon-glyph{box-shadow:-3px -4px 10px var(--bevel-hi), 4px 6px 13px rgba(86,80,60,.36)}
   .desk-icon .icon-label{font-size:11px; margin-top:5px; color:var(--muted); border-radius:999px;
-    padding:1px 6px; display:inline-block; border:1px solid transparent; transition:background .12s, color .12s}
+    padding:1px 6px; display:inline-block; border:1px solid transparent}
+  /* 「变黑」不做过渡：按下 / 选中 / 拖过都必须立刻生效。
+     背景是 linear-gradient，过渡既慢（120~140ms）又会发灰，正是"点下去有滞后"的来源；
+     同时把按下态也算作变黑，指针一按就有反馈，不必等松手。 */
+  .desk-icon:active .icon-glyph,
   .desk-icon.sel .icon-glyph{background:linear-gradient(150deg,#38372f,#1f1f19); color:var(--card);
     box-shadow:inset 0 2px 6px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.3)}
+  .desk-icon:active .icon-label,
   .desk-icon.sel .icon-label{background:var(--text); color:var(--card)}
   .desk-icon.over .icon-glyph{background:linear-gradient(150deg,#38372f,#1f1f19); color:var(--card);
     box-shadow:inset 0 2px 6px rgba(0,0,0,.6), 0 0 0 2px var(--text), 0 0 14px 2px rgba(43,43,38,.35); transform:scale(1.06)}
   .desk-icon .badge{top:-6px; right:0}
   .desk-icon.pulse .icon-glyph{animation:tecpulse 1.6s infinite}
   @keyframes tecpulse{0%,100%{box-shadow:var(--raise)}50%{box-shadow:-3px -4px 10px var(--bevel-hi), 4px 6px 14px rgba(86,80,60,.62), 0 0 0 2px var(--edge)}}
+  /* TEC「– 收起」的落点 = 桌面右下角那块带头像的助手卡片 #tec-chip（样式见 #case-dock 附近） */
   /* TEC 是常驻助手窗：z 要高于其它浮窗（21~25）与桌面图标（24），始终不被覆盖；
      仍低于拖拽镜像层（40）与瞬时提示 toast/verdict（30） */
   .tec-win{position:absolute; right:14px; bottom:96px; width:332px;
@@ -310,6 +316,37 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   #case-dock .cd-sub{font-size:9.5px; color:var(--muted); margin-top:2px; line-height:1.1;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  /* TEC「– 收起」的落点：桌面右下角一块带头像的助手卡片。
+     与案件卡片 #case-dock（bottom:14px）**上下错开**（bottom:84px），两张卡片不会叠在一起。
+     和案件卡片一样：只靠 visibility 隐藏、保留布局盒，收起 / 展开动画随时量得到目标点。 */
+  #tec-chip{position:absolute; right:16px; bottom:84px; width:196px;
+    display:flex; align-items:center; gap:9px; padding:8px 10px; text-align:left; cursor:pointer;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win); box-shadow:var(--win-shadow);
+    opacity:0; visibility:hidden; pointer-events:none; transition:opacity .2s ease; z-index:23}
+  #tec-chip.on{opacity:1; visibility:visible; pointer-events:auto}
+  #tec-chip:hover{background:var(--bg)}
+  /* 拖节点悬停在卡片上：与窗内助手头像 (#tec-avatar.over) 用同一套虚线高亮 */
+  #tec-chip.over{outline:2px dashed var(--text); outline-offset:3px}
+  #tec-chip .tc-av{width:32px; height:32px; border-radius:var(--r-btn); overflow:hidden; flex:0 0 auto;
+    border:1px solid var(--edge); background:var(--face-hi); box-shadow:var(--press)}
+  #tec-chip .tc-av img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  #tec-chip .tc-meta{min-width:0; flex:1}
+  #tec-chip .tc-name{font-size:9.5px; letter-spacing:1px; font-weight:700; line-height:1.1}
+  /* 状态行留固定行高，卡片高度就不会随文案变 —— 收起 / 展开动画量出来的落点才稳定 */
+  #tec-chip .tc-status{font-size:10.5px; color:var(--muted); margin-top:2px; line-height:1.2; min-height:13px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  /* 进度条常驻占位（高度不变），空闲时用 opacity 藏起来。
+     注意别用 visibility：父层 visibility:hidden 能被后代的 visible 反盖回来，卡片熄掉时进度条反而会露出来。 */
+  #tec-chip .tc-bar{height:4px; border-radius:3px; background:var(--face-lo); box-shadow:var(--press);
+    overflow:hidden; margin-top:4px; opacity:0; transition:opacity .15s ease}
+  #tec-chip.busy .tc-bar{opacity:1}
+  /* 用长写而不是 animation 简写：简写一旦被后续 inline/长写覆盖就整组复位，
+     animation-duration 会掉回 0s（真机踩过）。长写留 1s 兜底，运行期由 inline 覆盖。 */
+  #tec-chip .tc-bar i{display:block; height:100%; width:0; border-radius:3px;
+    background:linear-gradient(90deg,var(--muted),var(--text));
+    animation-name:tecana; animation-duration:1s; animation-timing-function:linear; animation-fill-mode:forwards}
+  #tec-chip .tc-dot{position:absolute; right:-4px; top:-4px; width:11px; height:11px; border-radius:999px;
+    background:var(--text); box-shadow:0 0 0 2px var(--card), 0 0 0 3px var(--edge); animation:pop .3s ease}
   .tec-win .tec-body{display:flex; gap:10px; align-items:stretch}
   .tec-win .tec-avatar-col{display:flex; flex-direction:column; align-items:center; gap:5px; width:74px; flex:0 0 74px; padding-top:2px}
   .tec-win .tec-avatar{width:60px; height:60px; border-radius:12px; overflow:hidden; border:1px solid var(--edge); box-shadow:var(--raise-sm); cursor:pointer; background:var(--face-hi); pointer-events:auto}
@@ -354,6 +391,11 @@
 
   /* 复古单色滚动条：黑滑块 + 米白轨道（证物袋 / 叙事卡 / 日志 / 详情全局统一） */
   *{scrollbar-width:thin; scrollbar-color:var(--text) var(--bg)}
+  /* OS 外壳整体不可选中：拖窗口 / 拖浮层时按住正文文字，不会再拉出一条蓝色选区。
+     多数窗口是「整窗拖动」（handle 默认 = 元素自身），正文若可选中就会一边拖一边选。
+     输入框单独放行 —— 密码 / 姓名要能放光标、能拖选。此条必须排在 body 那条之后。 */
+  body{user-select:none; -webkit-user-select:none}
+  input, textarea, [contenteditable]{user-select:text; -webkit-user-select:text}
   ::-webkit-scrollbar{width:12px; height:12px}
   ::-webkit-scrollbar-track{background:var(--bg); border-left:1px solid var(--line)}
   ::-webkit-scrollbar-corner{background:var(--bg)}
@@ -372,7 +414,7 @@
 
   #toast{
     position:absolute; left:50%; top:14px; transform:translateX(-50%); max-width:560px;
-    background:var(--card); border:1px solid var(--edge); border-left:4px solid var(--line);
+    background:var(--card); border:1px solid var(--edge);
     border-radius:var(--r-win); padding:11px 15px; font-size:13px; line-height:1.65;
     box-shadow:var(--win-shadow); display:none; z-index:30;
   }
@@ -396,7 +438,12 @@
   #detail-body .dt{font-size:15px; font-weight:700; margin-bottom:2px}
   #detail-body .dmeta{font-size:11px; color:var(--faint); margin-bottom:10px}
   #detail-body .ddesc{color:var(--text); white-space:pre-wrap}
-  #detail-body .drow{font-size:12px; color:var(--muted); margin-top:9px; padding-top:8px; border-top:1px dashed var(--line2)}
+  #detail-body .drow{font-size:12px; color:var(--muted); margin-top:7px}
+  /* 详情窗内不放任何内层方框（"框套框"很难看）：行间只留白、不用虚线，按钮降级成纯文字链接 */
+  #detail-body button{background:none; border:0; border-radius:0; box-shadow:none; padding:0;
+    font-size:12px; color:var(--muted); text-decoration:underline; text-underline-offset:3px}
+  #detail-body button:hover{background:none; border:0; color:var(--text)}
+  #detail-body button:active{box-shadow:none; transform:none}
   #detail-body .empty{color:var(--faint); font-size:12px}
 
   .log-win{position:absolute; right:14px; bottom:96px; width:320px;
@@ -462,6 +509,14 @@
         <div class="cd-code" id="cd-code">CASE A-001</div>
         <div class="cd-title" id="cd-title">植物学家的花园</div>
         <div class="cd-sub" id="cd-sub">进度已保存 · 点此展开</div>
+      </div>
+    </div>
+    <div id="tec-chip" title="TEC 已收起：单击展开对话窗，按住可拖动">
+      <div class="tc-av"><img id="tc-av-img" alt="TEC" draggable="false"></div>
+      <div class="tc-meta">
+        <div class="tc-name">TEC // 助手</div>
+        <div class="tc-status" id="tc-status">助手已收起 · 点此展开</div>
+        <div class="tc-bar"><i id="tc-bar-fill"></i></div>
       </div>
     </div>
         <div id="toast"></div>
@@ -703,6 +758,8 @@ function link(aKey, bKey, kind){
 function revealScene(sid, silent){
   const s = SCENES[sid];
   if (!s) return 0;
+  /* 画布上此时只有这一个「未探索」的场景节点？展开后需要重排视野（只平移会溢出）。 */
+  const soloBefore = Object.keys(G.nodes).length <= 1;
   const sn = ensureNode("loc", sid, { label: s.title || sid });
   const firstTime = !G.explored.has(sid);
   G.explored.add(sid);
@@ -738,8 +795,9 @@ function revealScene(sid, silent){
   render();
   if (firstTime && !silent){
     renarrScene(sid);
-    /* 首次展开：只在「场景节点 + 本次新内容」超出视野时平移，使其可见 */
-    ensureVisible([sn.key].concat(newKeys));
+    /* 从孤零零一个场景节点展开时，只平移会溢出视野 → 直接 fit 重排；其余仍只做 ensureVisible */
+    if (soloBefore) fit();
+    else ensureVisible([sn.key].concat(newKeys));
   }
   if (((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[sid]) log("TEC 似乎有话要说（双击 TEC 图标）", "sys");
   updateTecBadge();
@@ -862,11 +920,9 @@ function attemptCombo(toolKey, targetKey){
   const killedSet = {};
   killed.forEach(k => { if (!killedSet[k.key]){ killedSet[k.key] = 1; deleteNode(k.key); } });
 
-  /* 反馈 */
-  let html = "<b>" + esc(toolLabel) + " → " + esc(targetLabel) + "</b><br>" + esc(plain(text));
-  if (gained.length) html += "<br><span style='color:#2b2b26'>获得：" + esc(gained.join("、")) + "</span>";
-  if (killed.length) html += "<br><span style='color:#8a8672'>消耗：" + esc(killed.map(k => plain(k.label)).join("、")) + "</span>";
-  toast(html, false);
+  /* 组合结果不弹提示条（成功也不弹）：这属于"节点的动作结果"，效果本来就靠画面自证 ——
+     新场景 / 新物品节点会当场冒出来、被消耗的节点会当场消失，再弹一张条等于告知已知信息。
+     反应正文与「获得 / 消耗」一并只写进 SYS_LOGS 因果追踪（信息不丢，只是不再打断画面）。 */
   log("组合 <b>" + esc(toolLabel) + "</b> ⇒ <b>" + esc(targetLabel) + "</b>：" + esc(plain(text)) +
       (gained.length ? "　［获得 " + esc(gained.join("、")) + "］" : "") +
       (killed.length ? "　［消耗 " + esc(killed.map(k => plain(k.label)).join("、")) + "］" : ""), "act");
@@ -877,7 +933,7 @@ function attemptCombo(toolKey, targetKey){
 }
 
 function fail(tool, target, msg){
-  toast(esc(msg), true);
+  /* 组合失败同样不弹提示条（"条件不足"就是什么也没发生）；原因只留在 SYS_LOGS 里。 */
   log("组合失败：" + esc(msg), "warn");
 }
 
@@ -1331,7 +1387,7 @@ function attachInteractions(el, n){
     }
 
     /* 桌面图标命中高亮（固定优先级 bag > tec > infer > goto） */
-    ["bag-dock","tec-dock","infer-icon","goto-icon","tec-avatar"].forEach(id => {
+    nodeDropTargets().forEach(id => {
       const ic = document.getElementById(id);
       if (!ic) return;
       const r = ic.getBoundingClientRect();
@@ -1372,7 +1428,7 @@ function attachInteractions(el, n){
 
     /* 桌面图标命中判定（固定优先级 bag > tec > infer > goto；任何路径清掉 over 高亮） */
     let iconHit = null;
-    ["bag-dock","tec-dock","infer-icon","goto-icon","tec-avatar"].forEach(id => {
+    nodeDropTargets().forEach(id => {
       const ic = document.getElementById(id);
       if (!ic) return;
       const r = ic.getBoundingClientRect();
@@ -1387,7 +1443,7 @@ function attachInteractions(el, n){
       /* 松手落在桌面图标上 → 对应功能，自己弹回原位 */
       springBack(el, ox, oy);
       if (iconHit === "bag-dock") bagStore(n.key);
-      else if (iconHit === "tec-dock" || iconHit === "tec-avatar") tecAnalyze(n.key);
+      else if (iconHit === "tec-dock" || iconHit === "tec-avatar" || iconHit === "tec-chip") tecAnalyze(n.key);
       else if (iconHit === "infer-icon"){
         if (n.kind === "clue") assignClue(n.key, (CLUES[n.id] || {}).type);
         else toast("只有线索能进推演器", true);
@@ -1421,12 +1477,19 @@ function attachInteractions(el, n){
       return;
     }
     /* 松手落在空白处 → 就停在这里，并锁定，之后自动布局不再挪它 */
-    n.x = Math.max(60, Math.min(2000 - 220, parseFloat(el.style.left) || n.x));
-    n.y = Math.max(50, Math.min(1300 - 120, parseFloat(el.style.top)  || n.y));
+    const rawX = parseFloat(el.style.left) || n.x, rawY = parseFloat(el.style.top) || n.y;
+    n.x = Math.max(60, Math.min(2000 - 220, rawX));
+    n.y = Math.max(50, Math.min(1300 - 120, rawY));
     n.pinned = true;
-    el.style.left = n.x + "px";
-    el.style.top  = n.y + "px";
-    paintEdges();
+    if (n.x !== rawX || n.y !== rawY){
+      /* 拖到画布「框边」→ 越界被夹回：必须用 springBack 让节点与连线同帧走完，
+         不能只写一次 left/top（CSS 过渡期间节点在滑、连线已跳到终点 → 看着就是"断线"）。 */
+      springBack(el, n.x, n.y);
+    } else {
+      el.style.left = n.x + "px";
+      el.style.top  = n.y + "px";
+      paintEdges();
+    }
     updateCrumbs();
   });
 
@@ -1519,28 +1582,14 @@ function runPrimary(n){
   }
   if (n.kind === "char"){
     const ch = CHARS[n.id] || {};
-    const queue = charTalkQueue(n);
-    const prog = G.talkProg[n.key] || 0;
-    if (!queue.length){ toast("<b>" + esc(ch.name || n.id) + "</b><br>（暂无对话文本）"); return; }
-    const line = queue[Math.min(prog, queue.length - 1)];
-    if (prog < queue.length){
-      pushHistory();
-      G.talkProg[n.key] = prog + 1;
-      gotClues(line);
-      log("<b>" + esc(ch.name || n.id) + "</b>：" + esc(plain(line)), "sys");
-    }
-    showBubble(n, "DIALOG // " + (ch.name || n.id), plain(line));
-    render();
-    selectNode(n.key);
+    if (!charTalkQueue(n).length){ toast("<b>" + esc(ch.name || n.id) + "</b><br>（暂无对话文本）"); return; }
+    showCharLine(n);            /* 双击节点 = 说下一句；点气泡 = 同一件事 */
     return;
   }
-  /* 物品：有命令就跑第一条，否则显示描述 */
+  /* 物品：有命令就跑第一条；无命令的没有主动作，双击 = 选中（描述统一在详情窗里读） */
   const it = ITEMS[n.id] || {};
   const cmds = it.commands || [];
-  if (!cmds.length){
-    toast("<b>" + esc(n.label) + "</b><br>" + esc(plain(it.desc || "（没有更多信息）")));
-    return;
-  }
+  if (!cmds.length){ selectNode(n.key); return; }
   runCommand(n, cmds[0]);
 }
 
@@ -1550,7 +1599,6 @@ function runCommand(n, cmd){
   const t = cmd.type;
 
   if (t === "text"){
-    toast("<b>" + esc(n.label) + "</b><br>" + esc(plain(cmd.value || cmd.message || "")));
     gotClues(plain(cmd.value || ""));
     noteSeen(cmd.value || cmd.message || "");
     log("「" + esc(n.label) + "」：" + esc(plain(cmd.value || "")), "sys");
@@ -1569,13 +1617,11 @@ function runCommand(n, cmd){
     const needLabel = labelOf("item", need) || need;
     const have = nodeByKey("item", need);
     if (!have){
-      toast("<b>" + esc(n.label) + "</b><br>" + esc(cmd.failMessage || "缺少所需物品：" + needLabel), true);
       log("「" + esc(n.label) + "」需要「" + esc(needLabel) + "」，但画布上还没有这个节点", "warn");
       noteSeen(cmd.failMessage || "");
       return;
     }
     pushHistory();
-    toast("<b>" + esc(cmd.label || "使用") + "</b><br>" + esc(plain(cmd.successMessage || "")));
     log("「" + esc(n.label) + "」使用「" + esc(needLabel) + "」：" + esc(plain(cmd.successMessage || "")), "act");
     gotClues(cmd.successMessage || "");
     noteSeen(cmd.successMessage || "");
@@ -1592,20 +1638,18 @@ function runCommand(n, cmd){
     const missing = conds.filter(c => !G.captured.has(c.clue));
     if (missing.length){
       const m = missing[0];
-      toast("<b>" + esc(n.label) + "</b><br>" + esc(m.failMessage || "条件不足"), true);
       log("「" + esc(n.label) + "」条件不足，缺线索：" + esc(labelOf("clue", m.clue) || m.clue), "warn");
       noteSeen(m.failMessage || "");
       return;
     }
     pushHistory();
-    toast("<b>" + esc(cmd.label || "") + "</b><br>" + esc(plain(cmd.successMessage || "")));
     log("「" + esc(n.label) + "」：" + esc(plain(cmd.successMessage || "")), "act");
     noteSeen(cmd.successMessage || "");
     if (cmd.onSuccess) applyPayload(cmd.onSuccess, n.key);
     layout(); render(); selectNode(n.key);
     return;
   }
-  toast("<b>" + esc(n.label) + "</b><br>（暂不支持的命令类型：" + esc(t) + "）", true);
+  log("「" + esc(n.label) + "」的命令类型 " + esc(t) + " 暂不支持", "warn");
 }
 
 function applyPayload(payload, nearKey){
@@ -1700,14 +1744,12 @@ function spawnChoiceNodes(n, cmd){
       applyPayload(r, n.key);
     }
   });
-  toast("<b>" + esc(cmd.label || n.label) + "</b><br>" +
-    (added.length ? "弹出了 " + esc(added.join("、")) + "，双击它们继续探索" : "选项节点已经在画布上了，双击它们继续探索"));
   log("「" + esc(n.label) + "」" + esc(cmd.label || "选项") + "：" + (added.length ? "出现 " + esc(added.join("、")) : "选项节点已在画布上"), "act");
   layout(); render(); selectNode(n.key);
 }
 
 /* ============ 统一系统窗口：标题栏（拖动把手）+ × 关闭 + 内容区 ============ */
-function makeWindow(titleText, onClose){
+function makeWindow(titleText, onClose, onMin){
   const el = document.createElement("div");
   el.className = "syswin";
   const bar = document.createElement("div");
@@ -1725,7 +1767,18 @@ function makeWindow(titleText, onClose){
   x.title = "关闭";
   x.addEventListener("pointerdown", e => { if (e) e.stopPropagation(); });
   x.addEventListener("click", e => { if (e) e.stopPropagation(); onClose(); });
-  bar.appendChild(rule1); bar.appendChild(title); bar.appendChild(rule2); bar.appendChild(x);
+  bar.appendChild(rule1); bar.appendChild(title); bar.appendChild(rule2);
+  /* 最小化键（可选）：只有传了 onMin 的窗口才有（如 TEC 对话窗），位置排在 × 左边 */
+  if (onMin){
+    const mn = document.createElement("span");
+    mn.className = "syswin-min";
+    mn.textContent = "–";
+    mn.title = "最小化";
+    mn.addEventListener("pointerdown", e => { if (e) e.stopPropagation(); });
+    mn.addEventListener("click", e => { if (e) e.stopPropagation(); onMin(); });
+    bar.appendChild(mn);
+  }
+  bar.appendChild(x);
   const body = document.createElement("div");
   body.className = "syswin-body";
   el.appendChild(bar); el.appendChild(body);
@@ -1738,9 +1791,14 @@ function makeFloatDraggable(el, inWorld, handle){
   let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
   h.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
+    /* 「本次手势拖过没」在这里就复位 —— **必须在下面那张排除表之前**：从被排除的子元素
+       （TEC 头像 / 清单项 / × 关窗键）上起手时，下面会提前 return，若复位写在后面，_dragged
+       会一直留着上一次拖窗口的 true，那些元素自己的"点击"就被误吞了（真机才有；DOM stub 的
+       closest() 恒返回 null，排除表在 stub 里等于不存在，所以这条测不出来）。 */
+    el._dragged = false;
     /* 交互子元素（按钮/输入框/清单项/× 关闭钮）不启动拖动——否则 setPointerCapture 会把 click
        重定向到窗口自身，行内可点的清单项永远收不到 click。新增可点清单项时记得往这里加。 */
-    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.tec-avatar")) return;
+    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar")) return;
     /* CSS 定位的浮窗（right/bottom/margin 居中），首次拖动时换算成 left/top，并清掉 margin 防止跳位 */
     if (el.style.left === "" || el.style.left == null){
       const r = el.getBoundingClientRect(), sr = desktopEl.getBoundingClientRect();
@@ -1748,6 +1806,7 @@ function makeFloatDraggable(el, inWorld, handle){
       el.style.right = "auto"; el.style.bottom = "auto"; el.style.margin = "0";
     }
     dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
+    /* _dragged（本次手势拖过没）已在函数开头复位：点击推进靠它区分「点一下」和「按住挪一下」（阈值 5px） */
     ox = parseFloat(el.style.left) || 0; oy = parseFloat(el.style.top) || 0;
     try { el.setPointerCapture(e.pointerId); } catch(_){}
     e.stopPropagation();
@@ -1775,19 +1834,60 @@ function charTalkQueue(n){
   return base.concat(scene);
 }
 let bubbleEl = null;
-function closeBubble(){ if (bubbleEl){ bubbleEl.remove(); bubbleEl = null; } }
-function showBubble(n, titleText, text){
+function closeBubble(){
+  if (bubbleEl){
+    const bd = bubbleEl.querySelector && bubbleEl.querySelector(".syswin-body");
+    if (bd) cancelType(bd);
+    bubbleEl.remove(); bubbleEl = null;
+  }
+}
+/* 气泡：opts.adv 传了才支持「点框内任意位置推进」（捕获结果那种一次性提示不带推进）。
+   拖动仍是整框可拖，靠 _dragged 区分点/拖。 */
+function showBubble(n, titleText, text, opts){
   closeBubble();
   const w = makeWindow(titleText, closeBubble);
   const b = w.el;
   b.className = "bubble syswin";
-  w.body.textContent = text;
+  const adv = (opts && opts.adv) || null;
+  w.body.textContent = text;                 /* 先放全文 → 按整框实测高度定位 */
   makeFloatDraggable(b, true);
   world.appendChild(b);
   const bubTop = clampFloatY(n.y - b.offsetHeight - 12, b.offsetHeight);
   b.style.top = bubTop + "px";
   b.style.left = avoidHint(clampFloatX(n.x + NODE_W[n.kind] / 2 - b.offsetWidth / 2, b.offsetWidth), bubTop) + "px";
+  if (adv){
+    b.title = "单击任意位置继续，按住可拖动";
+    b._typing = true;
+    b.addEventListener("click", () => {
+      if (b._dragged) return;                       /* 刚拖过 -> 那一下不算点击 */
+      if (b._typing){                               /* 先补全本句，再点才推进 */
+        cancelType(w.body); w.body.textContent = text; b._typing = false;
+        return;
+      }
+      adv();
+    });
+    w.body.style.minHeight = (w.body.offsetHeight || 0) + "px";   /* 预占高度，打字时框不跳 */
+    typeInto(w.body, text, { done: () => { b._typing = false; } });
+  }
   bubbleEl = b;
+}
+/* 角色说下一句：双击节点与点气泡共用这一条路径 */
+function showCharLine(n){
+  const ch = CHARS[n.id] || {};
+  const queue = charTalkQueue(n);
+  if (!queue.length) return false;
+  const prog = G.talkProg[n.key] || 0;
+  const line = queue[Math.min(prog, queue.length - 1)];
+  if (prog < queue.length){
+    pushHistory();
+    G.talkProg[n.key] = prog + 1;
+    gotClues(line);
+    log("<b>" + esc(ch.name || n.id) + "</b>：" + esc(plain(line)), "sys");
+  }
+  showBubble(n, "DIALOG // " + (ch.name || n.id), plain(line), { adv: () => showCharLine(n) });
+  render();
+  selectNode(n.key);
+  return true;
 }
 
 /* 浮窗初始位置避开左上角操作提示区 */
@@ -1821,7 +1921,39 @@ function narrText(html){
     .replace(/<[^>]+>/g, "").trim();
 }
 let narrEl = null;
-function closeNarr(){ if (narrEl){ narrEl.remove(); narrEl = null; } memoryPlay = null; }
+/* 打字机：逐字写入用 setTimeout 轮询——无头 stub 里 setTimeout 返回 0（回调永不执行），
+   于是走「同步写全文」分支，既不会挂死也保证断言读到完整文本。
+   计时器记在**元素自己身上**（el._twTimer）：叙事卡 / 记忆放映卡 / 对话气泡可以同时在屏幕上，
+   共用一根全局 timer 会让后开的那个把先开的打字中途掐断（记忆放映卡还是**每行一个 div**）。 */
+function cancelType(el){
+  if (el && el._twTimer){ clearTimeout(el._twTimer); el._twTimer = null; }
+}
+function typeInto(el, text, opts){
+  const full = String(text == null ? "" : text);
+  const speed = (opts && opts.speed) || 45;      /* ms / 字（约每秒 22 字，逐字看得清、不赶） */
+  const done = (opts && opts.done) || null;
+  cancelType(el);
+  let i = 0;
+  const step = () => {
+    i += 1;
+    el.textContent = full.slice(0, i);
+    if (i >= full.length){ el._twTimer = null; if (done) done(); return; }
+    const t = setTimeout(step, speed);
+    if (!t){ el.textContent = full; el._twTimer = null; if (done) done(); }   /* stub：无定时能力 → 直接满字 */
+    else el._twTimer = t;
+  };
+  step();
+}
+function closeNarr(){
+  if (narrEl){
+    const nb = narrEl.querySelector && narrEl.querySelector(".syswin-body");
+    if (nb) cancelType(nb);
+    narrEl.remove(); narrEl = null;
+  }
+  if (memoryPlay && memoryPlay.cur) cancelType(memoryPlay.cur);
+  if (memoryPlay && memoryPlay.timer) clearTimeout(memoryPlay.timer);
+  memoryPlay = null;
+}
 function showNarrCard(n, s){
   closeNarr();
   const text = narrText(s.content || s.desc || "");
@@ -1829,13 +1961,16 @@ function showNarrCard(n, s){
   const w = makeWindow("SCENE_FEED // " + (s.title || n.id), closeNarr);
   const c = w.el;
   c.className = "narr-card syswin";
-  w.body.textContent = text;
+  w.body.textContent = text;                 /* 先放全文 → 按整卡实测高度定位 */
   makeFloatDraggable(c, true);
   world.appendChild(c);
   const narrTop = clampFloatY(n.y - c.offsetHeight - 14, c.offsetHeight);
   c.style.top = narrTop + "px";
   c.style.left = avoidHint(clampFloatX(n.x + NODE_W[n.kind] / 2 - c.offsetWidth / 2, c.offsetWidth), narrTop) + "px";
+  /* 预占整卡高度：打字时卡片不塌缩、位置不跳，字符逐字「长」在既有卡框里 */
+  w.body.style.minHeight = (w.body.offsetHeight || 0) + "px";
   narrEl = c;
+  typeInto(w.body, text);                    /* 清空重放为打字机 */
   /* 全文只留在卡片里；日志只记一行事件，不再镜像正文（去重） */
   log("〔场景〕<b>" + esc(s.title || "") + "</b>：叙事卡已放映", "sys");
 }
@@ -1851,10 +1986,24 @@ function renarrScene(sid){
 /* ============ TEC 对话窗口（桌面图标应用） ============ */
 const tecHistory = [];   /* 页面会话级，不进 G/快照 */
 let tecWinEl = null;
-function closeTecWin(){ if (tecWinEl){ tecWinEl.remove(); tecWinEl = null; } }
+let tecMin = false;      /* 「– 收起」把窗口缩成桌面右下角那块带头像的助手卡片（#tec-chip） */
+let tecDot = false;      /* 分析完成、玩家还没看过 -> 卡片角上点一个小圆点 */
+let tecTask = null;      /* 分析中的任务：{ key, label, ms, endAt }，空闲为 null */
+let tecChipBarKey = null;/* 进度条已按哪一个任务起播（防止每次 render 都把进度钉回 0%） */
+function closeTecWin(){
+  if (tecWinEl){ tecWinEl.remove(); tecWinEl = null; }
+  tecMin = false;                     /* 窗口不在屏幕上就不再是「收起」态 */
+  updateTecBadge();
+}
 /* TEC 是常驻助手：只有「换案」和「重置」才清空它；同案回访（– 收起 / × 关闭后再展开）
    必须保留窗口与对话内容，否则会被 boot() 顺带收掉、再打开就只剩空壳。 */
-function resetTec(){ closeTecWin(); tecHistory.length = 0; }
+function resetTec(){
+  closeTecWin();
+  tecHistory.length = 0;
+  tecTask = null; tecDot = false; tecChipBarKey = null;
+  showTecChip(false);
+  updateTecBadge();
+}
 function tecSay(text){
   tecHistory.push(text);
   log("<b>TEC</b>：" + esc(text), "sys");
@@ -1872,8 +2021,16 @@ function tecSay(text){
 const TEC_AVATAR_B64 = "iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAFDklEQVR4Ae2aS2xOQRTHr1ci8dggUdKyqCJUvEUi1SJCglp0JV4hIhG1I1hILbCwQ2wk3htJF8qCiHckjYhHiKCaCEK7sbGSNOIx9/6/7zv/707n3ju3XySOzZlz5syZuWd+zsy9/YJA/2kGNAOaAc2AZkAzoBn4PzMwqFKP/e3Ez19J5vrc9cW4zT5VE7u2F7s/iTg2vyRzJfEZnMTpf/YZ6vvw7c13xY42LV8aGxJkxHbGGLOSwutp6VgWS2LMlLEmJSg2LUWjV3b/hkFtuXfnQTFqSau2urZEC4LquolCdyku8ro/d8eGAMlj9gzxekYlKDa9RaN3DcIOY8eYJN7htATBH/NwvOKjhC2sA/7cn1ZXghwZ8yYI8bFj2EEmCX6Q8IfuKzFv3nGVIMfOpK7wOLUQl3eMawTv7IHeNgzNJI+Nl+N5Pj41fW/aSpBjm1LXICbGFh/kbHy4w7h8+RjeVyZOkvci23ibffPjjaYLcY5VtxmdSfIlB/MrQciERSYmiGsPx+NTq+lSk3HBTsP/csMZNIUEmbj3iM4SBXFhAlGHJrQZE5MEv6xSCXJkLjFBjjgBag5ICL6GI7b3hTWjaZN8yy/4RYFt5IyYvN94vL3VauTFRZejEaHY/DGMz6eXcPJQlCBH8hLfg/j7jC2urQas2X5DDAERLnLEoBIF40tMoqmnmEjHwCmJCbItgb/gsZ+tNiQlx0UKzwddCUImBlhmJmjWggbxLRrrxH0EelKCcFphHKSLICaR70mI8/LJw0zPqqcYMmiRqbPK5PBNGfcePrUs8+dmBmn8tQDvgJgoLUlKEDJnkalv0iCGd8YSP1h89FlsV+fBucI+rGaC0Ps+RVfxyOqKU6hFvSJMQcG6/xBUsCVpKEGOLKUmiONNmTFHml6EKu/4s87bpmPu4hVGop9JksGCMgJtcW5vCEfyepKSzvNCV4KQCYv0Jojjzlt4xZg668Mag9OF/Xz1c/PPmRDTVp40sufVrijkTN/QYrwSJNJRrngT9P71cxl1zjCpkzZ23Fiy9K+m9S9bT//hnb1KkCNFud+kT0cEVdWPNlPz/YbXg/tOz6vvoivr+F3P+0QcPsX0Ji3S46+kJghT8jsZ7B3rp5smCIB9oCUIbL76JnaqtOQgiNYgZMIiMxNkiVcw/7i2V3wvQi3imuMiDWTAj+NgwuHrjptnAdlZiUE8SCUImbBI73uQJW6ZGeSgA0SAENhZwg92jgM7ZNa3doxnqQRxRkgfsBqEebgWwZ6XRO1Z3bJN1Lwb7WdzeTYlyLFTuWTZMYfozkrUvqc1Ig4reAfLixzEV4KQCYus2CmG+VEzPhzZaWoGn1Lwg3SdcvDLmxzEVYKQCYusOEG8jqSEnDjcWvF6+XetShDvGOkVJwi/M6qqx7dk+R2I1hegRmFcXr/a4HlsuhJky0xkrzhBvB4QwvZ/RVeCHDuRO0Gr1q4V70SP7t+PXQL/vQx/34Iz98M+ctQoEX9JYyO6jLx5/Xqup50SJNJbrngTxMSUT5HMYiMm2eiiF6/HlyglqJjb2Fbm/6/Yqe5372IDw9jb04OmkI+2vBZ6y60VQm9fGf4aBMYlF2agaeT4qiqh25TaqVNNV1aSlCBbZiN75hrkIgfzYqeZJBBxflmHceV+/GJ/691mhMokk67TFlwJsmUmsqeuQbV1deIe4ohf1s2kgLAyx8jg8nf1c9zurq5Uz6wEcQZJ/w3W3JGX5b+4ggAAAABJRU5ErkJggg==";
 
 function toggleTecWin(){
-  if (tecWinEl){ closeTecWin(); return; }
-  const w = makeWindow("TEC // 对话", closeTecWin);
+  if (tecMin){                                /* 收在右下角卡片上 -> 点图标 = 还原，不是关闭 */
+    openTecWin();                             /* 先把窗口建回 DOM，才量得到放大动画的终点 */
+    tecMotionPlayIn();                        /* 从卡片位置放大回来 */
+    return;
+  }
+  if (tecWinEl){ closeTecWin(); return; }     /* 开着 -> 点图标 = 关闭（原语义） */
+  openTecWin();
+}
+function openTecWin(){
+  const w = makeWindow("TEC // 对话", closeTecWin, minTecWin);
   w.el.classList.add("tec-win");
   const body = document.createElement("div");
   body.className = "tec-body";
@@ -1882,8 +2039,7 @@ function toggleTecWin(){
   avCol.className = "tec-avatar-col";
   const av = document.createElement("div");
   av.id = "tec-avatar"; av.className = "tec-avatar";
-  av.title = "TEC 助手：点头像交谈，拖节点到我身上分析";
-  av.addEventListener("click", () => tecTalk());
+  av.title = "TEC 助手：点对话窗任意位置交谈，拖节点到我身上分析";
   const avImg = document.createElement("img");
   avImg.src = "data:image/png;base64," + TEC_AVATAR_B64;
   avImg.alt = "TEC"; avImg.draggable = false;
@@ -1904,19 +2060,162 @@ function toggleTecWin(){
   main.appendChild(lines);
   const hint = document.createElement("div");
   hint.className = "tec-hint";
-  hint.textContent = "点头像交谈 · 拖节点到我身上分析";
+  hint.textContent = "点框内任意位置交谈 · 拖节点到我身上分析";
   main.appendChild(hint);
   body.appendChild(avCol); body.appendChild(main);
   w.body.appendChild(body);
+  /* 点窗内任意位置 = 交谈推进（与角色对话气泡 / 记忆放映卡同一套口径）：拖过的那一下不算点击
+     （_dragged，所以整窗仍可拖动）。**必须挂在窗口根 `w.el` 上、不能挂在正文上** ——
+     makeFloatDraggable 在 pointerdown 里对窗口根做了 setPointerCapture，随后的 click 会被
+     **重定向到窗口根**（事件路径不再经过 .syswin-body），挂正文上的话点历史/提示行都不会触发；
+     只有头像例外（它在拖动排除表里，起手时提前 return、没设捕获，click 才照常从它冒泡上来）。
+     标题栏的 − / × 各自的 click 处理器里有 stopPropagation，落不到这里，语义不变。 */
+  w.el.addEventListener("click", () => {
+    if (w.el._dragged) return;
+    tecTalk();
+  });
   desktopEl.appendChild(w.el);
   makeFloatDraggable(w.el, false);
   tecWinEl = w.el;
+  tecMin = false;
+  showTecChip(false);                             /* 卡片熄掉（保留布局盒，展开动画还要量它） */
+  tecDot = false;                                 /* 看过即已读 */
+  if (tecTask){                                   /* 收起期间发起的分析还在跑 -> 补一根按剩余时间续播的进度条 */
+    const live = G.nodes[tecTask.key];
+    if (live) tecShowAnalyzing(live, tecTaskLeft());
+  }
+  updateTecBadge();
   if (lines) lines.scrollTop = lines.scrollHeight;   /* 打开时就停在最新一条 */
+}
+/* 收起 / 展开的位移与缩放：把 TEC 窗和右下角助手卡片的中心对上。
+   卡片只用 visibility 隐藏、保留布局盒，所以熄掉之后也量得到（与案件卡片同一套做法）。 */
+function tecChipMotion(){
+  const w = tecWinEl, c = document.getElementById("tec-chip");
+  if (!w || !c || typeof w.getBoundingClientRect !== "function") return null;
+  if (typeof c.getBoundingClientRect !== "function") return null;
+  const a = w.getBoundingClientRect(), b = c.getBoundingClientRect();
+  if (!a.width || !a.height || !b.width || !b.height) return null;
+  const dx = (b.left + b.width / 2) - (a.left + a.width / 2);
+  const dy = (b.top + b.height / 2) - (a.top + a.height / 2);
+  const s  = Math.max(.05, Math.min(b.width / a.width, b.height / a.height));
+  return "translate(" + dx + "px," + dy + "px) scale(" + s + ")";
+}
+function tecMotionReset(){
+  const w = tecWinEl;
+  if (!w || !w.style) return;
+  w.style.transition = ""; w.style.transform = ""; w.style.transformOrigin = ""; w.style.opacity = "";
+}
+function tecMotionApply(tf){
+  const w = tecWinEl;
+  if (!w || !w.style) return;
+  w.style.transition = "transform .26s cubic-bezier(.4,0,.2,1), opacity .26s ease";
+  w.style.transformOrigin = "50% 50%";
+  w.style.transform = tf; w.style.opacity = "0";
+}
+/* 展开：从卡片位置放大回原位（窗口必须已经在 DOM 里，才量得到起点） */
+function tecMotionPlayIn(){
+  const tf = tecChipMotion();
+  const w = tecWinEl;
+  if (!w || !w.style || !tf) return;
+  w.style.transition = "none";
+  w.style.transformOrigin = "50% 50%";
+  w.style.transform = tf; w.style.opacity = "0";
+  if (typeof w.getBoundingClientRect === "function") w.getBoundingClientRect();   /* 强制回流，让起始态生效 */
+  w.style.transition = "transform .26s cubic-bezier(.4,0,.2,1), opacity .26s ease";
+  w.style.transform = "none"; w.style.opacity = "1";
+  const t = setTimeout(tecMotionReset, 300);
+  if (!t) tecMotionReset();
+}
+/* – 收起：窗口带位移与缩放地缩进右下角那块助手卡片（与案件卡片同一套语言）。
+   分析进行中时，卡片上的进度条接着播（按剩余时间）。 */
+function minTecWin(){
+  if (!tecWinEl) return false;
+  const w0 = tecWinEl;                       /* 记住这一块窗：110ms 内被还原/换掉时别摘错 */
+  const tf = tecChipMotion();
+  const land = () => {
+    if (w0 && w0.parentNode) w0.remove();
+    if (tecWinEl === w0){ tecWinEl = null; updateTecBadge(); }
+  };
+  /* 落点**先亮出来当靶子**，窗口再缩过去（与案件卡片 caseParkPoint 同一套做法）：
+     卡片先淡入、窗口在它上面缩着淡出，两者交叠 —— 否则窗口先缩没、卡片才淡入，
+     中间会"闪一下"再出现（用户反馈"不够顺滑"）。 */
+  tecMin = true;                             /* 先置真：窗口不在屏幕上，但助手驻留在右下角卡片上 */
+  tecChipBarKey = null;                      /* 让进度条按剩余时间重新起播 */
+  showTecChip(true);
+  updateTecChip();
+  if (tf){
+    tecMotionApply(tf);
+    const t = setTimeout(land, 280);
+    if (!t) land();                          /* 无头 stub：setTimeout 返回 0，同步收尾 */
+  } else land();
+  return true;
 }
 
 /* ============ TEC 分析：拖节点入 TEC -> 约 5~8s 分析 -> 提取线索 / 无线索提示 ============ */
 const TEC_ANALYZE_MIN = 5000, TEC_ANALYZE_MAX = 8000;
 let tecBusy = false;
+/* ---- 右下角助手卡片（#tec-chip）：收起态的可视化 ----
+   还剩多少毫秒：收起 / 还原之间要接着播同一根进度 */
+function tecTaskLeft(){ return tecTask ? Math.max(400, tecTask.endAt - Date.now()) : 0; }
+let tecChipOn = false;
+/* 卡片的文案 / 进度条 / 完成圆点都在这里刷新（updateTecBadge 每次 render 都会调它） */
+function updateTecChip(){
+  const chip = document.getElementById("tec-chip");
+  if (!chip) return;
+  const st = document.getElementById("tc-status");
+  if (st) st.textContent = tecTask ? ("分析中 · " + tecTask.label)
+                       : (tecDot ? "分析完成 · 点此展开" : "助手已收起 · 点此展开");
+  if (chip.classList) chip.classList.toggle("busy", !!tecTask);
+  /* 进度条只在本轮任务的**第一次**刷新时起播：updateTecChip 会被 render 反复调到，
+     每次都重启动画会把进度条永远钉在 0%。key 里带 endAt，换任务自然重播；
+     minTecWin 把 key 清空，所以"分析途中才收起"也会按剩余时间重新起播。 */
+  const key = tecTask ? (tecTask.key + "@" + tecTask.endAt) : null;
+  const fill = document.getElementById("tc-bar-fill");
+  if (fill && fill.style){
+    if (!key){
+      /* 空闲：把进度条停回 0。这里不能只写 `key !== tecChipBarKey` —— 两边都可能是 null，
+         判不出来，进度条会一直停在"分析完成"的那一刻（踩过）。 */
+      tecChipBarKey = null;
+      if (fill.style.animationDuration !== "") fill.style.animationDuration = "";
+    } else if (key !== tecChipBarKey){
+      tecChipBarKey = key;
+      fill.style.animationDuration = Math.round(tecTaskLeft()) + "ms";
+      /* 重启动画只能用 animationName 长写：animation 是**简写**，写 "none" 会把 inline 的
+         animation-duration 一起清零，动画退化成 0s 瞬间跑完（真机实测踩到；DOM stub 的
+         style 不展开简写，所以 verify.js 查不出来）。 */
+      fill.style.animationName = "none";
+      void chip.offsetWidth;               /* 强制回流，让动画从头播 */
+      fill.style.animationName = "";
+    }
+  }
+  /* 完成圆点：压在卡片右上角，打开 TEC 窗口即清除 */
+  let d = chip.querySelector ? chip.querySelector(".tc-dot") : null;
+  if (tecDot){
+    if (!d && chip.appendChild){ d = document.createElement("span"); d.className = "tc-dot"; chip.appendChild(d); }
+  } else if (d) d.remove();
+}
+function showTecChip(v){
+  tecChipOn = !!v;
+  const c = document.getElementById("tec-chip");
+  if (!c || !c.classList) return;
+  if (v) updateTecChip();
+  c.classList.toggle("on", !!v);
+}
+/* 卡片与「案件卡片 #case-dock」是两个独立落点：本卡片排在上方（bottom:84px vs 14px），不叠在一起 */
+function initTecChip(){
+  const img = document.getElementById("tc-av-img");
+  if (img) img.src = "data:image/png;base64," + TEC_AVATAR_B64;
+  attachDock(document.getElementById("tec-chip"), openTecWin);   /* 单击展开；拖完那一次不误展开 */
+  showTecChip(false);
+}
+/* 节点可以拖到哪几个"外挂落点"上（悬停高亮 + 松手命中共用一份清单）。
+   收起态才把右下角助手卡片加进来：卡片即使熄着也保留布局盒，不加这道门，
+   窗口开着时拖节点划过卡片所在位置会被误判成"拖到了 TEC"。 */
+function nodeDropTargets(){
+  const list = ["bag-dock","tec-dock","infer-icon","goto-icon","tec-avatar"];
+  if (tecChipOn) list.push("tec-chip");
+  return list;
+}
 function tecAnalyzingEl(){ return tecWinEl ? tecWinEl.querySelector(".tec-analyzing") : null; }
 function tecClearAnalyzing(){ const e = tecAnalyzingEl(); if (e) e.remove(); }
 function tecShowAnalyzing(n, ms){
@@ -1937,21 +2236,30 @@ function tecShowAnalyzing(n, ms){
   const anchor = main.querySelector(".tec-actions") || main.querySelector(".tec-hint");
   if (anchor) main.insertBefore(box, anchor); else main.appendChild(box);
 }
-function tecAnalyze(key){
+function tecAnalyzeStart(key, ms){
   const n = G.nodes[key];
   if (!n) return false;
   if (n.kind === "clue"){ toast("线索节点不需要再让 TEC 分析", true); return false; }
   if (tecBusy){ toast("TEC 正在分析中，请稍候…", true); return false; }
-  if (!tecWinEl) toggleTecWin();
+  if (!tecWinEl && !tecMin) openTecWin();      /* 收起着就不弹窗：进度改画到右下角卡片上 */
   pushHistory();
   tecBusy = true;
-  const ms = TEC_ANALYZE_MIN + Math.random() * (TEC_ANALYZE_MAX - TEC_ANALYZE_MIN);
-  tecShowAnalyzing(n, ms);
+  const dur = (typeof ms === "number" && ms > 0) ? ms
+            : TEC_ANALYZE_MIN + Math.random() * (TEC_ANALYZE_MAX - TEC_ANALYZE_MIN);
+  tecTask = { key: key, label: plain(n.label), ms: dur, endAt: Date.now() + dur };
+  tecShowAnalyzing(n, dur);
+  updateTecBadge();                            /* 收在卡片上 -> 卡片状态行 / 进度条同步起播 */
   tecSay("（接收「" + plain(n.label) + "」，开始分析…）");
-  const finish = () => {
-    tecBusy = false;
-    tecClearAnalyzing();
-    tecReaction(key);                          /* TEC 对该节点的评述（沿用原有反应表） */
+  return true;
+}
+function tecAnalyzeFinish(key){
+  const n = G.nodes[key];
+  tecBusy = false;
+  tecTask = null;              /* 进度条的收尾交给 updateTecChip（key 变 null 时会把动画停掉） */
+  tecClearAnalyzing();
+  if (!n) return false;
+  tecReaction(key);                            /* TEC 对该节点的评述（沿用原有反应表） */
+  {
     const fresh = capturableClues(n).filter(id => !G.captured.has(id));
     if (fresh.length){
       const src = n.isScene ? SCENES[n.id] : (n.kind === "char" ? CHARS[n.id] : ITEMS[n.id]);
@@ -1974,10 +2282,17 @@ function tecAnalyze(key){
       tecSay("分析完成：「" + plain(n.label) + "」中没有可以捕获的线索。");
       log("TEC 分析「" + esc(n.label) + "」：无可捕获线索", "warn");
     }
-    updateTecBadge();
-  };
-  const t = setTimeout(finish, ms);
-  if (!t) finish();                            /* 无头 stub：setTimeout 返回 0，同步收尾 */
+  }
+  /* 窗口收在右下角卡片上：分析完成后在卡片角上点一个小圆点，打开 TEC 窗口即清除 */
+  if (tecMin && !tecWinEl) tecDot = true;
+  updateTecBadge();
+  return true;
+}
+function tecAnalyze(key){
+  const ms = TEC_ANALYZE_MIN + Math.random() * (TEC_ANALYZE_MAX - TEC_ANALYZE_MIN);
+  if (!tecAnalyzeStart(key, ms)) return false;
+  const t = setTimeout(() => tecAnalyzeFinish(key), ms);
+  if (!t) tecAnalyzeFinish(key);               /* 无头 stub：setTimeout 返回 0，同步收尾 */
   return true;
 }
 
@@ -2039,7 +2354,7 @@ function updateTecBadge(){
     const st = (tec.sceneTalks || {})[sid];
     if (st) unread += Math.max(0, st.length - (G.tecProg[sid] || 0));
   });
-  let b = dock.querySelector(".badge");
+  let b = dock.querySelector(".badge.talk");
   if (unread > 0){
     if (!b){ b = document.createElement("span"); b.className = "badge talk"; dock.appendChild(b); }
     b.textContent = "提示 " + unread;
@@ -2048,6 +2363,9 @@ function updateTecBadge(){
     if (b) b.remove();
     dock.classList.remove("pulse");
   }
+  /* 驻留态（– 收起）= 右下角那块助手卡片，不落在图标上（用户明确要求"收进右下角带头像的一块"） */
+  showTecChip(tecMin);
+  updateTecChip();
 }
 
 /* ============ 选中聚焦（dim 非邻居） ============ */
@@ -2272,7 +2590,9 @@ function showMemoryCard(n, s){
   const w = makeWindow("MEMORY // " + (s.title || n.id), closeNarr);
   const c = w.el;
   c.className = "narr-card memory syswin";
-  makeFloatDraggable(c, true, w.bar);
+  c.title = "单击任意位置推进下一行，按住可拖动";
+  makeFloatDraggable(c, true);                       /* 整卡可拖（与对话气泡一致），点/拖靠 _dragged 区分 */
+  c.addEventListener("click", () => { if (!c._dragged) advanceMemory(); });
   world.appendChild(c);
   c.style.left = (n.x + NODE_W[n.kind] / 2 - c.offsetWidth / 2) + "px";
   c.style.top  = (n.y - c.offsetHeight - 14) + "px";
@@ -2285,19 +2605,34 @@ function showMemoryCard(n, s){
     (st || []).forEach(l => lines.push("——" + (ch.name || t.id) + "：" + plain(l.text || "")));
   });
   log("<b>" + esc(s.title || "") + "</b>（记忆放映）", "sys");
-  memoryPlay = { el: c, body: w.body, lines: lines, idx: 0 };
+  memoryPlay = { el: c, body: w.body, lines: lines, idx: 0, typing: false, cur: null, curText: "" };
   playMemoryLine();
 }
 function playMemoryLine(){
   const mp = memoryPlay;
   if (!mp || !narrEl || mp.el !== narrEl){ memoryPlay = null; return; }
   if (mp.idx >= mp.lines.length){ memoryPlay = null; return; }
+  const txt = mp.lines[mp.idx];
   const d = document.createElement("div");
-  d.textContent = mp.lines[mp.idx];
-  d.className = mp.lines[mp.idx].startsWith("——") ? "mem-line talk" : "mem-line";
+  d.className = txt.startsWith("——") ? "mem-line talk" : "mem-line";
   mp.body.appendChild(d);
   mp.idx++;
-  if (mp.idx < mp.lines.length) mp.timer = setTimeout(playMemoryLine, 700);
+  /* 每行也走打字机；打完就停在那儿等玩家点 —— 不再 700ms 自动换行（改成点击推进） */
+  mp.typing = true; mp.cur = d; mp.curText = txt;
+  typeInto(d, txt, { done: () => { mp.typing = false; } });
+}
+/* 单次推进：本行还在打字 -> 先补全本句；已打完 -> 换下一行（视觉小说通行做法） */
+function advanceMemory(){
+  const mp = memoryPlay;
+  if (!mp) return false;
+  if (mp.typing){
+    cancelType(mp.cur);
+    if (mp.cur) mp.cur.textContent = mp.curText;
+    mp.typing = false;
+    return true;
+  }
+  playMemoryLine();
+  return true;
 }
 
 /* ============ 详情面板 ============ */
@@ -2355,9 +2690,9 @@ function selectNode(key){
 
   /* 物品 */
   const it = ITEMS[n.id] || {};
-  /* 无命令的物品：描述已由「双击 → 提示条」呈现，详情窗不再复读；
-     有命令的物品：双击跑的是命令，描述没有别的出口，保留在此（去重但不丢内容） */
-  if ((it.commands || []).length) html += "<div class='ddesc'>" + esc(plain(it.desc || "（无描述）")) + "</div>";
+  /* 物品描述统一由详情窗承载（不论有没有命令）：无命令物品的双击只是选中，
+     描述就在详情窗里读 —— 不再靠顶部提示条闪一下。 */
+  html += "<div class='ddesc'>" + esc(plain(it.desc || "（无描述）")) + "</div>";
   if (n.homeScene && SCENES[n.homeScene]) html += "<div class='drow'>来源：" + esc(SCENES[n.homeScene].title) + "</div>";
   const outs = [];
   for (const f in (it.presentReactions || {})) outs.push({ tool:f, r:it.presentReactions[f] });
@@ -2387,7 +2722,6 @@ window.__choice = function(id, ci, oi){
     sn.fresh = true;
     link(n.key, sn.key, "cond");
     revealScene(r.scene);
-    toast("<b>" + esc(opt.label) + "</b><br>展开场景「" + esc(sn.label) + "」", false);
     layout(); render();
     selectNode(sn.key);
     return;
@@ -2402,7 +2736,7 @@ window.__pw = function(id){
   if (!n || !cmd) return;
   const v = (input && input.value || "").trim();
   if (v !== String(cmd.value)){
-    toast("<b>" + esc(n.label) + "</b><br>密码不对。", true);
+    /* 密码错：只抖一下 + 记一行日志（不再弹提示 / 不再往详情窗塞文字） */
     log("「" + esc(n.label) + "」密码 " + esc(v || "(空)") + " 不正确", "warn");
     if (pwPop){ pwPop.classList.remove("shake"); void pwPop.offsetWidth; pwPop.classList.add("shake"); }
     return;
@@ -2410,8 +2744,8 @@ window.__pw = function(id){
   pushHistory();
   closePwPop();
   const os = cmd.onSuccess || {};
-  toast("<b>" + esc(cmd.label) + "</b><br>" + esc(plain(os.message || "打开了。")));
-  log("「" + esc(n.label) + "」已打开：" + esc(plain(os.message || "")), "act");
+  const pwMsg = plain(os.message || "打开了。");
+  log("「" + esc(n.label) + "」已打开：" + esc(pwMsg), "act");
   noteSeen(os.message || "");
   if (os.items){
     spawnItems(os.items, n.key);
@@ -2543,6 +2877,7 @@ document.getElementById("case-min").addEventListener("click", e => {
   stowCase();
 });
 attachDock(document.getElementById("case-dock"));
+initTecChip();          /* 右下角的 TEC 助手卡片：头像取 base64 + 可拖动 + 单击展开 */
 makeFloatDraggable(document.getElementById("detail-win"), false);
 makeFloatDraggable(document.getElementById("log-win"), false);
 setDetailWin(false);
@@ -2753,7 +3088,7 @@ function showCaseDock(v){
 /* 右下角卡片可拖动：按住拖动 = 挪位置（拖动过的那一次不展开），原地单击 = 展开案件。
    它原来是靠 right/bottom 定位的，首次按下时换算成 left/top。
    注意 moved 要在 pointerdown 复位 —— 这样"拖完紧跟的 click"被吞掉，下一次正常单击又能用。 */
-function attachDock(el){
+function attachDock(el, onPick){
   if (!el || !el.addEventListener) return;
   let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
   el.addEventListener("pointerdown", e => {
@@ -2780,7 +3115,8 @@ function attachDock(el){
     el.style.top  = Math.max(0, Math.min((r.height ||  800) - h, oy + e.clientY - sy)) + "px";
   });
   el.addEventListener("pointerup", () => { dragging = false; });
-  el.addEventListener("click", () => { if (!moved) enterCase(CASE_ID); });
+  /* 落点默认展开案件；TEC 助手卡片传了 onPick，就展开 TEC 对话窗 */
+  el.addEventListener("click", () => { if (!moved){ if (onPick) onPick(); else enterCase(CASE_ID); } });
 }
 /* 收缩 / 展开的位移与缩放：把案件窗和右下角卡片的中心对上。
    卡片只用 visibility 隐藏、保留布局盒，所以隐藏时也量得到（这是选它当落点的一个原因）。 */
@@ -3134,8 +3470,8 @@ function finishIntro(){
   if (!introState) return;
   closeIntroLight();
   mountInvChip();
-  const sn = G.nodes["loc:" + START];
-  if (sn) showNarrCard(sn, SCENES[START]);
+  /* 不在这里放起始场景的叙事卡：开局只留一个「未探索」的花园节点，
+     等玩家双击展开时才出叙事卡（见 boot / revealScene）。 */
   log("调查员 <b>" + esc(investigator.name) + "</b>（" + esc(investigator.id) + "）已接入 T.E.C-OS", "sys");
 }
 
@@ -3282,18 +3618,19 @@ function boot(opts){
     mountInvChip();
     return;
   }
-  const sn = ensureNode("loc", START, { label: SCENES[START].title || START, x: 1000, y: 620 });
-  revealScene(START, true);
+  /* 开局只放一个「未探索」的起始场景节点：里面的东西和叙事卡都要等玩家双击展开时才出现，
+     开场画面保持干净，第一次交互就是「双击这个节点」。 */
+  ensureNode("loc", START, { label: SCENES[START].title || START, x: 1000, y: 620 });
+  G.lastScene = START;   /* 交谈 / TEC 的上下文仍认起始场景，只是画面还没展开 */
   layout();
   render();
   fit();
   mountInvChip();
-  if (investigator) showNarrCard(sn, SCENES[START]);
-  else openIntro();
+  if (!investigator) openIntro();
   const _cc = caseById(CASE_ID);
   const _code = (_cc ? _cc.code : CASE_ID).replace(/^CASE\s+/, "");
   log("已载入案件 <b>" + esc(_code) + "</b>：双击 <b>场景节点</b> 展开里面的东西，把节点 <b>拖到另一个节点上</b> 组合使用。", "sys");
-  if (CASE_ID === "A001") log("提示：起始场景就是「植物学家的花园」。双击「书桌」等场景节点继续展开，拖动手电筒到黑影上试试。", "sys");
+  if (CASE_ID === "A001") log("提示：先双击「植物学家的花园」展开场景，再双击「书桌」等继续展开，拖动手电筒到黑影上试试。", "sys");
 }
 
 /* 测试钩子（供 verify.js 无头驱动） */
@@ -3301,6 +3638,10 @@ window.__combo = (a, b) => attemptCombo(a, b);
 window.__talk = key => { const n = G.nodes[key]; if (n) runPrimary(n); };
 window.__tec = key => tecConsult(key);
 window.__analyze = key => tecAnalyze(key);
+window.__analyzeStart = (key, ms) => tecAnalyzeStart(key, ms);   /* 只起任务、不排收尾（测「分析中」态） */
+window.__analyzeFinish = key => tecAnalyzeFinish(key);
+window.__tecMin = () => minTecWin();
+window.__tecState = () => ({ min: tecMin, dot: tecDot, busy: tecBusy, task: tecTask ? tecTask.key : null });
 window.__tecTalk = () => tecTalk();
 window.__collapse = sid => toggleCollapse(sid);
 window.__store = (key, sid) => storeNode(key, sid);
@@ -3313,7 +3654,7 @@ window.__goto = sid => gotoScene(sid);
 window.__gotoList = () => heardScenes();
 window.__mxAssign = (k, s) => assignClue(k, s);
 window.__infer = () => executeInference();
-window.__playStep = () => { if (memoryPlay) playMemoryLine(); else if (endingState) playEndingStage(); };
+window.__playStep = () => { if (memoryPlay) advanceMemory(); else if (endingState) playEndingStage(); };
 window.__intro = {
   step: () => introState && introState.step,
   name: v => setIntroName(v),

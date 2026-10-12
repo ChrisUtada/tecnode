@@ -17,6 +17,7 @@ _geo.html
 
 # ─── 截图 / 测试页 / 预览页 ─────────────────────────────────
 shot-*.png
+_shot-*.png
 screenshot-*
 case-*-check.png
 index-*
@@ -31,6 +32,8 @@ avatar_b64.txt
 
 # ─── 备份与日志 ─────────────────────────────────────────────
 *.bak
+_*.bak.*
+_verify*.txt
 *.bak[0-9]*
 *.orig
 *.rej

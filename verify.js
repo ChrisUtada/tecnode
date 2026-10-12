@@ -298,6 +298,28 @@ assert('自动布局没有挪走已锁定的节点',
   after2.pos[startKey].x === locked.x && after2.pos[startKey].y === locked.y);
 assert('新节点仍然被自动布局（数量增加）', after2.nodes.length > dragRes.nodes.length);
 
+/* ---- 拖到画布「框边」外松手：越界必须夹回，且模型与 DOM 落在同一位置 ----
+   这里守的是「弹回后连线断开」的根因：夹回若只写一次 left/top 交给 .node 的 CSS 过渡，
+   节点会在 340ms 里滑回去、而连线已跳到终点（实测最大脱开 108px）。
+   正确做法是走 springBack（JS 逐帧同时推进节点 + 连线），落定后两边必须严格一致。 */
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+const edgeKey = 'loc:SCENES_garden';
+const edgeEl = findEl(edgeKey);
+dragTo(edgeEl, 90000, 90000);            /* 远远超出世界范围 2000×1300 → 必然触发夹回 */
+const clamped = window.__dump().pos[edgeKey];
+assert('越界拖到空白：位置被夹回世界右下边界', clamped.x === 2000 - 220 && clamped.y === 1300 - 120);
+assert('越界夹回后同样被锁定', clamped.pinned === true);
+assert('夹回后 DOM 与模型同位置（否则连线会脱开）',
+  Math.round(parseFloat(edgeEl.style.left)) === clamped.x && Math.round(parseFloat(edgeEl.style.top)) === clamped.y);
+assert('夹回动画结束后还原 CSS 过渡（不能残留 transition:none）', edgeEl.style.transition === "");
+/* 反例：不越界时不该走夹回，位置就停在松手处，且 DOM 与模型仍一致 */
+dragTo(edgeEl, -50, -50);
+const moved = window.__dump().pos[edgeKey];
+assert('未越界松手：位置停在松手处（未被夹回）', moved.x < 1780 && moved.x > 60 && moved.y < 1180 && moved.y > 50);
+assert('未越界松手：DOM 与模型仍一致',
+  Math.round(parseFloat(edgeEl.style.left)) === moved.x && Math.round(parseFloat(edgeEl.style.top)) === moved.y);
+
 /* 拖到另一个节点上 → 组合 */
 ids['btn-reset']._ev.click[0]();
 window.__reveal('SCENES_garden');
@@ -333,6 +355,7 @@ assert('原地点击被标记为已选中', gEl._classes.has('sel'));
 /* ---- 13. 交互节点化：choice 弹出节点 / 台灯点亮 / useItem 拖拽 / 密码弹窗 ---- */
 console.log('\n=== 13. 交互节点化 ===');
 ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');   /* 新开局只有一个「未展开」的花园节点：本段要用花园内容物（唱机等），先展开 */
 window.__reveal('SCENE_shuzhuo');
 
 window.__cmd('ITEM_chouti', 0);   // 双击抽屉 → 应弹出左右抽屉两个场景节点
@@ -367,7 +390,14 @@ assert('密码弹窗打开无异常', true);
 
 console.log('\n=== 14. 叙事层：对话气泡 + 场景叙事卡 ===');
 ids['btn-reset']._ev.click[0]();
-assert('开局显示起始场景叙事卡', window.__dump().floats.narr === true);
+/* 开局只放一个「未探索」的起始场景节点：不自动弹叙事卡，内容物也没铺开 */
+assert('开局不自动弹叙事卡', window.__dump().floats.narr === false);
+assert('开局只显示起始场景节点（未展开）',
+  window.__dump().nodes.length === 1 && window.__dump().nodes[0] === 'loc:SCENES_garden');
+assert('起始场景尚未标记为已展开', !window.__dump().explored.includes('SCENES_garden'));
+window.__reveal('SCENES_garden');
+assert('双击起始场景 → 弹出其它节点 + 叙事卡',
+  window.__dump().floats.narr === true && window.__dump().nodes.length > 1);
 window.__closeFloats();
 assert('叙事卡可收起', window.__dump().floats.narr === false);
 
@@ -440,6 +470,7 @@ assert('清除选中后淡化清空', window.__dump().dim.length === 0);
 
 console.log('\n=== 16. 节点收纳（放回现场）===');
 ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');   /* 收纳对象是花园里的注射器：先展开花园 */
 window.__closeFloats();
 
 /* 直接收纳：注射器放回花园 */
@@ -467,6 +498,7 @@ assert('展开书桌后注射器被取回', !window.__dump().stored.includes('it
 
 console.log('\n=== 17. 证物袋 ===');
 ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');   /* 收纳对象（注射器 / 唱机）都在花园里 */
 window.__closeFloats();
 
 window.__bag('item:ITEMS_zsq');
@@ -501,6 +533,7 @@ assert('场景收纳与证物袋互不干扰', bs.stored.includes('item:ITEMS_zs
 
 console.log('\n=== 18. 捕获 + 前往 ===');
 ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');   /* 「手电筒 → 黑影」的目标黑影在花园里 */
 window.__closeFloats();
 
 /* 捕获：手电筒 → 黑影 → 尸体场景，捕获尸体的 hiddenClue（真结局线索） */
@@ -526,6 +559,7 @@ assert('前往生成场景节点', window.__dump().nodes.includes('loc:SCENES_md
 
 console.log('\n=== 18b. TEC 拖入分析：延迟后提取线索 / 无线索提示 ===');
 ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');   /* 黑影在花园里：保持这条链路真实可走 */
 window.__closeFloats();
 window.__reveal('SCENE_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);
@@ -542,8 +576,167 @@ assert('无新线索可捕获时走到「无线索」分支且返回 true', wind
 assert('线索节点拒绝被再次分析', window.__analyze('clue:CLUES_V_luheng') === false);
 assert('分析后 TEC 对话窗处于打开态', window.__dump().floats.tec === true);
 
+console.log('\n=== 18c. TEC 最小化：收进右下角助手卡片 · 分析进度条 · 完成圆点 ===');
+const tecDock = document.getElementById('tec-dock');
+const tecChip = document.getElementById('tec-chip');
+const tecWinNode = () => document.getElementById('desktop').querySelector('.tec-win');
+const chipOn = () => !!(tecChip.classList && tecChip.classList.contains('on'));
+const chipStatus = () => { const e = document.getElementById('tc-status'); return e ? e.textContent : null; };
+const chipBar = () => document.getElementById('tc-bar-fill');
+const dotOf = () => (tecChip.querySelector ? tecChip.querySelector('.tc-dot') : null);
+const durOf = () => parseInt(chipBar().style.animationDuration, 10) || 0;
+
+assert('TEC 窗口开着时右下角没有助手卡片', !chipOn());
+assert('TEC 标题栏同时有「– 最小化」与「× 关闭」',
+  !!tecWinNode().querySelector('.syswin-min') && !!tecWinNode().querySelector('.syswin-x'));
+
+/* 走真实按钮路径：点标题栏的「–」 */
+tecWinNode().querySelector('.syswin-min')._ev.click[0]();
+assert('点「–」后窗口从屏幕上收走', window.__dump().floats.tec === false);
+assert('点「–」后右下角亮出助手卡片', chipOn() && window.__tecState().min === true);
+assert('空闲卡片写着「助手已收起 · 点此展开」', chipStatus() === '助手已收起 · 点此展开');
+assert('空闲时卡片不显示进度条（没有 busy）', !tecChip._classes.has('busy'));
+assert('收起时卡片上没有完成圆点', !dotOf());
+
+/* 收着的时候发起分析：进度画在卡片上，窗口不被弹出来 */
+assert('收起状态下发起分析返回 true', window.__analyzeStart('loc:SCENES_body', 6000) === true);
+assert('分析中窗口保持收起', window.__dump().floats.tec === false && window.__tecState().busy === true);
+assert('卡片进入分析态、状态行是「分析中 · <标签>」',
+  tecChip._classes.has('busy') && /^分析中 · /.test(chipStatus() || ''));
+assert('卡片进度条按分析时长起播（约 6000ms）', durOf() > 5500 && durOf() <= 6000);
+assert('分析中拒绝新的分析请求', window.__analyzeStart('loc:SCENES_body', 6000) === false);
+
+/* 完成：进度条收起、点出圆点 */
+assert('分析收尾返回 true', window.__analyzeFinish('loc:SCENES_body') === true);
+assert('完成后卡片退出分析态、进度条停播',
+  !tecChip._classes.has('busy') && chipBar().style.animationDuration === ''
+    && window.__tecState().task === null);
+assert('完成后卡片上点出一个小圆点', !!dotOf() && window.__tecState().dot === true);
+assert('完成后状态行改为「分析完成 · 点此展开」', chipStatus() === '分析完成 · 点此展开');
+
+/* 卡片 = 可拖动的落点：单击即展开对话窗 */
+tecChip._ev.click[0]();
+assert('点卡片 = 还原窗口（而不是关闭）',
+  window.__dump().floats.tec === true && window.__tecState().min === false);
+assert('还原后卡片熄掉', !chipOn());
+assert('打开 TEC 窗口即清掉完成圆点', !dotOf() && window.__tecState().dot === false);
+assert('还原后再点图标 = 关闭窗口（原语义不变）',
+  (tecDock._ev.dblclick[0](), window.__dump().floats.tec === false));
+assert('窗口没开时最小化是空操作', window.__tecMin() === false && window.__tecState().min === false);
+
+/* 卡片可拖动："拖完紧跟的那一次单击"不误展开（与案件卡片共用 attachDock） */
+assert('重开 TEC 窗口', (tecDock._ev.dblclick[0](), window.__dump().floats.tec === true));
+tecWinNode().querySelector('.syswin-min')._ev.click[0]();
+assert('再次收起落在右下角卡片上', chipOn() && window.__dump().floats.tec === false);
+tecChip._ev.pointerdown[0]({ button: 0, clientX: 900, clientY: 500 });
+assert('卡片拖动时把 right/bottom 换成了 left/top',
+  tecChip.style.right === 'auto' && tecChip.style.bottom === 'auto');
+tecChip._ev.pointermove[0]({ clientX: 800, clientY: 420 });
+tecChip._ev.pointerup[0]({});
+tecChip._ev.click[0]();
+assert('拖完紧跟的单击不误展开 TEC', window.__dump().floats.tec === false && chipOn());
+
+/* 开着窗口分析到一半再收起：进度要接着挪到卡片上 */
+tecChip._ev.pointerdown[0]({ button: 0, clientX: 800, clientY: 420 });   /* 下一次按下复位 moved */
+tecChip._ev.click[0]();
+assert('点卡片重新展开 TEC 窗口', window.__dump().floats.tec === true && !chipOn());
+assert('开着窗口发起分析', window.__analyzeStart('loc:SCENES_body', 5000) === true);
+assert('窗口开着时进度留在窗内（卡片没亮）',
+  !!tecWinNode().querySelector('.tec-analyzing') && !chipOn());
+tecWinNode().querySelector('.syswin-min')._ev.click[0]();
+assert('分析途中收起：窗口收走、卡片接着放进度',
+  window.__dump().floats.tec === false && chipOn() && tecChip._classes.has('busy'));
+assert('中途收起的进度条按剩余时间续播（< 6000ms）', durOf() > 4000 && durOf() <= 5000);
+window.__analyzeFinish('loc:SCENES_body');
+assert('中途收起后完成，同样点出圆点', !!dotOf() && window.__tecState().task === null);
+tecChip._ev.click[0]();
+assert('点卡片还原窗口并清掉圆点', window.__dump().floats.tec === true && !dotOf() && !chipOn());
+assert('收尾归位：窗口关闭 / 无卡片 / 无圆点 / 无进度',
+  (tecDock._ev.dblclick[0](), window.__dump().floats.tec === false && window.__tecState().min === false
+    && !chipOn() && !dotOf() && !tecChip._classes.has('busy') && window.__tecState().busy === false));
+
+/* 收起态也能把节点拖到卡片上发起分析（用户要求：最小化时也能拖入节点） */
+ids['tec-dock']._ev.dblclick[0]();
+assert('拖入用例：先把 TEC 开起来', window.__dump().floats.tec === true);
+tecWinNode().querySelector('.syswin-min')._ev.click[0]();
+assert('拖入用例：收起后卡片亮着', chipOn() && window.__tecState().min === true);
+/* 把卡片挪到一个不与任何桌面图标矩形重叠的位置（stub 里图标按 style 定位取矩形） */
+tecChip.style.left = '900px'; tecChip.style.top = '500px';
+const dropEl = findEl('loc:SCENES_garden');
+assert('收起态里仍有可拖的节点当靶子', !!dropEl);
+assert('拖入之前卡片上没有完成圆点', !dotOf());
+dragTo(dropEl, 960, 520);
+assert('拖节点到收起卡片上 = 发起 TEC 分析（窗口不弹回、卡片点出圆点）',
+  window.__tecState().dot === true && window.__dump().floats.tec === false);
+assert('分析任务已收尾（无头 stub 里同步走完）', window.__tecState().task === null);
+tecChip.style.left = ''; tecChip.style.top = '';
+/* 收尾：展开（顺带清圆点）再 × 关闭，别给后一节留脏状态 */
+ids['tec-dock']._ev.dblclick[0]();
+assert('拖入用例：展开后清掉圆点', !dotOf() && window.__dump().floats.tec === true);
+tecWinNode().querySelector('.syswin-x')._ev.click[0]();
+assert('拖入用例收尾：窗口关闭、无卡片、无圆点',
+  window.__dump().floats.tec === false && !chipOn() && !dotOf());
+
+console.log('\n=== 18d. 对话气泡：点框内任意位置推进下一句 ===');
+ids['btn-reset']._ev.click[0]();
+/* 用真实角色节点：CHARS_TEC 被 sceneTags() 过滤（TEC 只从桌面图标进对话窗，不当画布节点），
+   所以改用 SCENES_lhsdst 里的 [char:CHARS_luhengs]。 */
+window.__reveal('SCENES_lhsdst');
+window.__closeFloats();
+window.__talk('char:CHARS_luhengs');       /* 双击角色节点 = 说第一句 */
+const TALK_KEY = 'char:CHARS_luhengs';
+assert('双击角色节点弹出对话气泡', window.__dump().floats.bubble === true);
+const talkBub = ids['world'].children.find(c => c._classes.has('bubble'));
+assert('气泡仍是带 × 的系统窗（可点 / 可拖）', !!talkBub && !!talkBub.querySelector('.syswin-x'));
+const tp1 = window.__dump().talk[TALK_KEY] || 0;
+assert('第一句已计入对话进度', tp1 >= 1);
+/* 打字中点击：先补全本句、不推进（用户选定口径）；stub 里 typeInto 同步跑完，手动立 _typing 复现 */
+talkBub._typing = true;
+talkBub._ev.click[0]();
+assert('打字中点击先补全本句、不推进', (window.__dump().talk[TALK_KEY] || 0) === tp1);
+assert('补全后打字态已解除', talkBub._typing === false);
+talkBub._ev.click[0]();                    /* 再点一次 = 点框内任意位置推进 */
+const tp2 = window.__dump().talk[TALK_KEY] || 0;
+assert('点气泡任意位置 = 推进下一句', tp2 === tp1 + 1);
+/* 拖过的那一次点击不算推进（makeFloatDraggable 的 _dragged 判据） */
+const talkBub2 = ids['world'].children.find(c => c._classes.has('bubble'));
+assert('点完之后是新的一块气泡', !!talkBub2 && talkBub2 !== talkBub);
+talkBub2._ev.pointerdown[0]({ button: 0, pointerId: 1, clientX: 400, clientY: 400, stopPropagation(){}, preventDefault(){} });
+talkBub2._ev.pointermove[0]({ clientX: 470, clientY: 436 });
+talkBub2._ev.pointerup[0]({});
+talkBub2._ev.click[0]();
+assert('拖过之后紧跟的那次点击不推进', (window.__dump().talk[TALK_KEY] || 0) === tp2);
+window.__closeFloats();
+assert('关闭浮层后气泡消失', window.__dump().floats.bubble === false);
+
+console.log('\n=== 18e. TEC 对话窗：点框内任意位置推进 ===');
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');          /* 给 TEC 一个上下文场景（lastScene） */
+window.__closeFloats();
+tecDock._ev.dblclick[0]();                 /* 双击 TEC 图标开窗 */
+assert('TEC 窗已打开', window.__dump().floats.tec === true);
+const twEl = tecWinNode();
+const twBody = twEl.querySelector('.syswin-body');
+const tlines = () => twEl.querySelector('.tec-lines').children.length;
+const tl0 = tlines();
+const tp0 = window.__dump().tec.prog['SCENES_garden'] || 0;
+twEl._ev.click[0]();                     /* 点窗内任意位置（真机里子元素点击会冒泡到这里） */
+assert('点 TEC 窗内任意位置 = 说下一句（历史 +1 行）', tlines() === tl0 + 1);
+assert('点 TEC 窗内任意位置推进提示进度', (window.__dump().tec.prog['SCENES_garden'] || 0) === tp0 + 1);
+/* 拖过 TEC 窗之后紧跟的那一次点击不算推进（_dragged 判据） */
+twEl._ev.pointerdown[0]({ button: 0, pointerId: 1, clientX: 400, clientY: 400, stopPropagation(){}, preventDefault(){} });
+twEl._ev.pointermove[0]({ clientX: 470, clientY: 436 });
+twEl._ev.pointerup[0]({});
+const tl1 = tlines();
+twEl._ev.click[0]();
+assert('拖过 TEC 窗之后紧跟的点击不推进', tlines() === tl1);
+/* 标题栏不属于"框内"：− / × 仍是原语义 */
+twEl.querySelector('.syswin-x')._ev.click[0]();
+assert('TEC 窗 × 仍然关闭窗口（标题栏不在"框内"范围）', window.__dump().floats.tec === false);
+
 console.log('\n=== 19. 结局系统 + 记忆放映 ===');
 ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');   /* 真结局配方要用到花园里的黑影 / 唱机 */
 window.__closeFloats();
 
 /* 记忆场景放映卡 */
@@ -551,10 +744,22 @@ window.__reveal('SCENES_0602');
 assert('记忆场景弹放映卡', window.__dump().floats.narr === true);
 const memCard = ids['world'].children.find(c => c._classes.has('narr-card') && c._classes.has('memory'));
 assert('放映卡有 memory 样式', !!memCard);
+const memLines = () => memCard.querySelector('.syswin-body').children.length;
 if (memCard){
-  const bodyBefore = memCard.querySelector('.syswin-body').children.length;
+  const bodyBefore = memLines();
   window.__playStep(); window.__playStep();
-  assert('放映逐行推进', memCard.querySelector('.syswin-body').children.length > bodyBefore);
+  assert('放映逐行推进', memLines() > bodyBefore);
+  /* 点框内任意位置也能推进（以前只能等 700ms 自动换行） */
+  const bodyMid = memLines();
+  memCard._ev.click[0]();
+  assert('点放映卡任意位置推进下一行', memLines() > bodyMid);
+  /* 拖动过的那一次点击不算推进 */
+  memCard._ev.pointerdown[0]({ button: 0, pointerId: 1, clientX: 500, clientY: 300, stopPropagation(){}, preventDefault(){} });
+  memCard._ev.pointermove[0]({ clientX: 566, clientY: 334 });
+  memCard._ev.pointerup[0]({});
+  const bodyDrag = memLines();
+  memCard._ev.click[0]();
+  assert('放映卡拖过之后点击不推进', memLines() === bodyDrag);
 }
 window.__closeFloats();
 
@@ -599,6 +804,7 @@ assert('演出步进完毕自动关闭', window.__dump().endingOverlay === false
 
 console.log('\n=== 20. 桌面图标 ===');
 ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');   /* 图标链路里要「手电筒 → 黑影」 */
 /* 图标拖动 */
 const icon = ids['bag-dock'];
 const ix = icon.style.left, iy = icon.style.top;
@@ -627,6 +833,8 @@ assert('TEC 交谈推进提示进度', window.__dump().tec.prog['SCENES_body'] =
 
 console.log('\n=== 22. 侧边栏图标化 ===');
 ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');   /* 后面要选花园节点、用唱机 / 注射器 */
+window.__select(null);              /* 展开会顺带选中并弹详情窗，先取消，保持「默认关闭」断言 */
 assert('日志窗默认关闭', window.__dump().floats.logs === false);
 assert('详情窗默认关闭', window.__dump().floats.detail === false);
 assert('aside 已从源码移除', html.indexOf('<aside') < 0);
@@ -680,15 +888,57 @@ window.__renarr('SCENE_shuzhuo');
 assert('「重看叙事」重新弹出卡', window.__dump().floats.narr === true);
 window.__closeFloats();
 
-/* 物品：无命令 → 详情不复读描述；有命令 → 描述保留（唯一出口） */
+/* 物品描述统一在详情窗承载（不论有没有命令）；双击无命令物品只选中、不再弹提示条 */
 window.__reveal('SCENES_choutiyi');
 window.__select('item:ITEM_shoudiantong');
 dh = ids['detail-body']._html || '';
-assert('无命令物品：详情不再复读描述', dh.indexOf('还能使用的手电筒') < 0);
+assert('无命令物品：描述也在详情窗（唯一出口）', dh.indexOf('还能使用的手电筒') >= 0);
 window.__reveal('SCENES_garden');
 window.__select('item:ITEMS_zhiwu');
 dh = ids['detail-body']._html || '';
-assert('有命令物品：详情保留描述（唯一出口）', dh.indexOf('自生自灭') >= 0);
+assert('有命令物品：描述同样在详情窗', dh.indexOf('自生自灭') >= 0);
+/* 双击无命令物品 = 选中（不再走顶部提示条） */
+ids['toast'].innerHTML = '__sentinel__';
+window.__talk('item:ITEM_shoudiantong');
+assert('双击无命令物品不再走提示条', ids['toast'].innerHTML === '__sentinel__');
+assert('双击无命令物品：仍被选中（详情窗开着）', window.__dump().floats.detail === true);
+
+/* 动作 / 错误提示整体移除：详情窗只呈现描述与结构信息，既不弹提示条也不塞「结果」块
+   —— 行为与状态变化靠画面自证（点亮、节点出现/消失、线索落盘），文字提示没有意义。 */
+ids['toast'].innerHTML = '__sentinel__';
+window.__talk('item:ITEMS_zsq');            /* 注射器：条件命令「查看内部」不满足 */
+dh = ids['detail-body']._html || '';
+assert('双击有命令物品：提示条不响', ids['toast'].innerHTML === '__sentinel__');
+assert('详情窗不再有「结果 / 未成功」反馈块', dh.indexOf('dfb') < 0 && dh.indexOf('不知名的液体') < 0);
+
+ids['toast'].innerHTML = '__sentinel__';
+window.__talk('item:ITEM_taideng');         /* 台灯：文字命令「点亮台灯」 */
+dh = ids['detail-body']._html || '';
+assert('双击文字命令物品：提示条不响', ids['toast'].innerHTML === '__sentinel__');
+assert('双击文字命令物品：详情窗只留描述、不放命令结果',
+  dh.indexOf("class='dt'") >= 0 && dh.indexOf('昏黄的灯光照亮了书桌') < 0);
+assert('动作结果仍记进日志（信息不丢）', logs.some(l => l.indexOf('昏黄的灯光照亮了书桌') >= 0));
+
+/* 组合结果同样不再弹提示条（成功 / 失败都只写日志）—— 效果靠画面自证：
+   新场景 / 新物品节点当场冒出来、被消耗的节点当场消失，文字提示只是复述已知信息。 */
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+window.__reveal('SCENE_shuzhuo');
+window.__choice('ITEM_chouti', 0, 1);        /* 右抽屉 → 剪刀 */
+window.__reveal('SCENES_body');              /* 绷带在这个场景里 */
+const lcBefore = logs.length;
+ids['toast'].innerHTML = '__sentinel__';
+window.__combo('item:ITEMS_jd', 'item:ITEMS_bd');      /* 剪刀 → 绷带：必定成功的组合 */
+assert('组合成功不再弹提示条', ids['toast'].innerHTML === '__sentinel__');
+assert('组合成功仍写进日志（反应正文 + 获得 / 消耗）',
+  logs.length > lcBefore &&
+  logs.slice(lcBefore).some(l => l.indexOf('陆珩松的尸体') >= 0 && l.indexOf('消耗') >= 0));
+assert('组合成功的效果仍落在画布上（新场景出现 / 绷带消失）',
+  window.__dump().nodes.includes('loc:SCENES_lhsdst') && !window.__dump().nodes.includes('item:ITEMS_bd'));
+ids['toast'].innerHTML = '__sentinel__';
+window.__combo('item:ITEMS_changji', 'item:ITEMS_zsq');   /* 无反应的失败组合 */
+assert('组合失败也不再弹提示条', ids['toast'].innerHTML === '__sentinel__');
+assert('组合失败仍写进日志', logs.some(l => l.indexOf('组合失败') >= 0));
 
 console.log('\n=== 24. 案件库：切案 / 会话态隔离 / 各存各档 ===');
 ids['btn-reset']._ev.click[0]();
@@ -819,6 +1069,63 @@ assert('#detail-win 也在 #desktop 下', depthAt['detail-win'] === depthAt['cas
 assert('#stage 在 #case-win 内一层', depthAt['stage'] === depthAt['case-win'] + 1);
 assert('#world 在 #stage 内', depthAt['world'] === depthAt['stage'] + 1);
 
+/* 详情窗「框套框」整治（2026-10-12）：窗内不得再出现任何内层方框。
+   这几条只能查源码 —— DOM stub 不解析 CSS，看不到圆角/边框这类视觉问题。 */
+assert('详情窗里没有内嵌结果块（.dfb 规则已移除）', html.indexOf('.dfb') < 0);
+assert('详情窗的结构行不再用虚线分隔（只留白）', !/#detail-body \.drow\{[^}]*border-top/.test(html));
+assert('详情窗里的按钮降级为纯文字（无边框/无底/无阴影）',
+  /#detail-body button\{[^}]*border:0[^}]*box-shadow:none/.test(html));
+
+/* TEC「– 收起」（2026-10-12）：窗口缩成桌面右下角那块**带头像的助手卡片** #tec-chip ——
+   进度条 / 完成圆点都落在卡片上（落点不再用左侧的 ◉ 图标）。
+   源码级断言：DOM stub 不解析 HTML / CSS，结构类与视觉类规则只能查源码。 */
+assert('TEC 标题栏接线了最小化（makeWindow 第三参）',
+  /makeWindow\("TEC \/\/ 对话", closeTecWin, minTecWin\)/.test(html));
+assert('助手卡片有头像位 / 状态行 / 进度条 / 完成圆点',
+  /id="tec-chip"/.test(html) && /id="tc-av-img"/.test(html) && /id="tc-status"/.test(html)
+  && /id="tc-bar-fill"/.test(html) && /\.tc-dot\{/.test(html));
+assert('助手卡片样式齐备（头像 / 进度条 / 分析态）',
+  /#tec-chip\{/.test(html) && /\.tc-av\{/.test(html) && /\.tc-bar\{/.test(html)
+  && /#tec-chip\.busy \.tc-bar\{/.test(html));
+assert('助手卡片排在案件卡片上方（两张卡片不叠在一起）',
+  Number((/#tec-chip\{[^}]*bottom:(\d+)px/.exec(html) || [0, 0])[1]) >
+  Number((/#case-dock\{[^}]*bottom:(\d+)px/.exec(html) || [0, 0])[1]));
+assert('落点已从桌面图标移到卡片：图标那边不再有进度环 / 圆点',
+  html.indexOf('tec-ring') < 0 && html.indexOf('tecring') < 0 && html.indexOf('desk-icon .tec-dot') < 0);
+assert('收起态助手卡片也能接收节点（拖入 = TEC 分析，与图标 / 窗内头像同一路由）',
+  /function nodeDropTargets\(\)/.test(html)
+  && /if \(tecChipOn\) list\.push\("tec-chip"\)/.test(html)
+  && /iconHit === "tec-chip"\) tecAnalyze\(n\.key\)/.test(html));
+assert('悬停高亮与松手判决共用同一份 nodeDropTargets()',
+  (html.match(/nodeDropTargets\(\)\.forEach\(id => \{/g) || []).length === 2);
+assert('拖节点悬停到收起卡片上有高亮（与窗内头像同一套虚线）',
+  /#tec-chip\.over\{[^}]*outline:2px dashed var\(--text\)/.test(html));
+/* 最小化的顺滑关键：先亮落点卡片、再让窗口缩过去（否则窗口缩没、卡片才淡入 = 闪一下） */
+const iMinTec = html.indexOf('function minTecWin(){');
+const minTecBody = iMinTec < 0 ? '' : html.slice(iMinTec, html.indexOf('\n}', iMinTec) + 2);
+assert('最小化先亮落点卡片再缩窗口（消除"闪一下再出现"）',
+  minTecBody.indexOf('tecMin = true') >= 0
+  && minTecBody.indexOf('showTecChip(true)') >= 0 && minTecBody.indexOf('tecMotionApply(tf)') >= 0
+  && minTecBody.indexOf('showTecChip(true)') < minTecBody.indexOf('tecMotionApply(tf)'));
+/* 点击框内任意位置推进（对话气泡 / 记忆放映卡）：拖动过的那一次不算点击 */
+assert('TEC 对话窗也接线了"点框内任意位置推进"（挂在窗口根上，头像不再独占）',
+  /w\.el\.addEventListener\("click"/.test(html) && /tecTalk\(\)/.test(html)
+  && !/av\.addEventListener\("click", \(\) => tecTalk\(\)\)/.test(html));
+assert('_dragged 的复位在拖动排除表之前（真机里从被排除的子元素上起手也会复位）',
+  html.indexOf('el._dragged = false;') > 0
+  && html.indexOf('el._dragged = false;') < html.indexOf('closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar")'));
+assert('气泡与记忆放映卡都接线了"点击推进"，且用 _dragged 挡掉拖过的那次点击',
+  /c\.addEventListener\("click", \(\) => \{ if \(!c\._dragged\) advanceMemory\(\); \}\)/.test(html)
+  && /if \(b\._dragged\) return;/.test(html) && /advanceMemory/.test(html));
+assert('打字中点击 = 先补全本句，再点才推进',
+  /if \(b\._typing\)\{/.test(html) && /if \(mp\.typing\)\{/.test(html)
+  && /cancelType\(mp\.cur\)/.test(html));
+assert('记忆放映卡不再 700ms 自动换行', html.indexOf('setTimeout(playMemoryLine, 700)') < 0);
+assert('打字机计时器记在元素自己身上（卡片与气泡不会互相掐断）',
+  /function cancelType\(el\)\{/.test(html) && /\._twTimer/.test(html) && !/[^_]twTimer/.test(html));
+assert('OS 外壳整体不可选中（拖窗口不会拉出蓝色选区），输入框放行',
+  /body\{user-select:none/.test(html) && /input, textarea, \[contenteditable\]\{user-select:text/.test(html));
+
 console.log('\n=== 27. 案件窗离屏：– 收起 -> 右下角卡片 / × 关闭 -> 「案件地图」图标 ===');
 /* 静态结构：两个落点各有归宿。DOM stub 不解析 HTML，结构断言只能查源码。 */
 assert('落点 A：#case-dock 卡片存在且有 .on 样式', /id="case-dock"/.test(html) && /#case-dock\.on\{/.test(html));
@@ -829,7 +1136,8 @@ assert('标题栏同时有最小化 #case-min 与关闭 #case-x', /id="case-min"
 assert('两条路是分开的函数（parkCase / stowCase / closeCase）',
   /function parkCase\(p\)/.test(html) && /function stowCase\(\)\{ return parkCase\("dock"\); \}/.test(html)
   && /function closeCase\(\)\{ return parkCase\("icon"\); \}/.test(html));
-assert('拖动排除表覆盖了地图地址卡与 TEC 头像', /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.tec-avatar"\)/.test(html));
+assert('拖动排除表覆盖了地图地址卡 / TEC 头像 / TEC 最小化键',
+  /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.syswin-min,\.tec-avatar"\)/.test(html));
 /* 触发 stub 里注册的事件处理器 */
 const fire = (el, t, o) => (el._ev[t] || []).forEach(f => f(Object.assign(
   { button: 0, clientX: 0, clientY: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o)));
