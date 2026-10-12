@@ -1212,6 +1212,13 @@ assert('开着的时候两个落点都是空的', ci0.held === false && ci0.dock
 /* 做出进度（会进撤销栈） */
 window.__reveal('SCENE_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);
+/* 关窗前先往证物袋里放一件证物，用于验证离屏后取不出 */
+window.__reveal('SCENES_garden');
+window.__closeFloats();
+window.__bag('item:ITEMS_zsq');
+assert('关闭前注射器已收入证物袋', window.__dump().bag.includes('item:ITEMS_zsq'));
+ids['bag-dock']._ev.dblclick[0]();
+assert('关闭前证物袋窗已打开', window.__dump().floats.bag === true);
 const n1 = window.__dump().nodes.length;
 assert('已产生进度', n1 > 1 && window.__dump().history > 0);
 
@@ -1232,12 +1239,17 @@ mapDbl();
 assert('查完地图后地图窗已关掉', document.getElementById('desktop').querySelectorAll('.map-win').length === 0);
 assert('撤销栈已随离屏清空', window.__dump().history === 0);
 assert('重复关闭是空操作', window.__closeCase() === false);
+assert('案件离屏后证物袋窗仍开着（随身收纳不随案件窗走）', window.__dump().floats.bag === true);
 const rawSave = JSON.parse(_ls['tec_case_A001']);
 assert('存档里记住了镜头位置', !!rawSave.__view && isFinite(rawSave.__view.k));
 
 /* 关闭状态下，画布上的操作应被拦下（否则会把案件窗又弹回来） */
 ids['btn-reset']._ev.click[0]();
 assert('关闭时「重置」被拦下，案件窗没被弹回来', window.__caseInfo().open === false && window.__caseInfo().held === true);
+
+/* 关闭状态下，证物袋里的证物也不能点出来（取出 = 放回画布，同属被拦的画布操作） */
+assert('关闭时从证物袋取出被拦下', window.__bagTake('item:ITEMS_zsq') === false);
+assert('证物仍留在袋中', window.__dump().bag.includes('item:ITEMS_zsq'));
 
 /* 从地图点本案那行：展开、角标消失、进度续上 */
 assert('从案件地图展开成功', window.__switchCase('A001') === true);
@@ -1246,6 +1258,10 @@ assert('案件窗重新打开', ci3.open === true && document.getElementById('ca
 assert('展开后「已关闭」角标消失', ci3.held === false && !badgeOf());
 assert('重新进入后进度续上（节点数一致）', window.__dump().nodes.length === n1);
 assert('重新进入后撤销栈是新会话', window.__dump().history === 0);
+assert('重新展开后证物袋窗仍在（boot 不再收掉它）', window.__dump().floats.bag === true);
+const bwRe = document.getElementById('desktop').querySelector('.bag-win');
+assert('袋窗清单已按恢复的图刷新（仍是 1 条）', !!bwRe && bwRe.querySelectorAll('.bag-item').length === 1);
+assert('重新展开后可以从袋中取出（闸门放行）', window.__bagTake('item:ITEMS_zsq') === true);
 /* 开着的本案在地图上应标回「当前」 */
 mapDbl();
 assert('展开状态在地图上标回「当前」', mapText('.map-state')[0] === '当前');
@@ -1285,6 +1301,13 @@ assert('切案后案件窗是开着的', window.__caseInfo().open === true && wi
 assert('切案后两个落点都清空',
   window.__caseInfo().held === false && window.__caseInfo().dock === false && !badgeOf() && !dockOn());
 assert('切回 A-001 后仍能续上它自己的档', (window.__switchCase('A001'), window.__dump().nodes.length === n1));
+
+/* ---- 换案（案件窗开着时切到别的案）：证物袋窗与 TEC 一样被清掉；同案回访才保留 ---- */
+ids['bag-dock']._ev.dblclick[0]();
+assert('换案前证物袋窗已打开', window.__dump().floats.bag === true);
+window.__switchCase('A002');
+assert('换案后证物袋窗被清掉', window.__dump().floats.bag === false);
+window.__switchCase('A001');
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

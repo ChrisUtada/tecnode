@@ -1051,6 +1051,8 @@ function bagStore(key){
 function bagTake(key){
   const n = G.nodes[key];
   if (!n || n.storedIn !== "BAG") return false;
+  /* 案件窗关着时不能取：取出是放回画布的操作，不能对看不见的画布施展 */
+  if (!requireCase()) return false;
   pushHistory();
   n.stored = false; n.storedIn = null; n.hidden = false; n.fresh = true;
   /* 取回到袋子附近的画布位置（屏幕坐标换算成世界坐标） */
@@ -2925,6 +2927,7 @@ document.getElementById("btn-reset").addEventListener("click", () => {
   history = [];
   clearCaseState(CASE_ID);   /* 重置也清掉本案存档，避免下次回访又续上旧进度 */
   resetTec();                /* 重置是全新开局，TEC 也一并清空 */
+  closeBagWin();             /* 证物袋窗同理：常驻于离屏/回访，不常驻于重置 */
   boot();
   log("已重置为初始状态", "sys");
 });
@@ -3280,7 +3283,7 @@ function enterCase(id){
 function doEnterCase(id, from){
   const c = caseById(id);
   const snap = loadCaseState(id);    /* 先把目标案的档读出来，再存旧案，免得两边撞在一起 */
-  if (from){ saveCaseState(from); resetTec(); }   /* 只有换案才清 TEC；同案回访保留窗口与对话 */
+  if (from){ saveCaseState(from); resetTec(); closeBagWin(); }   /* 只有换案才清 TEC 与证物袋窗；同案回访保留 */
   applyCaseData(CASE_DATA[id]);      /* 2. 载目标案数据 */
   CASE_ID = id;
   progress.last = id; saveProgress();
@@ -3310,7 +3313,7 @@ function parkCase(p){
     setCaseWinVisible(false);
     caseParkPoint(p);
     history = [];
-    /* 浮层都锚在画布上，画布一藏就没意义了，一起收掉（TEC 是独立助手窗，保留） */
+    /* 浮层都锚在画布上，画布一藏就没意义了，一起收掉（TEC 是独立助手窗、证物袋是随身收纳，都保留） */
     closeBubble(); closeNarr(); closePwPop();
     clearSelection();
     setDetailWin(false);
@@ -3606,9 +3609,9 @@ function boot(opts){
   closePwPop();
   closeBubble();
   closeNarr();
-  /* 注意：TEC 窗不在这里关。它是常驻助手窗，只有换案(resetTec) / 重置 才清，
+  /* 注意：TEC 窗与证物袋窗都不在这里关。它们是常驻窗（独立助手 / 随身收纳），
+     只有换案 / 重置才清（resetTec / closeBagWin 在各自调用点），
      否则「– 收起 → 展开」回访同一案件时会被顺带收掉。 */
-  closeBagWin();
   closeGotoWin();
   closeInferWin();
   closeMapWin();
@@ -3629,6 +3632,7 @@ function boot(opts){
       view = { x: saved.x, y: saved.y, k: saved.k };
       applyView();
     } else fit();
+    refreshBagWin();   /* 袋窗若开着，清单按恢复后的图刷新（G 刚重建过） */
     mountInvChip();
     return;
   }
@@ -3639,6 +3643,7 @@ function boot(opts){
   layout();
   render();
   fit();
+  refreshBagWin();   /* 同上：全新开局时袋窗若开着，刷成空清单 */
   mountInvChip();
   if (!investigator) openIntro();
   const _cc = caseById(CASE_ID);
