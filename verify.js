@@ -860,13 +860,29 @@ assert('阵列窗体收边为 560×420（五芒星大小不变）',
   html.indexOf('margin-left:-280px; width:560px') > 0 &&
   html.indexOf('width:560px; height:420px') > 0 &&
   html.indexOf('MX_W = 560, MX_H = 420') > 0);
-assert('蓄力时窗体微颤、头像震颤且红光渐盛（源码检查）',
-  html.indexOf('.infer-win.charging{animation:mx-win-quiver') > 0 &&
+assert('蓄力时头像震颤且红光渐盛（源码检查）',
   html.indexOf('.mx-exec.charging .mx-avatar{animation:mx-av-quiver') > 0 &&
   html.indexOf('mx-av-glow 2.5s') > 0);
-assert('蓄力起停给窗体挂/摘 charging（源码检查）',
-  html.indexOf('inferWinEl.classList.add("charging")') > 0 &&
-  html.indexOf('inferWinEl.classList.remove("charging")') > 0);
+/* 窗体震动只属于真名结局：蓄力不再抖整窗（否则点一下头像就会闪一下窗抖），
+   mx-win-quiver 与 .infer-win.charging 规则应已删除 */
+assert('蓄力不再抖整窗（窗体震动只留给真名结局，源码检查）',
+  html.indexOf('mx-win-quiver') < 0 &&
+  html.indexOf('.infer-win.charging') < 0 &&
+  html.indexOf('inferWinEl.classList.add("charging")') < 0);
+/* 真名结局：整窗冲击震动一拍后再落遮罩（无头 setTimeout 归零，走同步兜底立即演出） */
+assert('真名结局判定时整窗冲击震动（源码检查）',
+  html.indexOf('.infer-win.shock{animation:mx-win-shock') > 0 &&
+  html.indexOf('inferWinEl.classList.add("shock")') > 0 &&
+  html.indexOf('setTimeout(playEndingStage, 900)') > 0 &&
+  html.indexOf('if (!t) playEndingStage();') > 0);
+/* 配方不匹配：头像上方弹心碎表情替代 toast（源码检查：stub 下 setTimeout 归零，动画量不到持续态） */
+assert('配方不匹配改为头像弹心碎表情（源码检查）',
+  html.indexOf('.mx-emote{') > 0 &&
+  html.indexOf('animation:mx-emote-pop 1.4s ease forwards') > 0 &&
+  html.indexOf('EXEC_EMOTE_HEARTBROKEN_B64') > 0 &&
+  html.indexOf('function showExecEmote(){') > 0 &&
+  html.indexOf('else { showExecEmote(); log("推演失败') > 0 &&
+  html.indexOf('toast("配方不匹配，再想想"') < 0);
 
 console.log('\n=== 20. 桌面图标 ===');
 ids['btn-reset']._ev.click[0]();
@@ -1471,6 +1487,40 @@ assert('两颗新图标进了桌面图标栏且能被布局摆位',
 ids['clue-icon']._ev.dblclick[0]();
 window.__switchCase('A002');
 window.__switchCase('A001');
+
+/* ---- 常驻性对齐证物袋（§27 同款链路）：离屏 / 同案回访都保留，换案 / 重置才清 ---- */
+ids['btn-reset']._ev.click[0]();                       /* 全新开局 */
+window.__reveal('SCENES_body');
+window.__cap('loc:SCENES_body');                       /* CLUES_V_luheng */
+assert('册窗常驻测试：线索已入册', window.__ledgerStore('clue:CLUES_V_luheng') === true);
+ids['clue-icon']._ev.dblclick[0]();
+assert('册窗常驻测试：窗已开且册里 1 条',
+  window.__dump().floats.clue === true && window.__dump().ledger.length === 1);
+assert('案件离屏前案件窗是开着的', window.__caseInfo().open === true);
+window.__closeCase();
+assert('案件离屏后线索册窗仍开着（与证物袋同等常驻）', window.__dump().floats.clue === true);
+assert('离屏时从册中取出被拦下（取出 = 放回画布）', window.__ledgerTake('clue:CLUES_V_luheng') === false);
+window.__switchCase('A001');                           /* 同案回访 */
+assert('同案回访后线索册窗仍在（boot 不再收掉它）', window.__dump().floats.clue === true);
+const cwRe2 = document.getElementById('desktop').querySelector('.clue-win');
+assert('册窗清单已按恢复的图刷新（仍是 1 条）', !!cwRe2 && cwRe2.querySelectorAll('.goto-item').length === 1);
+assert('回访后可以从册中取出（闸门放行）', window.__ledgerTake('clue:CLUES_V_luheng') === true);
+window.__switchCase('A002');
+assert('换案后线索册窗被清掉（与证物袋一致）', window.__dump().floats.clue === false);
+window.__switchCase('A001');
+
+/* ---- 两扇收纳窗的层级 / 样式 / 清理点对齐（源码检查） ---- */
+assert('两扇收纳窗同层（z-index 25）且都带拖动手型',
+  /\.bag-win\{[^}]*z-index:25;[^}]*cursor:grab/.test(html) &&
+  /\.clue-win\{[^}]*z-index:25;[^}]*cursor:grab/.test(html) &&
+  /\.clue-win:active\{cursor:grabbing\}/.test(html));
+assert('线索册窗也有悬停虚线高亮（与证物袋同款）',
+  /\.clue-win\.over\{[^}]*outline:2px dashed var\(--text\)/.test(html));
+assert('两扇收纳窗的清理点对齐：换案 / 重置显式负责，boot 不再收',
+  html.indexOf('saveCaseState(from); resetTec(); closeBagWin(); closeClueWin();') > 0 &&
+  html.indexOf('closeBagWin();             /* 证物袋窗同理') > 0 &&
+  html.indexOf('closeClueWin();            /* 线索册窗与证物袋同级') > 0 &&
+  html.indexOf('refreshClueWin();  /* 册窗同理（同样是常驻窗，恢复的图变了） */') > 0);
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

@@ -217,8 +217,11 @@
   /* 线索册（收纳盒）/ 人物（名册）：与档案同一族的清单窗（行复用 .goto-item，拖动排除表已覆盖它） */
   .clue-win{position:absolute; left:96px; top:80px; width:326px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
-    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+    box-shadow:var(--win-shadow); z-index:25; cursor:grab; overflow:hidden}
+  .clue-win:active{cursor:grabbing}
   .clue-win .syswin-body{max-height:356px; overflow:auto; padding:0}
+  /* 与 .bag-win.over 同一套虚线高亮：两扇收纳窗都是落点，悬停反馈必须一致 */
+  .clue-win.over{outline:2px dashed var(--text); outline-offset:3px}
   /* 人物窗紧挨详情窗左侧（列表 + 详情成一对），避开 #detail-win（right:14 top:60）不叠窗 */
   .people-win{position:absolute; right:328px; top:60px; width:300px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
@@ -253,12 +256,9 @@
     filter:drop-shadow(0 0 4px rgba(192,57,43,.6)) drop-shadow(0 0 9px rgba(192,57,43,.38))}
   .mx-board.charging .mx-star-draw{animation:mxdraw 2.5s linear forwards}
   @keyframes mxdraw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
-  /* 蓄力仪式（与描星同步 2.5s）：整窗微颤 + 头像剧烈震颤 + 红光渐盛 */
-  .infer-win.charging{animation:mx-win-quiver .17s linear infinite}
-  @keyframes mx-win-quiver{
-    0%,100%{transform:translate(0,0)} 25%{transform:translate(1.1px,-.8px)}
-    50%{transform:translate(-1.1px,.8px)} 75%{transform:translate(.8px,1.1px)}
-  }
+  /* 蓄力仪式（与描星同步 2.5s）：头像剧烈震颤 + 红光渐盛。
+     窗体本身在蓄力时不抖——整窗震动只留给真名结局（.infer-win.shock），
+     否则点一下头像就会闪一下窗抖。 */
   .mx-exec.charging .mx-avatar{animation:mx-av-quiver .1s linear infinite, mx-av-glow 2.5s ease-in forwards}
   @keyframes mx-av-quiver{
     0%,100%{transform:translate(0,0) rotate(0deg)} 25%{transform:translate(1.6px,-1.1px) rotate(.9deg)}
@@ -268,6 +268,25 @@
     0%{box-shadow:var(--raise)}
     55%{box-shadow:0 0 12px 2px rgba(192,57,43,.5), var(--raise)}
     100%{box-shadow:0 0 22px 7px rgba(192,57,43,.68), 0 0 44px 16px rgba(192,57,43,.3), var(--raise)}
+  }
+  /* 真名结局判定：整窗冲击震动（衰减式先猛后缓，含轻微旋转）；
+     结局遮罩近乎不透明，所以震完这一拍再落下遮罩，震动才看得见 */
+  .infer-win.shock{animation:mx-win-shock .9s cubic-bezier(.36,.07,.19,.97) both}
+  @keyframes mx-win-shock{
+    0%{transform:translate(0,0) rotate(0deg)}
+    6%{transform:translate(-4px,3px) rotate(-.5deg)}
+    12%{transform:translate(4px,-3px) rotate(.5deg)}
+    18%{transform:translate(-3.4px,2.4px) rotate(-.42deg)}
+    24%{transform:translate(3.4px,-2.4px) rotate(.42deg)}
+    30%{transform:translate(-2.8px,2px) rotate(-.34deg)}
+    36%{transform:translate(2.8px,-2px) rotate(.34deg)}
+    44%{transform:translate(-2.2px,1.6px) rotate(-.26deg)}
+    52%{transform:translate(2.2px,-1.6px) rotate(.26deg)}
+    60%{transform:translate(-1.6px,1.1px) rotate(-.18deg)}
+    70%{transform:translate(1.6px,-1.1px) rotate(.18deg)}
+    80%{transform:translate(-1px,.7px) rotate(-.1deg)}
+    90%{transform:translate(1px,-.7px) rotate(.1deg)}
+    100%{transform:translate(0,0) rotate(0deg)}
   }
   /* 感官锚点：五感环绕中央排布，归位的线索 chip 叠在锚点下方（无文字标签，排布留给五芒星本身） */
   .mx-anchor{position:absolute; width:140px; margin-left:-70px; text-align:center}
@@ -289,6 +308,20 @@
   .mx-exec .mx-avatar{width:72px; height:72px; border-radius:14px; overflow:hidden; margin:0 auto;
     border:1px solid var(--edge); box-shadow:var(--raise); background:var(--face-hi)}
   .mx-exec .mx-avatar img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  /* 配方不匹配：头像上方弹心碎表情（替代 toast；1.4s 自动消失，连发先撤旧的）。
+     源图仅 16×16，气泡保持 46px——再放大心形反而糊/抢戏 */
+  .mx-emote{position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%);
+    width:46px; height:46px; padding:6px; background:var(--card); border:1px solid var(--edge);
+    border-radius:var(--r-sm); box-shadow:var(--raise); pointer-events:none;
+    animation:mx-emote-pop 1.4s ease forwards}
+  .mx-emote img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  @keyframes mx-emote-pop{
+    0%{opacity:0; transform:translateX(-50%) translateY(8px) scale(.5)}
+    16%{opacity:1; transform:translateX(-50%) translateY(0) scale(1.12)}
+    28%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
+    78%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
+    100%{opacity:0; transform:translateX(-50%) translateY(-10px) scale(.9)}
+  }
   /* 结局清单：弱化存在，收在桌布左下角 */
   .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
   .memory{background:#dcd8c2; border:3px double #2b2b26; border-radius:var(--r-win); box-shadow:var(--win-shadow)}
@@ -2794,6 +2827,8 @@ const MX_CIRCLE_R = 195;
 const MX_ANCHORS = { vision:[.5000,.0192], hearing:[.7971,.3073], touch:[.6840,.7727], smell:[.3160,.7727], taste:[.2029,.3073] };
 /* 执行者头像：暂借 TEC 的（同风格同尺寸），新头像做好只改这一行 */
 const EXECUTOR_AVATAR_B64 = "iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAD50lEQVR4Ae2aP2gUQRTGzz+NeI2gYBBEQkxAQUWEU8RComATBHsrU1lapbC0Tmmllb0gaQRNZWECIlFQSAxBBImgxCaijWiy63fcfHtv3szs7u1FXprZN29m3ttvfvd29i6tlv2ZAqaAKWAKmAI7VYFdw5L4pzu3/vTmcnT24VDktrs3KbsuKrC32NVMz4ev35sJrEQ1goZNoO1aw/VGyTFzp84LWds3xgjyqbPla6wGzd+8kT21Jh899j6tME65j9rcRpAibbBA2zvZ9G4q9xLkjr2PYIGCov+Hg6JrED+Byp54JSql/tg94Hxjz1tGkKJ4NEG8Hu8Q/CBr87T7jrWBAdQ+W3NP0ldHD9CI3OT12m/ydzYpj76LRHQaQYpYwQThvMK14fih/js9c/Fyds7Z6OQZ3F9cyy5ut0aVlPzue+1/63TydWbaeRxpFtcc3Ic0nvuNIFaEbO8plsY6JpPkOHsMri13N/OdXzzl1pyeKX0vO29zUkEQBkm1Cn60seRgnhEEJYQ2mSCsJ5EEcrDDsEEQ5se2IIjXhc3rpZKDdYwgKCG0pQnidZmoUHL2Lz1wlvpxZtqx2WCS4C9LDNZBawRBCaGtnKAnB887v05MHjkphM67Qc7ZC1ecca9fPs9sjaT5z++cede/LVR6T0aQI2/RCD5JF6f6ezRy/LPDvYjDJIWv4B9pBPn1ae47aeT1a3o2u0TN4X7YTbVGkKJ8bTWI4+JphX48nX6/ep91gST40Q9bmg9/Xa0RpCibTJD0zR7Hw84XzjlLYeec1Pmh+XG+bBtBrAjZyQTROi3sWF3nEY4n2chD8sf2G0GKYskE4dcEbcfwdEo955SdjzwVHUS3ESRKkztKv/mCIK49eEdS4nfddc03groS13ORXIM4HRDDJPA4ycZ8yR/aX9U6iGc1CEoIbWmC8BlHLRLiFLov7fuY9fHTjQfiBP7i5zF2eW3k5R0U4DSCFJFKP8Wk9TWiQJA0n/s1gqoihuMaQawI2aVrEK3XNbGjGkmhNai7MF0gDnVXZhpBipS11SCOq5G059wJZwp/o+g4t4y6yUE8IwhKCO3ACEJ8jSSMk9pBkYP4RhCUENqBE4Q88Bu+9u6Ed7uqf3NHHlprBCkKDZyga1NT2X9/rC4vO6mNTUw4tuR/Ojc30JyNIGdbioYJVNTE6TGBHDmKRuWfZ9QYDoWa8mV9nV1R9uGRkWw81ywsUnWNMoKgrNCWJkgiBvFADuyqW4kkxClLlBEEJYU2mSCQUzchQt7B3SAslSQjSJE6maCx8XHn/6GVOI27V1dWku7VCFK2LlrVnUYO338sSUYQK0j2X/jsN0+TP2FGAAAAAElFTkSuQmCC";
+/* 执行者表情：配方不匹配时在头像上方弹出（心碎，16×16 像素，含气泡框） */
+const EXEC_EMOTE_HEARTBROKEN_B64 = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAABGdBTUEAALGPC/xhBQAAABVQTFRFAAAA/7/U5u/55ubm/wBUnsLp////vxedWQAAAAF0Uk5TAEDm2GYAAABXSURBVAjXPY3RCcAwCET9cYPQDTpBVhC/SyGZQN1/hJ4aegg+Dz2JV+mhN0o37QYHiIYkmCiqIOTANQowW+2EydCCMO3zk/Mn84Ln+EXEc2aDtncnTuMDvLQk1hSuZ+MAAAAASUVORK5CYII=";
 
 let inferWinEl = null;
 function closeInferWin(){ if (inferWinEl){ inferWinEl.remove(); inferWinEl = null; } }
@@ -2976,7 +3011,6 @@ function riteEnd(commit){
     }
     const bd = inferWinEl.querySelector(".mx-board");
     if (bd) bd.classList.remove("charging");
-    inferWinEl.classList.remove("charging");   /* 窗体微颤停 */
   }
   if (commit) executeInference();
 }
@@ -2987,8 +3021,7 @@ function riteStart(e){
   if (!ex) return;
   ex.classList.add("charging");
   const bd = inferWinEl.querySelector(".mx-board");
-  if (bd) bd.classList.add("charging");
-  inferWinEl.classList.add("charging");   /* 窗体微颤起，与头像震颤、描星同步 */
+  if (bd) bd.classList.add("charging");   /* 描星与头像震颤起；窗体不抖（窗口震动只属于真名结局） */
   const t = setTimeout(() => riteEnd(true), 2500);
   if (!t){ riteEnd(true); return; }
   riteTimer = t;
@@ -3009,6 +3042,22 @@ function assignClue(clueKey, sense){
   render(); refreshInferWin();
   return true;
 }
+/* 配方不匹配：头像上方弹心碎表情（1.4s 自动消失；连发时先撤旧的再弹，重置动画） */
+function showExecEmote(){
+  if (!inferWinEl) return;
+  const ex = inferWinEl.querySelector(".mx-exec");
+  if (!ex) return;
+  const old = ex.querySelector(".mx-emote");
+  if (old) old.remove();
+  const em = document.createElement("div");
+  em.className = "mx-emote";
+  const im = document.createElement("img");
+  im.src = "data:image/png;base64," + EXEC_EMOTE_HEARTBROKEN_B64;
+  im.alt = "心碎"; im.draggable = false;
+  em.appendChild(im);
+  ex.appendChild(em);
+  setTimeout(() => em.remove(), 1500);
+}
 function executeInference(){
   const inMatrix = new Set();
   Object.keys(G.matrix).forEach(s => G.matrix[s].forEach(id => inMatrix.add(id)));
@@ -3017,7 +3066,7 @@ function executeInference(){
     return r.length === inMatrix.size && r.every(id => inMatrix.has(id));
   });
   if (hit){ refreshInferWin(); triggerEnding(hit); }
-  else { toast("配方不匹配，再想想", true); log("推演失败：当前阵列不匹配任何结局配方", "warn"); }
+  else { showExecEmote(); log("推演失败：当前阵列不匹配任何结局配方", "warn"); }
 }
 
 /* ============ 结局演出（步进状态机：setTimeout 自动推进 / 点击跳过 / 钩子手动推进） ============ */
@@ -3027,8 +3076,15 @@ function triggerEnding(ending){
   /* 只有捕获「真名」（真结局）才点亮下一案的地址 */
   if (ending.isTrueCapture) unlockNextCase(CASE_ID);
   log("<b>结局达成：" + esc(ending.name) + "</b>", "cap");
+  /* 真名结局：先让推演器整窗冲击震动一拍，再落下结局遮罩 */
+  const shock = !!(ending.isTrueCapture && inferWinEl);
+  if (shock){
+    inferWinEl.classList.add("shock");
+    setTimeout(() => { if (inferWinEl) inferWinEl.classList.remove("shock"); }, 1000);
+  }
   endingState = { ending, step: 0, stages: buildStages(ending) };
-  playEndingStage();
+  const t = shock ? setTimeout(playEndingStage, 900) : 0;
+  if (!t) playEndingStage();
 }
 function buildStages(e){
   const st = [];
@@ -3389,6 +3445,7 @@ document.getElementById("btn-reset").addEventListener("click", () => {
   clearCaseState(CASE_ID);   /* 重置也清掉本案存档，避免下次回访又续上旧进度 */
   resetTec();                /* 重置是全新开局，TEC 也一并清空 */
   closeBagWin();             /* 证物袋窗同理：常驻于离屏/回访，不常驻于重置 */
+  closeClueWin();            /* 线索册窗与证物袋同级：同样只在此处与换案时清 */
   boot();
   log("已重置为初始状态", "sys");
 });
@@ -3744,7 +3801,7 @@ function enterCase(id){
 function doEnterCase(id, from){
   const c = caseById(id);
   const snap = loadCaseState(id);    /* 先把目标案的档读出来，再存旧案，免得两边撞在一起 */
-  if (from){ saveCaseState(from); resetTec(); closeBagWin(); }   /* 只有换案才清 TEC 与证物袋窗；同案回访保留 */
+  if (from){ saveCaseState(from); resetTec(); closeBagWin(); closeClueWin(); }   /* 只有换案才清 TEC 与两扇收纳窗；同案回访保留 */
   applyCaseData(CASE_DATA[id]);      /* 2. 载目标案数据 */
   CASE_ID = id;
   progress.last = id; saveProgress();
@@ -3774,7 +3831,8 @@ function parkCase(p){
     setCaseWinVisible(false);
     caseParkPoint(p);
     history = [];
-    /* 浮层都锚在画布上，画布一藏就没意义了，一起收掉（TEC 是独立助手窗、证物袋是随身收纳，都保留） */
+    /* 浮层都锚在画布上，画布一藏就没意义了，一起收掉
+       （TEC 是独立助手窗、证物袋 / 线索册是随身收纳，三扇常驻窗都保留） */
     closeBubble(); closeNarr(); closePwPop();
     clearSelection();
     setDetailWin(false);
@@ -4070,12 +4128,11 @@ function boot(opts){
   closePwPop();
   closeBubble();
   closeNarr();
-  /* 注意：TEC 窗与证物袋窗都不在这里关。它们是常驻窗（独立助手 / 随身收纳），
-     只有换案 / 重置才清（resetTec / closeBagWin 在各自调用点），
+  /* 注意：TEC 窗、证物袋窗、线索册窗都不在这里关。三扇常驻窗（独立助手 / 随身收纳 / 随身册子），
+     只有换案 / 重置才清（resetTec / closeBagWin / closeClueWin 在各自调用点），
      否则「– 收起 → 展开」回访同一案件时会被顺带收掉。 */
   closeGotoWin();
   closeInferWin();
-  closeClueWin();
   closePeopleWin();
   closeMapWin();
   view = { x: 40, y: 20, k: 1 };
@@ -4096,6 +4153,7 @@ function boot(opts){
       applyView();
     } else fit();
     refreshBagWin();   /* 袋窗若开着，清单按恢复后的图刷新（G 刚重建过） */
+    refreshClueWin();  /* 册窗同理（同样是常驻窗，恢复的图变了） */
     mountInvChip();
     return;
   }
@@ -4107,6 +4165,7 @@ function boot(opts){
   render();
   fit();
   refreshBagWin();   /* 同上：全新开局时袋窗若开着，刷成空清单 */
+  refreshClueWin();  /* 册窗同理 */
   mountInvChip();
   if (!investigator) openIntro();
   const _cc = caseById(CASE_ID);
