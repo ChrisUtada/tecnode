@@ -120,6 +120,12 @@ try {
 let bad = 0;
 function assert(name, cond){ console.log('  ' + (cond ? '✅' : '❌') + ' ' + name); if (!cond) bad++; }
 
+/* 手电筒必须先点亮才能照亮黑影（发光工具门）：每条「手电筒 → 黑影」链路都先点亮它。
+   已经亮着就不重复点（再点一次是熄灭）。 */
+function torchOn(){
+  if (window.__dump().lit.indexOf('item:ITEM_shoudiantong') < 0) window.__cmd('ITEM_shoudiantong', 0);
+}
+
 console.log('\n=== 21. 适性测试 + 调查员证 ===');
 assert('开局弹出适性测试', window.__dump().intro === true);
 window.__intro.name('陈调查');
@@ -251,6 +257,7 @@ assert('左抽屉拿到手电筒', window.__dump().nodes.includes('item:ITEM_sho
 assert('右抽屉拿到剪刀', window.__dump().nodes.includes('item:ITEMS_jd'));
 assert('花园里有黑影节点', window.__dump().nodes.includes('item:ITEM_something'));
 
+torchOn();   /* 手电筒先点亮：发光工具门 */
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
 assert('手电筒 → 黑影：解锁「尸体」场景', window.__dump().nodes.includes('loc:SCENES_body'));
 
@@ -425,6 +432,64 @@ window.__collapse('SCENE_shuzhuo');
 assert('折叠书桌后长出的植物笔记被一并隐藏（homeScene 继承了书桌）',
   window.__dump().hidden.includes('item:ITEMS_dsc'));
 window.__collapse('SCENE_shuzhuo');
+
+/* ---- 13c. 手电筒：点亮之后才照得亮黑影（发光工具门） ---- */
+console.log('\n=== 13c. 手电筒：点亮后才照得亮黑影 ===');
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+window.__reveal('SCENE_shuzhuo');
+window.__closeFloats();
+window.__choice('ITEM_chouti', 0, 0);          // 左抽屉 → 手电筒
+const tc0 = window.__dump();
+assert('手电筒是画布上的物品节点', tc0.nodes.includes('item:ITEM_shoudiantong'));
+assert('手电筒初始未点亮', !tc0.lit.includes('item:ITEM_shoudiantong'));
+assert('黑影在花园里', tc0.nodes.includes('item:ITEM_something'));
+
+/* 没点亮的电筒拖到黑影上：照不出东西，也不留下任何后果 */
+window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
+const tcDark = window.__dump();
+assert('手电筒未点亮时接触黑影：不解锁「尸体」场景', !tcDark.nodes.includes('loc:SCENES_body'));
+assert('手电筒未点亮时接触黑影：手电筒与黑影都还在（谁也没被消耗）',
+  tcDark.nodes.includes('item:ITEM_shoudiantong') && tcDark.nodes.includes('item:ITEM_something'));
+assert('手电筒未点亮时接触黑影：不记「已试过」（门拦在记录之前）',
+  !tcDark.edges.some(e => e.indexOf('tried:item:ITEM_shoudiantong>item:ITEM_something') === 0));
+
+/* 详情窗把照明前置写在明面上（趁黑影还在画布上 —— 照亮它之后它就散去了） */
+window.__select('item:ITEM_something');
+let tch = ids['detail-body']._html || '';
+assert('黑影详情窗：标出手电筒「须先点亮」', tch.includes('须先点亮'));
+
+window.__cmd('ITEM_shoudiantong', 0);          // 双击 → 打开手电筒
+assert('双击手电筒 → 点亮（lit）', window.__dump().lit.includes('item:ITEM_shoudiantong'));
+window.__cmd('ITEM_shoudiantong', 0);          // 再双击 → 关掉
+assert('再次双击手电筒 → 熄灭', !window.__dump().lit.includes('item:ITEM_shoudiantong'));
+
+/* 手电筒的光不算「桌上的光」：它亮着也翻不开手写笔记（笔记的光照门只认台灯） */
+window.__cmd('ITEM_shoudiantong', 0);          // 重新打开
+assert('手电筒重新点亮', window.__dump().lit.includes('item:ITEM_shoudiantong'));
+window.__cmd('ITEM_sxbj', 0);
+assert('手电筒的光不当数：手写笔记仍然翻不开（光照门只认台灯）',
+  !['ITEMS_dsc', 'ITEMS_a4paper'].some(i => window.__dump().nodes.includes('item:' + i)));
+window.__cmd('ITEM_taideng', 0);               // 点亮台灯（书桌的光）
+window.__cmd('ITEM_sxbj', 0);
+assert('点亮台灯（而不是手电筒）才翻得开笔记',
+  window.__dump().nodes.includes('item:ITEMS_dsc'));
+
+/* 手电筒点亮 → 黑影现形 */
+window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
+assert('手电筒点亮后接触黑影：解锁「尸体」场景',
+  window.__dump().nodes.includes('loc:SCENES_body'));
+
+/* 手电筒自己的详情窗：状态 + 用途（手电筒是可重复使用的工具，照亮黑影后仍在） */
+window.__cmd('ITEM_shoudiantong', 0);          // 关掉，看「未点亮」态
+window.__select('item:ITEM_shoudiantong');
+tch = ids['detail-body']._html || '';
+assert('手电筒详情窗：标注未点亮 + 先点亮才能照亮黑暗里的东西',
+  tch.includes('未点亮') && tch.includes('先点亮它'));
+window.__cmd('ITEM_shoudiantong', 0);          // 打开
+window.__select('item:ITEM_shoudiantong');
+tch = ids['detail-body']._html || '';
+assert('手电筒详情窗：点亮后标注已点亮', tch.includes('已点亮') && !tch.includes('未点亮'));
 
 console.log('\n=== 14. 叙事层：对话气泡 + 场景叙事卡 ===');
 ids['btn-reset']._ev.click[0]();
@@ -617,6 +682,7 @@ window.__closeFloats();
 /* 捕获：手电筒 → 黑影 → 尸体场景，捕获尸体的 hiddenClue（真结局线索） */
 window.__reveal('SCENE_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);        // 左抽屉 → 手电筒
+torchOn();   /* 手电筒先点亮：发光工具门 */
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
 window.__reveal('SCENES_body');
 window.__cap('loc:SCENES_body');
@@ -641,6 +707,7 @@ window.__reveal('SCENES_garden');   /* 黑影在花园里：保持这条链路�
 window.__closeFloats();
 window.__reveal('SCENE_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);
+torchOn();   /* 手电筒先点亮：发光工具门 */
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
 window.__reveal('SCENES_body');
 assert('TEC 分析入口已暴露（window.__analyze）', typeof window.__analyze === 'function');
@@ -844,6 +911,7 @@ window.__closeFloats();
 /* 集齐真结局配方（五感各一，全部走正常玩法链路） */
 window.__reveal('SCENE_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);                        // 左抽屉 → 手电筒
+torchOn();                                                        // 手电筒先点亮
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');  // 手电筒 → 黑影 ⇒ 尸体
 window.__reveal('SCENES_body');
 window.__cap('loc:SCENES_body');                             // CLUES_V_luheng（视觉）
@@ -942,6 +1010,7 @@ assert('双击推演器图标开窗', window.__dump().floats.matrix === true);
 /* 拖线索到推演器图标 = 直接归槽（拖放路径由 bag>tec>infer>goto 优先级保证，此处用钩子验证归槽逻辑） */
 window.__reveal('SCENE_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);
+torchOn();   /* 手电筒先点亮：发光工具门 */
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
 window.__reveal('SCENES_body');
 window.__cap('loc:SCENES_body');
@@ -1038,16 +1107,16 @@ window.__closeFloats();
 
 /* 物品描述统一在详情窗承载（不论有没有命令）；双击无命令物品只选中、不再弹提示条 */
 window.__reveal('SCENES_choutiyi');
-window.__select('item:ITEM_shoudiantong');
+window.__reveal('SCENES_garden');           /* 黑影：没有命令的物品，描述只在详情窗 */
+window.__select('item:ITEM_something');
 dh = ids['detail-body']._html || '';
-assert('无命令物品：描述也在详情窗（唯一出口）', dh.indexOf('还能使用的手电筒') >= 0);
-window.__reveal('SCENES_garden');
+assert('无命令物品：描述也在详情窗（唯一出口）', dh.indexOf('摇摇晃晃') >= 0);
 window.__select('item:ITEMS_zhiwu');
 dh = ids['detail-body']._html || '';
 assert('有命令物品：描述同样在详情窗', dh.indexOf('自生自灭') >= 0);
 /* 双击无命令物品 = 选中（不再走顶部提示条） */
 ids['toast'].innerHTML = '__sentinel__';
-window.__talk('item:ITEM_shoudiantong');
+window.__talk('item:ITEM_something');
 assert('双击无命令物品不再走提示条', ids['toast'].innerHTML === '__sentinel__');
 assert('双击无命令物品：仍被选中（详情窗开着）', window.__dump().floats.detail === true);
 
