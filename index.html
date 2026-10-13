@@ -214,6 +214,24 @@
     padding:6px 8px; border-radius:var(--r-btn); cursor:pointer; font-size:12.5px; transition:background .12s, box-shadow .12s}
   .goto-item:hover{background:var(--bg); box-shadow:var(--press)}
   .goto-item .st{color:var(--faint); font-size:10.5px; white-space:nowrap}
+  /* 线索册（收纳盒）/ 人物（名册）：与档案同一族的清单窗（行复用 .goto-item，拖动排除表已覆盖它） */
+  .clue-win{position:absolute; left:96px; top:80px; width:326px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+  .clue-win .syswin-body{max-height:356px; overflow:auto; padding:0}
+  /* 人物窗紧挨详情窗左侧（列表 + 详情成一对），避开 #detail-win（right:14 top:60）不叠窗 */
+  .people-win{position:absolute; right:328px; top:60px; width:300px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+  .people-win .syswin-body{max-height:356px; overflow:auto}
+  /* 线索册 = 收纳盒：不分组、无状态列，感官直接标在行尾（整表已按五感排序，排序本身就是分组） */
+  .goto-item .st.sense{color:var(--muted); letter-spacing:1px}
+  .clue-win .syswin-body .goto-item, .people-win .syswin-body .goto-item{margin:2px 5px}
+  .goto-item .nm{display:flex; flex-direction:column; min-width:0}
+  .goto-item .nm .lb{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .goto-item .ds{font-size:10px; color:var(--faint); line-height:1.35; margin-top:1px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .goto-item.done .st{color:var(--line2)}
   /* 阵列桌布：大版纸面窗——执行者居中，线索环绕五感锚点，虚线连向中央（与主舞台同一张"纸"） */
   .infer-win{position:absolute; left:50%; top:40px; margin-left:-320px; width:640px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
@@ -537,6 +555,8 @@
     <div id="icons">
       <div class="desk-icon" id="infer-icon" data-app="infer"><div class="icon-glyph">◈</div><div class="icon-label">推演器</div></div>
       <div class="desk-icon" id="goto-icon"  data-app="goto"><div class="icon-glyph">▤</div><div class="icon-label">档案</div></div>
+      <div class="desk-icon" id="clue-icon"  data-app="clues"><div class="icon-glyph">※</div><div class="icon-label">线索册</div></div>
+      <div class="desk-icon" id="people-icon" data-app="people"><div class="icon-glyph">●</div><div class="icon-label">人物</div></div>
       <div class="desk-icon" id="bag-dock"   data-app="bag"><div class="icon-glyph">▣</div><div class="icon-label">证物袋</div></div>
       <div class="desk-icon" id="tec-dock"   data-app="tec"><div class="icon-glyph">◉</div><div class="icon-label">TEC</div></div>
       <div class="desk-icon" id="log-icon"><div class="icon-glyph">≡</div><div class="icon-label">日志</div></div>
@@ -1144,6 +1164,17 @@ function updateBagBadge(){
     b.textContent = cnt + " 件";
   } else if (b) b.remove();
 }
+/* 线索册图标角标：册子里（已收纳、不在画布上）的线索条数 */
+function updateLedgerBadge(){
+  const icon = document.getElementById("clue-icon");
+  if (!icon) return;
+  const cnt = ledgerItems().length;
+  let b = icon.querySelector(".badge");
+  if (cnt > 0){
+    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    b.textContent = cnt + " 条";
+  } else if (b) b.remove();
+}
 /* 推演器图标角标：桌布上已归位的线索数（与证物袋角标同一套） */
 function updateInferBadge(){
   const icon = document.getElementById("infer-icon");
@@ -1273,7 +1304,10 @@ function render(){
   updateCrumbs();
   updateTecBadge();
   updateBagBadge();
+  updateLedgerBadge();
   updateInferBadge();
+  refreshClueWin();     /* 开着的索引窗跟着图刷新（关着时是空操作） */
+  refreshPeopleWin();
   /* 重建 DOM 后恢复选中态并重挂聚焦淡化 */
   if (sel && G.nodes[sel] && G.nodes[sel].el) G.nodes[sel].el.classList.add("sel"); else sel = null;
   applyFocus();
@@ -1479,7 +1513,7 @@ function attachInteractions(el, n){
     if (overEl) overEl.classList.remove("over");
     overEl = null;
 
-    /* 桌面图标命中判定（固定优先级 bag > tec > infer > goto；任何路径清掉 over 高亮） */
+    /* 桌面图标命中判定（固定优先级 bag > clue > tec > infer > goto；任何路径清掉 over 高亮） */
     let iconHit = null;
     nodeDropTargets().forEach(id => {
       const ic = dropTargetEl(id);
@@ -1496,6 +1530,7 @@ function attachInteractions(el, n){
       /* 松手落在桌面图标上 → 对应功能，自己弹回原位 */
       springBack(el, ox, oy);
       if (iconHit === "bag-dock" || iconHit === "bag-win") bagStore(n.key);
+      else if (iconHit === "clue-icon" || iconHit === "clue-win") ledgerStore(n.key);
       else if (iconHit === "tec-dock" || iconHit === "tec-avatar" || iconHit === "tec-chip") tecAnalyze(n.key);
       else if (iconHit === "infer-icon"){
         if (n.kind === "clue") assignClue(n.key, (CLUES[n.id] || {}).type);
@@ -2274,21 +2309,25 @@ function initTecChip(){
 /* 节点可以拖到哪几个"外挂落点"上（悬停高亮 + 松手命中共用一份清单）。
    收起态才把右下角助手卡片加进来：卡片即使熄着也保留布局盒，不加这道门，
    窗口开着时拖节点划过卡片所在位置会被误判成"拖到了 TEC"。 */
-/* 顺序即命中优先级。证物袋窗口排在最前：它在图标层之上（.bag-win z-index:25 > #icons z-index:24），
-   窗口开着时会盖住左侧图标栏，按「看得见的最上面那个算数」的口径，被盖住的区域应判给窗口，
-   而不是底下那张看不见的图标（否则拖物品到窗口上会莫名其妙落进被遮住的推演器 / 档案）。
+/* 顺序即命中优先级。两扇收纳窗（证物袋 / 线索册）排在最前：它们在图标层之上
+   （.bag-win / .clue-win z-index:25 > #icons z-index:24），窗口开着时会盖住左侧图标栏，
+   按「看得见的最上面那个算数」的口径，被盖住的区域应判给窗口，而不是底下那张看不见的图标
+   （否则拖物品到窗口上会莫名其妙落进被遮住的推演器 / 档案）。
    代价：窗口盖住的图标在窗口开着时点不到 —— 窗口可以拖走，这是可接受的取舍。 */
 function nodeDropTargets(){
   const list = [];
   if (bagWinEl) list.push("bag-win");                                    /* 只在证物袋窗口开着时才是落点 */
-  list.push("bag-dock","tec-dock","infer-icon","goto-icon","tec-avatar");
+  if (clueWinEl) list.push("clue-win");                                  /* 同上：线索册窗口开着才算落点 */
+  list.push("bag-dock","clue-icon","tec-dock","infer-icon","goto-icon","tec-avatar");
   if (tecChipOn) list.push("tec-chip");
   return list;
 }
-/* 落点元素解析：除证物袋窗口外都是静态图标 / 头像，按 id 取即可；
-   证物袋窗口是每次开窗临时建的，没有稳定的 DOM 查询入口，直接引用 bagWinEl（关窗即置 null）。 */
+/* 落点元素解析：两扇收纳窗是每次开窗临时建的，没有稳定的 DOM 查询入口，直接引用变量（关窗即置 null）；
+   其余都是静态图标 / 头像，按 id 取即可。 */
 function dropTargetEl(id){
-  return id === "bag-win" ? bagWinEl : document.getElementById(id);
+  if (id === "bag-win") return bagWinEl;
+  if (id === "clue-win") return clueWinEl;
+  return document.getElementById(id);
 }
 function tecAnalyzingEl(){ return tecWinEl ? tecWinEl.querySelector(".tec-analyzing") : null; }
 function tecClearAnalyzing(){ const e = tecAnalyzingEl(); if (e) e.remove(); }
@@ -2538,6 +2577,186 @@ function refreshGotoWin(){
     d.addEventListener("click", () => { gotoScene(sid); closeGotoWin(); });
     body.appendChild(d);
   });
+}
+
+/* ============ CLUE LEDGER // 线索册：收纳盒 ============
+   线索捕获后先落在画布上，要做的是「把它拖进线索册」（拖到窗口里或左侧图标上）——收进来即离开画布。
+   册子里只有已收纳的线索：一条一行，感官直接标在行尾，整表按五感顺序自动排序（同感自然相邻），
+   不再分组、不再标归位状态，也不给未捕获 / 未收纳的线索留位——册子就是盒子，装什么显示什么。
+   点一行 = 取回画布（回到线索册图标旁并选中，详情窗顺势展开全文）。 */
+let clueWinEl = null;
+function closeClueWin(){ if (clueWinEl){ clueWinEl.remove(); clueWinEl = null; } }
+function toggleClueWin(){
+  if (clueWinEl){ closeClueWin(); return; }
+  const w = makeWindow("CLUE LEDGER // 线索册", closeClueWin);
+  w.el.classList.add("clue-win");
+  desktopEl.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  clueWinEl = w.el;
+  refreshClueWin();
+}
+/* 册中条目（与证物袋共用 stored 机制：收纳 = 离开画布，只留一条清单记录） */
+function ledgerItems(){
+  return Object.values(G.nodes).filter(n => n.stored && n.storedIn === "LEDGER");
+}
+function ledgerStore(key){
+  const n = G.nodes[key];
+  if (!n || n.stored) return false;
+  if (n.isScene || n.kind !== "clue"){ toast("只有线索能收进线索册", true); return false; }
+  pushHistory();
+  n.stored = true; n.storedIn = "LEDGER"; n.pinned = false;
+  log("已把「" + esc(n.label) + "」收进线索册", "sys");
+  recomputeHidden(); layout(); render(); refreshClueWin();
+  return true;
+}
+function ledgerTake(key){
+  const n = G.nodes[key];
+  if (!n || n.storedIn !== "LEDGER") return false;
+  /* 案件窗关着时不能取：取出是放回画布的操作，不能对看不见的画布施展 */
+  if (!requireCase()) return false;
+  pushHistory();
+  n.stored = false; n.storedIn = null; n.hidden = false; n.fresh = true;
+  /* 取回到线索册图标附近的画布位置（屏幕坐标换算成世界坐标） */
+  const icon = document.getElementById("clue-icon");
+  if (icon){
+    const r = icon.getBoundingClientRect();
+    const wpt = toWorld(r.left + r.width / 2, r.top - 40);
+    n.x = wpt.x; n.y = wpt.y;
+  }
+  log("从线索册取出「" + esc(n.label) + "」", "sys");
+  layout(); render(); refreshClueWin();
+  return true;
+}
+/* 排序键 = 五感顺序（SENSES 的键序）* 1000 + 线索在数据里的书写顺序，等价于「先按感官、再按原序」 */
+function ledgerRank(id){
+  const order = Object.keys(SENSES), ti = order.indexOf((CLUES[id] || {}).type);
+  return (ti < 0 ? order.length : ti) * 1000 + Object.keys(CLUES).indexOf(id);
+}
+function ledgerList(){
+  return ledgerItems().sort((a, b) => ledgerRank(a.id) - ledgerRank(b.id));
+}
+/* 把镜头拉到某个节点上（档案的 gotoScene 同款算法，按节点宽度取心） */
+function centerOnNode(n){
+  const r = stage.getBoundingClientRect();
+  view.x = r.width / 2 - (n.x + (NODE_W[n.kind] || 152) / 2) * view.k;
+  view.y = r.height / 2 - (n.y + 27) * view.k;
+  applyView();
+}
+function refreshClueWin(){
+  if (!clueWinEl) return;
+  const body = clueWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  const items = ledgerList();
+  if (!items.length){
+    const d = document.createElement("div");
+    d.className = "bag-empty";
+    d.textContent = "（空）把画布上的线索拖到这里收纳";
+    body.appendChild(d);
+    return;
+  }
+  items.forEach(n => {
+    const c = CLUES[n.id] || {};
+    const d = document.createElement("div");
+    d.className = "goto-item";
+    const box = document.createElement("span"); box.className = "nm";
+    const lb = document.createElement("span"); lb.className = "lb"; lb.textContent = c.label || n.label;
+    box.appendChild(lb);
+    if (c.desc){
+      const ds = document.createElement("span"); ds.className = "ds"; ds.textContent = c.desc;
+      box.appendChild(ds);
+    }
+    const st = document.createElement("span"); st.className = "st sense";
+    st.textContent = SENSES[c.type] || "";
+    d.appendChild(box); d.appendChild(st);
+    d.addEventListener("click", () => takeFromLedger(n.key));
+    body.appendChild(d);
+  });
+}
+/* 点一行 = 取回画布：放回图标旁、镜头拉到它身上并选中 */
+function takeFromLedger(key){
+  if (!requireCase()) return false;
+  const n = G.nodes[key];
+  if (!n || !ledgerTake(key)) return false;
+  centerOnNode(n); selectNode(n.key);
+  return true;
+}
+
+/* ============ ROSTER // 人物：已结识角色的索引 ============
+   已结识 = 画布上有节点 ∪ 文本里点过名 ∪ 在已展开的场景里说过话；TEC 有自己的助手窗，不列进名册。
+   点一行 = 把人叫到画面中央、选中，并接着说下一句（没有节点就补一个）。 */
+let peopleWinEl = null;
+function closePeopleWin(){ if (peopleWinEl){ peopleWinEl.remove(); peopleWinEl = null; } }
+function togglePeopleWin(){
+  if (peopleWinEl){ closePeopleWin(); return; }
+  const w = makeWindow("ROSTER // 人物", closePeopleWin);
+  w.el.classList.add("people-win");
+  desktopEl.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  peopleWinEl = w.el;
+  refreshPeopleWin();
+}
+function metChars(){
+  const ids = new Set();
+  Object.keys(G.nodes).forEach(k => { if (k.indexOf("char:") === 0) ids.add(k.slice(5)); });
+  G.seenTexts.forEach(txt => parseTags(txt).forEach(t => { if (t.kind === "char" && CHARS[t.id]) ids.add(t.id); }));
+  G.explored.forEach(sid => Object.keys(CHARS).forEach(id => {
+    if ((CHARS[id].sceneTalks || {})[sid]) ids.add(id);
+  }));
+  return Object.keys(CHARS).filter(id => id !== "CHARS_TEC" && ids.has(id));
+}
+/* 对话进度：有节点就按真实队列算（含场景对白），没节点时退回基础队列 */
+function charProgress(id){
+  const n = nodeByKey("char", id);
+  if (n) return { prog: G.talkProg[n.key] || 0, total: charTalkQueue(n).length };
+  const base = ((CHARS[id] || {}).talkQueue) || [];
+  return { prog: 0, total: base.filter(Boolean).length };
+}
+function refreshPeopleWin(){
+  if (!peopleWinEl) return;
+  const body = peopleWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  const list = metChars();
+  if (!list.length){
+    const d = document.createElement("div");
+    d.className = "bag-empty";
+    d.textContent = "（还没有结识任何人）展开场景、读一读文本，就会记下遇到的人";
+    body.appendChild(d);
+    return;
+  }
+  list.forEach(id => {
+    const ch = CHARS[id] || {};
+    const pr = charProgress(id);
+    const d = document.createElement("div");
+    d.className = "goto-item" + ((pr.total && pr.prog >= pr.total) ? " done" : "");
+    const box = document.createElement("span"); box.className = "nm";
+    const lb = document.createElement("span"); lb.className = "lb"; lb.textContent = ch.name || id;
+    box.appendChild(lb);
+    const ds = document.createElement("span"); ds.className = "ds"; ds.textContent = ch.desc || "";
+    box.appendChild(ds);
+    const st = document.createElement("span"); st.className = "st";
+    st.textContent = pr.total ? (pr.prog ? "对话 " + pr.prog + "/" + pr.total : "未交谈") : "无对话文本";
+    d.appendChild(box); d.appendChild(st);
+    d.addEventListener("click", () => gotoChar(id));
+    body.appendChild(d);
+  });
+}
+/* 点一行 = 把角色叫到画面中央、选中，然后接着说下一句 */
+function gotoChar(id){
+  if (!requireCase()) return;
+  const ch = CHARS[id] || {};
+  let n = nodeByKey("char", id);
+  if (!n){
+    pushHistory();
+    n = ensureNode("char", id, { label: ch.name || id });
+    if (!n.homeScene) n.homeScene = G.lastScene || null;
+    layout(); render();
+  }
+  if (n.stored) bagTake(n.key);
+  centerOnNode(n); selectNode(n.key);
+  if (!charTalkQueue(n).length){ toast("<b>" + esc(ch.name || id) + "</b><br>（暂无对话文本）"); return; }
+  showCharLine(n);
 }
 
 /* ============ INFERENCE_MATRIX // 逻辑阵列 ============ */
@@ -3036,6 +3255,8 @@ function fit(){
 function openApp(app){
   if (app === "infer") toggleInferWin();
   else if (app === "goto") toggleGotoWin();
+  else if (app === "clues") toggleClueWin();
+  else if (app === "people") togglePeopleWin();
   else if (app === "bag") toggleBagWin();
   else if (app === "tec") toggleTecWin();
   else if (app === "log") toggleLogWin();
@@ -3075,7 +3296,7 @@ function attachIcon(el, app){
    图标现在在案件窗之外的独立栏里，不用再避开画布左上角的 hint，所以从桌面顶部开始排；
    桌面高度不够时压缩间距，避免最后一个图标被 #desktop{overflow:hidden} 裁掉。
    位置不进撤销栈、重置不回位。 */
-const ICON_LAYOUT = [["infer-icon","infer"],["goto-icon","goto"],["bag-dock","bag"],["tec-dock","tec"],["log-icon","log"],["map-icon","map"]];
+const ICON_LAYOUT = [["infer-icon","infer"],["goto-icon","goto"],["clue-icon","clues"],["people-icon","people"],["bag-dock","bag"],["tec-dock","tec"],["log-icon","log"],["map-icon","map"]];
 const ICON_LEFT = 18, ICON_TOP = 16, ICON_PITCH = 85, ICON_H = 64;
 function resetIconPositions(){
   const n = ICON_LAYOUT.length;
@@ -3823,6 +4044,8 @@ function boot(opts){
      否则「– 收起 → 展开」回访同一案件时会被顺带收掉。 */
   closeGotoWin();
   closeInferWin();
+  closeClueWin();
+  closePeopleWin();
   closeMapWin();
   view = { x: 40, y: 20, k: 1 };
   applyView();
@@ -3880,6 +4103,13 @@ window.__cap = key => attemptCapture(key);
 window.__noteSeen = t => noteSeen(t);
 window.__goto = sid => gotoScene(sid);
 window.__gotoList = () => heardScenes();
+window.__clueToggle = () => toggleClueWin();
+window.__clueLedger = () => ledgerList().map(n => ({ key:n.key, id:n.id, label:n.label, sense:(CLUES[n.id] || {}).type }));
+window.__ledgerStore = key => ledgerStore(key);
+window.__ledgerTake  = key => ledgerTake(key);
+window.__dropTargets = () => nodeDropTargets();
+window.__peopleToggle = () => togglePeopleWin();
+window.__roster = () => metChars().map(id => { const p = charProgress(id); return { id, name:(CHARS[id] || {}).name || id, prog:p.prog, total:p.total }; });
 window.__mxAssign = (k, s) => assignClue(k, s);
 window.__infer = () => executeInference();
 window.__playStep = () => { if (memoryPlay) advanceMemory(); else if (endingState) playEndingStage(); };
@@ -3920,10 +4150,11 @@ window.__dump  = () => ({
   hidden: Object.keys(G.nodes).filter(k => G.nodes[k].hidden),
   stored: Object.keys(G.nodes).filter(k => G.nodes[k].stored),
   bag: bagItems().map(n => n.key),
+  ledger: ledgerItems().map(n => n.key),
   collapsed: [...G.collapsed],
   dim: G._dimKeys || [],
   sel: sel,
-  floats: { bubble: !!bubbleEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, detail: detailWinOpen, logs: logWinOpen },
+  floats: { bubble: !!bubbleEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
   matrix: JSON.parse(JSON.stringify(G.matrix)),
   endings: [...G.endings],
   endingOverlay: !!endingState,

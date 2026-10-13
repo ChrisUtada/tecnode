@@ -1172,22 +1172,26 @@ assert('悬停高亮与松手判决共用同一份 nodeDropTargets()',
   (html.match(/nodeDropTargets\(\)\.forEach\(id => \{/g) || []).length === 2);
 assert('拖节点悬停到收起卡片上有高亮（与窗内头像同一套虚线）',
   /#tec-chip\.over\{[^}]*outline:2px dashed var\(--text\)/.test(html));
-/* 证物袋窗口也是落点：窗口开着时把节点拖到窗口上 = 收纳。
-   顺序必须排在最前 —— .bag-win（z25）盖在 #icons（z24）之上，被盖住的区域要判给
+/* 证物袋窗口 / 线索册窗口都是落点：窗口开着时把节点拖到窗口上 = 收纳。
+   顺序必须排在最前 —— .bag-win / .clue-win（z25）盖在 #icons（z24）之上，被盖住的区域要判给
    「看得见的窗口」，否则拖物品到窗口上会落进底下那张被遮住的图标（推演器 / 档案）。 */
 assert('证物袋窗口进了落点清单，且排在图标之前（z 序：窗口 25 > 图标 24）',
   /function nodeDropTargets\(\)\{[^}]*if \(bagWinEl\) list\.push\("bag-win"\)/.test(html)
-  && html.indexOf('if (bagWinEl) list.push("bag-win")') < html.indexOf('list.push("bag-dock","tec-dock"'));
+  && html.indexOf('if (bagWinEl) list.push("bag-win")') < html.indexOf('list.push("bag-dock","clue-icon"'));
 assert('窗口是「只在开着时才算落点」（关窗后不再是落点）',
   /if \(bagWinEl\) list\.push\("bag-win"\)/.test(html)
+  && /if \(clueWinEl\) list\.push\("clue-win"\)/.test(html)
   && /\.bag-win\{position:absolute/.test(html));
 assert('拖进窗口与拖到图标上走同一条收纳路由（bagStore）',
   /iconHit === "bag-dock" \|\| iconHit === "bag-win"\) bagStore\(n\.key\);/.test(html));
+assert('线索册窗口 / ※ 图标走 ledgerStore 收纳', 
+  /iconHit === "clue-icon" \|\| iconHit === "clue-win"\) ledgerStore\(n\.key\);/.test(html));
 assert('证物袋窗口有悬停高亮样式（与卡片 / 助手头像同一套虚线）',
   /\.bag-win\.over\{[^}]*outline:2px dashed var\(--text\)/.test(html));
-assert('落点元素解析走 dropTargetEl()（窗口取 bagWinEl，其余按 id），两处调用都在',
+assert('落点元素解析走 dropTargetEl()（两扇收纳窗取变量，其余按 id），两处调用都在',
   /function dropTargetEl\(id\)\{/.test(html)
-  && /id === "bag-win" \? bagWinEl : document\.getElementById\(id\)/.test(html)
+  && /if \(id === "bag-win"\) return bagWinEl;/.test(html)
+  && /if \(id === "clue-win"\) return clueWinEl;/.test(html)
   && (html.match(/const ic = dropTargetEl\(id\);/g) || []).length === 2);
 assert('空袋提示把「窗口内」也说清楚', html.indexOf('或本窗口内）收纳') >= 0);
 /* 最小化的顺滑关键：先亮落点卡片、再让窗口缩过去（否则窗口缩没、卡片才淡入 = 闪一下） */
@@ -1339,6 +1343,113 @@ ids['bag-dock']._ev.dblclick[0]();
 assert('换案前证物袋窗已打开', window.__dump().floats.bag === true);
 window.__switchCase('A002');
 assert('换案后证物袋窗被清掉', window.__dump().floats.bag === false);
+window.__switchCase('A001');
+
+console.log('\n=== 28. 线索册（收纳盒）/ 人物：两个桌面层清单窗 ===');
+/* ---- 线索册 = 收纳盒：捕获 ≠ 入册，要手动拖进去；进去后离开画布；感官标行尾、按五感自动排序 ---- */
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+window.__reveal('SCENES_body');
+/* 三条线索按「味觉 → 触觉 → 视觉」（与 SENSES 顺序相反）依次入册，用真实的拖放路径 */
+window.__cap('item:ITEMS_xh');                         /* 味觉 CLUES_CBKW */
+window.__cap('item:ITEMS_ccss');                       /* 触觉 CLUES_mc */
+window.__cap('loc:SCENES_body');                       /* 视觉 CLUES_V_luheng */
+ids['clue-icon']._ev.dblclick[0]();
+assert('双击线索册图标开窗', window.__dump().floats.clue === true);
+const clueWinEl = document.getElementById('desktop').querySelector('.clue-win');
+const clueBody = clueWinEl.querySelector('.syswin-body');
+assert('捕获 ≠ 入册：还没拖进去时册子是空的',
+  window.__dump().captured.length === 3 && window.__clueLedger().length === 0);
+assert('空态是 bag-empty 提示行', clueBody.children.length === 1 && clueBody.children[0]._classes.has('bag-empty'));
+assert('线索册不再有分组框 / 表头 / 归位反查（源码检查）',
+  html.indexOf('clue-sec') < 0 && html.indexOf('clue-head') < 0 && html.indexOf('clueOnBoard') < 0);
+assert('册子窗口与 ※ 图标都在落点清单里',
+  window.__dropTargets().indexOf('clue-win') >= 0 && window.__dropTargets().indexOf('clue-icon') >= 0);
+/* 拖到窗口上收纳（stub 里窗口矩形退化成 140×48，先给内联位置避开左侧图标栏） */
+clueWinEl.style.left = '520px'; clueWinEl.style.top = '120px';
+const cwr = clueWinEl.getBoundingClientRect();
+const dropIntoWin = k => dragTo(findEl(k), cwr.left + cwr.width / 2, cwr.top + cwr.height / 2);
+dropIntoWin('clue:CLUES_CBKW');
+dropIntoWin('clue:CLUES_mc');
+dropIntoWin('clue:CLUES_V_luheng');
+assert('拖进线索册 = 收纳（节点离开画布，只留清单记录）',
+  window.__dump().ledger.length === 3 && window.__dump().stored.indexOf('clue:CLUES_V_luheng') >= 0);
+assert('落定后窗口高亮被清掉', !clueWinEl._classes.has('over'));
+assert('册内按五感自动排序（味→触→视 入册，排出 视→触→味）',
+  window.__clueLedger().map(c => c.sense).join(',') === 'vision,touch,taste');
+const lrows = clueBody.querySelectorAll('.goto-item');
+assert('册内一条线索一行', lrows.length === 3);
+assert('行上有线索名与描述', lrows[0].querySelector('.nm').children.length === 2);
+assert('行尾标的是感官（视觉/触觉/味觉），不再有归位状态列',
+  lrows.map(r => r.querySelector('.st').textContent).join(',') === '视觉,触觉,味觉');
+assert('感官标记走 .st.sense，行上不再有 done 样式',
+  lrows.every(r => r.querySelector('.st')._classes.has('sense') && !r._classes.has('done')));
+assert('※ 图标角标显示册内条数', ids['clue-icon'].querySelector('.badge').textContent === '3 条');
+/* 拖到 ※ 图标上同样收纳（图标是常驻落点，不一定非要开着窗） */
+window.__cap('item:ITEMS_xfbyc');                      /* 视觉 CLUES_gcs */
+const icr = ids['clue-icon'].getBoundingClientRect();
+dragTo(findEl('clue:CLUES_gcs'), icr.left + icr.width / 2, icr.top + icr.height / 2);
+assert('拖到 ※ 图标上也能收纳', window.__dump().ledger.indexOf('clue:CLUES_gcs') >= 0);
+assert('两条视觉线索按数据书写序排出（陆珩松 → 贯穿伤）',
+  window.__clueLedger().map(c => c.id).join(',') === 'CLUES_V_luheng,CLUES_gcs,CLUES_mc,CLUES_CBKW');
+/* 点一行 = 取回画布 */
+fire(lrows[0], 'click', {});
+assert('点一行 = 取回画布（离开册子、回到画布）',
+  window.__dump().ledger.indexOf('clue:CLUES_V_luheng') < 0 && window.__dump().stored.indexOf('clue:CLUES_V_luheng') < 0);
+assert('取回后选中该线索节点（详情窗顺势展开）', window.__dump().sel === 'clue:CLUES_V_luheng');
+assert('取回后册内少一行、角标跟着回落',
+  clueBody.querySelectorAll('.goto-item').length === 3 && ids['clue-icon'].querySelector('.badge').textContent === '3 条');
+assert('点完线索册仍开着（对照着看画布）', window.__dump().floats.clue === true);
+/* 非线索节点收不进册（只有线索能进） */
+assert('非线索节点收不进线索册', window.__ledgerStore('loc:SCENES_garden') === false);
+
+/* ---- 人物：已结识的角色（TEC 不列），点一行 = 叫到画面中央并接着说下一句 ---- */
+ids['people-icon']._ev.dblclick[0]();
+assert('双击人物图标开窗', window.__dump().floats.people === true);
+const peopleBody = document.getElementById('desktop').querySelector('.people-win').querySelector('.syswin-body');
+assert('还没遇到人时名册是空的', peopleBody.querySelectorAll('.goto-item').length === 0 &&
+  peopleBody.children.length === 1);
+window.__reveal('SCENES_fkjl');                        /* 这场景点名了朱穗 / 傅柏 */
+const roster = window.__roster();
+assert('展开场景后名册记下遇到的人', roster.map(r => r.id).sort().join(',') === 'CHARS_zs,NPC_FB');
+assert('名册不列 TEC（它有自己的助手窗）', !roster.some(r => r.id === 'CHARS_TEC'));
+assert('名册行带对话进度（未交谈 0/1）',
+  roster.find(r => r.id === 'CHARS_zs').prog === 0 && roster.find(r => r.id === 'CHARS_zs').total === 1);
+/* 点「朱穗」那一行（傅柏在这个场景里没有对白，走的是「无对话文本」分支） */
+const zsRow = [...document.getElementById('desktop').querySelector('.people-win').querySelector('.syswin-body')
+  .querySelectorAll('.goto-item')].find(r => r.querySelector('.lb').textContent === '朱穗');
+assert('名册里找得到「朱穗」这一行', !!zsRow);
+assert('傅柏那行标「无对话文本」（该场景里他确实没词）',
+  [...document.getElementById('desktop').querySelector('.people-win').querySelector('.syswin-body')
+    .querySelectorAll('.goto-item')].find(r => r.querySelector('.lb').textContent === '傅柏')
+    .querySelector('.st').textContent === '无对话文本');
+fire(zsRow, 'click', {});
+assert('点人物一行 = 选中该角色节点', window.__dump().sel === 'char:CHARS_zs');
+assert('点人物一行 = 说出第一句（对话进度 +1）', window.__dump().talk['char:CHARS_zs'] === 1);
+assert('点完人物窗仍开着（可以接着点下一个人）', window.__dump().floats.people === true);
+const prows = [...document.getElementById('desktop').querySelector('.people-win').querySelector('.syswin-body')
+  .querySelectorAll('.goto-item')];
+assert('名册行随之刷新出对话进度',
+  prows.find(r => r.querySelector('.lb').textContent === '朱穗').querySelector('.st').textContent === '对话 1/1');
+assert('说完的角色行标上 done',
+  prows.find(r => r.querySelector('.lb').textContent === '朱穗')._classes.has('done'));
+
+/* ---- 离屏守卫 + 开关窗：换案 / 重置都要把这两扇窗收掉 ---- */
+ids['btn-reset']._ev.click[0]();
+assert('重置后线索册与人物窗都被收掉',
+  window.__dump().floats.clue === false && window.__dump().floats.people === false);
+ids['clue-icon']._ev.dblclick[0]();
+assert('线索册再次打开（重置后册子是空的）', window.__dump().floats.clue === true);
+assert('空态文案在（bag-empty）',
+  document.getElementById('desktop').querySelector('.clue-win').querySelector('.syswin-body')
+    .children[0]._classes.has('bag-empty'));
+assert('图标栏里挂上了两个新图标（线索册 / 人物）',
+  /id="clue-icon"/.test(html) && /id="people-icon"/.test(html) &&
+  /\["clue-icon","clues"\],\["people-icon","people"\]/.test(html));
+assert('两颗新图标进了桌面图标栏且能被布局摆位',
+  document.getElementById('clue-icon').style.top !== '' && document.getElementById('people-icon').style.top !== '');
+ids['clue-icon']._ev.dblclick[0]();
+window.__switchCase('A002');
 window.__switchCase('A001');
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
