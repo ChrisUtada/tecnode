@@ -525,13 +525,19 @@ fd = window.__dump().focus;
 assert('选项命令长出物品 → 聚焦（centered）', !!fd && fd.on === true && fd.why === 'centered');
 assert('聚焦集合里有这次新长出的手电筒', !!fd && fd.keys.indexOf('item:ITEM_shoudiantong') >= 0);
 
-/* 4) 组合产出新场景（手电筒 → 黑影 ⇒ 尸体）→ 聚焦；两个参与者当锚点 */
+/* 4) 组合产出新场景（手电筒 → 黑影 ⇒ 尸体）→ 聚焦；只框新节点（锚点可能远在几百像素外） */
 window.__cmd('ITEM_shoudiantong', 0);          /* 点亮手电筒 */
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
 fd = window.__dump().focus;
 assert('组合产出新场景 → 聚焦（centered）', !!fd && fd.on === true && fd.why === 'centered');
-assert('聚焦集合里有新长的「尸体」场景，也带着还活着的参与者（手电筒）',
-  !!fd && fd.keys.indexOf('loc:SCENES_body') >= 0 && fd.keys.indexOf('item:ITEM_shoudiantong') >= 0);
+assert('聚焦集合里有新长的「尸体」场景', !!fd && fd.keys.indexOf('loc:SCENES_body') >= 0);
+assert('聚焦只框新节点，不把还活着的参与者（手电筒）一起拽进来',
+  !!fd && fd.keys.indexOf('item:ITEM_shoudiantong') < 0);
+assert('聚焦集合就是这次的新节点，一个不多', !!fd && fd.keys.length === 1 && fd.keys[0] === 'loc:SCENES_body');
+/* 合成吃掉了目标（黑影）→ 不能去选中一个已经没了的节点（否则详情窗弹「节点已不存在」） */
+let dd = window.__dump();
+assert('合成吃掉目标后，改选中新长出来的节点', dd.sel === 'loc:SCENES_body');
+assert('详情窗不再显示「节点已不存在」', (ids['detail-body']._html || '').indexOf('节点已不存在') < 0);
 
 /* 5) 没有新节点产出 → 镜头一动不动（纯提示 / 纯消耗不把画面拽走） */
 window.__reveal('SCENES_mdhm');                /* 铁栅栏所在场景 */
@@ -553,19 +559,28 @@ ids['tg-reveal'].checked = true;
 
 /* 源码检查：这套收尾是「单一入口」，产出路径全都走它 */
 assert('引擎里有 settle() 单一收尾（重排 → 渲染 → 聚焦）',
-  html.indexOf('function settle(anchors){') > 0);
+  html.indexOf('function settle(){') > 0);
 assert('引擎里有 focusOn()（只平移、不缩放）', html.indexOf('function focusOn(keys, ms){') > 0);
 assert('引擎里有 freshKeys()：以 n.fresh 认「本次新长出来的节点」',
   html.indexOf('function freshKeys(){') > 0);
 assert('旧的 ensureVisible 已并入 focusOn（不再留「已在视野内就不动」的短路）',
   html.indexOf('ensureVisible') < 0);
 assert('产出路径都接了 settle（组合 / 捕获 / 命令 / 选项 / 密码 / TEC）',
-  (html.match(/settle\(/g) || []).length >= 11);
+  (html.match(/settle\(\)/g) || []).length >= 9);
 {
   const fb = html.slice(html.indexOf('function focusOn(keys, ms){'), html.indexOf('function freshKeys(){'));
   assert('聚焦只平移不缩放（focusOn 体内不给 view.k 赋值）',
     fb.indexOf('view.k =') < 0 && fb.indexOf('view.k=') < 0);
 }
+{
+  /* 只框新节点：focusFresh 的形参里不许再有锚点（锚点会把新节点顶到舞台角落） */
+  const ff = html.slice(html.indexOf('function focusFresh('), html.indexOf('function settle(){'));
+  assert('focusFresh 只收新节点、不再收锚点', ff.indexOf('function focusFresh(news){') >= 0 && ff.indexOf('anchors') < 0);
+}
+assert('收尾会挑「该选中谁」：原目标被消耗就改选新节点',
+  html.indexOf('function settleSelect(news, preferKey){') > 0);
+assert('spawnItems 不给已经在画布上的旧节点重打 fresh（否则镜头被老节点拽走）',
+  html.indexOf('if (existed) n.fresh = false;') > 0);
 assert('抓住节点拖动也能打断自动聚焦（节点 pointerdown 里 cancelViewAnim）',
   html.indexOf('cancelViewAnim();   /* 抓住节点即接管镜头') > 0);
 assert('顶栏开关改名成「新节点自动居中」',

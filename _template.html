@@ -944,13 +944,15 @@ function revealScene(sid, silent){
   return added;
 }
 
-/* 生成一批物品节点（由合成产出） */
+/* 生成一批物品节点（由合成产出）。只把真正新上画布的那些算「新」——
+   已经在画布上的旧节点若也被标记成 fresh，会跟着一起进聚焦集合，把镜头拽到别处。 */
 function spawnItems(ids, nearKey){
   const src = G.nodes[nearKey];
   const sx = src ? src.x : 900, sy = src ? src.y : 600;
   ids.forEach((iid, i) => {
+    const existed = !!G.nodes["item:" + iid];
     const n = ensureNode("item", iid, { x: sx + 60 + i * 26, y: sy + 60 + i * 26 });
-    n.fresh = true;
+    if (existed) n.fresh = false;
     n.homeScene = (G.nodes[nearKey] || {}).homeScene || null;
   });
 }
@@ -1070,10 +1072,10 @@ function attemptCombo(toolKey, targetKey){
       (gained.length ? "　［获得 " + esc(gained.join("、")) + "］" : "") +
       (killed.length ? "　［消耗 " + esc(killed.map(k => plain(k.label)).join("、")) + "］" : ""), "act");
 
-  /* 收尾：重排 → 渲染 → 把这次新长出来的节点（新场景 / 新物品 / 新线索）带进视野。
-     两个参与者一起当锚点，是为了让"结果"和"它在哪儿冒出来的"同框。 */
-  settle([toolKey, targetKey]);
-  selectNode(owner ? owner.key : targetKey);
+  /* 收尾：重排 → 渲染 → 把这次新长出来的节点（新场景 / 新物品 / 新线索）带到视野中央。
+     只框新节点本身：合成常把参与者吃掉，还活着的那个锚点可能在几百像素之外。 */
+  const news = settle();
+  settleSelect(news, owner ? owner.key : targetKey);
 }
 
 function fail(tool, target, msg){
@@ -1117,7 +1119,7 @@ function attemptCapture(key){
   const text = plain(hc.text || "");
   if (text) showBubble(n, "CAPTURE // " + n.label, text);
   log("捕获「" + esc(n.label) + "」的隐藏线索：" + esc(fresh.map(id => CLUES[id].label).join("、")) + (text ? "——" + esc(text) : ""), "cap");
-  settle([key]); selectNode(key);
+  settleSelect(settle(), key);
 }
 
 /* ============ 场景折叠收纳 ============ */
@@ -1756,32 +1758,42 @@ function focusOn(keys, ms){
    视野内，那个短路会让聚焦永不触发，等于没做。聚焦的意思是「看这里」，不是「勉强可见」。
 
    两个收尾动作按"这次要不要重排图"来选：
-     settle(anchors)        —— 图结构变了（长 / 删了节点）：重排 → 渲染 → 聚焦；无新节点则只重排
-     focusFresh(news, ...)  —— 图没重排（开关灯 / 纯重绘）：只把已有结论送去聚焦             */
+     settle()           —— 图结构变了（长 / 删了节点）：重排 → 渲染 → 聚焦；无新节点则只重排
+     focusFresh(news)   —— 图没重排（开关灯 / 纯重绘）：只把已有结论送去聚焦
+   镜头只认「新节点」这一个集合：锚点（谁产出了它）不参与框选，理由见 focusFresh 的注释。 */
 function freshKeys(){
   return Object.keys(G.nodes).filter(k => {
     const n = G.nodes[k];
     return n && n.fresh && !n.hidden && !n.stored;
   });
 }
-/* 聚焦到「本次新长出来的节点」，并把锚点（产出它的那个节点）一起框住 ——
-   这样"新东西"和"它长在哪儿"能同框，不至于只看到一个孤零零的新节点。 */
-function focusFresh(news, anchors){
+/* 聚焦到「本次新长出来的节点」，把它们整体带到视野中央。
+   为什么只框新节点、不把"产出它的那个锚点"也框进来：合成会消耗参与者，还活着的那个
+   锚点可能在几百像素之外（实测手电筒 ↔ 尸体相距 264~763px），一起框等于把新节点推到
+   舞台角落（实测最坏偏离中心 285px）——看着就是"没聚焦"。锚点本身就在玩家眼皮底下，
+   不需要镜头带过去；新节点才是要找的那个。 */
+function focusFresh(news){
   const live = (news || []).filter(k => { const n = G.nodes[k]; return n && !n.hidden && !n.stored; });
   if (!live.length){ lastFocus = { on:false, why:"no-new-node", keys:[] }; return false; }
-  const extra = (anchors || []).filter(k => {
-    const n = G.nodes[k];
-    return n && !n.hidden && !n.stored && live.indexOf(k) < 0;
-  });
-  return focusOn(extra.concat(live));
+  return focusOn(live);
 }
 /* 标准收尾：重排 → 渲染 → 把新节点带进视野。没有新节点（纯消耗 / 纯提示）时退回原来的
-   「重排 + 渲染」，镜头一动不动。顶栏「新节点自动居中」关掉 → focusOn 直接返回 false。 */
-function settle(anchors){
+   「重排 + 渲染」，镜头一动不动。顶栏「新节点自动居中」关掉 → focusOn 直接返回 false。
+   返回本次新节点的 key 列表，供调用方决定"该选中谁"。 */
+function settle(){
   const news = freshKeys();     /* 必须抢在 render() 清掉 fresh 之前读 */
   layout();
   render();
-  return focusFresh(news, anchors);
+  focusFresh(news);
+  return news;
+}
+/* 收尾后选中"该看的东西"：原目标若在这一步被消耗掉了（合成常吃掉参与者），
+   就改选这次新长出来的节点 —— 否则详情窗会弹出「节点已不存在」。
+   返回实际选中的 key（无可选则 null）。 */
+function settleSelect(news, preferKey){
+  const keep = G.nodes[preferKey] ? preferKey : ((news || []).find(k => G.nodes[k]) || null);
+  if (keep) selectNode(keep);
+  return keep;
 }
 
 /* 双击物品 / 线索的主行为 */
@@ -1837,7 +1849,7 @@ function runCommand(n, cmd){
     /* 开关灯只重绘（重排会让灯自己跳位置）；正文里真带出 [clue:] 时才重排并聚焦过去 */
     if (news.length) layout();
     render();
-    focusFresh(news, [n.key]);
+    focusFresh(news);
     return;
   }
   if (t === "choice"){ spawnChoiceNodes(n, cmd); return; }
@@ -1862,7 +1874,7 @@ function runCommand(n, cmd){
       deleteNode("item:" + need);
       log("　［消耗 " + esc(needLabel) + "］", "sys");
     }
-    settle([n.key]); selectNode(n.key);
+    settleSelect(settle(), n.key);
     return;
   }
   if (t === "conditional"){
@@ -1878,7 +1890,7 @@ function runCommand(n, cmd){
     log("「" + esc(n.label) + "」：" + esc(plain(cmd.successMessage || "")), "act");
     noteSeen(cmd.successMessage || "");
     if (cmd.onSuccess) applyPayload(cmd.onSuccess, n.key);
-    settle([n.key]); selectNode(n.key);
+    settleSelect(settle(), n.key);
     return;
   }
   if (t === "reveal"){
@@ -1895,7 +1907,7 @@ function runCommand(n, cmd){
       kids.forEach(iid => link(n.key, "item:" + iid, "entity"));
       log("　［出现 " + esc(kids.map(i => labelOf("item", i) || i).join("、")) + "］", "sys");
     }
-    settle([n.key]); selectNode(n.key);
+    settleSelect(settle(), n.key);
     return;
   }
   log("「" + esc(n.label) + "」的命令类型 " + esc(t) + " 暂不支持", "warn");
@@ -1994,7 +2006,7 @@ function spawnChoiceNodes(n, cmd){
     }
   });
   log("「" + esc(n.label) + "」" + esc(cmd.label || "选项") + "：" + (added.length ? "出现 " + esc(added.join("、")) : "选项节点已在画布上"), "act");
-  settle([n.key]); selectNode(n.key);
+  settleSelect(settle(), n.key);
 }
 
 /* ============ 统一系统窗口：标题栏（拖动把手）+ × 关闭 + 内容区 ============ */
@@ -2550,7 +2562,7 @@ function tecAnalyzeFinish(key){
       const text = plain(hc.text || "");
       if (text) tecSay(text);
       log("TEC 捕获「" + esc(n.label) + "」的隐藏线索：" + esc(names), "cap");
-      settle([key]);   /* 分析完把新线索带进视野（TEC 窗收在右下角，不挡画面） */
+      settle();   /* 分析完把新线索带到视野中央（TEC 窗收在右下角，不挡画面） */
     } else {
       tecSay("分析完成：「" + plain(n.label) + "」中没有可以捕获的线索。");
       log("TEC 分析「" + esc(n.label) + "」：无可捕获线索", "warn");
@@ -3381,7 +3393,7 @@ window.__choice = function(id, ci, oi){
     return;
   }
   applyPayload(r, n.key);
-  settle([n.key]); selectNode(n.key);
+  settleSelect(settle(), n.key);
 };
 window.__pw = function(id){
   const n = nodeByKey("item", id);
@@ -3407,8 +3419,7 @@ window.__pw = function(id){
   }
   gotClues(os.message || "");
   if (tgConsume.checked){ deleteNode(n.key); }
-  layout(); render();
-  if (G.nodes[n.key]) selectNode(n.key); else updateCrumbs();
+  settleSelect(settle(), n.key);
 };
 
 /* ============ 画布平移 / 缩放 ============ */
