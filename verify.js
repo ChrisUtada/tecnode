@@ -388,6 +388,44 @@ window.__choice('ITEM_chouti', 0, 1);
 window.__cmd('ITEMS_jzmh', 0);
 assert('密码弹窗打开无异常', true);
 
+/* ---- 13b. 手写笔记：场景 → 物品 + 光照门（台灯不亮就翻不开） ---- */
+console.log('\n=== 13b. 手写笔记（物品）+ 光照门 ===');
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+window.__reveal('SCENE_shuzhuo');
+const nb0 = window.__dump();
+assert('书桌上的手写笔记是物品节点（不再是场景节点）',
+  nb0.nodes.includes('item:ITEM_sxbj') && !nb0.nodes.includes('loc:SCENES_sxbj'));
+assert('旧场景已从数据里删掉：档案（听说过的场景）里不再有它',
+  !window.__gotoList().includes('SCENES_sxbj'));
+assert('台灯初始是灭的', !nb0.lit.includes('item:ITEM_taideng'));
+
+/* 暗着翻：一个节点都不长 */
+window.__cmd('ITEM_sxbj', 0);
+const nbDark = window.__dump();
+assert('台灯未点亮时翻笔记：植物笔记一个都不出现',
+  !['ITEMS_dlh','ITEMS_yjh','ITEMS_dsc','ITEMS_bah','ITEMS_a4paper']
+    .some(i => nbDark.nodes.includes('item:' + i)));
+assert('台灯未点亮时翻笔记：笔记本身仍在画布上', nbDark.nodes.includes('item:ITEM_sxbj'));
+
+/* 点亮台灯 → 再翻：下一层级节点铺开 */
+window.__cmd('ITEM_taideng', 0);
+assert('台灯点亮（光照门放行）', window.__dump().lit.includes('item:ITEM_taideng'));
+window.__cmd('ITEM_sxbj', 0);
+const nbLit = window.__dump();
+assert('点亮后翻笔记：五个植物笔记 / A4 纸节点全部长出来',
+  ['ITEMS_dlh','ITEMS_yjh','ITEMS_dsc','ITEMS_bah','ITEMS_a4paper']
+    .every(i => nbLit.nodes.includes('item:' + i)));
+assert('新长出的节点与手写笔记之间有实体边',
+  nbLit.edges.includes('entity:item:ITEM_sxbj>item:ITEMS_dsc'));
+assert('再次翻笔记不会重复长（节点数不变）',
+  (window.__cmd('ITEM_sxbj', 0), window.__dump().nodes.length === nbLit.nodes.length));
+/* 长出来的东西归属书桌：折叠书桌应把它们一并收起 */
+window.__collapse('SCENE_shuzhuo');
+assert('折叠书桌后长出的植物笔记被一并隐藏（homeScene 继承了书桌）',
+  window.__dump().hidden.includes('item:ITEMS_dsc'));
+window.__collapse('SCENE_shuzhuo');
+
 console.log('\n=== 14. 叙事层：对话气泡 + 场景叙事卡 ===');
 ids['btn-reset']._ev.click[0]();
 /* 开局只放一个「未探索」的起始场景节点：不自动弹叙事卡，内容物也没铺开 */
@@ -814,7 +852,9 @@ window.__cap('item:ITEMS_xh');                               // CLUES_CBKW（味
 window.__choice('ITEM_chouti', 0, 1);                        // 右抽屉 → 剪刀 + 木盒
 window.__combo('item:ITEMS_jd', 'item:ITEMS_bd');            // 剪刀 → 绷带 ⇒ 陆珩松的尸体
 window.__reveal('SCENES_lhsdst');                            // 皱纸 + 唱针
-window.__reveal('SCENES_sxbj');                              // 大豕草（手写笔记）
+window.__cmd('ITEM_taideng', 0);                             // 点亮台灯：手写笔记的光照门
+assert('§19 台灯已点亮（笔记翻得开）', window.__dump().lit.includes('item:ITEM_taideng'));
+window.__cmd('ITEM_sxbj', 0);                                // 翻开手写笔记 → 大豕草等
 window.__combo('item:ITEMS_zbbdz', 'item:ITEMS_dsc');        // 皱纸 → 大豕草 ⇒ CLUES_xds（嗅觉）
 ids['pw-in'].value = '0321';
 window.__pw('ITEMS_jzmh');                                   // 木盒 → 黄铜钥匙
