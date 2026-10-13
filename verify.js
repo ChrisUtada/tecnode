@@ -843,10 +843,30 @@ const execEl = iwEl19 && iwEl19.querySelector('.mx-exec');
 assert('中央执行者在桌布上', !!execEl);
 assert('执行者只剩头像（标签与提示已移除，头像即五芒星中枢）',
   !!execEl && !!execEl.querySelector('.mx-avatar') && !execEl.querySelector('.mx-exec-label') && !execEl.querySelector('.mx-exec-hint'));
+/* 星阵 = 外圆 + 五芒星一条路径：常显框与长按描线共用（源码检查：stub 的 setAttribute("class")
+   不进 _classes，SVG path 按 class 选不中，故与尺寸/抖动断言同用源码级） */
+assert('星阵含外圆与五芒星一条路径（常显框与长按描线共用）',
+  html.indexOf('const MX_CIRCLE_R = 195') > 0 &&
+  html.indexOf('" a" + MX_CIRCLE_R + "," + MX_CIRCLE_R + " 0 1,1 " + (MX_CIRCLE_R * 2) + ",0"') > 0 &&
+  html.indexOf('d += " M" + pts[0].x') > 0 &&
+  html.indexOf('draw.setAttribute("d", d)') > 0 &&
+  html.indexOf('draw.setAttribute("pathLength", "100")') > 0);
 execEl._ev.pointerdown[0]({ button: 0 });
 assert('真结局触发', window.__dump().endingOverlay === true && window.__dump().endings.includes('TRUE_E'));
 for (let i = 0; i < 10; i++) window.__playStep();
 assert('演出步进完毕自动关闭', window.__dump().endingOverlay === false);
+/* 窗体缩小 + 蓄力抖动仪式（源码检查：无头环境 setTimeout 归零，蓄力立即完成，量不到持续态） */
+assert('阵列窗体收边为 560×420（五芒星大小不变）',
+  html.indexOf('margin-left:-280px; width:560px') > 0 &&
+  html.indexOf('width:560px; height:420px') > 0 &&
+  html.indexOf('MX_W = 560, MX_H = 420') > 0);
+assert('蓄力时窗体微颤、头像震颤且红光渐盛（源码检查）',
+  html.indexOf('.infer-win.charging{animation:mx-win-quiver') > 0 &&
+  html.indexOf('.mx-exec.charging .mx-avatar{animation:mx-av-quiver') > 0 &&
+  html.indexOf('mx-av-glow 2.5s') > 0);
+assert('蓄力起停给窗体挂/摘 charging（源码检查）',
+  html.indexOf('inferWinEl.classList.add("charging")') > 0 &&
+  html.indexOf('inferWinEl.classList.remove("charging")') > 0);
 
 console.log('\n=== 20. 桌面图标 ===');
 ids['btn-reset']._ev.click[0]();

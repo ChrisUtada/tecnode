@@ -233,25 +233,42 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .goto-item.done .st{color:var(--line2)}
   /* 阵列桌布：大版纸面窗——执行者居中，线索环绕五感锚点，虚线连向中央（与主舞台同一张"纸"） */
-  .infer-win{position:absolute; left:50%; top:40px; margin-left:-320px; width:640px;
+  .infer-win{position:absolute; left:50%; top:40px; margin-left:-280px; width:560px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
   .infer-win .syswin-body{padding:0}
   /* 桌布本体：与 #stage 共用纸纹变量；整块都是线索落点。尺寸与 JS 的 MX_W/MX_H 对应，改动要同步 */
-  .mx-board{position:relative; width:640px; height:460px; overflow:hidden;
+  .mx-board{position:relative; width:560px; height:420px; overflow:hidden;
     background-color:var(--bg);
     background-image:var(--paper-grain), var(--paper-fleck);
     background-size:200px 200px, 360px 360px; background-repeat:repeat, repeat;
     background-blend-mode:soft-light, multiply}
   .mx-board.over{outline:2px dashed var(--text); outline-offset:-6px}
   .mx-links{position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none}
-  /* 五芒星 = 逻辑阵列本体：五感锚点（证据即顶点）连成的星形描线，红色微光（#c0392b，同核准印章/地图红框） */
+  /* 星阵 = 逻辑阵列本体：外圆 + 五芒星（外圆 = 法阵，五感顶点 = 证据，红色微光 #c0392b 同核准印章）。
+     常显虚线框 + 长按描线共用同一条路径（先圆后星，pathLength 归一化后顺序描绘）。 */
   .mx-star-frame{fill:none; stroke:#c0392b; stroke-width:1.25; stroke-dasharray:5 5; opacity:.42;
     filter:drop-shadow(0 0 2px rgba(192,57,43,.35))}
   .mx-star-draw{fill:none; stroke:#c0392b; stroke-width:1.75; stroke-dasharray:100; stroke-dashoffset:100; opacity:.95;
     filter:drop-shadow(0 0 4px rgba(192,57,43,.6)) drop-shadow(0 0 9px rgba(192,57,43,.38))}
   .mx-board.charging .mx-star-draw{animation:mxdraw 2.5s linear forwards}
   @keyframes mxdraw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+  /* 蓄力仪式（与描星同步 2.5s）：整窗微颤 + 头像剧烈震颤 + 红光渐盛 */
+  .infer-win.charging{animation:mx-win-quiver .17s linear infinite}
+  @keyframes mx-win-quiver{
+    0%,100%{transform:translate(0,0)} 25%{transform:translate(1.1px,-.8px)}
+    50%{transform:translate(-1.1px,.8px)} 75%{transform:translate(.8px,1.1px)}
+  }
+  .mx-exec.charging .mx-avatar{animation:mx-av-quiver .1s linear infinite, mx-av-glow 2.5s ease-in forwards}
+  @keyframes mx-av-quiver{
+    0%,100%{transform:translate(0,0) rotate(0deg)} 25%{transform:translate(1.6px,-1.1px) rotate(.9deg)}
+    50%{transform:translate(-1.1px,1.6px) rotate(-.7deg)} 75%{transform:translate(1.1px,1.1px) rotate(.5deg)}
+  }
+  @keyframes mx-av-glow{
+    0%{box-shadow:var(--raise)}
+    55%{box-shadow:0 0 12px 2px rgba(192,57,43,.5), var(--raise)}
+    100%{box-shadow:0 0 22px 7px rgba(192,57,43,.68), 0 0 44px 16px rgba(192,57,43,.3), var(--raise)}
+  }
   /* 感官锚点：五感环绕中央排布，归位的线索 chip 叠在锚点下方（无文字标签，排布留给五芒星本身） */
   .mx-anchor{position:absolute; width:140px; margin-left:-70px; text-align:center}
   /* 逻辑阵列里的线索卡：复用外部节点观感（纸面渐变 / 圆角 / 浮雕），保持流内排布 */
@@ -2761,13 +2778,20 @@ function gotoChar(id){
 
 /* ============ INFERENCE_MATRIX // 逻辑阵列 ============ */
 /* ============ 逻辑阵列：桌布式推演窗 ============
-   桌布几何与 CSS .mx-board 的尺寸对应（DOM stub 里 offsetWidth 是常量，量不出真尺寸时退回这两个值） */
-const MX_W = 640, MX_H = 460;
-/* 五感锚点：环绕中央执行者的方位（桌布宽高的分数） */
-/* 五感锚点：以「卡片中心」近似正五边形（半径≈175px，绕板心 72° 均布）摆放，
+   桌布几何与 CSS .mx-board 的尺寸对应（DOM stub 里 offsetWidth 是常量，量不出真尺寸时退回这两个值）。
+   560×420：去掉文字标签后窗体收边，但**五芒星绝对大小不变**——顶点间距与 640×460 版一致，
+   仅整体平移（水平 -40px、垂直 -20px）重新居中：五芒星**形心与桌布中心重合**，
+   这样中央头像正好坐在星的中枢上（五芒星横跨 332px、纵跨 316px，是窗体缩小的物理下限）。 */
+const MX_W = 560, MX_H = 420;
+/* 星阵外圆半径：五感顶点外接圆(≈175) + 20 缓冲，圆心 = 桌布中心 = 五芒星形心。
+   外圆与五芒星合成一条路径（先圆后星），常显框与长按描线共用。 */
+const MX_CIRCLE_R = 195;
+/* 五感锚点：环绕中央执行者的方位（桌布宽高的分数）。数值按 560×420 反推：
+   顶点（卡中心）= (MX_ANCHORS.xy × 桌布) + 27px 卡占位，换算后与原 640×460 版的顶点绝对坐标一致。 */
+/* 五感锚点：以「卡片中心」近似正五边形（桌布坐标下半径≈137px，绕板心 72° 均布）摆放，
    这样证据（卡片中心）正好是五芒星的五个顶点。锚点 top 已减去卡片占位（≈27px）：
    去掉文字标签后 chip 从锚点顶起，margin4 + 半卡高23 即中心偏移。 */
-const MX_ANCHORS = { vision:[.500,.061], hearing:[.760,.324], touch:[.661,.749], smell:[.339,.749], taste:[.240,.324] };
+const MX_ANCHORS = { vision:[.5000,.0192], hearing:[.7971,.3073], touch:[.6840,.7727], smell:[.3160,.7727], taste:[.2029,.3073] };
 /* 执行者头像：暂借 TEC 的（同风格同尺寸），新头像做好只改这一行 */
 const EXECUTOR_AVATAR_B64 = "iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAD50lEQVR4Ae2aP2gUQRTGzz+NeI2gYBBEQkxAQUWEU8RComATBHsrU1lapbC0Tmmllb0gaQRNZWECIlFQSAxBBImgxCaijWiy63fcfHtv3szs7u1FXprZN29m3ttvfvd29i6tlv2ZAqaAKWAKmAI7VYFdw5L4pzu3/vTmcnT24VDktrs3KbsuKrC32NVMz4ev35sJrEQ1goZNoO1aw/VGyTFzp84LWds3xgjyqbPla6wGzd+8kT21Jh899j6tME65j9rcRpAibbBA2zvZ9G4q9xLkjr2PYIGCov+Hg6JrED+Byp54JSql/tg94Hxjz1tGkKJ4NEG8Hu8Q/CBr87T7jrWBAdQ+W3NP0ldHD9CI3OT12m/ydzYpj76LRHQaQYpYwQThvMK14fih/js9c/Fyds7Z6OQZ3F9cyy5ut0aVlPzue+1/63TydWbaeRxpFtcc3Ic0nvuNIFaEbO8plsY6JpPkOHsMri13N/OdXzzl1pyeKX0vO29zUkEQBkm1Cn60seRgnhEEJYQ2mSCsJ5EEcrDDsEEQ5se2IIjXhc3rpZKDdYwgKCG0pQnidZmoUHL2Lz1wlvpxZtqx2WCS4C9LDNZBawRBCaGtnKAnB887v05MHjkphM67Qc7ZC1ecca9fPs9sjaT5z++cede/LVR6T0aQI2/RCD5JF6f6ezRy/LPDvYjDJIWv4B9pBPn1ae47aeT1a3o2u0TN4X7YTbVGkKJ8bTWI4+JphX48nX6/ep91gST40Q9bmg9/Xa0RpCibTJD0zR7Hw84XzjlLYeec1Pmh+XG+bBtBrAjZyQTROi3sWF3nEY4n2chD8sf2G0GKYskE4dcEbcfwdEo955SdjzwVHUS3ESRKkztKv/mCIK49eEdS4nfddc03groS13ORXIM4HRDDJPA4ycZ8yR/aX9U6iGc1CEoIbWmC8BlHLRLiFLov7fuY9fHTjQfiBP7i5zF2eW3k5R0U4DSCFJFKP8Wk9TWiQJA0n/s1gqoihuMaQawI2aVrEK3XNbGjGkmhNai7MF0gDnVXZhpBipS11SCOq5G059wJZwp/o+g4t4y6yUE8IwhKCO3ACEJ8jSSMk9pBkYP4RhCUENqBE4Q88Bu+9u6Ed7uqf3NHHlprBCkKDZyga1NT2X9/rC4vO6mNTUw4tuR/Ojc30JyNIGdbioYJVNTE6TGBHDmKRuWfZ9QYDoWa8mV9nV1R9uGRkWw81ywsUnWNMoKgrNCWJkgiBvFADuyqW4kkxClLlBEEJYU2mSCQUzchQt7B3SAslSQjSJE6maCx8XHn/6GVOI27V1dWku7VCFK2LlrVnUYO338sSUYQK0j2X/jsN0+TP2FGAAAAAElFTkSuQmCC";
 
@@ -2899,11 +2923,16 @@ function refreshInferWin(){
                                     : { x: ax, y: ay + 27 };
   });
 
-  /* 五芒星 = 逻辑阵列本体：把五感顶点按星序（隔一个连）连成五角星，证据即顶点 */
+  /* 星阵 = 外圆 + 五芒星，合成一条路径：常显虚线框与长按描线都包含它。
+     蓄力时按路径顺序描绘——先描外圆（划定法阵），再描五芒星（建立逻辑归因）。
+     外圆半径 = 五感顶点外接圆(≈175) + 20 缓冲；圆心 = 桌布中心 = 五芒星形心。 */
   const STAR_ORDER = ["vision","touch","taste","hearing","smell"];   /* 顺时针 视觉→触觉→味觉→听觉→嗅觉 */
   const pts = STAR_ORDER.map(s => verts[s]).filter(Boolean);
   if (pts.length === 5){
-    let d = "M" + pts[0].x + " " + pts[0].y;
+    let d = "M" + (cx - MX_CIRCLE_R) + " " + cy +
+            " a" + MX_CIRCLE_R + "," + MX_CIRCLE_R + " 0 1,1 " + (MX_CIRCLE_R * 2) + ",0" +
+            " a" + MX_CIRCLE_R + "," + MX_CIRCLE_R + " 0 1,1 " + (-MX_CIRCLE_R * 2) + ",0";
+    d += " M" + pts[0].x + " " + pts[0].y;
     for (let i = 1; i < pts.length; i++) d += " L" + pts[i].x + " " + pts[i].y;
     d += " Z";
     const frame = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -2947,6 +2976,7 @@ function riteEnd(commit){
     }
     const bd = inferWinEl.querySelector(".mx-board");
     if (bd) bd.classList.remove("charging");
+    inferWinEl.classList.remove("charging");   /* 窗体微颤停 */
   }
   if (commit) executeInference();
 }
@@ -2958,6 +2988,7 @@ function riteStart(e){
   ex.classList.add("charging");
   const bd = inferWinEl.querySelector(".mx-board");
   if (bd) bd.classList.add("charging");
+  inferWinEl.classList.add("charging");   /* 窗体微颤起，与头像震颤、描星同步 */
   const t = setTimeout(() => riteEnd(true), 2500);
   if (!t){ riteEnd(true); return; }
   riteTimer = t;
