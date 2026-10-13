@@ -78,6 +78,10 @@ ids['gamedata']._text = jsonText;
 ids['tg-consume'].checked = true;
 ids['tg-focus'] = mkEl('input');
 ids['tg-focus'].checked = true;
+/* 顶栏「新节点自动居中」默认是勾选的：stub 里 getElementById 现场造出来的元素 checked 为 false，
+   不置真就会让自动聚焦整条停用，量不到任何聚焦决定 */
+ids['tg-reveal'] = mkEl('input');
+ids['tg-reveal'].checked = true;
 ids['pw-in'] = mkEl('input');
 ids['pw-in'].value = '0321';
 
@@ -490,6 +494,82 @@ window.__cmd('ITEM_shoudiantong', 0);          // 打开
 window.__select('item:ITEM_shoudiantong');
 tch = ids['detail-body']._html || '';
 assert('手电筒详情窗：点亮后标注已点亮', tch.includes('已点亮') && !tch.includes('未点亮'));
+
+console.log('\n=== 13d. 新节点产出后自动聚焦 ===');
+ids['btn-reset']._ev.click[0]();
+
+/* 镜头位移在无头 stub 里量不到（setTimeout 归零 → 逐帧推进不跑），所以这里量的是「聚焦决定」：
+   __dump().focus = { on, why, keys }。on=true = 这次收尾确实要把镜头平移过去，keys = 它框住的节点；
+   on=false = 镜头一动不动（why 说明原因：no-new-node / toggle-off / nothing-visible / no-viewport）。 */
+
+/* 1) 开场：画布上只有一个未探索场景 → 展开走 fit（整幅铺开） */
+window.__reveal('SCENES_garden');
+window.__closeFloats();
+let fd = window.__dump().focus;
+assert('展开首个场景 → 铺开画面并记下聚焦决定', !!fd && fd.on === true && fd.why === 'fit');
+
+/* 2) 画布上已有内容时再展开场景 → 聚焦，且把这次新长出来的节点都框进来 */
+const nodesBeforeD2 = window.__dump().nodes;
+window.__reveal('SCENE_shuzhuo');
+window.__closeFloats();
+fd = window.__dump().focus;
+assert('再展开场景 → 聚焦（centered，而不再是 fit）', !!fd && fd.on === true && fd.why === 'centered');
+assert('聚焦朝新节点走：框住的集合里有此前不在画布上的节点',
+  !!fd && fd.keys.some(k => nodesBeforeD2.indexOf(k) < 0));
+assert('聚焦把触发它的场景节点也一起框住（"新东西"和"它长在哪儿"同框）',
+  !!fd && fd.keys.indexOf('loc:SCENE_shuzhuo') >= 0);
+
+/* 3) 选项命令产出物品（抽屉 → 手电筒）→ 聚焦到新物品 */
+window.__choice('ITEM_chouti', 0, 0);
+fd = window.__dump().focus;
+assert('选项命令长出物品 → 聚焦（centered）', !!fd && fd.on === true && fd.why === 'centered');
+assert('聚焦集合里有这次新长出的手电筒', !!fd && fd.keys.indexOf('item:ITEM_shoudiantong') >= 0);
+
+/* 4) 组合产出新场景（手电筒 → 黑影 ⇒ 尸体）→ 聚焦；两个参与者当锚点 */
+window.__cmd('ITEM_shoudiantong', 0);          /* 点亮手电筒 */
+window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
+fd = window.__dump().focus;
+assert('组合产出新场景 → 聚焦（centered）', !!fd && fd.on === true && fd.why === 'centered');
+assert('聚焦集合里有新长的「尸体」场景，也带着还活着的参与者（手电筒）',
+  !!fd && fd.keys.indexOf('loc:SCENES_body') >= 0 && fd.keys.indexOf('item:ITEM_shoudiantong') >= 0);
+
+/* 5) 没有新节点产出 → 镜头一动不动（纯提示 / 纯消耗不把画面拽走） */
+window.__reveal('SCENES_mdhm');                /* 铁栅栏所在场景 */
+fd = window.__dump().focus;
+assert('展开「明灯花圃」先聚焦一次（对照组）', !!fd && fd.on === true);
+window.__cmd('ITEMS_tzl', 0);                  /* 条件恒真、只出一行文本、不长任何节点 */
+fd = window.__dump().focus;
+assert('命令只出文本、不长节点 → 不做任何镜头移动',
+  !!fd && fd.on === false && fd.why === 'no-new-node');
+
+/* 6) 顶栏开关关掉 → 自动聚焦整条停用，但节点照样长出来 */
+ids['tg-reveal'].checked = false;
+const nodesBeforeD6 = window.__dump().nodes;
+window.__reveal('SCENES_lhsdst');
+fd = window.__dump().focus;
+assert('关掉「新节点自动居中」→ 不再动镜头', !!fd && fd.on === false && fd.why === 'toggle-off');
+assert('关掉开关不影响节点照常长出来', window.__dump().nodes.length > nodesBeforeD6.length);
+ids['tg-reveal'].checked = true;
+
+/* 源码检查：这套收尾是「单一入口」，产出路径全都走它 */
+assert('引擎里有 settle() 单一收尾（重排 → 渲染 → 聚焦）',
+  html.indexOf('function settle(anchors){') > 0);
+assert('引擎里有 focusOn()（只平移、不缩放）', html.indexOf('function focusOn(keys, ms){') > 0);
+assert('引擎里有 freshKeys()：以 n.fresh 认「本次新长出来的节点」',
+  html.indexOf('function freshKeys(){') > 0);
+assert('旧的 ensureVisible 已并入 focusOn（不再留「已在视野内就不动」的短路）',
+  html.indexOf('ensureVisible') < 0);
+assert('产出路径都接了 settle（组合 / 捕获 / 命令 / 选项 / 密码 / TEC）',
+  (html.match(/settle\(/g) || []).length >= 11);
+{
+  const fb = html.slice(html.indexOf('function focusOn(keys, ms){'), html.indexOf('function freshKeys(){'));
+  assert('聚焦只平移不缩放（focusOn 体内不给 view.k 赋值）',
+    fb.indexOf('view.k =') < 0 && fb.indexOf('view.k=') < 0);
+}
+assert('抓住节点拖动也能打断自动聚焦（节点 pointerdown 里 cancelViewAnim）',
+  html.indexOf('cancelViewAnim();   /* 抓住节点即接管镜头') > 0);
+assert('顶栏开关改名成「新节点自动居中」',
+  html.indexOf('新节点自动居中') > 0 && html.indexOf('展开自动居中') < 0);
 
 console.log('\n=== 14. 叙事层：对话气泡 + 场景叙事卡 ===');
 ids['btn-reset']._ev.click[0]();

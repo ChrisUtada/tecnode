@@ -579,8 +579,8 @@
     <label class="tog" title="选中节点时，淡化与它无关的节点和连线">
       <input type="checkbox" id="tg-focus" checked> 聚焦选中
     </label>
-    <label class="tog" title="双击展开场景时，若节点或新内容超出视野，自动平移使其可见（不缩放，可直接拖动打断）">
-      <input type="checkbox" id="tg-reveal" checked> 展开自动居中
+    <label class="tog" title="有节点新长出来时（展开场景 / 组合出结果 / 命令产出 / TEC 分析），自动平移把它带到视野中央（不缩放；拖动节点或拖动、滚轮滚动画布即可打断）">
+      <input type="checkbox" id="tg-reveal" checked> 新节点自动居中
     </label>
     <button id="btn-relayout">自动布局</button>
     <button id="btn-fit">适应窗口</button>
@@ -929,13 +929,14 @@ function revealScene(sid, silent){
     if (!added && !silent) log("（此场景的节点此前已经出现在画布上了）", "sys");
   }
   unstoreScene(sid);   /* 展开场景时取回存放在这里的节点 */
+  const fresh = freshKeys();   /* 抢在 render() 之前：本次新建的 + 从收纳里取回的，都要一起框住 */
   layout();          /* 必须重新布局，否则新节点没有坐标 */
   render();
   if (firstTime && !silent){
-    /* 先定镜头（fit / ensureVisible），再弹叙事卡：卡片用当前视图做「不裁出屏幕」钳制，
+    /* 先定镜头（fit / 聚焦），再弹叙事卡：卡片用当前视图做「不裁出屏幕」钳制，
        镜头定了之后钳制才准，否则卡片会盖到节点上（实测） */
     if (soloBefore) fit();
-    else ensureVisible([sn.key].concat(newKeys));
+    else focusOn([sn.key].concat(fresh, newKeys));
     renarrScene(sid);
   }
   if (((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[sid]) log("TEC 似乎有话要说（双击 TEC 图标）", "sys");
@@ -1069,8 +1070,9 @@ function attemptCombo(toolKey, targetKey){
       (gained.length ? "　［获得 " + esc(gained.join("、")) + "］" : "") +
       (killed.length ? "　［消耗 " + esc(killed.map(k => plain(k.label)).join("、")) + "］" : ""), "act");
 
-  layout();
-  render();
+  /* 收尾：重排 → 渲染 → 把这次新长出来的节点（新场景 / 新物品 / 新线索）带进视野。
+     两个参与者一起当锚点，是为了让"结果"和"它在哪儿冒出来的"同框。 */
+  settle([toolKey, targetKey]);
   selectNode(owner ? owner.key : targetKey);
 }
 
@@ -1115,7 +1117,7 @@ function attemptCapture(key){
   const text = plain(hc.text || "");
   if (text) showBubble(n, "CAPTURE // " + n.label, text);
   log("捕获「" + esc(n.label) + "」的隐藏线索：" + esc(fresh.map(id => CLUES[id].label).join("、")) + (text ? "——" + esc(text) : ""), "cap");
-  layout(); render(); selectNode(key);
+  settle([key]); selectNode(key);
 }
 
 /* ============ 场景折叠收纳 ============ */
@@ -1508,6 +1510,7 @@ function attachInteractions(el, n){
 
   el.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
+    cancelViewAnim();   /* 抓住节点即接管镜头：正在跑的自动聚焦立刻停住（"拖动即可打断"） */
     if (mirror){ mirror.remove(); mirror = null; }   /* 兜底：清掉可能残留的镜像 */
     if (el.__springTimer){ clearTimeout(el.__springTimer); el.__springTimer = null; el.style.transition = ""; }   /* 打断正在进行的弹回动画 */
     el.style.visibility = "";
@@ -1692,10 +1695,11 @@ function applyView(){
   world.style.transform = "translate(" + view.x + "px," + view.y + "px) scale(" + view.k + ")";
 }
 
-/* ============ 展开后的「确保可见」（ensure-visible）============
-   仅在目标节点或本次新内容超出/贴边时才平移镜头使其进入视野；已在视野内则不动。
-   只平移不缩放；缓动期间玩家一拖动/滚动即打断。 */
+/* ============ 镜头：自动平移 ============
+   只平移、不缩放（不替玩家改缩放级别）；缓动期间玩家一拖节点 / 一平移 / 一滚轮即打断。 */
 let viewAnim = null;
+/* 最近一次自动聚焦的「决定」（调试 + 无头验证用：镜头位移在无头环境里量不到，只能量决定） */
+let lastFocus = null;
 const __now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 /* 用 setTimeout 逐帧推进（不用 rAF）：无头 stub 里 setTimeout 是 no-op，既不动画也不会递归爆炸；
    浏览器里 16ms 一帧足以平滑 240ms 的位移。 */
@@ -1718,26 +1722,66 @@ function animateViewTo(tx, ty, ms){
 function nodeBox(n){
   return { x0: n.x, y0: n.y, x1: n.x + (NODE_W[n.kind] || 130), y1: n.y + (NODE_H[n.kind] || 46) };
 }
-function ensureVisible(keys, pad){
-  if (tgReveal && !tgReveal.checked) return false;
-  pad = pad == null ? 72 : pad;
+/* 把一组节点整体平移到视野中央（只平移，不改 view.k）。 */
+function focusOn(keys, ms){
   const list = (keys || []).map(k => G.nodes[k]).filter(n => n && !n.hidden && !n.stored);
-  if (!list.length) return false;
+  if (tgReveal && !tgReveal.checked){ lastFocus = { on:false, why:"toggle-off", keys:[] }; return false; }
+  if (!list.length){ lastFocus = { on:false, why:"nothing-visible", keys:[] }; return false; }
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   list.forEach(n => {
     const b = nodeBox(n);
     x0 = Math.min(x0, b.x0); y0 = Math.min(y0, b.y0);
     x1 = Math.max(x1, b.x1); y1 = Math.max(y1, b.y1);
   });
+  const names = [];
+  list.forEach(n => { if (names.indexOf(n.key) < 0) names.push(n.key); });   /* 去重：调用方给的集合可能有交集 */
   const r = stage.getBoundingClientRect();
-  if (!r || !r.width || !r.height) return false;   /* 无头/隐藏环境：无法判断视口，不主动动镜头 */
-  const sx0 = x0 * view.k + view.x, sy0 = y0 * view.k + view.y;
-  const sx1 = x1 * view.k + view.x, sy1 = y1 * view.k + view.y;
-  /* 已经完全在视野内（含留白）→ 不动镜头 */
-  if (sx0 >= pad && sy0 >= pad && sx1 <= r.width - pad && sy1 <= r.height - pad) return false;
+  if (!r || !r.width || !r.height){                  /* 无头/隐藏环境：量不到视口，不动镜头 */
+    lastFocus = { on:false, why:"no-viewport", keys:names };
+    return false;
+  }
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-  animateViewTo(r.width / 2 - cx * view.k, r.height / 2 - cy * view.k, 240);
+  const tx = r.width / 2 - cx * view.k, ty = r.height / 2 - cy * view.k;
+  lastFocus = { on:true, why:"centered", keys:names, cx:cx, cy:cy, tx:tx, ty:ty };
+  animateViewTo(tx, ty, ms || 260);
   return true;
+}
+
+/* ---- 新节点产出后的自动聚焦 ----
+   「哪条路径长了新节点，它就该被看到」——把这个规则收成一处，所有产出路径共用同一套收尾。
+   谁算「新」？ensureNode 新建的节点都带 n.fresh = true，而 render() 会把它擦掉，
+   所以取"新节点"必须抢在 render() 之前——settle() 内部已经按这个顺序摆好了。
+
+   为什么不沿用「已在视野内就不动镜头」的做法：缩到最小时（适应窗口 k≈0.42）整张图都在
+   视野内，那个短路会让聚焦永不触发，等于没做。聚焦的意思是「看这里」，不是「勉强可见」。
+
+   两个收尾动作按"这次要不要重排图"来选：
+     settle(anchors)        —— 图结构变了（长 / 删了节点）：重排 → 渲染 → 聚焦；无新节点则只重排
+     focusFresh(news, ...)  —— 图没重排（开关灯 / 纯重绘）：只把已有结论送去聚焦             */
+function freshKeys(){
+  return Object.keys(G.nodes).filter(k => {
+    const n = G.nodes[k];
+    return n && n.fresh && !n.hidden && !n.stored;
+  });
+}
+/* 聚焦到「本次新长出来的节点」，并把锚点（产出它的那个节点）一起框住 ——
+   这样"新东西"和"它长在哪儿"能同框，不至于只看到一个孤零零的新节点。 */
+function focusFresh(news, anchors){
+  const live = (news || []).filter(k => { const n = G.nodes[k]; return n && !n.hidden && !n.stored; });
+  if (!live.length){ lastFocus = { on:false, why:"no-new-node", keys:[] }; return false; }
+  const extra = (anchors || []).filter(k => {
+    const n = G.nodes[k];
+    return n && !n.hidden && !n.stored && live.indexOf(k) < 0;
+  });
+  return focusOn(extra.concat(live));
+}
+/* 标准收尾：重排 → 渲染 → 把新节点带进视野。没有新节点（纯消耗 / 纯提示）时退回原来的
+   「重排 + 渲染」，镜头一动不动。顶栏「新节点自动居中」关掉 → focusOn 直接返回 false。 */
+function settle(anchors){
+  const news = freshKeys();     /* 必须抢在 render() 清掉 fresh 之前读 */
+  layout();
+  render();
+  return focusFresh(news, anchors);
 }
 
 /* 双击物品 / 线索的主行为 */
@@ -1778,6 +1822,7 @@ function runCommand(n, cmd){
   }
 
   if (t === "text"){
+    const news = freshKeys();          /* 抢在 render() 清掉 fresh 之前 */
     gotClues(plain(cmd.value || ""));
     noteSeen(cmd.value || cmd.message || "");
     log("「" + esc(n.label) + "」：" + esc(plain(cmd.value || "")), "sys");
@@ -1786,8 +1831,13 @@ function runCommand(n, cmd){
       n.lit = !n.lit;
       const flavor = n.lit ? (it.litOnMessage || "亮了起来") : (it.litOffMessage || "熄灭了");
       log("「" + esc(n.label) + "」" + esc(plain(flavor)), n.lit ? "act" : "sys");
-      render();
+    } else if (!news.length){
+      return;                      /* 纯文本、也没长出节点：维持原来的"不动画面" */
     }
+    /* 开关灯只重绘（重排会让灯自己跳位置）；正文里真带出 [clue:] 时才重排并聚焦过去 */
+    if (news.length) layout();
+    render();
+    focusFresh(news, [n.key]);
     return;
   }
   if (t === "choice"){ spawnChoiceNodes(n, cmd); return; }
@@ -1812,7 +1862,7 @@ function runCommand(n, cmd){
       deleteNode("item:" + need);
       log("　［消耗 " + esc(needLabel) + "］", "sys");
     }
-    layout(); render(); selectNode(n.key);
+    settle([n.key]); selectNode(n.key);
     return;
   }
   if (t === "conditional"){
@@ -1828,7 +1878,7 @@ function runCommand(n, cmd){
     log("「" + esc(n.label) + "」：" + esc(plain(cmd.successMessage || "")), "act");
     noteSeen(cmd.successMessage || "");
     if (cmd.onSuccess) applyPayload(cmd.onSuccess, n.key);
-    layout(); render(); selectNode(n.key);
+    settle([n.key]); selectNode(n.key);
     return;
   }
   if (t === "reveal"){
@@ -1845,7 +1895,7 @@ function runCommand(n, cmd){
       kids.forEach(iid => link(n.key, "item:" + iid, "entity"));
       log("　［出现 " + esc(kids.map(i => labelOf("item", i) || i).join("、")) + "］", "sys");
     }
-    layout(); render(); selectNode(n.key);
+    settle([n.key]); selectNode(n.key);
     return;
   }
   log("「" + esc(n.label) + "」的命令类型 " + esc(t) + " 暂不支持", "warn");
@@ -1944,7 +1994,7 @@ function spawnChoiceNodes(n, cmd){
     }
   });
   log("「" + esc(n.label) + "」" + esc(cmd.label || "选项") + "：" + (added.length ? "出现 " + esc(added.join("、")) : "选项节点已在画布上"), "act");
-  layout(); render(); selectNode(n.key);
+  settle([n.key]); selectNode(n.key);
 }
 
 /* ============ 统一系统窗口：标题栏（拖动把手）+ × 关闭 + 内容区 ============ */
@@ -2489,20 +2539,18 @@ function tecAnalyzeFinish(key){
     if (fresh.length){
       const src = n.isScene ? SCENES[n.id] : (n.kind === "char" ? CHARS[n.id] : ITEMS[n.id]);
       const hc = (src && src.hiddenClue) || {};
-      const keys = [];
       fresh.forEach(id => {
         const cn = ensureNode("clue", id, {});
         cn.fresh = true;
         link(key, cn.key, "entity");
         G.captured.add(id);
-        keys.push(cn.key);
       });
       const names = fresh.map(id => (CLUES[id] && CLUES[id].label) || id).join("、");
       tecSay("分析完成：「" + plain(n.label) + "」中提取到线索 —— " + names + "。（已落到画布上，可自由拖动）");
       const text = plain(hc.text || "");
       if (text) tecSay(text);
       log("TEC 捕获「" + esc(n.label) + "」的隐藏线索：" + esc(names), "cap");
-      layout(); render(); ensureVisible([key].concat(keys));
+      settle([key]);   /* 分析完把新线索带进视野（TEC 窗收在右下角，不挡画面） */
     } else {
       tecSay("分析完成：「" + plain(n.label) + "」中没有可以捕获的线索。");
       log("TEC 分析「" + esc(n.label) + "」：无可捕获线索", "warn");
@@ -3333,7 +3381,7 @@ window.__choice = function(id, ci, oi){
     return;
   }
   applyPayload(r, n.key);
-  layout(); render(); selectNode(n.key);
+  settle([n.key]); selectNode(n.key);
 };
 window.__pw = function(id){
   const n = nodeByKey("item", id);
@@ -3411,6 +3459,8 @@ function fit(){
   view.x = (r.width - (x1 - x0) * k) / 2 - x0 * k;
   view.y = (r.height - (y1 - y0) * k) / 2 - y0 * k;
   applyView();
+  /* 「适应窗口」也是自动动镜头（开场只有一个场景节点时的展开就走这条路），一并记账 */
+  lastFocus = { on:true, why:"fit", keys:keys.slice() };
 }
 
 /* ============ 桌面图标：单击选中 / 拖动移动 / 双击打开 / 拖节点直达功能 ============ */
@@ -4329,7 +4379,9 @@ window.__dump  = () => ({
   explored: [...G.explored], captured: [...G.captured], tried: [...G.tried],
   history: history.length,
   pos: (() => { const o = {}; for (const k in G.nodes){
-    o[k] = { x: Math.round(G.nodes[k].x), y: Math.round(G.nodes[k].y), pinned: !!G.nodes[k].pinned }; } return o; })()
+    o[k] = { x: Math.round(G.nodes[k].x), y: Math.round(G.nodes[k].y), pinned: !!G.nodes[k].pinned }; } return o; })(),
+  /* 最近一次自动聚焦的「决定」（无头环境量不到镜头位移，量决定；on=false 表示镜头没动） */
+  focus: lastFocus ? { on:lastFocus.on, why:lastFocus.why, keys:(lastFocus.keys || []).slice() } : null
 });
 
 boot();
