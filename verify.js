@@ -841,8 +841,8 @@ assert('五感归槽完成',
 const iwEl19 = document.getElementById('desktop').querySelector('.infer-win');
 const execEl = iwEl19 && iwEl19.querySelector('.mx-exec');
 assert('中央执行者在桌布上', !!execEl);
-const hintEl = iwEl19 && iwEl19.querySelector('.mx-exec-hint');
-assert('五感俱足时提示长按激活', !!hintEl && hintEl.textContent.indexOf('长按激活') >= 0);
+assert('执行者只剩头像（标签与提示已移除，头像即五芒星中枢）',
+  !!execEl && !!execEl.querySelector('.mx-avatar') && !execEl.querySelector('.mx-exec-label') && !execEl.querySelector('.mx-exec-hint'));
 execEl._ev.pointerdown[0]({ button: 0 });
 assert('真结局触发', window.__dump().endingOverlay === true && window.__dump().endings.includes('TRUE_E'));
 for (let i = 0; i < 10; i++) window.__playStep();
@@ -884,12 +884,18 @@ assert('落定后桌布高亮被清掉', !boardEl._classes.has('over'));
 /* 推演器图标角标显示已归位条数 */
 const ib = ids['infer-icon'].querySelector('.badge');
 assert('推演器图标角标显示 1 条', !!ib && ib.textContent === '1 条');
-/* chip 上的 × 能把线索拿下桌布（排除表放行 click，否则被窗口拖拽的 pointer capture 吃掉）。
+/* chip 上不再有 ×：拿下桌布只能拖出（与外部「拖进拖出」一致）。
    注意：归位后 refreshInferWin 重建了桌布，要重新取元素（手里旧的 boardEl 已离树） */
 const chipX = iwEl20.querySelector('.mx-board').querySelector('.mx-chip');
-assert('桌布上的线索 chip 带 ×', !!chipX && !!chipX.querySelector('.mx-x'));
-chipX.querySelector('.mx-x')._ev.click[0]();
-assert('点 × 后线索从桌布移除', !window.__dump().matrix.vision.includes('CLUES_V_luheng'));
+assert('桌布上的线索 chip 不再带 ×', !!chipX && !chipX.querySelector('.mx-x'));
+/* 拖出桌布 = 移除：stub 里桌布矩形由 style.left/top + 140×48 常量拼出（新桌布无内联位置 → 0,0,140,48），
+   拖到 (900,700) 必在其外；mirror 走 #drag-layer（getElementById 按需创建） */
+const pev = o => Object.assign({ button: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o);
+chipX._ev.pointerdown[0](pev({ clientX: 0, clientY: 0 }));
+chipX._ev.pointermove[0](pev({ clientX: 40, clientY: 30 }));
+chipX._ev.pointermove[0](pev({ clientX: 900, clientY: 700 }));
+chipX._ev.pointerup[0](pev({ clientX: 900, clientY: 700 }));
+assert('拖出桌布后线索从桌布移除', !window.__dump().matrix.vision.includes('CLUES_V_luheng'));
 assert('移除后推演器图标角标消失', !ids['infer-icon'].querySelector('.badge'));
 /* TEC 窗口 */
 ids['tec-dock']._ev.dblclick[0]();

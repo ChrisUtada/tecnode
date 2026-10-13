@@ -227,17 +227,15 @@
     background-blend-mode:soft-light, multiply}
   .mx-board.over{outline:2px dashed var(--text); outline-offset:-6px}
   .mx-links{position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none}
-  .mx-links line{stroke:var(--text); stroke-width:1.5; stroke-dasharray:5 5; opacity:.55}
-  .mx-board.charging .mx-links line{animation:mxflow .5s linear infinite; opacity:.9}
-  @keyframes mxflow{from{stroke-dashoffset:0}to{stroke-dashoffset:-20}}
-  /* 感官锚点：五感环绕中央排布，归位的线索 chip 叠在锚点下方 */
+  /* 五芒星 = 逻辑阵列本体：五感锚点（证据即顶点）连成的星形描线，红色微光（#c0392b，同核准印章/地图红框） */
+  .mx-star-frame{fill:none; stroke:#c0392b; stroke-width:1.25; stroke-dasharray:5 5; opacity:.42;
+    filter:drop-shadow(0 0 2px rgba(192,57,43,.35))}
+  .mx-star-draw{fill:none; stroke:#c0392b; stroke-width:1.75; stroke-dasharray:100; stroke-dashoffset:100; opacity:.95;
+    filter:drop-shadow(0 0 4px rgba(192,57,43,.6)) drop-shadow(0 0 9px rgba(192,57,43,.38))}
+  .mx-board.charging .mx-star-draw{animation:mxdraw 2.5s linear forwards}
+  @keyframes mxdraw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+  /* 感官锚点：五感环绕中央排布，归位的线索 chip 叠在锚点下方（无文字标签，排布留给五芒星本身） */
   .mx-anchor{position:absolute; width:140px; margin-left:-70px; text-align:center}
-  .mx-anchor-label{font-size:12.5px; font-weight:700; letter-spacing:3px; color:var(--muted)}
-  .mx-anchor-label::after{content:""; display:block; width:20px; height:2px; margin:4px auto 0;
-    background:var(--line2); opacity:.4; border-radius:2px}
-  /* 空态落点骨架：与线索卡同尺寸（130×46）的虚线槽位，归位后被实际节点卡替换 */
-  .mx-slot{width:130px; height:46px; margin:4px auto 0; box-sizing:border-box;
-    border:1.5px dashed var(--line2); border-radius:var(--r-sm); opacity:.3}
   /* 逻辑阵列里的线索卡：复用外部节点观感（纸面渐变 / 圆角 / 浮雕），保持流内排布 */
   .mx-chip.node{
     position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -250,20 +248,12 @@
   .mx-chip.node .n-title{padding:0 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
   .mx-chip.node .n-sub{font-size:10px; color:var(--faint); line-height:1.3; margin-top:2px}
   .mx-chip.node.got .n-sub{color:var(--line2)}
-  .mx-chip.node .mx-x{position:absolute; top:1px; right:4px; font-size:13px; line-height:1; color:var(--faint)}
-  .mx-chip.node .mx-x:hover{color:var(--text)}
-  /* 中央执行者：长按 2.5s 激活归因（蓄力环绕头像转满一圈） */
+  /* 中央执行者：长按 2.5s 激活归因（蓄力 = 描出五芒星，见 .mx-star-draw） */
   .mx-exec{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); text-align:center;
     cursor:pointer; user-select:none; padding:6px}
   .mx-exec .mx-avatar{width:72px; height:72px; border-radius:14px; overflow:hidden; margin:0 auto;
     border:1px solid var(--edge); box-shadow:var(--raise); background:var(--face-hi)}
   .mx-exec .mx-avatar img{width:100%; height:100%; display:block; image-rendering:pixelated}
-  .mx-exec-label{font-size:10.5px; font-weight:700; letter-spacing:2px; color:var(--muted); margin-top:4px}
-  .mx-exec-hint{font-size:10.5px; color:var(--faint); margin-top:2px; white-space:nowrap}
-  .mx-exec::before{content:""; position:absolute; left:50%; top:6px; width:84px; height:84px;
-    transform:translateX(-50%); border-radius:999px; border:2px dashed var(--line2); opacity:0; pointer-events:none}
-  .mx-exec.charging::before{opacity:1; border-color:var(--text); animation:mxspin 2.5s linear forwards}
-  @keyframes mxspin{from{transform:translateX(-50%) rotate(0)}to{transform:translateX(-50%) rotate(360deg)}}
   /* 结局清单：弱化存在，收在桌布左下角 */
   .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
   .memory{background:#dcd8c2; border:3px double #2b2b26; border-radius:var(--r-win); box-shadow:var(--win-shadow)}
@@ -2555,7 +2545,10 @@ function refreshGotoWin(){
    桌布几何与 CSS .mx-board 的尺寸对应（DOM stub 里 offsetWidth 是常量，量不出真尺寸时退回这两个值） */
 const MX_W = 640, MX_H = 460;
 /* 五感锚点：环绕中央执行者的方位（桌布宽高的分数） */
-const MX_ANCHORS = { vision:[.50,.08], hearing:[.80,.26], touch:[.70,.72], smell:[.30,.72], taste:[.20,.26] };
+/* 五感锚点：以「卡片中心」近似正五边形（半径≈175px，绕板心 72° 均布）摆放，
+   这样证据（卡片中心）正好是五芒星的五个顶点。锚点 top 已减去卡片占位（≈27px）：
+   去掉文字标签后 chip 从锚点顶起，margin4 + 半卡高23 即中心偏移。 */
+const MX_ANCHORS = { vision:[.500,.061], hearing:[.760,.324], touch:[.661,.749], smell:[.339,.749], taste:[.240,.324] };
 /* 执行者头像：暂借 TEC 的（同风格同尺寸），新头像做好只改这一行 */
 const EXECUTOR_AVATAR_B64 = "iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAD50lEQVR4Ae2aP2gUQRTGzz+NeI2gYBBEQkxAQUWEU8RComATBHsrU1lapbC0Tmmllb0gaQRNZWECIlFQSAxBBImgxCaijWiy63fcfHtv3szs7u1FXprZN29m3ttvfvd29i6tlv2ZAqaAKWAKmAI7VYFdw5L4pzu3/vTmcnT24VDktrs3KbsuKrC32NVMz4ev35sJrEQ1goZNoO1aw/VGyTFzp84LWds3xgjyqbPla6wGzd+8kT21Jh899j6tME65j9rcRpAibbBA2zvZ9G4q9xLkjr2PYIGCov+Hg6JrED+Byp54JSql/tg94Hxjz1tGkKJ4NEG8Hu8Q/CBr87T7jrWBAdQ+W3NP0ldHD9CI3OT12m/ydzYpj76LRHQaQYpYwQThvMK14fih/js9c/Fyds7Z6OQZ3F9cyy5ut0aVlPzue+1/63TydWbaeRxpFtcc3Ic0nvuNIFaEbO8plsY6JpPkOHsMri13N/OdXzzl1pyeKX0vO29zUkEQBkm1Cn60seRgnhEEJYQ2mSCsJ5EEcrDDsEEQ5se2IIjXhc3rpZKDdYwgKCG0pQnidZmoUHL2Lz1wlvpxZtqx2WCS4C9LDNZBawRBCaGtnKAnB887v05MHjkphM67Qc7ZC1ecca9fPs9sjaT5z++cede/LVR6T0aQI2/RCD5JF6f6ezRy/LPDvYjDJIWv4B9pBPn1ae47aeT1a3o2u0TN4X7YTbVGkKJ8bTWI4+JphX48nX6/ep91gST40Q9bmg9/Xa0RpCibTJD0zR7Hw84XzjlLYeec1Pmh+XG+bBtBrAjZyQTROi3sWF3nEY4n2chD8sf2G0GKYskE4dcEbcfwdEo955SdjzwVHUS3ESRKkztKv/mCIK49eEdS4nfddc03groS13ORXIM4HRDDJPA4ycZ8yR/aX9U6iGc1CEoIbWmC8BlHLRLiFLov7fuY9fHTjQfiBP7i5zF2eW3k5R0U4DSCFJFKP8Wk9TWiQJA0n/s1gqoihuMaQawI2aVrEK3XNbGjGkmhNai7MF0gDnVXZhpBipS11SCOq5G059wJZwp/o+g4t4y6yUE8IwhKCO3ACEJ8jSSMk9pBkYP4RhCUENqBE4Q88Bu+9u6Ed7uqf3NHHlprBCkKDZyga1NT2X9/rC4vO6mNTUw4tuR/Ojc30JyNIGdbioYJVNTE6TGBHDmKRuWfZ9QYDoWa8mV9nV1R9uGRkWw81ywsUnWNMoKgrNCWJkgiBvFADuyqW4kkxClLlBEEJYU2mSCQUzchQt7B3SAslSQjSJE6maCx8XHn/6GVOI27V1dWku7VCFK2LlrVnUYO338sSUYQK0j2X/jsN0+TP2FGAAAAAElFTkSuQmCC";
 
@@ -2570,13 +2563,12 @@ function toggleInferWin(){
   inferWinEl = w.el;
   refreshInferWin();
 }
-/* 阵列内的线索卡：可拖出桌布移除（与外部"拖进拖出"一致）；× 仍保留作兜底。
+/* 阵列内的线索卡：只能拖出桌布移除（与外部「拖进拖出」一致，卡上不再放 ×）。
    桌布 overflow:hidden，所以拖动时把卡片克隆到全局 #drag-layer 跟随指针，松手落在桌布外即移除。 */
 function makeMatrixNodeDraggable(card, cid, sense){
   let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
   card.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
-    if (e.target && e.target.closest && e.target.closest(".mx-x")) return;   /* 让 × 点得到 */
     dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
     sr = desktopEl.getBoundingClientRect();
     try { card.setPointerCapture(e.pointerId); } catch(_){}
@@ -2643,44 +2635,30 @@ function refreshInferWin(){
   if (!body) return;
   body.innerHTML = "";
 
-  const total = Object.keys(SENSES).reduce((sum, s) => sum + G.matrix[s].length, 0);
-  const full = Object.keys(SENSES).every(s => G.matrix[s].length > 0);
-
   const board = document.createElement("div");
   board.className = "mx-board";
   body.appendChild(board);
   const bw = board.offsetWidth || MX_W, bh = board.offsetHeight || MX_H;
   const cx = bw / 2, cy = bh / 2;
 
-  /* 连线层铺在最底：chip 落位后把虚线画到中央执行者 */
+  /* 连线层铺在最底：放五芒星描线（faint 框常显，长按时描出亮线） */
   const links = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   links.setAttribute("class", "mx-links");
   links.setAttribute("width", bw); links.setAttribute("height", bh);
   board.appendChild(links);
-  const linkTo = (x1, y1) => {
-    const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    ln.setAttribute("x1", x1); ln.setAttribute("y1", y1);
-    ln.setAttribute("x2", cx); ln.setAttribute("y2", cy);
-    links.appendChild(ln);
-  };
 
   /* 五感锚点 + 归位线索 chip（同感官按序向下叠；连线终点用解析坐标，不量 DOM） */
+  const verts = {};   /* 五感星形顶点（board 坐标）：证据落在哪，五芒星就连到哪 */
   Object.keys(SENSES).forEach(sense => {
     const a = MX_ANCHORS[sense];
     const ax = a[0] * bw, ay = a[1] * bh;
     const anchor = document.createElement("div");
     anchor.className = "mx-anchor";
     anchor.style.left = ax + "px"; anchor.style.top = ay + "px";
-    const lb = document.createElement("div");
-    lb.className = "mx-anchor-label"; lb.textContent = SENSES[sense];
-    anchor.appendChild(lb);
+    anchor.title = SENSES[sense];   /* 无文字标签：感官名只进 tooltip，不进排布 */
     const list = G.matrix[sense];
-    if (list.length === 0){
-      /* 空态：虚线落点骨架，提示「线索将落在此处」 */
-      const slot = document.createElement("div");
-      slot.className = "mx-slot";
-      anchor.appendChild(slot);
-    } else {
+    let child = null;
+    if (list.length){
       list.forEach((cid, i) => {
         const chip = document.createElement("div");
         let cls = "mx-chip node ent-node ent-clue";
@@ -2689,24 +2667,36 @@ function refreshInferWin(){
         const sub = G.captured.has(cid) ? "线索 · 已捕获" : "线索";
         chip.innerHTML = "<div class='n-title'>" + esc((CLUES[cid] || {}).label || cid) + "</div>" +
                         "<div class='n-sub'>" + esc(sub) + "</div>";
-        const rx = document.createElement("span"); rx.className = "mx-x"; rx.textContent = "×";
-        rx.addEventListener("click", () => {
-          pushHistory();
-          G.matrix[sense] = G.matrix[sense].filter(x => x !== cid);
-          log("「" + esc((CLUES[cid] || {}).label || cid) + "」移出逻辑阵列", "sys");
-          render(); refreshInferWin();
-        });
-        chip.appendChild(rx);
         anchor.appendChild(chip);
-        /* 连线终点用卡片实测中心（DOM stub 量不出真尺寸时退回锚点下方近似中点） */
-        const cr = chip.getBoundingClientRect(), br = board.getBoundingClientRect();
-        linkTo(cr.width ? (cr.left + cr.width / 2 - br.left) : ax,
-               cr.height ? (cr.top + cr.height / 2 - br.top) : (ay + 39 + i * 50));
+        if (i === 0) child = chip;   /* 顶点取该感官第一条线索的中心 */
         makeMatrixNodeDraggable(chip, cid, sense);
       });
     }
     board.appendChild(anchor);
+    /* 记录该感官的星形顶点：用卡片实测中心；stub 量不出时退回解析坐标（锚点+27） */
+    const cr = child ? child.getBoundingClientRect() : null;
+    const br = board.getBoundingClientRect();
+    verts[sense] = (cr && cr.width) ? { x: cr.left + cr.width / 2 - br.left, y: cr.top + cr.height / 2 - br.top }
+                                    : { x: ax, y: ay + 27 };
   });
+
+  /* 五芒星 = 逻辑阵列本体：把五感顶点按星序（隔一个连）连成五角星，证据即顶点 */
+  const STAR_ORDER = ["vision","touch","taste","hearing","smell"];   /* 顺时针 视觉→触觉→味觉→听觉→嗅觉 */
+  const pts = STAR_ORDER.map(s => verts[s]).filter(Boolean);
+  if (pts.length === 5){
+    let d = "M" + pts[0].x + " " + pts[0].y;
+    for (let i = 1; i < pts.length; i++) d += " L" + pts[i].x + " " + pts[i].y;
+    d += " Z";
+    const frame = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    frame.setAttribute("class", "mx-star-frame");
+    frame.setAttribute("d", d);
+    links.appendChild(frame);
+    const draw = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    draw.setAttribute("class", "mx-star-draw");
+    draw.setAttribute("d", d);
+    draw.setAttribute("pathLength", "100");   /* 归一化长度 → dasharray:100 即整条线 */
+    links.appendChild(draw);
+  }
 
   /* 中央执行者：长按激活归因 */
   const exec = document.createElement("div");
@@ -2717,10 +2707,7 @@ function refreshInferWin(){
   img.src = "data:image/png;base64," + EXECUTOR_AVATAR_B64;
   img.alt = "执行者"; img.draggable = false;
   av.appendChild(img);
-  const elb = document.createElement("div"); elb.className = "mx-exec-label"; elb.textContent = "执 行 者";
-  const hint = document.createElement("div"); hint.className = "mx-exec-hint";
-  hint.textContent = !total ? "把捕获的线索拖上桌布" : full ? "五感俱足 · 长按激活归因" : "已归位 " + total + " 条 · 继续献上";
-  exec.appendChild(av); exec.appendChild(elb); exec.appendChild(hint);
+  exec.appendChild(av);   /* 执行者只留头像：头像即五芒星中枢，标签/提示已移除 */
   exec.addEventListener("pointerdown", riteStart);
   board.appendChild(exec);
 }
