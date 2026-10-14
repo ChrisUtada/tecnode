@@ -45,6 +45,17 @@ function showBubble(n, titleText, text, opts){
   }
   bubbleEl = b;
 }
+/* 对话专用的线索入口：**台词本身不进案卷**（气泡与 TEC 窗里逐字都在），
+   只把「这一句给出了线索」这个结果留档 —— 否则玩家回头查不到线索到手的时刻。
+   对话是本案唯一「说了话才拿到线索」的通道：陆珩松 7月4日 那句带 [clue:CLUES_zhpt]，
+   朱穗密室那句带 [clue:CLUES_qsan]，都不能因为不记台词而连线索一起丢。 */
+function talkClues(text, who){
+  const before = new Set(G.captured);
+  gotClues(text);
+  const fresh = [...G.captured].filter(id => !before.has(id));
+  if (fresh.length)
+    log("「" + esc(who) + "」的话里提到了线索：" + esc(fresh.map(id => (CLUES[id] && CLUES[id].label) || id).join("、")), "cap");
+}
 /* 角色说下一句：双击节点与点气泡共用这一条路径 */
 function showCharLine(n){
   const ch = CHARS[n.id] || {};
@@ -55,8 +66,7 @@ function showCharLine(n){
   if (prog < queue.length){
     pushHistory();
     G.talkProg[n.key] = prog + 1;
-    gotClues(line);
-    log("<b>" + esc(ch.name || n.id) + "</b>：" + esc(plain(line)), "sys");
+    talkClues(line, ch.name || n.id);
   }
   showBubble(n, "DIALOG // " + (ch.name || n.id), plain(line), { adv: () => showCharLine(n) });
   render();
@@ -191,7 +201,8 @@ function resetTec(){
 }
 function tecSay(text){
   tecHistory.push(text);
-  log("<b>TEC</b>：" + esc(text), "sys");
+  /* 台词不进案卷：TEC 窗自带对话历史，日志再抄一遍只会把案卷冲成流水账
+     （7月4日那组闪回档案一次就有八条长句）。要留档的是结果，不是台词。 */
   if (tecWinEl){
     const lines = tecWinEl.querySelector(".tec-lines");
     if (lines){
@@ -504,7 +515,7 @@ function tecTalk(){
     pushHistory();
     G.tecProg[ctx] = prog + 1;
     line = plain(st[prog].text || "");
-    gotClues(st[prog].text || "");
+    talkClues(st[prog].text || "", "TEC");
   } else {
     const def = (tec.defaultTalks && tec.defaultTalks.length) ? tec.defaultTalks : (tec.talkQueue || []);
     if (!def.length){ if (!tecWinEl) toggleTecWin(); tecSay("（暂无更多提示）"); return; }
@@ -525,7 +536,7 @@ function tecReaction(toolKey){
   if (hit){
     const text = plain(hit.react.text || hit.react.message || "");
     tecSay("（分析 " + tool.label + "）" + text);
-    gotClues(hit.react.text || hit.react.message || "");
+    talkClues(hit.react.text || hit.react.message || "", "TEC");
     noteSeen(hit.react.text || hit.react.message || "");
   } else {
     tecSay("关于「" + plain(tool.label) + "」，我暂时没有更多线索。试试把它和别的节点组合。");

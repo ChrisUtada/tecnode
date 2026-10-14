@@ -34,11 +34,23 @@ function attemptCombo(toolKey, targetKey){
     if (hit) owner = tool;
   }
 
-  /* 3.5) 目标的 useItem 命令正好需要这个工具（如 黑胶 → 唱机） */
+  /* 3.5) 目标的 useItem 命令正好需要这个工具（如 黑胶 → 唱机）
+         这条路径必须和 runCommand 认同一道前置零件门，否则拖上去就把「先装唱针」绕过去了。 */
   if (!hit && target.kind === "item"){
     const ucmds = (ITEMS[target.id] || {}).commands || [];
     const uc = ucmds.find(c => c.type === "useItem" && c.requiredItem === tool.id);
-    if (uc){ hit = { field:"useItem", react:{ text:uc.successMessage || "", results:uc.onSuccess || {} } }; owner = target; }
+    if (uc){
+      const lack = (uc.requires || []).find(pid => !(target.installed || {})[pid]);
+      if (lack){
+        fail(tool, target, plain(uc.failMessage || ("「" + plain(target.label) + "」还缺零件，现在做不了这件事")));
+        G.tried.add(triedKey);
+        link(toolKey, targetKey, "tried");
+        return;
+      }
+      hit = { field:"useItem", installs:!!uc.installs,
+              react:{ text:uc.successMessage || "", results:uc.onSuccess || {} } };
+      owner = target;
+    }
   }
 
   /* 4) 目标是容器（场景 / 书桌这类会装东西的物品）：扫描它收着的对象 */
@@ -96,6 +108,12 @@ function attemptCombo(toolKey, targetKey){
   });
   /* 反应文本里出现的线索同时计入已捕获（与 runCommand 的 gotClues 行为一致） */
   gotClues(text);
+
+  /* 装上的零件：带 installs:true 的 useItem 命令命中后，把工具记在目标节点上（进快照） */
+  if (hit.field === "useItem" && hit.installs && owner){
+    owner.installed = Object.assign({}, owner.installed);
+    owner.installed[tool.id] = true;
+  }
 
   /* 消耗：与角色对话/询问不消耗任何东西 */
   const consume = tgConsume.checked && !(owner && owner.kind === "char");

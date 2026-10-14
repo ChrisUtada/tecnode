@@ -196,7 +196,7 @@ function updateMapBadge(){
   if (!icon || !icon.querySelector) return;
   let b = icon.querySelector(".badge");
   if (caseHeld){
-    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; icon.appendChild(b); }
     b.textContent = "已关闭";
   } else if (b) b.remove();
 }

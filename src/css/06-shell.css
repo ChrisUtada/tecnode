@@ -39,12 +39,13 @@
     padding:3px 6px; border-radius:999px; background:var(--text); border:1px solid var(--text);
     color:var(--card); white-space:nowrap; pointer-events:none;
   }
-  .badge.cond{color:var(--card); border-color:var(--text); background:var(--text)}
+  .badge.cnt{color:var(--card); border-color:var(--text); background:var(--text)}
   .badge.talk{color:var(--card); border-color:var(--text); background:var(--text)}
   .badge.warn{color:var(--text); border:2px solid var(--text); background:var(--card)}
   .badge.new{color:var(--card); background:var(--text); border-color:var(--text)}
   /* 「已固定」（右键钉住，唯一入口）：挂左上角，与右上角的通知类角标分开，不叠字。
-     空心药丸 = 状态（别自动挪我、折叠也不收我），实心药丸 = 通知（新 / 对话 / 条件进入）。 */
+     空心药丸 = 状态（别自动挪我、折叠也不收我），实心药丸 = 通知 / 计数
+     （新 / 对话 N / 件数 / 条数 / 未读 / 已关闭）。 */
   .badge.pin{left:-6px; right:auto; font-size:9px; padding:2px 5px;
     color:var(--text); background:var(--card); border:1px solid var(--text)}
 
@@ -80,6 +81,11 @@
     font-size:12px; color:var(--muted); text-decoration:underline; text-underline-offset:3px}
   #detail-body button:hover{background:none; border:0; color:var(--text)}
   #detail-body button:active{box-shadow:none; transform:none}
+  /* 文本物正文里的「可摘录」词：比窗内普通动作链接更实、用虚线下划线区分；摘过之后褪灰、去掉下划线 */
+  #detail-body button.ex{font-size:inherit; color:var(--text); text-decoration:underline;
+    text-decoration-style:dotted; text-underline-offset:3px}
+  #detail-body button.ex:hover{color:var(--muted)}
+  #detail-body button.ex.got{color:var(--faint); text-decoration:none}
   #detail-body .empty{color:var(--faint); font-size:12px}
 
   .log-win{position:absolute; right:14px; bottom:96px; width:320px;

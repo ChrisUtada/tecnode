@@ -43,12 +43,24 @@ function runCommand(n, cmd){
       noteSeen(cmd.failMessage || "");
       return;
     }
+    /* 前置零件（可选）：requires 里列的东西必须**已经装在本节点上** ——
+       由带 installs:true 的 useItem 命令成功时写进 n.installed。
+       例：唱机得先装上唱针，才放得出黑胶（数据写在唱机的「放入黑胶」命令上）。 */
+    const lack = (cmd.requires || []).find(pid => !(n.installed || {})[pid]);
+    if (lack){
+      const why = plain(cmd.failMessage || ("还缺「" + (labelOf("item", lack) || lack) + "」没装上，现在做不了这件事。"));
+      log("「" + esc(n.label) + "」：" + esc(why), "warn");
+      noteSeen(cmd.failMessage || "");
+      return;
+    }
     /* 工具本身要发光却没点亮（手电筒）：先拦下 */
     if (litToolBlocked(have)) return;
     pushHistory();
     log("「" + esc(n.label) + "」使用「" + esc(needLabel) + "」：" + esc(plain(cmd.successMessage || "")), "act");
     gotClues(cmd.successMessage || "");
     noteSeen(cmd.successMessage || "");
+    /* 装上的零件：记在节点上（进快照，撤销 / 续档跟着走），后续命令用 requires 认它 */
+    if (cmd.installs){ n.installed = Object.assign({}, n.installed); n.installed[need] = true; }
     if (cmd.onSuccess) applyPayload(cmd.onSuccess, n.key);
     if (tgConsume.checked && REUSABLE_TOOLS.indexOf(need) < 0) deleteNode("item:" + need);
     settleSelect(settle(), n.key);

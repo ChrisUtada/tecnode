@@ -127,7 +127,7 @@ function updateBagBadge(){
   const cnt = bagItems().length;
   let b = dock.querySelector(".badge");
   if (cnt > 0){
-    if (!b){ b = document.createElement("span"); b.className = "badge cond"; dock.appendChild(b); }
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; dock.appendChild(b); }
     b.textContent = cnt + " 件";
   } else if (b) b.remove();
 }
@@ -138,7 +138,7 @@ function updateLedgerBadge(){
   const cnt = ledgerItems().length;
   let b = icon.querySelector(".badge");
   if (cnt > 0){
-    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; icon.appendChild(b); }
     b.textContent = cnt + " 条";
   } else if (b) b.remove();
 }
@@ -149,7 +149,7 @@ function updateInferBadge(){
   const cnt = Object.keys(G.matrix).reduce((s, k) => s + G.matrix[k].length, 0);
   let b = icon.querySelector(".badge");
   if (cnt > 0){
-    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; icon.appendChild(b); }
     b.textContent = cnt + " 条";
   } else if (b) b.remove();
 }

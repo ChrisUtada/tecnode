@@ -3,6 +3,8 @@ _cdp_profile*/
 .cdp_profile_tec/
 _cdp*.cjs
 _cdp*.html
+# 「改前」对照页：用 _cdp_condbadge.cjs 的 CB_FILE 跑同一套真机动作取证（脚本自己生成，不是源码）
+_cb_*.html
 connect-cdp.*
 cdp-*.log
 
@@ -25,6 +27,9 @@ _*.woff2
 shot-*.png
 _shot-*.png
 _spot*.png
+# 「以 _ 开头即临时物」的约定在 png 上可以安全地写成通配
+# （只在 html 上不能写 `_*.html`，会误吞要提交的 _template.html）
+_*.png
 screenshot-*
 case-*-check.png
 index-*

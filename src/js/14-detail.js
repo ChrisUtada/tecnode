@@ -55,8 +55,9 @@ function paintDetail(){
     /* 物品 */
     const it = ITEMS[n.id] || {};
     /* 物品描述统一由详情窗承载（不论有没有命令）：无命令物品的双击只是选中，
-       描述就在详情窗里读 —— 不再靠顶部提示条闪一下。 */
-    html += "<div class='ddesc'>" + esc(plain(it.desc || "（无描述）")) + "</div>";
+       描述就在详情窗里读 —— 不再靠顶部提示条闪一下。
+       文本物（纸条 / 笔记这类）的正文里，被 excerpts 点名的词渲染成可点下划线：点一下就在图上长边。 */
+    html += "<div class='ddesc'>" + excerptHtml(plain(it.desc || "（无描述）"), excerptsOf(n.id)) + "</div>";
     /* 需要光的物品：把条件写在详情窗里，玩家不用瞎试 */
     const litCmd = (it.commands || []).find(c => c.requiresLit);
     if (litCmd){
@@ -67,6 +68,15 @@ function paintDetail(){
       html += "<div class='drow'>状态：" + (n.lit ? "已点亮" : "未点亮") +
         (it.needsLitToUse ? (n.lit ? " · 可以照亮黑暗里的东西" : " · 先点亮它，才能照亮黑暗里的东西") : "") + "</div>";
     }
+    /* 装上的零件：命令上的 requires 门要靠它兑现（唱机得先装上唱针，才放得出黑胶）。
+       和上面的「光照条件」一个性质 —— 把条件写在详情窗里，玩家不用瞎试。 */
+    const fitted = Object.keys(n.installed || {}).map(id => labelOf("item", id) || id);
+    if (fitted.length) html += "<div class='drow'>已装上：" + esc(fitted.join("、")) + "</div>";
+    const needFit = [];
+    (it.commands || []).forEach(c => (c.requires || []).forEach(pid => {
+      if (!(n.installed || {})[pid]) needFit.push(labelOf("item", pid) || pid);
+    }));
+    if (needFit.length) html += "<div class='drow'>待装上：" + esc([...new Set(needFit)].join("、")) + "</div>";
     /* 来源容器：可能是场景，也可能是书桌 / 垃圾桶这类容器物品 */
     if (n.homeScene && containerData(n.homeScene)) html += "<div class='drow'>来源：" + esc(containerTitle(n.homeScene)) + "</div>";
     const outs = [];
@@ -88,6 +98,72 @@ function paintDetail(){
   const rb = document.getElementById("dt-renarr");
   if (rb) rb.addEventListener("click", () => renarrScene(n.id));
 }
+
+/* ============ 摘录：文本物正文里可点的一小段 → 图上长出「目标节点 + 一条连回这张纸的边」 ============
+   数据写在 items 那一条上（正文 desc 保持干净、不掺标签，可读性不受影响）：
+     "excerpts": [ { "text": "7月4日", "to": "loc:SCENES_0704" }, { "text": "槿杉", "to": "char:CHARS_JS" } ]
+   重点是「长出边」而不是「长出节点」：纸上的信息原本只活在玩家脑子里（读完是死胡同），
+   现在「读到」这个动作本身把那条边画了出来 —— 于是它进了快照、可撤销、也被枢纽统计认。 */
+function excerptsOf(id){
+  const list = (ITEMS[id] || {}).excerpts;
+  return Array.isArray(list) ? list.filter(e => e && e.text && e.to) : [];
+}
+/* 按摘录表把命中的词包成可点按钮，其余部分照常转义。
+   从左到右扫一遍，重叠的命中以「先出现的、且更长的」为准。 */
+function excerptHtml(text, list){
+  const t = String(text == null ? "" : text);
+  if (!list.length) return esc(t);
+  const hits = [];
+  list.forEach((ex, i) => {
+    const w = String(ex.text);
+    for (let at = t.indexOf(w); at >= 0; at = t.indexOf(w, at + w.length)) hits.push({ at, len:w.length, i });
+  });
+  if (!hits.length) return esc(t);
+  hits.sort((a, b) => (a.at - b.at) || (b.len - a.len));
+  let out = "", cur = 0;
+  hits.forEach(h => {
+    if (h.at < cur) return;                                  /* 与已输出的片段重叠：跳过 */
+    const key = String(list[h.i].to);
+    out += esc(t.slice(cur, h.at));
+    out += "<button class='ex" + (G.nodes[key] ? " got" : "") + "' data-ex=\"" + esc(key) + "\">" +
+           esc(t.slice(h.at, h.at + h.len)) + "</button>";
+    cur = h.at + h.len;
+  });
+  return out + esc(t.slice(cur));
+}
+/* 点下划线 = 读到了它：ensureNode（已有就复用）+ 一条 cond 边（连回那张纸）+ noteSeen + 镜头带过去。
+   已经摘过的（节点与边都在）不重复长、不记历史 —— 免得连着点几下刷出一堆撤销步。
+   **详情窗留在原来那张纸上**：玩家是在文档里读的，连着摘几个词不该被反复踢走
+   （目标节点靠「新」角标 + 镜头自动居中告诉他东西长出来了）。 */
+function takeExcerpt(target, srcKey){
+  if (!requireCase()) return;
+  const src = G.nodes[srcKey];
+  const i = String(target || "").indexOf(":");
+  if (!src || i < 0) return;
+  const kind = target.slice(0, i), id = target.slice(i + 1);
+  const nm = labelOf(kind, id);
+  if (!nm) return;
+  const key = kind + ":" + id;
+  const isNew = !G.nodes[key];
+  const newEdge = !edgeBetween(srcKey, key, "cond");
+  if (isNew || newEdge){
+    pushHistory();
+    const n = ensureNode(kind, id, { label: nm });
+    if (isNew) markFresh(n);
+    link(srcKey, key, "cond");
+    noteSeen(nm);
+    settle();
+    log("摘录：从「" + esc(src.label) + "」上读到「" + esc(nm) + "」", "act");
+  }
+  if (sel !== srcKey) selectNode(key);     /* 已经在这张纸上读：留住他，别把详情窗踢走 */
+}
+/* 委托挂在 #detail-body 上（innerHTML 每次重绘都会换掉子节点，绑定按钮本身会漏）。
+   按钮天然在 makeFloatDraggable 的排除表里（表里有 button），所以浮窗的 setPointerCapture
+   不会把这次 click 重定向到窗口根 —— 这正是 details 窗内其它按钮一直在用的那条通路。 */
+detailBody.addEventListener("click", e => {
+  const b = (e.target && e.target.closest) ? e.target.closest("button.ex") : null;
+  if (b) takeExcerpt(b.getAttribute("data-ex"), sel);
+});
 
 /* 「新」角标**只有玩家点过这个节点才会摘**：这里把 DOM 上那枚角标摘掉，同时清 n.unread
    （render() 画角标认的就是 unread，重绘不会动它 —— 只有这里会清）。

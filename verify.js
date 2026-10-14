@@ -385,12 +385,26 @@ window.__cmd('ITEM_taideng', 0);  // 再次双击 → 熄灭
 assert('台灯再次双击熄灭', !window.__dump().lit.includes('item:ITEM_taideng'));
 window.__cmd('ITEM_taideng', 0);  // 重新点亮供后续观察
 
-/* 唱机 useItem：黑胶拖到唱机上 */
+/* 唱机 useItem：黑胶拖到唱机上 —— 但唱机得先装上唱针（命令上的 requires 门） */
 window.__choice('ITEM_chouti', 0, 1);          // 右侧抽屉 → 木盒
 ids['pw-in'].value = '0321';
 window.__pw('ITEMS_jzmh');                     // → 黄铜钥匙
 window.__combo('item:ITEMS_htys', 'item:ITEMS_changji');  // 钥匙 → 唱机暗格
 window.__reveal('SCENES_cjag');                // → 黑胶
+/* ① 还没装唱针：放黑胶必须被挡下 —— 不捕获、不消耗，日志里给一句原因 */
+const preVinyl = logs.length;
+window.__combo('item:ITEMS_wmhj', 'item:ITEMS_changji');
+assert('没装唱针时黑胶放不进唱机（requires 门）',
+  !window.__dump().captured.includes('CLUES_wmhj') &&
+  logs.slice(preVinyl).some(l => l.indexOf('还没有装唱针') >= 0));
+assert('被门挡下时黑胶留在画布上（没被消耗）', window.__dump().nodes.includes('item:ITEMS_wmhj'));
+/* ② 去尸体口袋拿到唱针，装上（installs:true → 状态记在唱机上、唱针本身被消耗） */
+window.__reveal('SCENES_lhsdst');                          // → 唱针
+assert('唱针在画布上（尸体右侧口袋）', window.__dump().nodes.includes('item:ITEMS_cz'));
+window.__combo('item:ITEMS_cz', 'item:ITEMS_changji');
+assert('装上唱针：状态记在唱机节点上', (window.__dump().installed['item:ITEMS_changji'] || []).includes('ITEMS_cz'));
+assert('唱针装上后被消耗（不再留在画布上）', !window.__dump().nodes.includes('item:ITEMS_cz'));
+/* ③ 现在才放得进黑胶 */
 window.__combo('item:ITEMS_wmhj', 'item:ITEMS_changji');  // 黑胶 → 唱机（useItem）
 const ph = window.__dump();
 assert('黑胶 → 唱机：捕获录音线索', ph.captured.includes('CLUES_wmhj'));
@@ -1033,6 +1047,8 @@ ids['pw-in'].value = '0321';
 window.__pw('ITEMS_jzmh');                                   // 木盒 → 黄铜钥匙
 window.__combo('item:ITEMS_htys', 'item:ITEMS_changji');     // 钥匙 → 唱机 ⇒ 暗格
 window.__reveal('SCENES_cjag');                              // 黑胶
+window.__reveal('SCENES_lhsdst');                            // 唱针（尸体右侧口袋）
+window.__combo('item:ITEMS_cz', 'item:ITEMS_changji');       // 唱针 → 唱机 ⇒ 装上唱针（前置）
 window.__combo('item:ITEMS_wmhj', 'item:ITEMS_changji');     // 黑胶 → 唱机 ⇒ CLUES_nm（听觉）
 ['CLUES_V_luheng','CLUES_mc','CLUES_CBKW','CLUES_xds','CLUES_nm'].forEach(id =>
   assert('配方线索已捕获 ' + id, window.__dump().captured.includes(id)));
@@ -1128,17 +1144,35 @@ boardEl.style.left = '400px'; boardEl.style.top = '120px';
 const clueEl20 = findEl('clue:CLUES_V_luheng');
 assert('线索节点在画布上', !!clueEl20);
 const bdr = boardEl.getBoundingClientRect();
+const posBefore20 = window.__dump().pos['clue:CLUES_V_luheng'];
 dragTo(clueEl20, bdr.left + bdr.width / 2, bdr.top + bdr.height / 2);
 assert('拖线索上桌布归位（自动归入视觉）', window.__dump().matrix.vision.includes('CLUES_V_luheng'));
 assert('落定后桌布高亮被清掉', !boardEl._classes.has('over'));
+/* 归位 = 收进桌布：画布上那份必须消失（与拖进证物袋 / 线索册同一个手感）。
+   stored 机制与那两处共用，所以「离开画布但保留连边、可撤销、可续档」都是白拿的。 */
+assert('归位后线索从画布上消失（收进桌布）',
+  !findEl('clue:CLUES_V_luheng') && window.__dump().storedIn['clue:CLUES_V_luheng'] === 'MATRIX');
+assert('它不会被证物袋 / 线索册重复登记（storedIn 各认各的）',
+  window.__dump().bag.indexOf('clue:CLUES_V_luheng') < 0 && window.__dump().ledger.indexOf('clue:CLUES_V_luheng') < 0);
+assert('连边数据保留着（只是不画：paintEdges 跳过 stored 节点）',
+  window.__dump().edges.some(e => e.includes('clue:CLUES_V_luheng')));
 /* 推演器图标角标显示已归位条数 */
 const ib = ids['infer-icon'].querySelector('.badge');
 assert('推演器图标角标显示 1 条', !!ib && ib.textContent === '1 条');
+/* 撤销能把归位收回去（状态在快照里，与收入袋 / 册同款） */
+ids['btn-undo']._ev.click[0]();
+assert('撤销能收回「归位」：线索回到画布、桌布上没了',
+  !!findEl('clue:CLUES_V_luheng') && !window.__dump().matrix.vision.includes('CLUES_V_luheng'));
+window.__mxAssign('clue:CLUES_V_luheng', 'vision');   /* 再归位一次，接着测取回 */
 /* chip 上不再有 ×：拿下桌布只能拖出（与外部「拖进拖出」一致）。
    注意：归位后 refreshInferWin 重建了桌布，要重新取元素（手里旧的 boardEl 已离树） */
 const chipX = iwEl20.querySelector('.mx-board').querySelector('.mx-chip');
 assert('桌布上的线索 chip 不再带 ×', !!chipX && !chipX.querySelector('.mx-x'));
-/* 拖出桌布 = 移除：stub 里桌布矩形由 style.left/top + 140×48 常量拼出（新桌布无内联位置 → 0,0,140,48），
+assert('chip 的副标题说它在桌布上（与画布上那枚「已捕获」分开说）',
+  !!chipX && chipX._html.indexOf('已归位') >= 0);
+assert('chip 的 tooltip 写明「拖出桌布 = 取回画布」', !!chipX && chipX.title === '拖出桌布 = 取回画布');
+/* 拖出桌布 = 取回画布（归位时画布上那份已经没了，这是唯一的回头路）。
+   stub 里桌布矩形由 style.left/top + 140×48 常量拼出（新桌布无内联位置 → 0,0,140,48），
    拖到 (900,700) 必在其外；mirror 走 #drag-layer（getElementById 按需创建） */
 const pev = o => Object.assign({ button: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o);
 chipX._ev.pointerdown[0](pev({ clientX: 0, clientY: 0 }));
@@ -1147,6 +1181,20 @@ chipX._ev.pointermove[0](pev({ clientX: 900, clientY: 700 }));
 chipX._ev.pointerup[0](pev({ clientX: 900, clientY: 700 }));
 assert('拖出桌布后线索从桌布移除', !window.__dump().matrix.vision.includes('CLUES_V_luheng'));
 assert('移除后推演器图标角标消失', !ids['infer-icon'].querySelector('.badge'));
+assert('取回后线索回到画布上', !!findEl('clue:CLUES_V_luheng') && window.__dump().storedIn['clue:CLUES_V_luheng'] === undefined);
+/* 落在哪儿就放回哪儿：卡片中心对着松手那一点（换算同 toWorld：屏幕 → 世界） */
+const v20 = window.__dump().view, sr20 = ids['stage'].getBoundingClientRect();
+const p20 = window.__dump().pos['clue:CLUES_V_luheng'];
+assert('取回落在松手的位置（卡片中心对着指针）',
+  Math.abs((p20.x + 65) * v20.k + v20.x + sr20.left - 900) < 1 &&
+  Math.abs((p20.y + 23) * v20.k + v20.y + sr20.top - 700) < 1);
+assert('取回后位置与归位前不同（是放到落点，不是弹回老位置）',
+  p20.x !== posBefore20.x || p20.y !== posBefore20.y);
+/* 取回 = 节点「重新上画布」，照例亮一次「新」角标（与 bagTake / ledgerTake 同款）。
+   注意 `hasNew` 要等到第 31 节才定义（const 有暂时性死区），这里就地判一次 */
+const backEl20 = findEl('clue:CLUES_V_luheng');
+assert('取回的线索带「新」角标（markFresh 同款）',
+  !!backEl20 && backEl20.children.some(c => c._classes.has('new') && c._text === '新'));
 /* TEC 窗口 */
 ids['tec-dock']._ev.dblclick[0]();
 assert('双击 TEC 图标开对话窗', window.__dump().floats.tec === true);
@@ -1742,7 +1790,7 @@ assert('两扇收纳窗的清理点对齐：换案 / 重置显式负责，boot �
   html.indexOf('closeClueWin();            /* 线索册窗与证物袋同级') > 0 &&
   html.indexOf('refreshClueWin();  /* 册窗同理（同样是常驻窗，恢复的图变了） */') > 0);
 
-console.log('\n=== 29. 钉住（右键）/ 折叠反馈 / 自动布局解除 ===');
+console.log('\n=== 29. 钉住（右键）/ 折叠反馈 ===');
 ids['btn-reset']._ev.click[0]();
 window.__reveal('SCENES_garden');
 window.__closeFloats();
@@ -1784,14 +1832,16 @@ assert('折叠时报告"另有 N 个节点留在画布上"',
 assert('被钉住的台灯留在画布上', !!findEl('item:ITEM_taideng'));
 assert('没被钉住的同类照常被收回（抽屉不在画布上）', !findEl('item:ITEM_chouti'));
 
-/* 「自动布局」= 明确的全量解除出口 */
-assert('「自动布局」的 title 点明会解除「已固定」（源码检查）',
-  html.indexOf('重新排布所有节点；节点上的「已固定」都会被解除') >= 0);
+/* 「自动布局」按钮已于 2026-10-14 删除：layout() 的 seed() 对已有坐标的节点直接跳过，
+   点它只是在原地再跑 260 轮弹簧迭代 —— 实测 31/31 个节点整体晃 50~165px，既不整理也不收敛。
+   于是「解除全部已固定」这个批量出口一并消失，钉住只留右键这一条路（逐个解除）。 */
+assert('顶栏不再有「自动布局」按钮（源码检查）',
+  html.indexOf('btn-relayout') < 0 && html.indexOf('>自动布局</button>') < 0);
 const lc29b = logs.length;
-ids['btn-relayout']._ev.click[0]();
-assert('自动布局把全部「已固定」解掉',
-  window.__dump().pos['item:ITEM_taideng'].pinned === false && !hasPin(findEl('item:ITEM_taideng')));
-assert('自动布局不再写日志（桌面操作不进案卷）', logs.length === lc29b);
+window.__pin('item:ITEM_taideng');                 /* 再右键一次 = 解除钉住 */
+assert('钉住只能逐个右键解除（右键即解除，没写日志）',
+  window.__dump().pos['item:ITEM_taideng'].pinned === false &&
+  !hasPin(findEl('item:ITEM_taideng')) && logs.length === lc29b);
 
 console.log('\n=== 30. 详情窗「状态」实时刷新 ===');
 ids['btn-reset']._ev.click[0]();
@@ -1856,8 +1906,8 @@ const ntPinKey = beforeRedraw[0], ntOtherKey = beforeRedraw[1];
 window.__pin(ntPinKey);                   /* 右键钉住：togglePin → pushHistory → render() */
 assert('右键钉住（一次重绘）后，角标没有被洗掉', newOnBoard().length === beforeRedraw.length);
 assert('被钉住的那个节点自己还带「新」', hasNew(findEl(ntPinKey)));
-ids['btn-relayout']._ev.click[0]();       /* 自动布局：又一次 render() */
-assert('自动布局（又一次重绘）后，角标依然在', newOnBoard().length === beforeRedraw.length);
+window.__pin(ntOtherKey);                 /* 右键钉住另一个节点：又一次 render() */
+assert('又一次重绘（钉别的节点）后，角标依然在', newOnBoard().length === beforeRedraw.length);
 window.__reveal('SCENES_body');           /* 展开别的容器：再来一次 render() */
 assert('展开别的场景（又一次重绘）后，角标依然在（且新场景的节点也带上了）',
   newOnBoard().length >= beforeRedraw.length && newOnBoard().length > beforeRedraw.length);
@@ -2001,6 +2051,17 @@ assert('从证物袋取回不写日志', window.__bagTake('item:ITEM_lianmu') ==
 l33 = logs.length;
 assert('推演归位不写日志',
   window.__mxAssign('clue:CLUES_V_luheng', 'vision') === true && logs.length === l33);
+/* 归位 = 收进桌布：线索离开画布（与收入袋 / 册是同一套 stored 机制，所以它也不能再被收进线索册） */
+assert('归位后线索离开画布、落在桌布上',
+  window.__dump().storedIn['clue:CLUES_V_luheng'] === 'MATRIX' && !findEl('clue:CLUES_V_luheng') &&
+  window.__matrixItems().includes('clue:CLUES_V_luheng'));
+assert('已经在桌布上的线索，不能再收进线索册',
+  window.__ledgerStore('clue:CLUES_V_luheng') === false && logs.length === l33);
+l33 = logs.length;
+assert('从桌布取回不写日志',
+  window.__boardTake('CLUES_V_luheng', 'vision') === true && logs.length === l33);
+assert('取回后线索回到画布上（与归位前同一枚节点）',
+  !!findEl('clue:CLUES_V_luheng') && window.__matrixItems().indexOf('clue:CLUES_V_luheng') < 0);
 l33 = logs.length;
 assert('收进线索册不写日志', window.__ledgerStore('clue:CLUES_V_luheng') === true && logs.length === l33);
 l33 = logs.length;
@@ -2021,6 +2082,242 @@ assert('桌面操作类日志已删除（源码检查）',
   html.indexOf('可达性：文本可达') < 0 && html.indexOf('已把案件') < 0);
 assert('推演 / 放映类日志已删除（源码检查）',
   html.indexOf('移出逻辑阵列') < 0 && html.indexOf('记忆放映）') < 0);
+
+/* —— 对话台词不进案卷（用户要求：「对话的内容不需要出现在日志记录里面」）—— */
+/* 台词在气泡 / TEC 窗里逐字都在，日志再抄一遍只会把案卷冲成流水账。
+   但「这一句给出了线索」是结果：陆珩松 7月4日 那句带 [clue:CLUES_zhpt]，
+   朱穗密室的第 6 句带 [clue:CLUES_qsan]，都不能因为不记台词而把线索一起丢。 */
+assert('人物台词的日志已删除（源码检查）',
+  html.indexOf('esc(plain(line)), "sys"') < 0);
+assert('TEC 台词的日志已删除（源码检查）',
+  html.indexOf('log("<b>TEC</b>："') < 0);
+assert('对话走「只记线索、不记台词」的专用入口（源码检查）',
+  html.indexOf('function talkClues(text, who)') >= 0 &&
+  html.indexOf('」的话里提到了线索：') >= 0);
+
+ids['btn-reset']._ev.click[0]();
+/* 人物：朱穗在密室（SCENES_mdhm）的第 1 句 —— 只说台词，日志纹丝不动 */
+window.__reveal('SCENES_mdhm');
+let l33c = logs.length;
+window.__talk('char:CHARS_zs');
+assert('人物说第一句不写日志（台词不进案卷）', logs.length === l33c);
+assert('台词仍进了对话框（气泡弹出）', window.__dump().floats.bubble === true);
+/* 一路点到第 6 句：那一句里带 [clue:CLUES_qsan] */
+for (let i = 0; i < 4; i++) window.__talk('char:CHARS_zs');
+assert('台词句句不写日志（1..5 句）', logs.length === l33c);
+window.__talk('char:CHARS_zs');                       /* 第 6 句：给出线索 */
+assert('对话给出线索时只记一条「结果」',
+  logs.length === l33c + 1 && logs[logs.length - 1].indexOf('话里提到了线索') >= 0 &&
+  logs[logs.length - 1].indexOf('墙上的按钮') >= 0);
+assert('这条结果里没有半句台词',
+  logs[logs.length - 1].indexOf('按下它我们就能出去了') < 0);
+assert('线索确实捕获了（不是只写日志）', window.__dump().captured.indexOf('CLUES_qsan') >= 0);
+/* TEC：连说两句，日志同样不动 —— 7月4日那组闪回档案一次八条长句，正是最该被挡在案卷外的 */
+ids['btn-reset']._ev.click[0]();
+l33c = logs.length;
+const l33cLines = () => tecWinNode().querySelector('.tec-lines').children.length;
+const l33cTec = (window.__tecTalk(), window.__tecTalk(), l33cLines());
+assert('TEC 台词不写日志（TEC 窗自带对话历史）', logs.length === l33c);
+assert('TEC 台词确实说了（历史里能查到）', l33cTec >= 2);
+
+console.log('\n=== 34. 文本物「摘录」：读到就能把边画出来 ===');
+/* 纸上的字原本只活在玩家脑子里（读完是死胡同）；excerpts 把「读到」这个动作直接变成图上的一条边。
+   样板 = 未被焚烧干净的纸片：摘「7月4日」→ 闪回场景、摘「槿杉」→ 角色。 */
+ids['btn-reset']._ev.click[0]();
+
+/* —— 数据体检：每条摘录都要「词真的在 desc 里」「目标真的存在」—— */
+(() => {
+  const gd34 = JSON.parse(jsonText);
+  const tbl = { loc: gd34.scenes || {}, item: gd34.items || {}, char: gd34.chars || {}, clue: gd34.clues || {} };
+  const broken = [];
+  let total = 0, onWbfs = 0;
+  Object.keys(gd34.items || {}).forEach(id => {
+    (gd34.items[id].excerpts || []).forEach(e => {
+      total++;
+      if (id === 'ITEMS_wbfs') onWbfs++;
+      const inDesc = String(gd34.items[id].desc || '').indexOf(String(e.text)) >= 0;
+      const p = String(e.to || '').split(':');
+      const exists = p.length === 2 && !!tbl[p[0]] && !!tbl[p[0]][p[1]];
+      if (!inDesc || !exists) broken.push(id + ' → ' + e.text + ' / ' + e.to);
+    });
+  });
+  assert('每条摘录的 text 都在该物品的 desc 里、to 都指向真实实体' + (broken.length ? ' —— ' + broken.join('；') : ''),
+    broken.length === 0 && total > 0);
+  assert('目前只有样板纸条带摘录，且正好 2 条（7月4日 / 槿杉）', onWbfs === 2 && total === 2);
+})();
+
+window.__reveal('ITEMS_ljt');                       /* 垃圾桶：纸片就是从这里翻出来的 */
+assert('垃圾桶里翻出「未被焚烧干净的纸片」', window.__dump().nodes.includes('item:ITEMS_wbfs'));
+
+const dHtml34 = () => ids['detail-body'].innerHTML;
+window.__select('item:ITEMS_wbfs');
+assert('详情正文里「7月4日」渲染成可点下划线（button.ex + data-ex）',
+  dHtml34().indexOf('<button class=\'ex\' data-ex="loc:SCENES_0704">7月4日</button>') >= 0);
+assert('详情正文里「槿杉」同样渲染成可点下划线',
+  dHtml34().indexOf('<button class=\'ex\' data-ex="char:CHARS_JS">槿杉</button>') >= 0);
+assert('未摘录时不带 got 类（虚线下划线还在）', dHtml34().indexOf("class='ex got'") < 0);
+assert('正文其余部分照常转义（没有多出裸标签）',
+  dHtml34().indexOf('纸上用潦草的笔记写着：姓名：') >= 0);
+
+const before34 = window.__dump();
+assert('摘录前画布上没有「7月4日」闪回场景', !before34.nodes.includes('loc:SCENES_0704'));
+const l34 = logs.length;
+window.__excerpt('loc:SCENES_0704', 'item:ITEMS_wbfs');
+const after34 = window.__dump();
+assert('摘录后长出目标节点', after34.nodes.includes('loc:SCENES_0704'));
+assert('*并*长出一条连回纸片的边（这才是解孤岛的那一步）',
+  after34.edges.indexOf('cond:item:ITEMS_wbfs>loc:SCENES_0704') >= 0);
+assert('摘录是「结果」，记一条日志', logs.length === l34 + 1 && logs[logs.length - 1].indexOf('摘录') >= 0);
+assert('摘录进撤销栈（可撤销）', after34.history > before34.history);
+assert('镜头判断认这次的新节点', !!after34.focus);
+
+window.__select('item:ITEMS_wbfs');
+assert('摘过之后该类名变 got（下划线褪掉）',
+  dHtml34().indexOf('<button class=\'ex got\' data-ex="loc:SCENES_0704">7月4日</button>') >= 0);
+
+const l34b = logs.length, h34b = window.__dump().history, n34b = window.__dump().nodes.length;
+window.__excerpt('loc:SCENES_0704', 'item:ITEMS_wbfs');
+assert('重复摘录不重复长节点、不写日志、不刷撤销步',
+  window.__dump().nodes.length === n34b && window.__dump().history === h34b && logs.length === l34b);
+
+window.__select('item:ITEMS_wbfs');
+window.__excerpt('char:CHARS_JS', 'item:ITEMS_wbfs');
+assert('摘录「槿杉」长出角色节点', window.__dump().nodes.includes('char:CHARS_JS'));
+assert('角色节点也连回了纸片',
+  window.__dump().edges.indexOf('cond:item:ITEMS_wbfs>char:CHARS_JS') >= 0);
+assert('摘录把读到的词记进「听说过」（源码检查：noteSeen(nm)）',
+  /noteSeen\(nm\);/.test(html));
+
+/* 撤销能把这步收回去 */
+const h34 = window.__dump().history;
+ids['btn-undo']._ev.click[0]();
+assert('撤销一次收回「槿杉」那一步', window.__dump().history < h34);
+
+/* 源码检查：委托 + 按钮天然在拖动排除表里（浮窗 setPointerCapture 不会吞掉这次 click） */
+assert('摘录点击委托在 #detail-body 上（源码检查）',
+  html.indexOf('detailBody.addEventListener("click"') >= 0 &&
+  html.indexOf('closest("button.ex")') >= 0);
+assert('拖动排除表里有 button —— 摘录按钮因此不会被浮窗拖拽吞掉（源码检查）',
+  /closest\("button,input,\.bag-item/.test(html));
+assert('摘录机制读的是数据里的 excerpts（源码检查）',
+  html.indexOf('function excerptsOf(') >= 0 && html.indexOf('(ITEMS[id] || {}).excerpts') >= 0);
+
+console.log('\n=== 35. 唱机要先装唱针（命令上的「前置零件」门）+ 顶栏去掉「自动布局」 ===');
+/* 用户要求：「唱机这个节点后面会播放没有标签的黑胶，但要设置一个前提就是得先装上唱针」。
+   引擎为此加了一对最小的数据词汇，都长在命令上：
+     installs:true  → 这条 useItem 成功时把工具记进 n.installed（进快照，跟着撤销 / 续档 / 存档走）
+     requires:[id]  → 这条命令要求那些零件**已经装在本节点上**
+   两条入口认同一个门：双击跑 cmds[0] 的 runCommand、拖动走的 combo 第 3.5 分支。 */
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+window.__reveal('SCENES_cjag');                 /* → 黑胶 */
+window.__reveal('SCENES_lhsdst');               /* → 唱针 */
+assert('素材到位：黑胶与唱针都在画布上',
+  window.__dump().nodes.includes('item:ITEMS_wmhj') && window.__dump().nodes.includes('item:ITEMS_cz'));
+
+/* ① 双击唱机 = 跑 cmds[0]「放入黑胶」：还没装唱针 → 只给一句 warn，不长节点、不捕获 */
+const l35 = logs.length, n35 = window.__dump().nodes.length;
+window.__talk('item:ITEMS_changji');
+assert('双击唱机：没装唱针时被挡下（只写一条 warn）',
+  logs.length === l35 + 1 && logs[logs.length - 1].indexOf('还没有装唱针') >= 0);
+assert('被挡下时不长节点、不捕获录音线索',
+  window.__dump().nodes.length === n35 && !window.__dump().captured.includes('CLUES_wmhj'));
+/* 条件写在详情窗里（和「光照条件」一个待遇，玩家不用瞎试） */
+window.__select('item:ITEMS_changji');
+assert('详情窗标出「待装上：唱针」',
+  ids['detail-body']._html.indexOf('待装上') >= 0 && ids['detail-body']._html.indexOf('唱针') >= 0);
+assert('此时详情窗没有「已装上」', ids['detail-body']._html.indexOf('已装上') < 0);
+
+/* ② 唱针 → 唱机：装上（installs）→ 状态记在唱机上、唱针本身被消耗 */
+window.__combo('item:ITEMS_cz', 'item:ITEMS_changji');
+assert('装上唱针：记进 n.installed', (window.__dump().installed['item:ITEMS_changji'] || []).includes('ITEMS_cz'));
+assert('唱针装上即消耗（不在画布上了）', !window.__dump().nodes.includes('item:ITEMS_cz'));
+window.__select('item:ITEMS_changji');
+assert('详情窗改标「已装上：唱针」',
+  ids['detail-body']._html.indexOf('已装上') >= 0 && ids['detail-body']._html.indexOf('待装上') < 0);
+/* 装上的状态是真的状态：进快照，撤销一步就回到"没装上、唱针还在" */
+ids['btn-undo']._ev.click[0]();
+assert('撤销能收回「装上唱针」（状态在快照里）',
+  !(window.__dump().installed['item:ITEMS_changji'] || []).includes('ITEMS_cz') &&
+  window.__dump().nodes.includes('item:ITEMS_cz'));
+
+/* ③ 重新装上，这回黑胶放得进去了 */
+window.__combo('item:ITEMS_cz', 'item:ITEMS_changji');
+assert('重新装上后，前置门放行',
+  (window.__dump().installed['item:ITEMS_changji'] || []).includes('ITEMS_cz'));
+const l35b = logs.length;
+window.__combo('item:ITEMS_wmhj', 'item:ITEMS_changji');
+assert('装好唱针后，黑胶放得进唱机了',
+  window.__dump().captured.includes('CLUES_wmhj') && window.__dump().captured.includes('CLUES_nm'));
+assert('放黑胶走的是「结果」那条 act 日志', logs.slice(l35b).some(l => l.indexOf('开始播放') >= 0));
+assert('黑胶被消耗（不在画布上了）', !window.__dump().nodes.includes('item:ITEMS_wmhj'));
+assert('「装上唱针」那条命令本身也产出了古典乐线索',
+  window.__dump().captured.includes('DATA_H_music'));
+
+/* ④ 源码检查：词汇与兜底清单 */
+assert('数据里显式声明了 reusableTools 且不含唱针（源码检查）',
+  /"reusableTools":\["ITEM_shoudiantong","ITEMS_htys","ITEMS_changji"\]/.test(html));
+assert('引擎兜底清单同样不含唱针（源码检查）',
+  html.indexOf('REUSABLE_TOOLS = cfg.reusableTools || ["ITEM_shoudiantong", "ITEMS_htys", "ITEMS_changji"]') >= 0);
+assert('引擎认 installs / requires 两个字段（源码检查）',
+  html.indexOf('if (cmd.installs)') >= 0 && html.indexOf('(cmd.requires || []).find(') >= 0 &&
+  html.indexOf('installed:n.installed') >= 0);
+assert('拖动入口（combo 第 3.5 分支）也认同一个门（源码检查）',
+  /const lack = \(uc\.requires \|\| \[\]\)\.find\(/.test(html));
+assert('顶栏不再有「自动布局」按钮（源码检查）',
+  html.indexOf('btn-relayout') < 0 && html.indexOf('>自动布局</button>') < 0);
+
+console.log('\n=== 36. 场景节点上不再挂「条件进入」角标 ===');
+/* 用户要求：「感觉不需要条件进入这个角标」。
+   这枚角标原本长在**未探索 + 无任何文本入边 + 在 condRoutes 里**的场景节点上。
+   它不是死代码，A-001 里真会亮：组合「剪刀剪开绷带」开出的「陆珩松的尸体」、
+   组合「磁带钥匙开暗格」开出的「唱机暗格」，走的都是 attemptCombo 的 results.scene 分支 ——
+   那条分支只 ensureNode、**不 revealScene**，所以开出来的场景是「未探索」的，正好撞上角标条件。
+   （选项分支 14-detail.js 会顺手 revealScene，所以抽屉那条路开出来的场景是已探索的。）
+   撤掉的理由：一枚实心药丸和「新 / 对话 N」挤在同一排，而它想说的那件事别处也说得清楚
+   （可达性检查里有「需条件触发才能进 5 个」）。condRoutes 保留，节点上只剩
+   「真的没路走」这一种警告。
+   关键点：警告分支必须带 `!condRoutes[n.id]`（旧代码靠 else-if 达到同一效果），
+   否则撤掉一枚角标的当天就会在同一个位置冒出另一枚，玩家只会以为"角标换了个字"。 */
+const B36 = key => { const el = findEl(key); return (el && el.children) ? el.children.filter(c => c._classes.has('badge')).map(c => c._text) : []; };
+const C36 = key => { const el = findEl(key); return (el && el.children) ? el.children.filter(c => c._classes.has('badge')).map(c => [...c._classes].join(' ')) : []; };
+ids['btn-reset']._ev.click[0]();
+window.__reveal('ITEM_shuzhuo');                 /* 书桌 → 抽屉上画布 */
+window.__choice('ITEM_chouti', 0, 1);            /* 打开右侧抽屉 → 里面有剪刀 */
+window.__reveal('SCENES_body');                  /* 尸体 → 里面有绷带 */
+assert('素材到位：剪刀与绷带都在画布上',
+  window.__dump().nodes.includes('item:ITEMS_jd') && window.__dump().nodes.includes('item:ITEMS_bd'));
+window.__combo('item:ITEMS_jd', 'item:ITEMS_bd');   /* 剪开绷带 ⇒ 开出「陆珩松的尸体」场景节点 */
+assert('组合开出的「陆珩松的尸体」在画布上、且是未探索的（旧角标正是挂这种节点）',
+  !!findEl('loc:SCENES_lhsdst') && !window.__dump().explored.includes('SCENES_lhsdst'));
+assert('这种节点上不再有「条件进入」角标', B36('loc:SCENES_lhsdst').indexOf('条件进入') < 0);
+assert('连 `cond` 这个类名都不再出现在节点角标上', C36('loc:SCENES_lhsdst').indexOf('badge cond') < 0);
+assert('也不改挂「无文本入口」（它是有入口的，只是要走组合 / 选项）',
+  B36('loc:SCENES_lhsdst').indexOf('无文本入口') < 0);
+assert('同一节点的「新」角标照常（撤的只是条件那枚，通知类角标不动）',
+  B36('loc:SCENES_lhsdst').indexOf('新') >= 0);
+/* 真的没路走的场景照旧警告：门的后面 = 零入边 + 零出边 + 不在 condRoutes 里。
+   走「档案 → 前往」的真实入口 gotoScene（它同样只 ensureNode、不 revealScene）。
+   注：A-001 里没有任何文本指向「门的后面」，所以玩家正常玩遇不到它 —— 这条是给 A-002 留的兜底。 */
+window.__goto('SCENES_mdhm');
+assert('前往开出的「门的后面」同样是未探索的',
+  !!findEl('loc:SCENES_mdhm') && !window.__dump().explored.includes('SCENES_mdhm'));
+assert('零入边零出边的场景照旧挂「无文本入口」', B36('loc:SCENES_mdhm').indexOf('无文本入口') >= 0);
+assert('它也拿不到「条件进入」角标', B36('loc:SCENES_mdhm').indexOf('条件进入') < 0);
+/* 条件信息仍在别处：可达性检查照旧把条件场景单列一类（也就不会掉进「没路走」的清单） */
+ids['btn-reach']._ev.click[0]();
+const v36 = ids['verdict']._html || '';
+assert('可达性检查照旧报「需条件触发才能进 5 个」', /需条件触发才能进 <b>5<\/b> 个/.test(v36));
+assert('条件场景不算「只能靠前往进」（不列在死路清单里）',
+  v36.indexOf('左侧抽屉') < 0 && v36.indexOf('唱机暗格') < 0 && v36.indexOf('陆珩松的尸体') < 0);
+/* 源码检查 */
+assert('render() 不再产出「条件进入」角标（源码检查）', html.indexOf('textContent = "条件进入"') < 0);
+assert('节点角标不再用 `badge cond` 这个类名（源码检查）', html.indexOf('badge cond') < 0);
+assert('「无文本入口」的分支仍带 `!condRoutes[n.id]` 守卫（源码检查）',
+  /inbound\[n\.id\] === 0 &&\s+!condRoutes\[n\.id\]/.test(html));
+assert('计数与通知类实心药丸统一叫 `.badge.cnt`（源码检查）',
+  (html.match(/className = "badge cnt"/g) || []).length === 5 && html.indexOf('.badge.cnt{') >= 0);
+assert('condRoutes 保留（可达性检查还在用）（源码检查）', html.indexOf('const condRoutes = {}') >= 0);
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

@@ -30,8 +30,8 @@ function toggleInferWin(){
   inferWinEl = w.el;
   refreshInferWin();
 }
-/* 阵列内的线索卡：只能拖出桌布移除（与外部「拖进拖出」一致，卡上不再放 ×）。
-   桌布 overflow:hidden，所以拖动时把卡片克隆到全局 #drag-layer 跟随指针，松手落在桌布外即移除。 */
+/* 阵列内的线索卡：**拖出桌布 = 取回画布**（与外部「拖进拖出」一致，卡上不放 ×）。
+   桌布 overflow:hidden，所以拖动时把卡片克隆到全局 #drag-layer 跟随指针，松手落在桌布外即取回。 */
 function makeMatrixNodeDraggable(card, cid, sense){
   let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
   card.addEventListener("pointerdown", e => {
@@ -79,10 +79,8 @@ function makeMatrixNodeDraggable(card, cid, sense){
     if (bd){
       const r = bd.getBoundingClientRect();
       const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-      if (!inside){                        /* 拖出桌布 → 移除该条 */
-        pushHistory();
-        G.matrix[sense] = G.matrix[sense].filter(x => x !== cid);
-        render(); refreshInferWin();
+      if (!inside){                        /* 拖出桌布 → 取回画布 */
+        boardTake(cid, sense, e.clientX, e.clientY);
         return;
       }
     }
@@ -130,7 +128,10 @@ function refreshInferWin(){
         let cls = "mx-chip node ent-node ent-clue";
         if (G.captured.has(cid)) cls += " got";
         chip.className = cls;
-        const sub = G.captured.has(cid) ? "线索 · 已捕获" : "线索";
+        chip.title = "拖出桌布 = 取回画布";   /* 归位后画布上不再留这份线索，取回只有这一条路 */
+        /* 归位 = 线索搬到了桌布上（画布上那份已经收走），所以这里说「已归位」，
+           与画布上那枚「线索 · 已捕获」分开说 —— 两者是两个地方的两个状态 */
+        const sub = G.captured.has(cid) ? "线索 · 已归位" : "线索";
         chip.innerHTML = "<div class='n-title'>" + esc((CLUES[cid] || {}).label || cid) + "</div>" +
                         "<div class='n-sub'>" + esc(sub) + "</div>";
         anchor.appendChild(chip);
@@ -218,6 +219,12 @@ function riteStart(e){
   ex.addEventListener("pointerup", off);
   ex.addEventListener("pointerleave", off);
 }
+/* 归位 = 把这枚线索**从画布收进桌布**（与证物袋 / 线索册共用 stored 机制，storedIn === "MATRIX"）。
+   桌布自己就是这份线索的清单 —— 归位后画布上不该再留一份：
+   「拖上台」和「拖进袋 / 册」在玩家手里是同一个动作，落下之后节点也该同样消失。
+   回头路只有一条：把桌布上的 chip 拖出去（boardTake）。 */
+const MATRIX_STORE = "MATRIX";
+function matrixItems(){ return Object.values(G.nodes).filter(n => n.stored && n.storedIn === MATRIX_STORE); }
 function assignClue(clueKey, sense){
   const n = G.nodes[clueKey];
   if (!n || n.kind !== "clue") return false;
@@ -226,6 +233,29 @@ function assignClue(clueKey, sense){
   if (G.matrix[sense].indexOf(n.id) >= 0) return false;
   pushHistory();
   G.matrix[sense].push(n.id);
+  n.stored = true; n.storedIn = MATRIX_STORE; n.pinned = false;
+  /* 只重画、**不调 layout()**：收纳入袋 / 入册那两处会顺手跑 260 轮弹簧迭代，
+     把画布上**别的**节点全推走（真机实测：18 个节点全动，最大 210px、平均 64px）——
+     那正是「自动布局」按钮被删掉的那个毛病。归位一个线索不该顺手重排玩家的摆位。 */
+  render(); refreshInferWin();
+  return true;
+}
+/* 拖出桌布 = 取回画布。归位时线索已经离开画布，这里是唯一的回头路。
+   落在哪儿就放回哪儿（松手那一点换算成世界坐标，卡片中心对着指针），镜头不抢，只亮一次「新」。
+   案件窗关着时取不回来 —— 与 bagTake / ledgerTake 同一条门（取出是往画布上放东西的动作）。 */
+function boardTake(cid, sense, cx, cy){
+  const n = nodeByKey("clue", cid);
+  if (!n) return false;
+  if (!requireCase()){ refreshInferWin(); return false; }
+  pushHistory();
+  G.matrix[sense] = G.matrix[sense].filter(x => x !== cid);
+  n.stored = false; n.storedIn = null; n.hidden = false; n.pinned = false; markFresh(n);
+  if (cx != null && cy != null){
+    /* 先换成世界坐标、**再**减去半张卡 —— 卡片尺寸是世界单位，不能在屏幕坐标里先减：
+       镜头缩放 k≠1 时两者差一个 k 倍（k=0.35 时落点会偏出 120 多世界像素，实测被 verify 逮住） */
+    const wpt = toWorld(cx, cy);
+    n.x = wpt.x - (NODE_W.clue || 130) / 2; n.y = wpt.y - (NODE_H.clue || 46) / 2;
+  }
   render(); refreshInferWin();
   return true;
 }

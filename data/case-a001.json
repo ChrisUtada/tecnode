@@ -1,6 +1,11 @@
 {
   "config": {
-    "startScene": "SCENE_START"
+    "startScene": "SCENE_START",
+    "reusableTools": [
+      "ITEM_shoudiantong",
+      "ITEMS_htys",
+      "ITEMS_changji"
+    ]
   },
   "scenes": {
     "SCENE_START": {
@@ -258,15 +263,19 @@
           "type": "useItem",
           "label": "放入黑胶",
           "requiredItem": "ITEMS_wmhj",
+          "requires": [
+            "ITEMS_cz"
+          ],
           "successMessage": "几声沙沙响和类似[clue:CLUES_nm]的声响后，[clue:CLUES_wmhj]开始播放……",
-          "failMessage": "似乎没有合适的黑胶可以放入。"
+          "failMessage": "唱机上还没有装唱针，黑胶放上去也放不出声。"
         },
         {
           "type": "useItem",
-          "label": "播放音乐",
+          "label": "装上唱针",
           "requiredItem": "ITEMS_cz",
-          "successMessage": "唱机开始播放古典音乐，[clue:DATA_H_music]在花园中流淌。",
-          "failMessage": "没有唱针，唱机无法播放黑胶。"
+          "installs": true,
+          "successMessage": "把唱针装上唱机，唱机开始播放古典音乐，[clue:DATA_H_music]在花园中流淌。",
+          "failMessage": "没有唱针，装不上。"
         }
       ],
       "canBePicked": true
@@ -384,6 +393,10 @@
     "ITEMS_wbfs": {
       "label": "未被焚烧干净的纸片",
       "desc": "纸上用潦草的笔记写着：姓名：槿杉 生日：7月4日 症状：前臂出现边界清晰的鲜红色水肿，1分钟后形成鸡蛋大小的张力性大疱，触碰剧痛……",
+      "excerpts": [
+        { "text": "7月4日", "to": "loc:SCENES_0704" },
+        { "text": "槿杉", "to": "char:CHARS_JS" }
+      ],
       "hiddenClue": {
         "text": "获得线索：[clue:CLUES_JS]",
         "ids": [

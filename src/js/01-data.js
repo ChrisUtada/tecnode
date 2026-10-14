@@ -16,8 +16,10 @@ function applyCaseData(data){
          : (DATA.config && DATA.config.startScene) || Object.keys(SCENES)[0];
   ENDINGS = DATA.endings || [];
   const cfg = DATA.config || {};
-  /* 合成后视为可重复使用、不消耗的道具 */
-  REUSABLE_TOOLS = cfg.reusableTools || ["ITEM_shoudiantong", "ITEMS_htys", "ITEMS_cz", "ITEMS_changji"];
+  /* 合成后视为可重复使用、不消耗的道具。**权威清单写在案件数据里**（config.reusableTools），
+     这里是"案件没写"时的兜底；两处保持一致。
+     唱针（ITEMS_cz）不在其中：它装上唱机就被"用掉"（见唱机「装上唱针」命令的 installs）。 */
+  REUSABLE_TOOLS = cfg.reusableTools || ["ITEM_shoudiantong", "ITEMS_htys", "ITEMS_changji"];
   /* 可以点亮的光源：双击执行命令后切换发光状态（光晕跟随节点） */
   LIGHT_SOURCES  = cfg.lightSources  || ["ITEM_taideng"];
   /* 日期闪回场景：首次展开时放 MEMORY 放映卡 */

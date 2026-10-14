@@ -516,12 +516,13 @@
     padding:3px 6px; border-radius:999px; background:var(--text); border:1px solid var(--text);
     color:var(--card); white-space:nowrap; pointer-events:none;
   }
-  .badge.cond{color:var(--card); border-color:var(--text); background:var(--text)}
+  .badge.cnt{color:var(--card); border-color:var(--text); background:var(--text)}
   .badge.talk{color:var(--card); border-color:var(--text); background:var(--text)}
   .badge.warn{color:var(--text); border:2px solid var(--text); background:var(--card)}
   .badge.new{color:var(--card); background:var(--text); border-color:var(--text)}
   /* 「已固定」（右键钉住，唯一入口）：挂左上角，与右上角的通知类角标分开，不叠字。
-     空心药丸 = 状态（别自动挪我、折叠也不收我），实心药丸 = 通知（新 / 对话 / 条件进入）。 */
+     空心药丸 = 状态（别自动挪我、折叠也不收我），实心药丸 = 通知 / 计数
+     （新 / 对话 N / 件数 / 条数 / 未读 / 已关闭）。 */
   .badge.pin{left:-6px; right:auto; font-size:9px; padding:2px 5px;
     color:var(--text); background:var(--card); border:1px solid var(--text)}
 
@@ -557,6 +558,11 @@
     font-size:12px; color:var(--muted); text-decoration:underline; text-underline-offset:3px}
   #detail-body button:hover{background:none; border:0; color:var(--text)}
   #detail-body button:active{box-shadow:none; transform:none}
+  /* 文本物正文里的「可摘录」词：比窗内普通动作链接更实、用虚线下划线区分；摘过之后褪灰、去掉下划线 */
+  #detail-body button.ex{font-size:inherit; color:var(--text); text-decoration:underline;
+    text-decoration-style:dotted; text-underline-offset:3px}
+  #detail-body button.ex:hover{color:var(--muted)}
+  #detail-body button.ex.got{color:var(--faint); text-decoration:none}
   #detail-body .empty{color:var(--faint); font-size:12px}
 
   .log-win{position:absolute; right:14px; bottom:96px; width:320px;
@@ -588,7 +594,6 @@
     <label class="tog" title="有节点新长出来时（展开场景 / 组合出结果 / 命令产出 / TEC 分析），自动平移把它带到视野中央（不缩放；拖动节点或拖动、滚轮滚动画布即可打断）">
       <input type="checkbox" id="tg-reveal" checked> 新节点自动居中
     </label>
-    <button id="btn-relayout" title="重新排布所有节点；节点上的「已固定」都会被解除">自动布局</button>
     <button id="btn-fit">适应窗口</button>
     <button id="btn-undo">撤销</button>
     <button id="btn-reset" class="danger">重置</button>
@@ -669,8 +674,10 @@ function applyCaseData(data){
          : (DATA.config && DATA.config.startScene) || Object.keys(SCENES)[0];
   ENDINGS = DATA.endings || [];
   const cfg = DATA.config || {};
-  /* 合成后视为可重复使用、不消耗的道具 */
-  REUSABLE_TOOLS = cfg.reusableTools || ["ITEM_shoudiantong", "ITEMS_htys", "ITEMS_cz", "ITEMS_changji"];
+  /* 合成后视为可重复使用、不消耗的道具。**权威清单写在案件数据里**（config.reusableTools），
+     这里是"案件没写"时的兜底；两处保持一致。
+     唱针（ITEMS_cz）不在其中：它装上唱机就被"用掉"（见唱机「装上唱针」命令的 installs）。 */
+  REUSABLE_TOOLS = cfg.reusableTools || ["ITEM_shoudiantong", "ITEMS_htys", "ITEMS_changji"];
   /* 可以点亮的光源：双击执行命令后切换发光状态（光晕跟随节点） */
   LIGHT_SOURCES  = cfg.lightSources  || ["ITEM_taideng"];
   /* 日期闪回场景：首次展开时放 MEMORY 放映卡 */
@@ -708,8 +715,9 @@ function snapshot(){
   const nodes = {};
   /* 节点上只存「图结构 + 真正会变的状态」；容器身份不存（kind + 数据表现算），
      「新」角标（n.unread）也不存 —— 那是"玩家还没点过这个节点"，属于玩家知识，
-     跟 seenTexts 一个性质，不随撤销 / 续档回滚（见 restore 里的接力）。 */
-  for (const k in G.nodes){ const n = G.nodes[k]; nodes[k] = { key:n.key, kind:n.kind, id:n.id, label:n.label, x:n.x, y:n.y, lit:n.lit, pinned:n.pinned, homeScene:n.homeScene, stored:n.stored, storedIn:n.storedIn, bagFrom:n.bagFrom }; }
+     跟 seenTexts 一个性质，不随撤销 / 续档回滚（见 restore 里的接力）。
+     `installed` 要存：它是**真的会变的状态**（给唱机装上唱针），装没装上得跟着撤销 / 续档走。 */
+  for (const k in G.nodes){ const n = G.nodes[k]; nodes[k] = { key:n.key, kind:n.kind, id:n.id, label:n.label, x:n.x, y:n.y, lit:n.lit, pinned:n.pinned, homeScene:n.homeScene, stored:n.stored, storedIn:n.storedIn, bagFrom:n.bagFrom, installed:n.installed }; }
   return JSON.stringify({
     nodes: nodes, edges: G.edges,
     explored:[...G.explored], captured:[...G.captured], tried:[...G.tried],
@@ -807,10 +815,12 @@ function edgeBetween(aId, bId, kind){
    日志窗是本案的**案卷**，只记玩家关心的事，不记操作流水。写之前先问一句：
    「这条是玩家读得懂的结果吗，还是我刚替他按了一下按钮？」
    ✅ 记：捕获线索 / 结局 / 案件解锁、组合结果与失败、使用物品的结果、前往、
-          一切失败与拦截（缺线索 / 缺工具 / 密码错 / 推演不匹配）、人物与 TEC 对白、
+          一切失败与拦截（缺线索 / 缺工具 / 密码错 / 推演不匹配）、
           开局与换案的一条标记、以及「另有 N 个节点留在画布上」这类**有东西没被收走**的警告。
    ❌ 不记：展开与收起容器、收入与取出（证物袋 / 线索册）、叙事卡与记忆卡放映、
-          自动布局 / 撤销 / 重置等桌面操作、案件窗离屏、可达性统计，以及
+          撤销 / 重置等桌面操作、案件窗离屏、可达性统计、
+          **对话台词本身**（人物气泡与 TEC 窗里逐字都在，日志再抄一遍只是流水账；
+          但「这一句给出了线索」是结果，照记），以及
           「［消耗 X］［出现 X］［获得 X］」这类附属小行（已经并进上一条结果里）。
    理由：展开容器是全局最高频动作，一次一屏日志会把它冲成流水账；
    而真正要回头查的「我什么时候拿到这条线索」反被埋掉。（2026-10-14 按用户要求收口） */
@@ -840,7 +850,7 @@ function updateLogBadge(){
   if (!icon) return;
   let b = icon.querySelector(".badge");
   if (logUnread > 0){
-    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; icon.appendChild(b); }
     b.textContent = logUnread;
   } else if (b) b.remove();
 }
@@ -1052,11 +1062,23 @@ function attemptCombo(toolKey, targetKey){
     if (hit) owner = tool;
   }
 
-  /* 3.5) 目标的 useItem 命令正好需要这个工具（如 黑胶 → 唱机） */
+  /* 3.5) 目标的 useItem 命令正好需要这个工具（如 黑胶 → 唱机）
+         这条路径必须和 runCommand 认同一道前置零件门，否则拖上去就把「先装唱针」绕过去了。 */
   if (!hit && target.kind === "item"){
     const ucmds = (ITEMS[target.id] || {}).commands || [];
     const uc = ucmds.find(c => c.type === "useItem" && c.requiredItem === tool.id);
-    if (uc){ hit = { field:"useItem", react:{ text:uc.successMessage || "", results:uc.onSuccess || {} } }; owner = target; }
+    if (uc){
+      const lack = (uc.requires || []).find(pid => !(target.installed || {})[pid]);
+      if (lack){
+        fail(tool, target, plain(uc.failMessage || ("「" + plain(target.label) + "」还缺零件，现在做不了这件事")));
+        G.tried.add(triedKey);
+        link(toolKey, targetKey, "tried");
+        return;
+      }
+      hit = { field:"useItem", installs:!!uc.installs,
+              react:{ text:uc.successMessage || "", results:uc.onSuccess || {} } };
+      owner = target;
+    }
   }
 
   /* 4) 目标是容器（场景 / 书桌这类会装东西的物品）：扫描它收着的对象 */
@@ -1114,6 +1136,12 @@ function attemptCombo(toolKey, targetKey){
   });
   /* 反应文本里出现的线索同时计入已捕获（与 runCommand 的 gotClues 行为一致） */
   gotClues(text);
+
+  /* 装上的零件：带 installs:true 的 useItem 命令命中后，把工具记在目标节点上（进快照） */
+  if (hit.field === "useItem" && hit.installs && owner){
+    owner.installed = Object.assign({}, owner.installed);
+    owner.installed[tool.id] = true;
+  }
 
   /* 消耗：与角色对话/询问不消耗任何东西 */
   const consume = tgConsume.checked && !(owner && owner.kind === "char");
@@ -1313,7 +1341,7 @@ function updateBagBadge(){
   const cnt = bagItems().length;
   let b = dock.querySelector(".badge");
   if (cnt > 0){
-    if (!b){ b = document.createElement("span"); b.className = "badge cond"; dock.appendChild(b); }
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; dock.appendChild(b); }
     b.textContent = cnt + " 件";
   } else if (b) b.remove();
 }
@@ -1324,7 +1352,7 @@ function updateLedgerBadge(){
   const cnt = ledgerItems().length;
   let b = icon.querySelector(".badge");
   if (cnt > 0){
-    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; icon.appendChild(b); }
     b.textContent = cnt + " 条";
   } else if (b) b.remove();
 }
@@ -1335,7 +1363,7 @@ function updateInferBadge(){
   const cnt = Object.keys(G.matrix).reduce((s, k) => s + G.matrix[k].length, 0);
   let b = icon.querySelector(".badge");
   if (cnt > 0){
-    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; icon.appendChild(b); }
     b.textContent = cnt + " 条";
   } else if (b) b.remove();
 }
@@ -1433,9 +1461,14 @@ function render(){
     if (n.kind === "clue" && G.captured.has(n.id)) sub = "线索 · 已捕获";
     el.innerHTML = "<div class='n-title'>" + esc(n.label) + "</div><div class='n-sub'>" + esc(sub) + "</div>";
 
-    if (n.kind === "loc" && !G.explored.has(n.id) && condRoutes[n.id] && !inbound[n.id]){
-      const b = document.createElement("span"); b.className = "badge cond"; b.textContent = "条件进入"; el.appendChild(b);
-    } else if (n.kind === "loc" && !G.explored.has(n.id) && inbound[n.id] === 0 && !sceneLocs(n.id).length){
+    /* 「条件进入」角标已撤（2026-10-14，用户要求）。它是一枚**实心**药丸，和「新 / 对话 N」
+       挤在右上角同一排；而它想说的那件事别处已经说过两遍 —— 详情窗有「参与条件跳转」行，
+       可达性统计里有「需条件触发才能进 N 个」。节点上只该留「真的没路走」这一种警告。
+       注意 `!condRoutes[n.id]`：条件场景**本来就不该**掉进下面这条（旧代码靠 else-if 达到同一效果），
+       否则撤掉一枚角标的当天就会在同一个位置冒出另一枚，玩家只会以为"角标换了个字"。
+       condRoutes 本身保留 —— 上面说的那两处还在用它。 */
+    if (n.kind === "loc" && !G.explored.has(n.id) && inbound[n.id] === 0 &&
+        !condRoutes[n.id] && !sceneLocs(n.id).length){
       const b = document.createElement("span"); b.className = "badge warn"; b.textContent = "无文本入口"; el.appendChild(b);
     }
     /* 已固定：右键钉住的节点。必须看得见——它同时意味着「自动布局不挪它」
@@ -1962,12 +1995,24 @@ function runCommand(n, cmd){
       noteSeen(cmd.failMessage || "");
       return;
     }
+    /* 前置零件（可选）：requires 里列的东西必须**已经装在本节点上** ——
+       由带 installs:true 的 useItem 命令成功时写进 n.installed。
+       例：唱机得先装上唱针，才放得出黑胶（数据写在唱机的「放入黑胶」命令上）。 */
+    const lack = (cmd.requires || []).find(pid => !(n.installed || {})[pid]);
+    if (lack){
+      const why = plain(cmd.failMessage || ("还缺「" + (labelOf("item", lack) || lack) + "」没装上，现在做不了这件事。"));
+      log("「" + esc(n.label) + "」：" + esc(why), "warn");
+      noteSeen(cmd.failMessage || "");
+      return;
+    }
     /* 工具本身要发光却没点亮（手电筒）：先拦下 */
     if (litToolBlocked(have)) return;
     pushHistory();
     log("「" + esc(n.label) + "」使用「" + esc(needLabel) + "」：" + esc(plain(cmd.successMessage || "")), "act");
     gotClues(cmd.successMessage || "");
     noteSeen(cmd.successMessage || "");
+    /* 装上的零件：记在节点上（进快照，撤销 / 续档跟着走），后续命令用 requires 认它 */
+    if (cmd.installs){ n.installed = Object.assign({}, n.installed); n.installed[need] = true; }
     if (cmd.onSuccess) applyPayload(cmd.onSuccess, n.key);
     if (tgConsume.checked && REUSABLE_TOOLS.indexOf(need) < 0) deleteNode("item:" + need);
     settleSelect(settle(), n.key);
@@ -2227,6 +2272,17 @@ function showBubble(n, titleText, text, opts){
   }
   bubbleEl = b;
 }
+/* 对话专用的线索入口：**台词本身不进案卷**（气泡与 TEC 窗里逐字都在），
+   只把「这一句给出了线索」这个结果留档 —— 否则玩家回头查不到线索到手的时刻。
+   对话是本案唯一「说了话才拿到线索」的通道：陆珩松 7月4日 那句带 [clue:CLUES_zhpt]，
+   朱穗密室那句带 [clue:CLUES_qsan]，都不能因为不记台词而连线索一起丢。 */
+function talkClues(text, who){
+  const before = new Set(G.captured);
+  gotClues(text);
+  const fresh = [...G.captured].filter(id => !before.has(id));
+  if (fresh.length)
+    log("「" + esc(who) + "」的话里提到了线索：" + esc(fresh.map(id => (CLUES[id] && CLUES[id].label) || id).join("、")), "cap");
+}
 /* 角色说下一句：双击节点与点气泡共用这一条路径 */
 function showCharLine(n){
   const ch = CHARS[n.id] || {};
@@ -2237,8 +2293,7 @@ function showCharLine(n){
   if (prog < queue.length){
     pushHistory();
     G.talkProg[n.key] = prog + 1;
-    gotClues(line);
-    log("<b>" + esc(ch.name || n.id) + "</b>：" + esc(plain(line)), "sys");
+    talkClues(line, ch.name || n.id);
   }
   showBubble(n, "DIALOG // " + (ch.name || n.id), plain(line), { adv: () => showCharLine(n) });
   render();
@@ -2373,7 +2428,8 @@ function resetTec(){
 }
 function tecSay(text){
   tecHistory.push(text);
-  log("<b>TEC</b>：" + esc(text), "sys");
+  /* 台词不进案卷：TEC 窗自带对话历史，日志再抄一遍只会把案卷冲成流水账
+     （7月4日那组闪回档案一次就有八条长句）。要留档的是结果，不是台词。 */
   if (tecWinEl){
     const lines = tecWinEl.querySelector(".tec-lines");
     if (lines){
@@ -2686,7 +2742,7 @@ function tecTalk(){
     pushHistory();
     G.tecProg[ctx] = prog + 1;
     line = plain(st[prog].text || "");
-    gotClues(st[prog].text || "");
+    talkClues(st[prog].text || "", "TEC");
   } else {
     const def = (tec.defaultTalks && tec.defaultTalks.length) ? tec.defaultTalks : (tec.talkQueue || []);
     if (!def.length){ if (!tecWinEl) toggleTecWin(); tecSay("（暂无更多提示）"); return; }
@@ -2707,7 +2763,7 @@ function tecReaction(toolKey){
   if (hit){
     const text = plain(hit.react.text || hit.react.message || "");
     tecSay("（分析 " + tool.label + "）" + text);
-    gotClues(hit.react.text || hit.react.message || "");
+    talkClues(hit.react.text || hit.react.message || "", "TEC");
     noteSeen(hit.react.text || hit.react.message || "");
   } else {
     tecSay("关于「" + plain(tool.label) + "」，我暂时没有更多线索。试试把它和别的节点组合。");
@@ -3057,8 +3113,8 @@ function toggleInferWin(){
   inferWinEl = w.el;
   refreshInferWin();
 }
-/* 阵列内的线索卡：只能拖出桌布移除（与外部「拖进拖出」一致，卡上不再放 ×）。
-   桌布 overflow:hidden，所以拖动时把卡片克隆到全局 #drag-layer 跟随指针，松手落在桌布外即移除。 */
+/* 阵列内的线索卡：**拖出桌布 = 取回画布**（与外部「拖进拖出」一致，卡上不放 ×）。
+   桌布 overflow:hidden，所以拖动时把卡片克隆到全局 #drag-layer 跟随指针，松手落在桌布外即取回。 */
 function makeMatrixNodeDraggable(card, cid, sense){
   let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
   card.addEventListener("pointerdown", e => {
@@ -3106,10 +3162,8 @@ function makeMatrixNodeDraggable(card, cid, sense){
     if (bd){
       const r = bd.getBoundingClientRect();
       const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-      if (!inside){                        /* 拖出桌布 → 移除该条 */
-        pushHistory();
-        G.matrix[sense] = G.matrix[sense].filter(x => x !== cid);
-        render(); refreshInferWin();
+      if (!inside){                        /* 拖出桌布 → 取回画布 */
+        boardTake(cid, sense, e.clientX, e.clientY);
         return;
       }
     }
@@ -3157,7 +3211,10 @@ function refreshInferWin(){
         let cls = "mx-chip node ent-node ent-clue";
         if (G.captured.has(cid)) cls += " got";
         chip.className = cls;
-        const sub = G.captured.has(cid) ? "线索 · 已捕获" : "线索";
+        chip.title = "拖出桌布 = 取回画布";   /* 归位后画布上不再留这份线索，取回只有这一条路 */
+        /* 归位 = 线索搬到了桌布上（画布上那份已经收走），所以这里说「已归位」，
+           与画布上那枚「线索 · 已捕获」分开说 —— 两者是两个地方的两个状态 */
+        const sub = G.captured.has(cid) ? "线索 · 已归位" : "线索";
         chip.innerHTML = "<div class='n-title'>" + esc((CLUES[cid] || {}).label || cid) + "</div>" +
                         "<div class='n-sub'>" + esc(sub) + "</div>";
         anchor.appendChild(chip);
@@ -3245,6 +3302,12 @@ function riteStart(e){
   ex.addEventListener("pointerup", off);
   ex.addEventListener("pointerleave", off);
 }
+/* 归位 = 把这枚线索**从画布收进桌布**（与证物袋 / 线索册共用 stored 机制，storedIn === "MATRIX"）。
+   桌布自己就是这份线索的清单 —— 归位后画布上不该再留一份：
+   「拖上台」和「拖进袋 / 册」在玩家手里是同一个动作，落下之后节点也该同样消失。
+   回头路只有一条：把桌布上的 chip 拖出去（boardTake）。 */
+const MATRIX_STORE = "MATRIX";
+function matrixItems(){ return Object.values(G.nodes).filter(n => n.stored && n.storedIn === MATRIX_STORE); }
 function assignClue(clueKey, sense){
   const n = G.nodes[clueKey];
   if (!n || n.kind !== "clue") return false;
@@ -3253,6 +3316,29 @@ function assignClue(clueKey, sense){
   if (G.matrix[sense].indexOf(n.id) >= 0) return false;
   pushHistory();
   G.matrix[sense].push(n.id);
+  n.stored = true; n.storedIn = MATRIX_STORE; n.pinned = false;
+  /* 只重画、**不调 layout()**：收纳入袋 / 入册那两处会顺手跑 260 轮弹簧迭代，
+     把画布上**别的**节点全推走（真机实测：18 个节点全动，最大 210px、平均 64px）——
+     那正是「自动布局」按钮被删掉的那个毛病。归位一个线索不该顺手重排玩家的摆位。 */
+  render(); refreshInferWin();
+  return true;
+}
+/* 拖出桌布 = 取回画布。归位时线索已经离开画布，这里是唯一的回头路。
+   落在哪儿就放回哪儿（松手那一点换算成世界坐标，卡片中心对着指针），镜头不抢，只亮一次「新」。
+   案件窗关着时取不回来 —— 与 bagTake / ledgerTake 同一条门（取出是往画布上放东西的动作）。 */
+function boardTake(cid, sense, cx, cy){
+  const n = nodeByKey("clue", cid);
+  if (!n) return false;
+  if (!requireCase()){ refreshInferWin(); return false; }
+  pushHistory();
+  G.matrix[sense] = G.matrix[sense].filter(x => x !== cid);
+  n.stored = false; n.storedIn = null; n.hidden = false; n.pinned = false; markFresh(n);
+  if (cx != null && cy != null){
+    /* 先换成世界坐标、**再**减去半张卡 —— 卡片尺寸是世界单位，不能在屏幕坐标里先减：
+       镜头缩放 k≠1 时两者差一个 k 倍（k=0.35 时落点会偏出 120 多世界像素，实测被 verify 逮住） */
+    const wpt = toWorld(cx, cy);
+    n.x = wpt.x - (NODE_W.clue || 130) / 2; n.y = wpt.y - (NODE_H.clue || 46) / 2;
+  }
   render(); refreshInferWin();
   return true;
 }
@@ -3436,8 +3522,9 @@ function paintDetail(){
     /* 物品 */
     const it = ITEMS[n.id] || {};
     /* 物品描述统一由详情窗承载（不论有没有命令）：无命令物品的双击只是选中，
-       描述就在详情窗里读 —— 不再靠顶部提示条闪一下。 */
-    html += "<div class='ddesc'>" + esc(plain(it.desc || "（无描述）")) + "</div>";
+       描述就在详情窗里读 —— 不再靠顶部提示条闪一下。
+       文本物（纸条 / 笔记这类）的正文里，被 excerpts 点名的词渲染成可点下划线：点一下就在图上长边。 */
+    html += "<div class='ddesc'>" + excerptHtml(plain(it.desc || "（无描述）"), excerptsOf(n.id)) + "</div>";
     /* 需要光的物品：把条件写在详情窗里，玩家不用瞎试 */
     const litCmd = (it.commands || []).find(c => c.requiresLit);
     if (litCmd){
@@ -3448,6 +3535,15 @@ function paintDetail(){
       html += "<div class='drow'>状态：" + (n.lit ? "已点亮" : "未点亮") +
         (it.needsLitToUse ? (n.lit ? " · 可以照亮黑暗里的东西" : " · 先点亮它，才能照亮黑暗里的东西") : "") + "</div>";
     }
+    /* 装上的零件：命令上的 requires 门要靠它兑现（唱机得先装上唱针，才放得出黑胶）。
+       和上面的「光照条件」一个性质 —— 把条件写在详情窗里，玩家不用瞎试。 */
+    const fitted = Object.keys(n.installed || {}).map(id => labelOf("item", id) || id);
+    if (fitted.length) html += "<div class='drow'>已装上：" + esc(fitted.join("、")) + "</div>";
+    const needFit = [];
+    (it.commands || []).forEach(c => (c.requires || []).forEach(pid => {
+      if (!(n.installed || {})[pid]) needFit.push(labelOf("item", pid) || pid);
+    }));
+    if (needFit.length) html += "<div class='drow'>待装上：" + esc([...new Set(needFit)].join("、")) + "</div>";
     /* 来源容器：可能是场景，也可能是书桌 / 垃圾桶这类容器物品 */
     if (n.homeScene && containerData(n.homeScene)) html += "<div class='drow'>来源：" + esc(containerTitle(n.homeScene)) + "</div>";
     const outs = [];
@@ -3469,6 +3565,72 @@ function paintDetail(){
   const rb = document.getElementById("dt-renarr");
   if (rb) rb.addEventListener("click", () => renarrScene(n.id));
 }
+
+/* ============ 摘录：文本物正文里可点的一小段 → 图上长出「目标节点 + 一条连回这张纸的边」 ============
+   数据写在 items 那一条上（正文 desc 保持干净、不掺标签，可读性不受影响）：
+     "excerpts": [ { "text": "7月4日", "to": "loc:SCENES_0704" }, { "text": "槿杉", "to": "char:CHARS_JS" } ]
+   重点是「长出边」而不是「长出节点」：纸上的信息原本只活在玩家脑子里（读完是死胡同），
+   现在「读到」这个动作本身把那条边画了出来 —— 于是它进了快照、可撤销、也被枢纽统计认。 */
+function excerptsOf(id){
+  const list = (ITEMS[id] || {}).excerpts;
+  return Array.isArray(list) ? list.filter(e => e && e.text && e.to) : [];
+}
+/* 按摘录表把命中的词包成可点按钮，其余部分照常转义。
+   从左到右扫一遍，重叠的命中以「先出现的、且更长的」为准。 */
+function excerptHtml(text, list){
+  const t = String(text == null ? "" : text);
+  if (!list.length) return esc(t);
+  const hits = [];
+  list.forEach((ex, i) => {
+    const w = String(ex.text);
+    for (let at = t.indexOf(w); at >= 0; at = t.indexOf(w, at + w.length)) hits.push({ at, len:w.length, i });
+  });
+  if (!hits.length) return esc(t);
+  hits.sort((a, b) => (a.at - b.at) || (b.len - a.len));
+  let out = "", cur = 0;
+  hits.forEach(h => {
+    if (h.at < cur) return;                                  /* 与已输出的片段重叠：跳过 */
+    const key = String(list[h.i].to);
+    out += esc(t.slice(cur, h.at));
+    out += "<button class='ex" + (G.nodes[key] ? " got" : "") + "' data-ex=\"" + esc(key) + "\">" +
+           esc(t.slice(h.at, h.at + h.len)) + "</button>";
+    cur = h.at + h.len;
+  });
+  return out + esc(t.slice(cur));
+}
+/* 点下划线 = 读到了它：ensureNode（已有就复用）+ 一条 cond 边（连回那张纸）+ noteSeen + 镜头带过去。
+   已经摘过的（节点与边都在）不重复长、不记历史 —— 免得连着点几下刷出一堆撤销步。
+   **详情窗留在原来那张纸上**：玩家是在文档里读的，连着摘几个词不该被反复踢走
+   （目标节点靠「新」角标 + 镜头自动居中告诉他东西长出来了）。 */
+function takeExcerpt(target, srcKey){
+  if (!requireCase()) return;
+  const src = G.nodes[srcKey];
+  const i = String(target || "").indexOf(":");
+  if (!src || i < 0) return;
+  const kind = target.slice(0, i), id = target.slice(i + 1);
+  const nm = labelOf(kind, id);
+  if (!nm) return;
+  const key = kind + ":" + id;
+  const isNew = !G.nodes[key];
+  const newEdge = !edgeBetween(srcKey, key, "cond");
+  if (isNew || newEdge){
+    pushHistory();
+    const n = ensureNode(kind, id, { label: nm });
+    if (isNew) markFresh(n);
+    link(srcKey, key, "cond");
+    noteSeen(nm);
+    settle();
+    log("摘录：从「" + esc(src.label) + "」上读到「" + esc(nm) + "」", "act");
+  }
+  if (sel !== srcKey) selectNode(key);     /* 已经在这张纸上读：留住他，别把详情窗踢走 */
+}
+/* 委托挂在 #detail-body 上（innerHTML 每次重绘都会换掉子节点，绑定按钮本身会漏）。
+   按钮天然在 makeFloatDraggable 的排除表里（表里有 button），所以浮窗的 setPointerCapture
+   不会把这次 click 重定向到窗口根 —— 这正是 details 窗内其它按钮一直在用的那条通路。 */
+detailBody.addEventListener("click", e => {
+  const b = (e.target && e.target.closest) ? e.target.closest("button.ex") : null;
+  if (b) takeExcerpt(b.getAttribute("data-ex"), sel);
+});
 
 /* 「新」角标**只有玩家点过这个节点才会摘**：这里把 DOM 上那枚角标摘掉，同时清 n.unread
    （render() 画角标认的就是 unread，重绘不会动它 —— 只有这里会清）。
@@ -3679,11 +3841,11 @@ document.getElementById("ending-overlay").addEventListener("click", () => {
   playEndingStage();
 });
 tgFocus.addEventListener("change", applyFocus);
-document.getElementById("btn-relayout").addEventListener("click", () => {
-  if (!requireCase()) return;
-  Object.values(G.nodes).forEach(n => { n.pinned = false; });
-  layout(); render();
-});
+/* 这里原本有个「自动布局」按钮（重排 + 解除全部「已固定」）。2026-10-14 删掉：
+   layout() 的 seed() 对已有坐标的节点直接跳过，所以它只是在当前位置上再跑 260 轮弹簧迭代 ——
+   实测点一次会让 31/31 个节点整体晃 50~165px（既没整理出更清楚的图，也不收敛），
+   玩家能看见的实际效果只有"我摆好的位置被抖散了 + 钉住全没了"。
+   位置要留住就右键钉住（唯一的钉住入口），要重排就自己拖 —— 不再有全局重排这个动作。 */
 document.getElementById("btn-undo").addEventListener("click", () => {
   if (!requireCase()) return;
   if (!history.length){ log("没有可撤销的操作", "warn"); return; }
@@ -3922,7 +4084,7 @@ function updateMapBadge(){
   if (!icon || !icon.querySelector) return;
   let b = icon.querySelector(".badge");
   if (caseHeld){
-    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; icon.appendChild(b); }
     b.textContent = "已关闭";
   } else if (b) b.remove();
 }
@@ -4447,6 +4609,8 @@ window.__dropTargets = () => nodeDropTargets();
 window.__peopleToggle = () => togglePeopleWin();
 window.__roster = () => metChars().map(id => { const p = charProgress(id); return { id, name:(CHARS[id] || {}).name || id, prog:p.prog, total:p.total }; });
 window.__mxAssign = (k, s) => assignClue(k, s);
+window.__boardTake = (id, sense, cx, cy) => boardTake(id, sense, cx, cy);   /* 等价于把桌布上的 chip 拖出去 */
+window.__matrixItems = () => matrixItems().map(n => n.key);
 window.__infer = () => executeInference();
 window.__playStep = () => { if (memoryPlay) advanceMemory(); else if (endingState) playEndingStage(); };
 window.__intro = {
@@ -4466,6 +4630,8 @@ window.__closeCase = () => closeCase();
 window.__registerCase = (id, data) => { CASE_DATA[id] = data; };
 window.__caseDataOf = id => CASE_DATA[id];
 window.__unlockCase = id => unlockCase(id);
+window.__excerpt = (target, srcKey) => takeExcerpt(target, srcKey || sel);   /* 等价于点正文里的下划线 */
+window.__excerpts = id => excerptsOf(id).map(e => ({ text:e.text, to:e.to }));
 window.__caseInfo = () => ({
   id: CASE_ID,
   open: caseOpen,
@@ -4485,6 +4651,8 @@ window.__dump  = () => ({
   tec: { prog: Object.assign({}, G.tecProg), lastScene: G.lastScene },
   hidden: Object.keys(G.nodes).filter(k => G.nodes[k].hidden),
   stored: Object.keys(G.nodes).filter(k => G.nodes[k].stored),
+  /* 被收走的节点去哪儿了：BAG / LEDGER / MATRIX（归位的线索离开画布后落在桌布上） */
+  storedIn: (() => { const o = {}; for (const k in G.nodes){ if (G.nodes[k].stored) o[k] = G.nodes[k].storedIn; } return o; })(),
   bag: bagItems().map(n => n.key),
   ledger: ledgerItems().map(n => n.key),
   collapsed: [...G.collapsed],
@@ -4499,8 +4667,12 @@ window.__dump  = () => ({
   edges: G.edges.map(e => e.kind + ":" + e.a + ">" + e.b),
   explored: [...G.explored], captured: [...G.captured], tried: [...G.tried],
   history: history.length,
+  /* 镜头（无头环境量不到位移，但能读状态）：拖进拖出的落点换算 / 自动聚焦的对账都要它 */
+  view: { x: view.x, y: view.y, k: view.k },
   pos: (() => { const o = {}; for (const k in G.nodes){
     o[k] = { x: Math.round(G.nodes[k].x), y: Math.round(G.nodes[k].y), pinned: !!G.nodes[k].pinned }; } return o; })(),
+  /* 装上的零件（唱机 ← 唱针）：节点上的状态，撤销 / 续档跟着走 */
+  installed: (() => { const o = {}; for (const k in G.nodes){ if (G.nodes[k].installed) o[k] = Object.keys(G.nodes[k].installed); } return o; })(),
   /* 最近一次自动聚焦的「决定」（无头环境量不到镜头位移，量决定；on=false 表示镜头没动） */
   focus: lastFocus ? { on:lastFocus.on, why:lastFocus.why, keys:(lastFocus.keys || []).slice() } : null
 });

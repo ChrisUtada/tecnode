@@ -91,9 +91,14 @@ function render(){
     if (n.kind === "clue" && G.captured.has(n.id)) sub = "线索 · 已捕获";
     el.innerHTML = "<div class='n-title'>" + esc(n.label) + "</div><div class='n-sub'>" + esc(sub) + "</div>";
 
-    if (n.kind === "loc" && !G.explored.has(n.id) && condRoutes[n.id] && !inbound[n.id]){
-      const b = document.createElement("span"); b.className = "badge cond"; b.textContent = "条件进入"; el.appendChild(b);
-    } else if (n.kind === "loc" && !G.explored.has(n.id) && inbound[n.id] === 0 && !sceneLocs(n.id).length){
+    /* 「条件进入」角标已撤（2026-10-14，用户要求）。它是一枚**实心**药丸，和「新 / 对话 N」
+       挤在右上角同一排；而它想说的那件事别处已经说过两遍 —— 详情窗有「参与条件跳转」行，
+       可达性统计里有「需条件触发才能进 N 个」。节点上只该留「真的没路走」这一种警告。
+       注意 `!condRoutes[n.id]`：条件场景**本来就不该**掉进下面这条（旧代码靠 else-if 达到同一效果），
+       否则撤掉一枚角标的当天就会在同一个位置冒出另一枚，玩家只会以为"角标换了个字"。
+       condRoutes 本身保留 —— 上面说的那两处还在用它。 */
+    if (n.kind === "loc" && !G.explored.has(n.id) && inbound[n.id] === 0 &&
+        !condRoutes[n.id] && !sceneLocs(n.id).length){
       const b = document.createElement("span"); b.className = "badge warn"; b.textContent = "无文本入口"; el.appendChild(b);
     }
     /* 已固定：右键钉住的节点。必须看得见——它同时意味着「自动布局不挪它」

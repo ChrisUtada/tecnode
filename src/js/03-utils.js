@@ -72,10 +72,12 @@ function edgeBetween(aId, bId, kind){
    日志窗是本案的**案卷**，只记玩家关心的事，不记操作流水。写之前先问一句：
    「这条是玩家读得懂的结果吗，还是我刚替他按了一下按钮？」
    ✅ 记：捕获线索 / 结局 / 案件解锁、组合结果与失败、使用物品的结果、前往、
-          一切失败与拦截（缺线索 / 缺工具 / 密码错 / 推演不匹配）、人物与 TEC 对白、
+          一切失败与拦截（缺线索 / 缺工具 / 密码错 / 推演不匹配）、
           开局与换案的一条标记、以及「另有 N 个节点留在画布上」这类**有东西没被收走**的警告。
    ❌ 不记：展开与收起容器、收入与取出（证物袋 / 线索册）、叙事卡与记忆卡放映、
-          自动布局 / 撤销 / 重置等桌面操作、案件窗离屏、可达性统计，以及
+          撤销 / 重置等桌面操作、案件窗离屏、可达性统计、
+          **对话台词本身**（人物气泡与 TEC 窗里逐字都在，日志再抄一遍只是流水账；
+          但「这一句给出了线索」是结果，照记），以及
           「［消耗 X］［出现 X］［获得 X］」这类附属小行（已经并进上一条结果里）。
    理由：展开容器是全局最高频动作，一次一屏日志会把它冲成流水账；
    而真正要回头查的「我什么时候拿到这条线索」反被埋掉。（2026-10-14 按用户要求收口） */
@@ -105,7 +107,7 @@ function updateLogBadge(){
   if (!icon) return;
   let b = icon.querySelector(".badge");
   if (logUnread > 0){
-    if (!b){ b = document.createElement("span"); b.className = "badge cond"; icon.appendChild(b); }
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; icon.appendChild(b); }
     b.textContent = logUnread;
   } else if (b) b.remove();
 }

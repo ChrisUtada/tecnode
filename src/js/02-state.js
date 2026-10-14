@@ -10,8 +10,9 @@ function snapshot(){
   const nodes = {};
   /* 节点上只存「图结构 + 真正会变的状态」；容器身份不存（kind + 数据表现算），
      「新」角标（n.unread）也不存 —— 那是"玩家还没点过这个节点"，属于玩家知识，
-     跟 seenTexts 一个性质，不随撤销 / 续档回滚（见 restore 里的接力）。 */
-  for (const k in G.nodes){ const n = G.nodes[k]; nodes[k] = { key:n.key, kind:n.kind, id:n.id, label:n.label, x:n.x, y:n.y, lit:n.lit, pinned:n.pinned, homeScene:n.homeScene, stored:n.stored, storedIn:n.storedIn, bagFrom:n.bagFrom }; }
+     跟 seenTexts 一个性质，不随撤销 / 续档回滚（见 restore 里的接力）。
+     `installed` 要存：它是**真的会变的状态**（给唱机装上唱针），装没装上得跟着撤销 / 续档走。 */
+  for (const k in G.nodes){ const n = G.nodes[k]; nodes[k] = { key:n.key, kind:n.kind, id:n.id, label:n.label, x:n.x, y:n.y, lit:n.lit, pinned:n.pinned, homeScene:n.homeScene, stored:n.stored, storedIn:n.storedIn, bagFrom:n.bagFrom, installed:n.installed }; }
   return JSON.stringify({
     nodes: nodes, edges: G.edges,
     explored:[...G.explored], captured:[...G.captured], tried:[...G.tried],

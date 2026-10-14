@@ -79,6 +79,8 @@ window.__dropTargets = () => nodeDropTargets();
 window.__peopleToggle = () => togglePeopleWin();
 window.__roster = () => metChars().map(id => { const p = charProgress(id); return { id, name:(CHARS[id] || {}).name || id, prog:p.prog, total:p.total }; });
 window.__mxAssign = (k, s) => assignClue(k, s);
+window.__boardTake = (id, sense, cx, cy) => boardTake(id, sense, cx, cy);   /* 等价于把桌布上的 chip 拖出去 */
+window.__matrixItems = () => matrixItems().map(n => n.key);
 window.__infer = () => executeInference();
 window.__playStep = () => { if (memoryPlay) advanceMemory(); else if (endingState) playEndingStage(); };
 window.__intro = {
@@ -98,6 +100,8 @@ window.__closeCase = () => closeCase();
 window.__registerCase = (id, data) => { CASE_DATA[id] = data; };
 window.__caseDataOf = id => CASE_DATA[id];
 window.__unlockCase = id => unlockCase(id);
+window.__excerpt = (target, srcKey) => takeExcerpt(target, srcKey || sel);   /* 等价于点正文里的下划线 */
+window.__excerpts = id => excerptsOf(id).map(e => ({ text:e.text, to:e.to }));
 window.__caseInfo = () => ({
   id: CASE_ID,
   open: caseOpen,
@@ -117,6 +121,8 @@ window.__dump  = () => ({
   tec: { prog: Object.assign({}, G.tecProg), lastScene: G.lastScene },
   hidden: Object.keys(G.nodes).filter(k => G.nodes[k].hidden),
   stored: Object.keys(G.nodes).filter(k => G.nodes[k].stored),
+  /* 被收走的节点去哪儿了：BAG / LEDGER / MATRIX（归位的线索离开画布后落在桌布上） */
+  storedIn: (() => { const o = {}; for (const k in G.nodes){ if (G.nodes[k].stored) o[k] = G.nodes[k].storedIn; } return o; })(),
   bag: bagItems().map(n => n.key),
   ledger: ledgerItems().map(n => n.key),
   collapsed: [...G.collapsed],
@@ -131,8 +137,12 @@ window.__dump  = () => ({
   edges: G.edges.map(e => e.kind + ":" + e.a + ">" + e.b),
   explored: [...G.explored], captured: [...G.captured], tried: [...G.tried],
   history: history.length,
+  /* 镜头（无头环境量不到位移，但能读状态）：拖进拖出的落点换算 / 自动聚焦的对账都要它 */
+  view: { x: view.x, y: view.y, k: view.k },
   pos: (() => { const o = {}; for (const k in G.nodes){
     o[k] = { x: Math.round(G.nodes[k].x), y: Math.round(G.nodes[k].y), pinned: !!G.nodes[k].pinned }; } return o; })(),
+  /* 装上的零件（唱机 ← 唱针）：节点上的状态，撤销 / 续档跟着走 */
+  installed: (() => { const o = {}; for (const k in G.nodes){ if (G.nodes[k].installed) o[k] = Object.keys(G.nodes[k].installed); } return o; })(),
   /* 最近一次自动聚焦的「决定」（无头环境量不到镜头位移，量决定；on=false 表示镜头没动） */
   focus: lastFocus ? { on:lastFocus.on, why:lastFocus.why, keys:(lastFocus.keys || []).slice() } : null
 });

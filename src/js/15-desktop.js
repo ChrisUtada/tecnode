@@ -138,11 +138,11 @@ document.getElementById("ending-overlay").addEventListener("click", () => {
   playEndingStage();
 });
 tgFocus.addEventListener("change", applyFocus);
-document.getElementById("btn-relayout").addEventListener("click", () => {
-  if (!requireCase()) return;
-  Object.values(G.nodes).forEach(n => { n.pinned = false; });
-  layout(); render();
-});
+/* 这里原本有个「自动布局」按钮（重排 + 解除全部「已固定」）。2026-10-14 删掉：
+   layout() 的 seed() 对已有坐标的节点直接跳过，所以它只是在当前位置上再跑 260 轮弹簧迭代 ——
+   实测点一次会让 31/31 个节点整体晃 50~165px（既没整理出更清楚的图，也不收敛），
+   玩家能看见的实际效果只有"我摆好的位置被抖散了 + 钉住全没了"。
+   位置要留住就右键钉住（唯一的钉住入口），要重排就自己拖 —— 不再有全局重排这个动作。 */
 document.getElementById("btn-undo").addEventListener("click", () => {
   if (!requireCase()) return;
   if (!history.length){ log("没有可撤销的操作", "warn"); return; }
