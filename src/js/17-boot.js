@@ -113,7 +113,7 @@ window.__avatarOpen = () => openAvatarWin();
 window.__avatarPick = id => { avatarPickId = id; renderAvatarWin(); };
 window.__avatarConfirm = () => confirmAvatarPick();
 window.__select = key => key ? selectNode(key) : clearSelection();
-window.__closeFloats = () => { closeBubble(); closeNarr(); closePwPop(); };
+window.__closeFloats = () => { closeBubble(); closeDlgWin(); closeNarr(); closePwPop(); };
 window.__renarr = sid => renarrScene(sid);
 window.__hit   = (cx, cy) => { const e = hitTest(cx, cy, null); return e ? e.dataset.key : null; };
 window.__switchCase = id => enterCase(id);
@@ -149,7 +149,7 @@ window.__dump  = () => ({
   collapsed: [...G.collapsed],
   dim: G._dimKeys || [],
   sel: sel,
-  floats: { bubble: !!bubbleEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
+  floats: { bubble: !!bubbleEl, dlg: !!dlgWinEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
   matrix: JSON.parse(JSON.stringify(G.matrix)),
   endings: [...G.endings],
   endingOverlay: !!endingState,

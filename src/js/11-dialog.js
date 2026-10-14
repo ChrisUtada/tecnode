@@ -56,19 +56,89 @@ function talkClues(text, who){
   if (fresh.length)
     log("「" + esc(who) + "」的话里提到了线索：" + esc(fresh.map(id => (CLUES[id] && CLUES[id].label) || id).join("、")), "cap");
 }
-/* 角色说下一句：双击节点与点气泡共用这一条路径 */
+/* 角色说下一句：双击节点 / 点名册行 / 点对话窗 共用这一条路径。
+   呈现统一按 TEC 对话窗的布局（用户定稿）：头像列 + 文字历史逐条追加，不再用锚定气泡；
+   但**落位仍按旧气泡的规矩**（用户定稿）：窗体锚定在人物节点上方（挂 #world、JS 写内联
+   top/left），上方放不下退到下方 —— TEC 自己的助手窗才留在桌面右下角。
+   台词不循环：队列说完（prog >= queue.length）就停止推进 —— 点了也不再有新句。 */
+let dlgWinEl = null;                 /* 当前对话窗（单例：换角色 = 关旧开新；同角色 = 追加） */
+function closeDlgWin(){
+  if (dlgWinEl){ dlgWinEl.remove(); dlgWinEl = null; }
+}
+function openDlgWin(n, ch, lineText){
+  const name = ch.name || n.id;
+  const sameChar = dlgWinEl && dlgWinEl._charKey === n.key;
+  if (!sameChar) closeDlgWin();
+  if (!dlgWinEl){
+    const w = makeWindow("DIALOG // " + name, closeDlgWin);
+    const b = w.el;
+    /* 复用 TEC 对话窗的布局语言：CSS 用 .tec-win,.dlg-win 并列选择器（窗本体不挂 tec-win，
+       否则 verify 的 tecWinNode() 会把对话窗误认成 TEC 窗） */
+    b.className = "dlg-win syswin";
+    const body = document.createElement("div");
+    body.className = "tec-body";
+    const avCol = document.createElement("div");
+    avCol.className = "tec-avatar-col";
+    const av = document.createElement("div");
+    av.className = "tec-avatar";
+    const art = rosterAvatar(n.id);
+    if (art){
+      const im = document.createElement("img");
+      im.src = art; im.alt = name; im.draggable = false;
+      av.appendChild(im);
+    } else {
+      const ini = document.createElement("span");
+      ini.className = "dlg-ini"; ini.textContent = name.slice(0, 1);
+      av.appendChild(ini);
+    }
+    const avLabel = document.createElement("div");
+    avLabel.className = "tec-avatar-label"; avLabel.textContent = name;
+    avCol.appendChild(av); avCol.appendChild(avLabel);
+    const main = document.createElement("div");
+    main.className = "tec-main";
+    const lines = document.createElement("div");
+    lines.className = "tec-lines dlg-lines";
+    main.appendChild(lines);
+    const hint = document.createElement("div");
+    hint.className = "tec-hint";
+    hint.textContent = "点框内任意位置继续对话";
+    main.appendChild(hint);
+    body.appendChild(avCol); body.appendChild(main);
+    w.body.appendChild(body);
+    /* 点窗内任意位置 = 说下一句（与 TEC 窗同一套口径：拖过不算，挂窗根） */
+    b.addEventListener("click", () => {
+      if (b._dragged) return;
+      showCharLine(b._talkNode);
+    });
+    world.appendChild(b);                 /* 挂世界层：跟着画布坐标走，锚在人物节点上 */
+    makeFloatDraggable(b, true);          /* inWorld：拖动位移按视图缩放换算（同气泡 / 叙事卡） */
+    dlgWinEl = b;
+  }
+  dlgWinEl._charKey = n.key;
+  dlgWinEl._talkNode = n;
+  dlgWinEl.querySelector(".syswin-title").textContent = "DIALOG // " + name;
+  const lines = dlgWinEl.querySelector(".dlg-lines");
+  const d = document.createElement("div");
+  d.className = "tec-line";
+  d.textContent = lineText;
+  lines.appendChild(d);
+  lines.scrollTop = lines.scrollHeight;
+  /* 每说一句都重新锚定（旧气泡的规矩）：台词追加窗体变高，底边始终压在人物上方 12px；
+     上方被视图上沿裁掉就退到人物下方，不盖住节点本身。 */
+  anchorAboveOrBelow(dlgWinEl, n, 12);
+  return dlgWinEl;
+}
 function showCharLine(n){
   const ch = CHARS[n.id] || {};
   const queue = charTalkQueue(n);
   if (!queue.length) return false;
   const prog = G.talkProg[n.key] || 0;
-  const line = queue[Math.min(prog, queue.length - 1)];
-  if (prog < queue.length){
-    pushHistory();
-    G.talkProg[n.key] = prog + 1;
-    talkClues(line, ch.name || n.id);
-  }
-  showBubble(n, "DIALOG // " + (ch.name || n.id), plain(line), { adv: () => showCharLine(n) });
+  if (prog >= queue.length) return false;      /* 台词说完：停止推进，点了也不再有新句 */
+  const line = queue[prog];
+  pushHistory();
+  G.talkProg[n.key] = prog + 1;
+  talkClues(line, ch.name || n.id);
+  openDlgWin(n, ch, plain(line));
   render();
   selectNode(n.key);
   return true;
@@ -520,14 +590,15 @@ function tecAnalyze(key){
 }
 
 function tecTalk(){
-  /* 点击 = 闲聊（defaultTalks 轮换），不给实质提示：提示的唯一来源是「拖节点 → 分析」。
-     不进撤销栈——一句闲聊没有可撤销的状态。 */
+  /* 点击 = 闲聊（defaultTalks 逐条推进，不循环：说完就停，点了也不再有新句）。
+     不给实质提示：提示的唯一来源是「拖节点 → 分析」。不进撤销栈——一句闲聊没有可撤销的状态。 */
   const tec = CHARS["CHARS_TEC"] || {};
   const def = (tec.defaultTalks && tec.defaultTalks.length) ? tec.defaultTalks : (tec.talkQueue || []);
   if (!def.length){ if (!tecWinEl) toggleTecWin(); tecSay("（把节点拖到我身上，我来分析）"); return; }
   const idx = G.tecProg._def || 0;
+  if (idx >= def.length) return;              /* 台词说完：停止推进 */
   G.tecProg._def = idx + 1;
-  const line = plain(def[idx % def.length].text || "");
+  const line = plain(def[idx].text || "");
   if (!tecWinEl) toggleTecWin();
   tecSay(line);
   updateTecBadge();

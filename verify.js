@@ -578,16 +578,14 @@ assert('双击手电筒 → 点亮（lit）', window.__dump().lit.includes('item
 window.__cmd('ITEM_shoudiantong', 0);          // 再双击 → 关掉
 assert('再次双击手电筒 → 熄灭', !window.__dump().lit.includes('item:ITEM_shoudiantong'));
 
-/* 手电筒的光不算「桌上的光」：它亮着也翻不开手写笔记（笔记的光照门只认台灯） */
+/* 手电筒的光也算数：点亮手电筒（不开台灯）也能翻手写笔记（光照门认台灯或手电筒） */
 window.__cmd('ITEM_shoudiantong', 0);          // 重新打开
 assert('手电筒重新点亮', window.__dump().lit.includes('item:ITEM_shoudiantong'));
 window.__cmd('ITEM_sxbj', 0);
-assert('手电筒的光不当数：手写笔记仍然翻不开（光照门只认台灯）',
-  !['ITEMS_dsc', 'ITEMS_a4paper'].some(i => window.__dump().nodes.includes('item:' + i)));
-window.__cmd('ITEM_taideng', 0);               // 点亮台灯（书桌的光）
-window.__cmd('ITEM_sxbj', 0);
-assert('点亮台灯（而不是手电筒）才翻得开笔记',
-  window.__dump().nodes.includes('item:ITEMS_dsc'));
+assert('手电筒亮着翻笔记：植物笔记 / A4 纸照样长出来',
+  ['ITEMS_dsc', 'ITEMS_a4paper'].every(i => window.__dump().nodes.includes('item:' + i)));
+assert('手电筒路径成立时台灯确实没亮（排除台灯漏光）',
+  !window.__dump().lit.includes('item:ITEM_taideng'));
 
 /* 手电筒点亮 → 黑影现形 */
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
@@ -717,7 +715,7 @@ assert('点击 TEC 只轮换闲聊，不再翻场景档案', !window.__dump().te
 assert('TEC 图标不再挂「提示 N」角标（免费提示频道已拆）', !ids['tec-dock'].querySelector('.badge.talk'));
 const hBeforeTecTalk = window.__dump().history;
 window.__tecTalk();
-assert('闲聊轮换进度 2', window.__dump().tec.prog._def === 2);
+assert('闲聊进度 2（逐条推进，不循环）', window.__dump().tec.prog._def === 2);
 assert('闲聊不进撤销栈（没有可撤销的状态）', window.__dump().history === hBeforeTecTalk);
 
 window.__closeFloats();
@@ -1039,7 +1037,7 @@ tecWinNode().querySelector('.syswin-x')._ev.click[0]();
 assert('拖入用例收尾：窗口关闭、无卡片、无圆点',
   window.__dump().floats.tec === false && !chipOn() && !dotOf());
 
-console.log('\n=== 18d. 对话气泡：点框内任意位置推进下一句 ===');
+console.log('\n=== 18d. 角色对话窗（TEC 式头像+文字）：点框内推进、说完即停 ===');
 ids['btn-reset']._ev.click[0]();
 /* 用真实角色节点：CHARS_TEC 被 sceneTags() 过滤（TEC 只从桌面图标进对话窗，不当画布节点），
    所以改用 SCENES_lhsdst 里的 [char:CHARS_luhengs]。 */
@@ -1047,29 +1045,41 @@ window.__reveal('SCENES_lhsdst');
 window.__closeFloats();
 window.__talk('char:CHARS_luhengs');       /* 双击角色节点 = 说第一句 */
 const TALK_KEY = 'char:CHARS_luhengs';
-assert('双击角色节点弹出对话气泡', window.__dump().floats.bubble === true);
-const talkBub = ids['world'].children.find(c => c._classes.has('bubble'));
-assert('气泡仍是带 × 的系统窗（可点 / 可拖）', !!talkBub && !!talkBub.querySelector('.syswin-x'));
+assert('双击角色节点弹出对话窗（不再是气泡）',
+  window.__dump().floats.dlg === true && window.__dump().floats.bubble === false);
+const dlgEl = ids['world'].children.find(c => c._classes.has('dlg-win'));
+assert('对话窗锚定在人物上方（挂世界层、JS 写了内联 top/left）',
+  !!dlgEl && dlgEl.parentNode === ids['world'] &&
+  dlgEl.style.top !== '' && dlgEl.style.top !== 'auto' && dlgEl.style.left !== 'auto');
+assert('对话窗是 TEC 式布局：头像列 + 文字历史', !!dlgEl && !!dlgEl.querySelector('.tec-avatar-col') && !!dlgEl.querySelector('.dlg-lines'));
+assert('对话窗仍是带 × 的系统窗（可点 / 可拖）', !!dlgEl && !!dlgEl.querySelector('.syswin-x'));
+assert('无美术稿角色头像位退首字方块', !!dlgEl && !!dlgEl.querySelector('.dlg-ini'));
+const dlgLinesN = () => dlgEl.querySelector('.dlg-lines').children.length;
 const tp1 = window.__dump().talk[TALK_KEY] || 0;
-assert('第一句已计入对话进度', tp1 >= 1);
-/* 打字中点击：先补全本句、不推进（用户选定口径）；stub 里 typeInto 同步跑完，手动立 _typing 复现 */
-talkBub._typing = true;
-talkBub._ev.click[0]();
-assert('打字中点击先补全本句、不推进', (window.__dump().talk[TALK_KEY] || 0) === tp1);
-assert('补全后打字态已解除', talkBub._typing === false);
-talkBub._ev.click[0]();                    /* 再点一次 = 点框内任意位置推进 */
+assert('第一句已计入对话进度且历史有一行', tp1 >= 1 && dlgLinesN() === 1);
+dlgEl._ev.click[0]();                      /* 点窗内任意位置 = 说下一句 */
 const tp2 = window.__dump().talk[TALK_KEY] || 0;
-assert('点气泡任意位置 = 推进下一句', tp2 === tp1 + 1);
+assert('点窗内推进下一句（历史追加，不换窗）', tp2 === tp1 + 1 && dlgLinesN() === 2);
 /* 拖过的那一次点击不算推进（makeFloatDraggable 的 _dragged 判据） */
-const talkBub2 = ids['world'].children.find(c => c._classes.has('bubble'));
-assert('点完之后是新的一块气泡', !!talkBub2 && talkBub2 !== talkBub);
-talkBub2._ev.pointerdown[0]({ button: 0, pointerId: 1, clientX: 400, clientY: 400, stopPropagation(){}, preventDefault(){} });
-talkBub2._ev.pointermove[0]({ clientX: 470, clientY: 436 });
-talkBub2._ev.pointerup[0]({});
-talkBub2._ev.click[0]();
+dlgEl._ev.pointerdown[0]({ button: 0, pointerId: 1, clientX: 400, clientY: 400, stopPropagation(){}, preventDefault(){} });
+dlgEl._ev.pointermove[0]({ clientX: 470, clientY: 436 });
+dlgEl._ev.pointerup[0]({});
+dlgEl._ev.click[0]();
 assert('拖过之后紧跟的那次点击不推进', (window.__dump().talk[TALK_KEY] || 0) === tp2);
+/* 台词不循环：把队列说完，再点也不推进、不加行（停止推进） */
+const talkTotal = window.__roster().find(r => r.id === 'CHARS_luhengs').total;
+dlgEl._dragged = false;                    /* 上面拖动模拟留下的 _dragged 在 stub 里没人复位（真机由下次 pointerdown 复位） */
+while ((window.__dump().talk[TALK_KEY] || 0) < talkTotal) dlgEl._ev.click[0]();
+const progFull = window.__dump().talk[TALK_KEY] || 0;
+const linesFull = dlgLinesN();
+dlgEl._ev.click[0]();
+dlgEl._ev.click[0]();
+assert('台词说完后再点：停止推进、不加行、窗不重开',
+  (window.__dump().talk[TALK_KEY] || 0) === progFull && dlgLinesN() === linesFull &&
+  window.__dump().floats.dlg === true);
+assert('说完进度等于队列总长（陆珩松 base+场景共 ' + talkTotal + ' 句）', progFull === talkTotal);
 window.__closeFloats();
-assert('关闭浮层后气泡消失', window.__dump().floats.bubble === false);
+assert('关闭浮层后对话窗消失', window.__dump().floats.dlg === false);
 
 console.log('\n=== 18e. TEC 对话窗：点框内任意位置推进 ===');
 ids['btn-reset']._ev.click[0]();
@@ -1085,6 +1095,18 @@ const tp0 = window.__dump().tec.prog['SCENES_garden'] || 0;
 twEl._ev.click[0]();                     /* 点窗内任意位置（真机里子元素点击会冒泡到这里） */
 assert('点 TEC 窗内任意位置 = 说闲聊（历史 +1 行）', tlines() === tl0 + 1);
 assert('点击闲聊不再推进场景档案进度', (window.__dump().tec.prog['SCENES_garden'] || 0) === tp0);
+/* 闲聊不循环：3 条说完后再点，停止推进 —— 不加行也不报错 */
+twEl._ev.click[0]();
+twEl._ev.click[0]();
+const tlDone = tlines();
+assert('TEC 三条闲聊说完（defaultTalks 共 3 条）', tlDone === tl0 + 3);
+console.log('DBG 18e: tl0=' + tl0 + ' tlDone=' + tlDone + ' _def=' + window.__dump().tec.prog._def +
+  ' twEl=' + (twEl.parentNode ? 'in-dom' : 'detached') + ' floats.tec=' + window.__dump().floats.tec);
+twEl._ev.click[0]();
+console.log('DBG after click4: lines=' + tlines() + ' _def=' + window.__dump().tec.prog._def);
+twEl._ev.click[0]();
+console.log('DBG after click5: lines=' + tlines() + ' _def=' + window.__dump().tec.prog._def);
+assert('说完后再点：停止推进、不加行', tlines() === tlDone);
 /* 拖过 TEC 窗之后紧跟的那一次点击不算推进（_dragged 判据） */
 twEl._ev.pointerdown[0]({ button: 0, pointerId: 1, clientX: 400, clientY: 400, stopPropagation(){}, preventDefault(){} });
 twEl._ev.pointermove[0]({ clientX: 470, clientY: 436 });
@@ -1920,7 +1942,7 @@ fire(zsRow, 'click', {});
 assert('点人物一行 = 选中该角色节点', window.__dump().sel === 'char:CHARS_zs');
 assert('点人物一行 = 说出第一句（对话进度 +1）', window.__dump().talk['char:CHARS_zs'] === 1);
 assert('点完人物窗仍开着（可以接着点下一个人）', window.__dump().floats.people === true);
-assert('名册行随之刷新出对话进度', rowByLabel('朱穗').querySelector('.st').textContent === '对话 1/1');
+assert('名册行随之刷新出对话状态词（不再显示条数）', rowByLabel('朱穗').querySelector('.st').textContent === '已聊完');
 assert('说完的角色行标上 done', rowByLabel('朱穗')._classes.has('done'));
 /* 点常驻两行 = 打开各自的窗（他们都没有画布节点，绝不该「叫到画布上」） */
 fire(rowByLabel('TEC'), 'click', {});
@@ -1982,8 +2004,8 @@ assert('两扇收纳窗同层（z-index 25）且都带拖动手型',
   /\.clue-win:active\{cursor:grabbing\}/.test(html));
 assert('线索册窗也有悬停虚线高亮（与证物袋同款）',
   /\.clue-win\.over\{[^}]*outline:2px dashed var\(--text\)/.test(html));
-assert('两扇收纳窗的清理点对齐：换案 / 重置显式负责，boot 不再收',
-  html.indexOf('saveCaseState(from); resetTec(); closeBagWin(); closeClueWin();') > 0 &&
+assert('两扇收纳窗的清理点对齐：换案 / 重置显式负责，boot 不再收（对话窗跟 resetTec 同点清理）',
+  html.indexOf('saveCaseState(from); resetTec(); closeDlgWin(); closeBagWin(); closeClueWin();') > 0 &&
   html.indexOf('closeBagWin();             /* 证物袋窗同理') > 0 &&
   html.indexOf('closeClueWin();            /* 线索册窗与证物袋同级') > 0 &&
   html.indexOf('refreshClueWin();  /* 册窗同理（同样是常驻窗，恢复的图变了） */') > 0);
@@ -2299,7 +2321,7 @@ window.__reveal('SCENES_mdhm');
 let l33c = logs.length;
 window.__talk('char:CHARS_zs');
 assert('人物说第一句不写日志（台词不进案卷）', logs.length === l33c);
-assert('台词仍进了对话框（气泡弹出）', window.__dump().floats.bubble === true);
+assert('台词仍进了对话窗（对话窗弹出）', window.__dump().floats.dlg === true);
 /* 一路点到第 6 句：那一句里带 [clue:CLUES_qsan] */
 for (let i = 0; i < 4; i++) window.__talk('char:CHARS_zs');
 assert('台词句句不写日志（1..5 句）', logs.length === l33c);

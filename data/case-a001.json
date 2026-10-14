@@ -515,9 +515,12 @@
         {
           "type": "reveal",
           "label": "翻阅手写笔记",
-          "requiresLit": "ITEM_taideng",
-          "value": "就着昏黄的灯光翻开手写植物笔记：大丽花、洋金花、大豕草、石蒜……全是与植物有关的记录。在笔记的最下面，还压着一张A4大小的纸。",
-          "failMessage": "光线太暗，纸页上的字迹一片模糊。也许该先点亮台灯。",
+          "requiresLit": [
+            "ITEM_taideng",
+            "ITEM_shoudiantong"
+          ],
+          "value": "借着光翻开手写植物笔记：大丽花、洋金花、大豕草、石蒜……全是与植物有关的记录。在笔记的最下面，还压着一张A4大小的纸。",
+          "failMessage": "光线太暗，纸页上的字迹一片模糊。也许该点亮台灯，或者打开手电筒。",
           "items": [
             "ITEMS_dlh",
             "ITEMS_yjh",

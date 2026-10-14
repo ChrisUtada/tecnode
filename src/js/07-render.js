@@ -113,10 +113,8 @@ function render(){
     if (n.unread){
       const b = document.createElement("span"); b.className = "badge new"; b.textContent = "新"; el.appendChild(b);
     }
-    if (n.kind === "char"){
-      const unread = charTalkQueue(n).length - (G.talkProg[n.key] || 0);
-      if (unread > 0){ const b = document.createElement("span"); b.className = "badge talk"; b.textContent = "对话 " + unread; el.appendChild(b); }
-    }
+    /* 「对话 N」角标已撤（2026-10-15，用户要求节点上不显示条数）：能不能继续聊，
+       详情窗状态行与名册行都有状态词，对话呈现统一走 TEC 式对话窗（11-dialog.js）。 */
     attachInteractions(el, n);
     nodeLayer.appendChild(el);
     n.el = el;

@@ -34,9 +34,14 @@
   .tec-win{position:absolute; right:14px; bottom:96px; width:332px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:28; overflow:hidden}
-  .tec-win .tec-lines{max-height:240px; overflow:auto; margin-bottom:8px}
-  .tec-win .tec-line{font-size:12px; line-height:1.7; padding:3px 0; border-bottom:1px dashed var(--line2)}
-  .tec-win .tec-hint{font-size:10.5px; color:var(--faint); margin-top:6px}
+  /* 人物对话窗（.dlg-win）：布局语言同 TEC 窗，但**不占桌面右下角** ——
+     挂在 #world 里、由 JS 锚定到人物节点上方（内联 top/left，同气泡 / 叙事卡） */
+  .dlg-win{position:absolute; width:332px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:28; overflow:hidden}
+  .tec-win .tec-lines, .dlg-win .tec-lines{max-height:240px; overflow:auto; margin-bottom:8px}
+  .tec-win .tec-line, .dlg-win .tec-line{font-size:12px; line-height:1.7; padding:3px 0; border-bottom:1px dashed var(--line2)}
+  .tec-win .tec-hint, .dlg-win .tec-hint{font-size:10.5px; color:var(--faint); margin-top:6px}
   .bag-win{position:absolute; left:14px; bottom:96px; width:280px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:25; cursor:grab; overflow:hidden}
@@ -183,7 +188,7 @@
   .memory .syswin-bar{background:#2b2b26}
   .memory .syswin-title{color:#e6e3d2}
   .memory .syswin-rule{border-color:#8a8672}
-  .memory .syswin-x{border-color:#8a8672; color:#e6e3d2; background:transparent}
+  .memory .syswin-x{border-color:#8a8672; color:#e6e3d2; background:#2b2b26}
   .mem-line{margin-bottom:6px}
   .mem-line.talk{color:#5c584a}
   #ending-overlay{position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(24,23,20,.97);
@@ -339,13 +344,17 @@
     animation-name:tecana; animation-duration:1s; animation-timing-function:linear; animation-fill-mode:forwards}
   #tec-chip .tc-dot{position:absolute; right:-4px; top:-4px; width:11px; height:11px; border-radius:999px;
     background:var(--text); box-shadow:0 0 0 2px var(--card), 0 0 0 3px var(--edge); animation:pop .3s ease}
-  .tec-win .tec-body{display:flex; gap:10px; align-items:stretch}
-  .tec-win .tec-avatar-col{display:flex; flex-direction:column; align-items:center; gap:5px; width:74px; flex:0 0 74px; padding-top:2px}
-  .tec-win .tec-avatar{width:60px; height:60px; border-radius:12px; overflow:hidden; border:1px solid var(--edge); box-shadow:var(--raise-sm); cursor:pointer; background:var(--face-hi); pointer-events:auto}
-  .tec-win .tec-avatar img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  .tec-win .tec-body, .dlg-win .tec-body{display:flex; gap:10px; align-items:stretch}
+  .tec-win .tec-avatar-col, .dlg-win .tec-avatar-col{display:flex; flex-direction:column; align-items:center; gap:5px; width:74px; flex:0 0 74px; padding-top:2px}
+  .tec-win .tec-avatar, .dlg-win .tec-avatar{width:60px; height:60px; border-radius:12px; overflow:hidden; border:1px solid var(--edge); box-shadow:var(--raise-sm); cursor:pointer; background:var(--face-hi); pointer-events:auto}
+  .tec-win .tec-avatar img, .dlg-win .tec-avatar img{width:100%; height:100%; display:block; image-rendering:pixelated}
   .tec-win .tec-avatar.over{outline:2px dashed var(--text); outline-offset:3px}
-  .tec-win .tec-avatar-label{font-size:10.5px; font-weight:700; letter-spacing:1px; color:var(--muted)}
-  .tec-win .tec-main{flex:1 1 auto; min-width:0; display:flex; flex-direction:column}
+  .tec-win .tec-avatar-label, .dlg-win .tec-avatar-label{font-size:10.5px; font-weight:700; letter-spacing:1px; color:var(--muted)}
+  /* 人物对话窗（.dlg-win）：无美术稿的角色头像位退「首字方块」 */
+  .dlg-win .dlg-ini{display:flex; align-items:center; justify-content:center;
+    width:100%; height:100%; font-size:26px; font-weight:700; color:var(--muted)}
+  .dlg-win .tec-avatar{cursor:default}
+  .tec-win .tec-main, .dlg-win .tec-main{flex:1 1 auto; min-width:0; display:flex; flex-direction:column}
   .tec-win .tec-analyzing{margin:0 0 8px; padding:7px 9px; border-radius:var(--r-sm); background:var(--bg); box-shadow:var(--press)}
   .tec-win .tec-analyzing .ta-head{font-size:11px; color:var(--muted); margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .tec-win .tec-analyzing .ta-bar{height:6px; border-radius:4px; background:var(--face-lo); box-shadow:var(--press); overflow:hidden}
@@ -406,5 +415,5 @@
   .music-win .music-ibtn svg{display:block}
   /* 详情面板「播放音乐」按钮：图标与文字对齐 */
   #dt-play-music svg{vertical-align:-3px; margin-right:2px}
-  .bubble, .narr-card{cursor:grab}
-  .bubble:active, .narr-card:active{cursor:grabbing}
+  .bubble, .narr-card, .dlg-win{cursor:grab}
+  .bubble:active, .narr-card:active, .dlg-win:active{cursor:grabbing}

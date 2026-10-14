@@ -331,7 +331,7 @@ function enterCase(id){
 function doEnterCase(id, from){
   const c = caseById(id);
   const snap = loadCaseState(id);    /* 先把目标案的档读出来，再存旧案，免得两边撞在一起 */
-  if (from){ saveCaseState(from); resetTec(); closeBagWin(); closeClueWin(); }   /* 只有换案才清 TEC 与两扇收纳窗；同案回访保留 */
+  if (from){ saveCaseState(from); resetTec(); closeDlgWin(); closeBagWin(); closeClueWin(); }   /* 只有换案才清 TEC、对话窗与两扇收纳窗；同案回访保留 */
   applyCaseData(CASE_DATA[id]);      /* 2. 载目标案数据 */
   CASE_ID = id;
   progress.last = id; saveProgress();

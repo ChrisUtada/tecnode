@@ -192,9 +192,14 @@
   .tec-win{position:absolute; right:14px; bottom:96px; width:332px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:28; overflow:hidden}
-  .tec-win .tec-lines{max-height:240px; overflow:auto; margin-bottom:8px}
-  .tec-win .tec-line{font-size:12px; line-height:1.7; padding:3px 0; border-bottom:1px dashed var(--line2)}
-  .tec-win .tec-hint{font-size:10.5px; color:var(--faint); margin-top:6px}
+  /* 人物对话窗（.dlg-win）：布局语言同 TEC 窗，但**不占桌面右下角** ——
+     挂在 #world 里、由 JS 锚定到人物节点上方（内联 top/left，同气泡 / 叙事卡） */
+  .dlg-win{position:absolute; width:332px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:28; overflow:hidden}
+  .tec-win .tec-lines, .dlg-win .tec-lines{max-height:240px; overflow:auto; margin-bottom:8px}
+  .tec-win .tec-line, .dlg-win .tec-line{font-size:12px; line-height:1.7; padding:3px 0; border-bottom:1px dashed var(--line2)}
+  .tec-win .tec-hint, .dlg-win .tec-hint{font-size:10.5px; color:var(--faint); margin-top:6px}
   .bag-win{position:absolute; left:14px; bottom:96px; width:280px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:25; cursor:grab; overflow:hidden}
@@ -341,7 +346,7 @@
   .memory .syswin-bar{background:#2b2b26}
   .memory .syswin-title{color:#e6e3d2}
   .memory .syswin-rule{border-color:#8a8672}
-  .memory .syswin-x{border-color:#8a8672; color:#e6e3d2; background:transparent}
+  .memory .syswin-x{border-color:#8a8672; color:#e6e3d2; background:#2b2b26}
   .mem-line{margin-bottom:6px}
   .mem-line.talk{color:#5c584a}
   #ending-overlay{position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(24,23,20,.97);
@@ -497,13 +502,17 @@
     animation-name:tecana; animation-duration:1s; animation-timing-function:linear; animation-fill-mode:forwards}
   #tec-chip .tc-dot{position:absolute; right:-4px; top:-4px; width:11px; height:11px; border-radius:999px;
     background:var(--text); box-shadow:0 0 0 2px var(--card), 0 0 0 3px var(--edge); animation:pop .3s ease}
-  .tec-win .tec-body{display:flex; gap:10px; align-items:stretch}
-  .tec-win .tec-avatar-col{display:flex; flex-direction:column; align-items:center; gap:5px; width:74px; flex:0 0 74px; padding-top:2px}
-  .tec-win .tec-avatar{width:60px; height:60px; border-radius:12px; overflow:hidden; border:1px solid var(--edge); box-shadow:var(--raise-sm); cursor:pointer; background:var(--face-hi); pointer-events:auto}
-  .tec-win .tec-avatar img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  .tec-win .tec-body, .dlg-win .tec-body{display:flex; gap:10px; align-items:stretch}
+  .tec-win .tec-avatar-col, .dlg-win .tec-avatar-col{display:flex; flex-direction:column; align-items:center; gap:5px; width:74px; flex:0 0 74px; padding-top:2px}
+  .tec-win .tec-avatar, .dlg-win .tec-avatar{width:60px; height:60px; border-radius:12px; overflow:hidden; border:1px solid var(--edge); box-shadow:var(--raise-sm); cursor:pointer; background:var(--face-hi); pointer-events:auto}
+  .tec-win .tec-avatar img, .dlg-win .tec-avatar img{width:100%; height:100%; display:block; image-rendering:pixelated}
   .tec-win .tec-avatar.over{outline:2px dashed var(--text); outline-offset:3px}
-  .tec-win .tec-avatar-label{font-size:10.5px; font-weight:700; letter-spacing:1px; color:var(--muted)}
-  .tec-win .tec-main{flex:1 1 auto; min-width:0; display:flex; flex-direction:column}
+  .tec-win .tec-avatar-label, .dlg-win .tec-avatar-label{font-size:10.5px; font-weight:700; letter-spacing:1px; color:var(--muted)}
+  /* 人物对话窗（.dlg-win）：无美术稿的角色头像位退「首字方块」 */
+  .dlg-win .dlg-ini{display:flex; align-items:center; justify-content:center;
+    width:100%; height:100%; font-size:26px; font-weight:700; color:var(--muted)}
+  .dlg-win .tec-avatar{cursor:default}
+  .tec-win .tec-main, .dlg-win .tec-main{flex:1 1 auto; min-width:0; display:flex; flex-direction:column}
   .tec-win .tec-analyzing{margin:0 0 8px; padding:7px 9px; border-radius:var(--r-sm); background:var(--bg); box-shadow:var(--press)}
   .tec-win .tec-analyzing .ta-head{font-size:11px; color:var(--muted); margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .tec-win .tec-analyzing .ta-bar{height:6px; border-radius:4px; background:var(--face-lo); box-shadow:var(--press); overflow:hidden}
@@ -564,8 +573,8 @@
   .music-win .music-ibtn svg{display:block}
   /* 详情面板「播放音乐」按钮：图标与文字对齐 */
   #dt-play-music svg{vertical-align:-3px; margin-right:2px}
-  .bubble, .narr-card{cursor:grab}
-  .bubble:active, .narr-card:active{cursor:grabbing}
+  .bubble, .narr-card, .dlg-win{cursor:grab}
+  .bubble:active, .narr-card:active, .dlg-win:active{cursor:grabbing}
   .syswin{overflow:hidden; padding:0}
   .syswin-bar{display:flex; justify-content:center; align-items:center; position:relative;
     background:linear-gradient(180deg,rgba(255,252,241,.6),rgba(255,252,241,0)); border-bottom:1px solid var(--edge-soft); padding:5px 6px;
@@ -1626,10 +1635,8 @@ function render(){
     if (n.unread){
       const b = document.createElement("span"); b.className = "badge new"; b.textContent = "新"; el.appendChild(b);
     }
-    if (n.kind === "char"){
-      const unread = charTalkQueue(n).length - (G.talkProg[n.key] || 0);
-      if (unread > 0){ const b = document.createElement("span"); b.className = "badge talk"; b.textContent = "对话 " + unread; el.appendChild(b); }
-    }
+    /* 「对话 N」角标已撤（2026-10-15，用户要求节点上不显示条数）：能不能继续聊，
+       详情窗状态行与名册行都有状态词，对话呈现统一走 TEC 式对话窗（11-dialog.js）。 */
     attachInteractions(el, n);
     nodeLayer.appendChild(el);
     n.el = el;
@@ -2426,19 +2433,89 @@ function talkClues(text, who){
   if (fresh.length)
     log("「" + esc(who) + "」的话里提到了线索：" + esc(fresh.map(id => (CLUES[id] && CLUES[id].label) || id).join("、")), "cap");
 }
-/* 角色说下一句：双击节点与点气泡共用这一条路径 */
+/* 角色说下一句：双击节点 / 点名册行 / 点对话窗 共用这一条路径。
+   呈现统一按 TEC 对话窗的布局（用户定稿）：头像列 + 文字历史逐条追加，不再用锚定气泡；
+   但**落位仍按旧气泡的规矩**（用户定稿）：窗体锚定在人物节点上方（挂 #world、JS 写内联
+   top/left），上方放不下退到下方 —— TEC 自己的助手窗才留在桌面右下角。
+   台词不循环：队列说完（prog >= queue.length）就停止推进 —— 点了也不再有新句。 */
+let dlgWinEl = null;                 /* 当前对话窗（单例：换角色 = 关旧开新；同角色 = 追加） */
+function closeDlgWin(){
+  if (dlgWinEl){ dlgWinEl.remove(); dlgWinEl = null; }
+}
+function openDlgWin(n, ch, lineText){
+  const name = ch.name || n.id;
+  const sameChar = dlgWinEl && dlgWinEl._charKey === n.key;
+  if (!sameChar) closeDlgWin();
+  if (!dlgWinEl){
+    const w = makeWindow("DIALOG // " + name, closeDlgWin);
+    const b = w.el;
+    /* 复用 TEC 对话窗的布局语言：CSS 用 .tec-win,.dlg-win 并列选择器（窗本体不挂 tec-win，
+       否则 verify 的 tecWinNode() 会把对话窗误认成 TEC 窗） */
+    b.className = "dlg-win syswin";
+    const body = document.createElement("div");
+    body.className = "tec-body";
+    const avCol = document.createElement("div");
+    avCol.className = "tec-avatar-col";
+    const av = document.createElement("div");
+    av.className = "tec-avatar";
+    const art = rosterAvatar(n.id);
+    if (art){
+      const im = document.createElement("img");
+      im.src = art; im.alt = name; im.draggable = false;
+      av.appendChild(im);
+    } else {
+      const ini = document.createElement("span");
+      ini.className = "dlg-ini"; ini.textContent = name.slice(0, 1);
+      av.appendChild(ini);
+    }
+    const avLabel = document.createElement("div");
+    avLabel.className = "tec-avatar-label"; avLabel.textContent = name;
+    avCol.appendChild(av); avCol.appendChild(avLabel);
+    const main = document.createElement("div");
+    main.className = "tec-main";
+    const lines = document.createElement("div");
+    lines.className = "tec-lines dlg-lines";
+    main.appendChild(lines);
+    const hint = document.createElement("div");
+    hint.className = "tec-hint";
+    hint.textContent = "点框内任意位置继续对话";
+    main.appendChild(hint);
+    body.appendChild(avCol); body.appendChild(main);
+    w.body.appendChild(body);
+    /* 点窗内任意位置 = 说下一句（与 TEC 窗同一套口径：拖过不算，挂窗根） */
+    b.addEventListener("click", () => {
+      if (b._dragged) return;
+      showCharLine(b._talkNode);
+    });
+    world.appendChild(b);                 /* 挂世界层：跟着画布坐标走，锚在人物节点上 */
+    makeFloatDraggable(b, true);          /* inWorld：拖动位移按视图缩放换算（同气泡 / 叙事卡） */
+    dlgWinEl = b;
+  }
+  dlgWinEl._charKey = n.key;
+  dlgWinEl._talkNode = n;
+  dlgWinEl.querySelector(".syswin-title").textContent = "DIALOG // " + name;
+  const lines = dlgWinEl.querySelector(".dlg-lines");
+  const d = document.createElement("div");
+  d.className = "tec-line";
+  d.textContent = lineText;
+  lines.appendChild(d);
+  lines.scrollTop = lines.scrollHeight;
+  /* 每说一句都重新锚定（旧气泡的规矩）：台词追加窗体变高，底边始终压在人物上方 12px；
+     上方被视图上沿裁掉就退到人物下方，不盖住节点本身。 */
+  anchorAboveOrBelow(dlgWinEl, n, 12);
+  return dlgWinEl;
+}
 function showCharLine(n){
   const ch = CHARS[n.id] || {};
   const queue = charTalkQueue(n);
   if (!queue.length) return false;
   const prog = G.talkProg[n.key] || 0;
-  const line = queue[Math.min(prog, queue.length - 1)];
-  if (prog < queue.length){
-    pushHistory();
-    G.talkProg[n.key] = prog + 1;
-    talkClues(line, ch.name || n.id);
-  }
-  showBubble(n, "DIALOG // " + (ch.name || n.id), plain(line), { adv: () => showCharLine(n) });
+  if (prog >= queue.length) return false;      /* 台词说完：停止推进，点了也不再有新句 */
+  const line = queue[prog];
+  pushHistory();
+  G.talkProg[n.key] = prog + 1;
+  talkClues(line, ch.name || n.id);
+  openDlgWin(n, ch, plain(line));
   render();
   selectNode(n.key);
   return true;
@@ -2890,14 +2967,15 @@ function tecAnalyze(key){
 }
 
 function tecTalk(){
-  /* 点击 = 闲聊（defaultTalks 轮换），不给实质提示：提示的唯一来源是「拖节点 → 分析」。
-     不进撤销栈——一句闲聊没有可撤销的状态。 */
+  /* 点击 = 闲聊（defaultTalks 逐条推进，不循环：说完就停，点了也不再有新句）。
+     不给实质提示：提示的唯一来源是「拖节点 → 分析」。不进撤销栈——一句闲聊没有可撤销的状态。 */
   const tec = CHARS["CHARS_TEC"] || {};
   const def = (tec.defaultTalks && tec.defaultTalks.length) ? tec.defaultTalks : (tec.talkQueue || []);
   if (!def.length){ if (!tecWinEl) toggleTecWin(); tecSay("（把节点拖到我身上，我来分析）"); return; }
   const idx = G.tecProg._def || 0;
+  if (idx >= def.length) return;              /* 台词说完：停止推进 */
   G.tecProg._def = idx + 1;
-  const line = plain(def[idx % def.length].text || "");
+  const line = plain(def[idx].text || "");
   if (!tecWinEl) toggleTecWin();
   tecSay(line);
   updateTecBadge();
@@ -3240,8 +3318,9 @@ function refreshPeopleWin(){
     const ds = document.createElement("span"); ds.className = "ds"; ds.textContent = (pin && pin.desc) || ch.desc || "";
     box.appendChild(ds);
     const st = document.createElement("span"); st.className = "st";
+    /* 对话状态只给状态词不给条数（用户要求 UI 上不出现 x/y 计数） */
     st.textContent = pin ? pin.tag
-      : (pr.total ? (pr.prog ? "对话 " + pr.prog + "/" + pr.total : "未交谈") : "无对话文本");
+      : (pr.total ? (pr.prog >= pr.total ? "已聊完" : (pr.prog ? "可继续" : "未交谈")) : "无对话文本");
     d.appendChild(av); d.appendChild(box); d.appendChild(st);
     d.addEventListener("click", () => { if (pin) pin.open(); else gotoChar(id); });
     body.appendChild(d);
@@ -3686,7 +3765,7 @@ function paintDetail(){
   } else if (n.kind === "char"){
     const c = CHARS[n.id] || {};
     html += "<div class='ddesc'>" + esc(plain(c.desc || "（无描述）")) + "</div>";
-    html += "<div class='drow'>状态：对话进度 " + (G.talkProg[n.key] || 0) + "/" + charTalkQueue(n).length + "</div>";
+    html += "<div class='drow'>状态：" + ((G.talkProg[n.key] || 0) >= charTalkQueue(n).length ? "已聊完" : "可对话") + "</div>";
   } else {
     /* 物品 */
     const it = ITEMS[n.id] || {};
@@ -4034,6 +4113,7 @@ document.getElementById("btn-reset").addEventListener("click", () => {
   history = [];
   clearCaseState(CASE_ID);   /* 重置也清掉本案存档，避免下次回访又续上旧进度 */
   resetTec();                /* 重置是全新开局，TEC 也一并清空 */
+  closeDlgWin();             /* 角色对话窗跟着清（台词进度已随 G 重置，旧窗挂在失效节点上） */
   closeBagWin();             /* 证物袋窗同理：常驻于离屏/回访，不常驻于重置 */
   closeClueWin();            /* 线索册窗与证物袋同级：同样只在此处与换案时清 */
   boot();
@@ -4397,7 +4477,7 @@ function enterCase(id){
 function doEnterCase(id, from){
   const c = caseById(id);
   const snap = loadCaseState(id);    /* 先把目标案的档读出来，再存旧案，免得两边撞在一起 */
-  if (from){ saveCaseState(from); resetTec(); closeBagWin(); closeClueWin(); }   /* 只有换案才清 TEC 与两扇收纳窗；同案回访保留 */
+  if (from){ saveCaseState(from); resetTec(); closeDlgWin(); closeBagWin(); closeClueWin(); }   /* 只有换案才清 TEC、对话窗与两扇收纳窗；同案回访保留 */
   applyCaseData(CASE_DATA[id]);      /* 2. 载目标案数据 */
   CASE_ID = id;
   progress.last = id; saveProgress();
@@ -5249,7 +5329,7 @@ window.__avatarOpen = () => openAvatarWin();
 window.__avatarPick = id => { avatarPickId = id; renderAvatarWin(); };
 window.__avatarConfirm = () => confirmAvatarPick();
 window.__select = key => key ? selectNode(key) : clearSelection();
-window.__closeFloats = () => { closeBubble(); closeNarr(); closePwPop(); };
+window.__closeFloats = () => { closeBubble(); closeDlgWin(); closeNarr(); closePwPop(); };
 window.__renarr = sid => renarrScene(sid);
 window.__hit   = (cx, cy) => { const e = hitTest(cx, cy, null); return e ? e.dataset.key : null; };
 window.__switchCase = id => enterCase(id);
@@ -5285,7 +5365,7 @@ window.__dump  = () => ({
   collapsed: [...G.collapsed],
   dim: G._dimKeys || [],
   sel: sel,
-  floats: { bubble: !!bubbleEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
+  floats: { bubble: !!bubbleEl, dlg: !!dlgWinEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
   matrix: JSON.parse(JSON.stringify(G.matrix)),
   endings: [...G.endings],
   endingOverlay: !!endingState,

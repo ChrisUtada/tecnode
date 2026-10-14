@@ -36,7 +36,7 @@ function paintDetail(){
   } else if (n.kind === "char"){
     const c = CHARS[n.id] || {};
     html += "<div class='ddesc'>" + esc(plain(c.desc || "（无描述）")) + "</div>";
-    html += "<div class='drow'>状态：对话进度 " + (G.talkProg[n.key] || 0) + "/" + charTalkQueue(n).length + "</div>";
+    html += "<div class='drow'>状态：" + ((G.talkProg[n.key] || 0) >= charTalkQueue(n).length ? "已聊完" : "可对话") + "</div>";
   } else {
     /* 物品 */
     const it = ITEMS[n.id] || {};

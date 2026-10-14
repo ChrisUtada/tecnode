@@ -296,8 +296,9 @@ function refreshPeopleWin(){
     const ds = document.createElement("span"); ds.className = "ds"; ds.textContent = (pin && pin.desc) || ch.desc || "";
     box.appendChild(ds);
     const st = document.createElement("span"); st.className = "st";
+    /* 对话状态只给状态词不给条数（用户要求 UI 上不出现 x/y 计数） */
     st.textContent = pin ? pin.tag
-      : (pr.total ? (pr.prog ? "对话 " + pr.prog + "/" + pr.total : "未交谈") : "无对话文本");
+      : (pr.total ? (pr.prog >= pr.total ? "已聊完" : (pr.prog ? "可继续" : "未交谈")) : "无对话文本");
     d.appendChild(av); d.appendChild(box); d.appendChild(st);
     d.addEventListener("click", () => { if (pin) pin.open(); else gotoChar(id); });
     body.appendChild(d);
