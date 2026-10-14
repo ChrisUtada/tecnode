@@ -65,7 +65,7 @@ function paintDetail(){
     if (st.length) html += "<div class='drow'>状态：" + esc(st.join(" · ")) + "</div>";
     /* 唱机装上唱针后：详情里直接给一个播放按钮（音乐随游戏内置，base64 内联） */
     if (n.id === "ITEMS_changji" && n.installed && n.installed["ITEMS_cz"])
-      html += "<div class='drow'><button id='dt-play-music'>▶ 播放音乐</button></div>";
+      html += "<div class='drow'><button id='dt-play-music'>" + iconSvg("play", 12) + " 播放音乐</button></div>";
   }
 
   /* 来源：物品 / 容器物品 / 线索 / 人物都可能记着「从哪来」（在哪展开、在哪遇见）。

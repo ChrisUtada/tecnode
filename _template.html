@@ -169,7 +169,9 @@
   .desk-icon .icon-glyph{width:44px; height:44px; margin:0 auto; border:1px solid var(--edge);
     background:linear-gradient(150deg,var(--face-hi) 0%,var(--card) 52%,var(--face-lo) 100%);
     border-radius:var(--r-sm); font-size:20px; line-height:42px; color:var(--text);
-    box-shadow:var(--raise); transition:box-shadow .14s, transform .14s}
+    box-shadow:var(--raise); transition:box-shadow .14s, transform .14s;
+    display:flex; align-items:center; justify-content:center; line-height:1}
+  .desk-icon .icon-glyph svg{display:block}
   .desk-icon:hover .icon-glyph{box-shadow:-3px -4px 10px var(--bevel-hi), 4px 6px 13px rgba(86,80,60,.36)}
   .desk-icon .icon-label{font-size:11px; margin-top:5px; color:var(--muted); border-radius:999px;
     padding:1px 6px; display:inline-block; border:1px solid transparent}
@@ -532,7 +534,9 @@
   #music-dock .md-sub{font-size:9.5px; color:var(--muted); margin-top:2px; line-height:1.1;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums}
   #music-dock .md-ctrl{display:flex; flex-direction:column; gap:4px; flex:0 0 auto}
-  #music-dock .md-ctrl button{width:28px; height:22px; padding:0; font-size:10px; line-height:1}
+  #music-dock .md-ctrl button{width:28px; height:22px; padding:0; font-size:10px; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center}
+  #music-dock .md-ctrl button svg{display:block}
   /* 播放器窗：与 TEC 窗同规格（宽 332、右下贴边、同族边框圆角阴影），清单超高滚动 */
   .music-win{position:absolute; right:14px; bottom:96px; width:332px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
@@ -555,7 +559,11 @@
   .music-win .music-prog i{display:block; height:100%; width:0; background:var(--line); border-radius:5px}
   .music-win .music-time{font-size:10.5px; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums}
   .music-win .music-ctrl{display:flex; gap:6px; justify-content:flex-end}
-  .music-win .music-ibtn{width:34px; height:26px; padding:0; font-size:11px; line-height:1}
+  .music-win .music-ibtn{width:34px; height:26px; padding:0; font-size:11px; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center}
+  .music-win .music-ibtn svg{display:block}
+  /* 详情面板「播放音乐」按钮：图标与文字对齐 */
+  #dt-play-music svg{vertical-align:-3px; margin-right:2px}
   .bubble, .narr-card{cursor:grab}
   .bubble:active, .narr-card:active{cursor:grabbing}
   .syswin{overflow:hidden; padding:0}
@@ -697,17 +705,17 @@
       </div><!-- /#stage -->
     </div><!-- /#case-win -->
     <div id="icons">
-      <div class="desk-icon" id="infer-icon" data-app="infer"><div class="icon-glyph">◈</div><div class="icon-label">推演器</div></div>
-      <div class="desk-icon" id="goto-icon"  data-app="goto"><div class="icon-glyph">▤</div><div class="icon-label">档案</div></div>
-      <div class="desk-icon" id="clue-icon"  data-app="clues"><div class="icon-glyph">※</div><div class="icon-label">线索册</div></div>
-      <div class="desk-icon" id="people-icon" data-app="people"><div class="icon-glyph">●</div><div class="icon-label">人物</div></div>
-      <div class="desk-icon" id="bag-dock"   data-app="bag"><div class="icon-glyph">▣</div><div class="icon-label">证物袋</div></div>
-      <div class="desk-icon" id="tec-dock"   data-app="tec"><div class="icon-glyph">◉</div><div class="icon-label">TEC</div></div>
-      <div class="desk-icon" id="log-icon"><div class="icon-glyph">≡</div><div class="icon-label">日志</div></div>
-      <div class="desk-icon" id="map-icon"  data-app="map"><div class="icon-glyph">▦</div><div class="icon-label">案件地图</div></div>
+      <div class="desk-icon" id="infer-icon" data-app="infer"><div class="icon-glyph"><span data-icon="star" data-icon-size="24"></span></div><div class="icon-label">推演器</div></div>
+      <div class="desk-icon" id="goto-icon"  data-app="goto"><div class="icon-glyph"><span data-icon="archive" data-icon-size="24"></span></div><div class="icon-label">档案</div></div>
+      <div class="desk-icon" id="clue-icon"  data-app="clues"><div class="icon-glyph"><span data-icon="notebook" data-icon-size="24"></span></div><div class="icon-label">线索册</div></div>
+      <div class="desk-icon" id="people-icon" data-app="people"><div class="icon-glyph"><span data-icon="users" data-icon-size="24"></span></div><div class="icon-label">人物</div></div>
+      <div class="desk-icon" id="bag-dock"   data-app="bag"><div class="icon-glyph"><span data-icon="briefcase" data-icon-size="24"></span></div><div class="icon-label">证物袋</div></div>
+      <div class="desk-icon" id="tec-dock"   data-app="tec"><div class="icon-glyph"><span data-icon="message" data-icon-size="24"></span></div><div class="icon-label">TEC</div></div>
+      <div class="desk-icon" id="log-icon"><div class="icon-glyph"><span data-icon="clipboard-list" data-icon-size="24"></span></div><div class="icon-label">日志</div></div>
+      <div class="desk-icon" id="map-icon"  data-app="map"><div class="icon-glyph"><span data-icon="map" data-icon-size="24"></span></div><div class="icon-label">案件地图</div></div>
     </div>
     <div id="case-dock" title="案件已收起：单击展开，按住可拖动">
-      <div class="cd-glyph">▣</div>
+      <div class="cd-glyph"><span data-icon="archive" data-icon-size="18"></span></div>
       <div class="cd-meta">
         <div class="cd-code" id="cd-code">CASE A-001</div>
         <div class="cd-title" id="cd-title">植物学家的花园</div>
@@ -723,15 +731,15 @@
       </div>
     </div>
     <div id="music-dock" title="播放器已最小化：单击展开，按住可拖动">
-      <div class="md-glyph">♪</div>
+      <div class="md-glyph"><span data-icon="music" data-icon-size="18"></span></div>
       <div class="md-meta">
         <div class="md-name" id="md-name">MUSIC // 播放器</div>
         <div class="md-prog"><i id="md-prog-fill"></i></div>
         <div class="md-sub" id="md-sub">已最小化 · 点此展开</div>
       </div>
       <div class="md-ctrl">
-        <button id="md-pp" title="播放 / 暂停">▶</button>
-        <button id="md-stop" title="停止">■</button>
+        <button id="md-pp" title="播放 / 暂停"><span data-icon="play" data-icon-size="13"></span></button>
+        <button id="md-stop" title="停止"><span data-icon="stop" data-icon-size="13"></span></button>
       </div>
     </div>
         <div id="toast"></div>
@@ -751,6 +759,44 @@
 
 <script type="application/json" id="gamedata">__GAME_DATA_A001__</script>
 <script>
+/* 00-icons.js —— Pixelarticons 像素图标（MIT License, pixelarticons.com / npm pixelarticons），内联 SVG。
+   拍板记录：桌面九宫格 + 播放器图标与控制键统一换用本库（用户定稿方案 A「像素图形 + 圆角底盒」）。
+   要点：
+   - fill="currentColor" ⇒ 跟随所在元素的 CSS color，桌面的「按下变黑」、按钮 hover 反色自动生效；
+   - 图形本体是 24×24 纯像素网格（无抗锯齿），与 12px 像素字完全同族；底盒 / 窗口仍是圆角；
+   - 换图 / 加图：往 ICON_PATHS 塞一段 <path d>（从 npm pixelarticons 的 svg 里抄，多条 path 直接拼接）；
+   - shell.html 里的静态图标用 data-icon 占位，底部 hydrateIcons() 一次性注入。 */
+const ICON_PATHS = {
+  music: "M4 12h4v2H4zm-2 2h2v4H2zm2 4h4v2H4zM8 6h2v12H8zm10 0h2v12h-2zm-6 8h2v4h-2zm2-2h4v2h-4zm0 6h4v2h-4zM10 4h8v2h-8z",
+  play: "M15 11h-2V9h2zm0 4h-2v-2h2zm-2 2h-2v-2h2zm0-8h-2V7h2zm-2-2H9V5h2zM9 21H7V3h2zm6-8h2v-2h-2zm-6 4h2v2H9z",
+  pause: "M10 20H4V4h6v16Zm8-16v16h-6V4h6Zm-4 2v12h2V6h-2ZM6 18h2V6H6v12Z",
+  stop: "M20 20H4V4H20V20ZM6 18H18V6H6V18ZM14 14H10V10H14V14Z",
+  star: "M5 20H8V22H3V16H5V20ZM21 22H16V20H19V16H21V22ZM10 20H8V18H10V20ZM16 20H14V18H16V20ZM14 18H10V16H14V18ZM7 16H5V13H7V16ZM19 16H17V13H19V16ZM5 13H3V11H5V13ZM21 13H19V11H21V13ZM9 9H3V11H1V7H9V9ZM23 11H21V9H15V7H23V11ZM11 7H9V3H11V7ZM15 7H13V3H15V7ZM13 3H11V1H13V3Z",
+  archive: "M3 2h18v2H3zm0 5h18v2H3zM1 4h2v3H1zm20 0h2v3h-2zm-2 5h2v11h-2zM3 9h2v11H3zm2 11h14v2H5zm4-9h6v2H9z",
+  notebook: "M6 2h14v2H6zm0 18h14v2H6zM20 4h2v16h-2zM4 4h2v16H4zM2 7h6v2H2zm0 4h6v2H2zm0 4h6v2H2zM16 4h2v16h-2z",
+  users: "M5 2h6v2H5zm10 0h4v2h-4zM5 10h6v2H5zm10 0h4v2h-4zm4-6h2v6h-2zm-8 0h2v6h-2zM3 4h2v6H3zM0 18h2v4H0zm14 0h2v4h-2zm8 0h2v4h-2zM4 14h8v2H4zm12 0h4v2h-4zM2 16h2v2H2zm10 0h2v2h-2zm8 0h2v2h-2z",
+  briefcase: "M2 8h2v12H2zm18 0h2v12h-2zM4 6h16v2H4zm0 14h16v2H4zM8 4h2v2H8zm2-2h4v2h-4zm4 2h2v2h-2z",
+  message: "M20 2H4v2h16zm0 14H6v2h14zm2-12h-2v12h2zM4 4H2v18h2zm2 14H4v2h2z",
+  "clipboard-list": "M20 12h2v8h-2zm-8-2h8v2h-8zm0 10h8v2h-8zm-2-8h2v8h-2zM6 2h8v2H6zm0 4h8v2H6zm0-2h2v2H6zm6 0h2v2h-2zm2 0h2v2h-2zM16 6h2v5h-2zM4 4h2v2H4zM2 6h2v12H2zm2 12h6v2H4zm2-8h4v2H6zm0 4h2v2H6zm11 2h5v2h-5zM16 16h2v6h-2z",
+  map: "M4 20h2v2H2V6h2v14Zm12 0h2v2h-4v-2h-2v-2h2V8h-2V6h4v14Zm-8 0H6v-2h2v2Zm12 0h-2v-2h2v2ZM10 4h2v2h-2v10h2v2H8V4H6V2h4v2Zm12 14h-2V4h-2V2h4v16ZM6 6H4V4h2v2Zm12 0h-2V4h2v2Z"
+};
+function iconSvg(name, size){
+  const paths = ICON_PATHS[name];
+  if (!paths) return "";
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="currentColor"' +
+         ' shape-rendering="crispEdges" aria-hidden="true"><path d="' + paths + '"/></svg>';
+}
+/* shell.html 里的静态图标占位（<span data-icon="name" data-icon-size="24"></span>）：
+   本切片按文件名排序最先拼入，且脚本在 body 末尾 ⇒ DOM 已就绪，注入一次即可。
+   无头 stub 若不支持属性选择器则静默跳过（不影响断言）。 */
+(function hydrateIcons(){
+  try {
+    document.querySelectorAll("[data-icon]").forEach(el => {
+      el.innerHTML = iconSvg(el.dataset.icon, el.dataset.iconSize || 22);
+    });
+  } catch (e) { /* stub 环境无此能力，忽略 */ }
+})();
+
 "use strict";
 /* ===== 案件数据（可切换）=====
    每个案件一份与 <script id="gamedata"> 同构的数据对象。applyCaseData() 负责把数据
@@ -3669,7 +3715,7 @@ function paintDetail(){
     if (st.length) html += "<div class='drow'>状态：" + esc(st.join(" · ")) + "</div>";
     /* 唱机装上唱针后：详情里直接给一个播放按钮（音乐随游戏内置，base64 内联） */
     if (n.id === "ITEMS_changji" && n.installed && n.installed["ITEMS_cz"])
-      html += "<div class='drow'><button id='dt-play-music'>▶ 播放音乐</button></div>";
+      html += "<div class='drow'><button id='dt-play-music'>" + iconSvg("play", 12) + " 播放音乐</button></div>";
   }
 
   /* 来源：物品 / 容器物品 / 线索 / 人物都可能记着「从哪来」（在哪展开、在哪遇见）。
@@ -4829,7 +4875,7 @@ function syncMusicPlayState(){
 }
 function renderMusicDock(){
   const pp = document.getElementById("md-pp");
-  if (pp) pp.textContent = (musicCurrent && musicAudio && !musicAudio.paused) ? "⏸" : "▶";
+  if (pp) pp.innerHTML = iconSvg((musicCurrent && musicAudio && !musicAudio.paused) ? "pause" : "play", 13);
   /* 卡片首行显示当前曲名（不放「播放器」字样）；没在播时退回应用名 */
   const nm = document.getElementById("md-name");
   if (nm){
@@ -4897,7 +4943,7 @@ function refreshMusicIcon(){
     el.className = "desk-icon";
     el.id = "music-icon";
     el.dataset.app = "music";
-    el.innerHTML = '<div class="icon-glyph">♪</div><div class="icon-label">播放器</div>';
+    el.innerHTML = '<div class="icon-glyph">' + iconSvg("music", 24) + '</div><div class="icon-label">播放器</div>';
     document.getElementById("icons").appendChild(el);
     attachIcon(el, "music", toggleMusicWin);   /* 用户要求单击即开（其他图标是双击开） */
     musicIconEl = el;
@@ -4996,12 +5042,12 @@ function renderMusicWin(){
     const pp = document.createElement("button");
     pp.className = "music-ibtn";
     pp.title = (musicAudio && !musicAudio.paused) ? "暂停" : "播放";
-    pp.textContent = (musicAudio && !musicAudio.paused) ? "⏸" : "▶";
+    pp.innerHTML = iconSvg((musicAudio && !musicAudio.paused) ? "pause" : "play", 13);
     pp.addEventListener("click", () => playMusic(musicCurrent));
     const stop = document.createElement("button");
     stop.className = "music-ibtn";
     stop.title = "停止";
-    stop.textContent = "■";
+    stop.innerHTML = iconSvg("stop", 13);
     stop.addEventListener("click", stopMusic);
     ctrl.appendChild(pp); ctrl.appendChild(stop);
     player.appendChild(prog); player.appendChild(time); player.appendChild(ctrl);

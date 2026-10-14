@@ -809,7 +809,7 @@ function syncMusicPlayState(){
 }
 function renderMusicDock(){
   const pp = document.getElementById("md-pp");
-  if (pp) pp.textContent = (musicCurrent && musicAudio && !musicAudio.paused) ? "⏸" : "▶";
+  if (pp) pp.innerHTML = iconSvg((musicCurrent && musicAudio && !musicAudio.paused) ? "pause" : "play", 13);
   /* 卡片首行显示当前曲名（不放「播放器」字样）；没在播时退回应用名 */
   const nm = document.getElementById("md-name");
   if (nm){
@@ -877,7 +877,7 @@ function refreshMusicIcon(){
     el.className = "desk-icon";
     el.id = "music-icon";
     el.dataset.app = "music";
-    el.innerHTML = '<div class="icon-glyph">♪</div><div class="icon-label">播放器</div>';
+    el.innerHTML = '<div class="icon-glyph">' + iconSvg("music", 24) + '</div><div class="icon-label">播放器</div>';
     document.getElementById("icons").appendChild(el);
     attachIcon(el, "music", toggleMusicWin);   /* 用户要求单击即开（其他图标是双击开） */
     musicIconEl = el;
@@ -976,12 +976,12 @@ function renderMusicWin(){
     const pp = document.createElement("button");
     pp.className = "music-ibtn";
     pp.title = (musicAudio && !musicAudio.paused) ? "暂停" : "播放";
-    pp.textContent = (musicAudio && !musicAudio.paused) ? "⏸" : "▶";
+    pp.innerHTML = iconSvg((musicAudio && !musicAudio.paused) ? "pause" : "play", 13);
     pp.addEventListener("click", () => playMusic(musicCurrent));
     const stop = document.createElement("button");
     stop.className = "music-ibtn";
     stop.title = "停止";
-    stop.textContent = "■";
+    stop.innerHTML = iconSvg("stop", 13);
     stop.addEventListener("click", stopMusic);
     ctrl.appendChild(pp); ctrl.appendChild(stop);
     player.appendChild(prog); player.appendChild(time); player.appendChild(ctrl);

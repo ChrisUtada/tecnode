@@ -11,7 +11,9 @@
   .desk-icon .icon-glyph{width:44px; height:44px; margin:0 auto; border:1px solid var(--edge);
     background:linear-gradient(150deg,var(--face-hi) 0%,var(--card) 52%,var(--face-lo) 100%);
     border-radius:var(--r-sm); font-size:20px; line-height:42px; color:var(--text);
-    box-shadow:var(--raise); transition:box-shadow .14s, transform .14s}
+    box-shadow:var(--raise); transition:box-shadow .14s, transform .14s;
+    display:flex; align-items:center; justify-content:center; line-height:1}
+  .desk-icon .icon-glyph svg{display:block}
   .desk-icon:hover .icon-glyph{box-shadow:-3px -4px 10px var(--bevel-hi), 4px 6px 13px rgba(86,80,60,.36)}
   .desk-icon .icon-label{font-size:11px; margin-top:5px; color:var(--muted); border-radius:999px;
     padding:1px 6px; display:inline-block; border:1px solid transparent}
@@ -374,7 +376,9 @@
   #music-dock .md-sub{font-size:9.5px; color:var(--muted); margin-top:2px; line-height:1.1;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums}
   #music-dock .md-ctrl{display:flex; flex-direction:column; gap:4px; flex:0 0 auto}
-  #music-dock .md-ctrl button{width:28px; height:22px; padding:0; font-size:10px; line-height:1}
+  #music-dock .md-ctrl button{width:28px; height:22px; padding:0; font-size:10px; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center}
+  #music-dock .md-ctrl button svg{display:block}
   /* 播放器窗：与 TEC 窗同规格（宽 332、右下贴边、同族边框圆角阴影），清单超高滚动 */
   .music-win{position:absolute; right:14px; bottom:96px; width:332px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
@@ -397,6 +401,10 @@
   .music-win .music-prog i{display:block; height:100%; width:0; background:var(--line); border-radius:5px}
   .music-win .music-time{font-size:10.5px; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums}
   .music-win .music-ctrl{display:flex; gap:6px; justify-content:flex-end}
-  .music-win .music-ibtn{width:34px; height:26px; padding:0; font-size:11px; line-height:1}
+  .music-win .music-ibtn{width:34px; height:26px; padding:0; font-size:11px; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center}
+  .music-win .music-ibtn svg{display:block}
+  /* 详情面板「播放音乐」按钮：图标与文字对齐 */
+  #dt-play-music svg{vertical-align:-3px; margin-right:2px}
   .bubble, .narr-card{cursor:grab}
   .bubble:active, .narr-card:active{cursor:grabbing}
