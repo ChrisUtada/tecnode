@@ -130,24 +130,108 @@ function torchOn(){
   if (window.__dump().lit.indexOf('item:ITEM_shoudiantong') < 0) window.__cmd('ITEM_shoudiantong', 0);
 }
 
-console.log('\n=== 21. 适性测试 + 调查员证 ===');
+console.log('\n=== 21. 适性测试 + 选头像 + 调查员证 ===');
+/* 头像材质直接从成品里取（源码里 `const X_AVATAR_B64 = "..."` 构建时已内联成裸 base64），
+   这样「证件照到底用的是哪一张」能断言到位，而不是只查「有个 img」。 */
+const b64Of = (name) => { const m = html.match(new RegExp(name + '\\s*=\\s*"([A-Za-z0-9+/=]+)"')); return m ? m[1] : null; };
+const TEC_B64 = b64Of('TEC_AVATAR_B64'), EXEC_B64 = b64Of('EXECUTOR_AVATAR_B64');
+const introNode = () => ids['stage'].querySelector('.intro-win');
+/* 证件照的 img：stub 的 `.cert-photo img` 取不到（querySelector 不解析后代），按 tagName 找 */
+const certImgIn = (root) => {
+  const p = root && root.querySelector('.cert-photo');
+  if (!p) return null;
+  const im = p.children.find(c => String(c.tagName).toLowerCase() === 'img');
+  return im ? im.src : null;
+};
+const clickAvatarTile = (root, name) => {
+  const t = root.querySelectorAll('.avatar-pick').find(x => {
+    const nm = x.querySelector('.nm');
+    return nm && nm.textContent === name;
+  });
+  if (!t) return false;
+  t._ev.click[0]();
+  return true;
+};
 assert('开局弹出适性测试', window.__dump().intro === true);
 window.__intro.name('陈调查');
 window.__intro.begin();
 window.__intro.answer(0);  // 视觉
 window.__intro.answer(0);  // 视觉
 window.__intro.answer(1);  // 听觉
+
+console.log('  —— 测试结束 → 选头像 ——');
+assert('答完三问进入选头像步骤（不再直接发证）', window.__intro.step() === 'avatar');
+assert('初始可选 = 执行者 + TEC', window.__intro.pool().join(',') === 'CHARS_EXEC,CHARS_TEC');
+assert('默认选中执行者', window.__intro.avatar() === 'CHARS_EXEC');
+assert('未解锁 4 张（CHARS 里没结识的四人）', window.__avatars().locked === 4);
+{
+  const tiles = introNode().querySelectorAll('.avatar-pick');
+  const locked = tiles.filter(t => t.classList.contains('locked'));
+  const open = tiles.filter(t => !t.classList.contains('locked'));
+  assert('格子 = 2 张可选 + 4 张未解锁', tiles.length === 6 && open.length === 2 && locked.length === 4);
+  assert('可选格写角色名（执行者 / TEC）',
+    open.map(t => t.querySelector('.nm').textContent).join('/') === '执行者/TEC');
+  assert('未解锁格只写「未解锁」、不泄角色名',
+    locked.every(t => t.querySelector('.nm').textContent === '未解锁'));
+  assert('未解锁格画「?」占位', locked.every(t => t.querySelector('.av').textContent === '?'));
+  assert('默认选中态挂在执行者那格',
+    introNode().querySelectorAll('.avatar-pick.sel').length === 1 &&
+    introNode().querySelector('.avatar-pick.sel').querySelector('.nm').textContent === '执行者');
+  assert('解锁计数行写「已解锁 2 / 6」', introNode().querySelector('.avatar-count').textContent === '已解锁 2 / 6');
+}
+assert('点一下即改选中', clickAvatarTile(introNode(), 'TEC') && window.__intro.avatar() === 'CHARS_TEC');
+assert('选中态跟着走', introNode().querySelector('.avatar-pick.sel').querySelector('.nm').textContent === 'TEC');
+
+console.log('  —— 头像 → 领证 ——');
+window.__intro.confirmPick();
+assert('确认头像后进入领证步骤', window.__intro.step() === 'card');
+assert('默认那张（执行者）不在时用选中的（TEC）',
+  certImgIn(introNode()) !== 'data:image/png;base64,' + EXEC_B64);
+assert('证件照 = TEC 的头像', certImgIn(introNode()) === 'data:image/png;base64,' + TEC_B64);
+assert('领证页留了反悔入口（换一张头像）', !!introNode().querySelector('.avatar-back'));
+introNode().querySelector('.avatar-back')._ev.click[0]();
+assert('点「换一张」退回选头像步骤', window.__intro.step() === 'avatar');
+assert('退回后仍记着刚才选的 TEC', introNode().querySelector('.avatar-pick.sel').querySelector('.nm').textContent === 'TEC');
+clickAvatarTile(introNode(), '执行者');
+window.__intro.confirmPick();
+assert('改选执行者后证件照随之更换', certImgIn(introNode()) === 'data:image/png;base64,' + EXEC_B64);
+
 const inv = (window.__intro.confirm(), window.__dump().investigator);
 assert('生成调查员', !!inv);
 assert('姓名写入证件', inv.name === '陈调查');
 assert('ID 格式 TEC-XX-0000', /^TEC-[A-Z0-9]{2}-\d{4}$/.test(inv.id));
 assert('倾向性为视觉主导', inv.sense === 'vision');
+assert('选中的头像写进证件', inv.avatarId === 'CHARS_EXEC');
 window.__intro.finish();
 assert('测试流程结束', window.__dump().intro === false);
 assert('顶栏挂出徽标', !!document.getElementById('inv-chip'));
+
+console.log('  —— 领证之后：换头像 ——');
+/* 回看路径：点顶栏徽标开证件窗（徽标挂在 #desktop 上，`id` 是普通属性，按属性找） */
+const invChipNode = ids['desktop'].children.find(c => c.id === 'inv-chip');
+assert('顶栏徽标可点展开证件', !!invChipNode && !!invChipNode._ev.click);
+invChipNode._ev.click[0]();
+assert('证件窗开出来了', !!ids['desktop'].querySelector('.cert-win'));
+assert('证件窗挂着两个动作（更换头像 / 重新测试）',
+  ids['desktop'].querySelector('.cert-actions').children.length === 2);
+window.__avatarOpen();
+assert('换头像窗开出来了', window.__avatars().win === true);
+assert('换头像池同源（还是执行者 + TEC）', window.__avatars().pool.join(',') === 'CHARS_EXEC,CHARS_TEC');
+assert('窗内当前选中 = 证件上那张', window.__avatars().pick === 'CHARS_EXEC');
+window.__avatarPick('CHARS_TEC');
+assert('窗内点选即改选中', window.__avatars().pick === 'CHARS_TEC');
+window.__avatarConfirm();
+assert('换头像写回 investigator', window.__dump().investigator.avatarId === 'CHARS_TEC');
+assert('落盘（localStorage 里的也换了）',
+  JSON.parse(localStorage.getItem('tec_investigator')).avatarId === 'CHARS_TEC');
+assert('换完窗自己关掉', window.__avatars().win === false);
+assert('证件窗自动重开、照片已换', certImgIn(ids['desktop'].querySelector('.cert-win')) === 'data:image/png;base64,' + TEC_B64);
+assert('换头像不留画布节点', window.__dump().nodes.filter(k => k.indexOf('char:') === 0).length === 0);
+
 ids['btn-reset']._ev.click[0]();
 assert('重置后不再弹测试', window.__dump().intro === false);
 assert('重置后徽标仍在', !!document.getElementById('inv-chip'));
+assert('重置后头像选择也在（investigator 独立存档）', window.__avatars().chosen === 'CHARS_TEC');
 
 console.log('=== 1. 启动（只能看到起始场景）===');
 let d = window.__dump();
@@ -475,10 +559,14 @@ assert('手电筒未点亮时接触黑影：手电筒与黑影都还在（谁也
 assert('手电筒未点亮时接触黑影：不记「已试过」（门拦在记录之前）',
   !tcDark.edges.some(e => e.indexOf('tried:item:ITEM_shoudiantong>item:ITEM_something') === 0));
 
-/* 详情窗把照明前置写在明面上（趁黑影还在画布上 —— 照亮它之后它就散去了） */
+/* 详情窗只剩「简介 / 状态 / 来源」：黑影跟手电筒有反应这件事**不进详情窗** ——
+   谜面在它自己的正文里（「打开手电筒照亮它」），剩下的玩家自己试。
+   手电筒「要先点亮」这件事写在**手电筒自己的**状态行里（见下面 §13c 的断言）。 */
 window.__select('item:ITEM_something');
 let tch = ids['detail-body']._html || '';
-assert('黑影详情窗：标出手电筒「须先点亮」', tch.includes('须先点亮'));
+assert('黑影详情窗：只列简介与来源，不再列「与这些东西存在反应」',
+  tch.indexOf('存在反应') < 0 && tch.indexOf('摇摇晃晃') >= 0);
+assert('黑影详情窗：来源照旧（植物学家的花园）', tch.indexOf('植物学家的花园') >= 0);
 
 window.__cmd('ITEM_shoudiantong', 0);          // 双击 → 打开手电筒
 assert('双击手电筒 → 点亮（lit）', window.__dump().lit.includes('item:ITEM_shoudiantong'));
@@ -619,12 +707,13 @@ assert('叙事卡可收起', window.__dump().floats.narr === false);
 assert('TEC 不再以画布节点出现', !window.__dump().nodes.includes('char:CHARS_TEC'));
 ids['tec-dock']._ev.dblclick[0]();   // 双击 TEC 图标：打开对话窗口
 assert('双击 TEC 图标开对话窗', window.__dump().floats.tec === true);
-window.__tecTalk();                  // 当前上下文是花园，先给花园场景提示
-assert('花园场景提示进度 1', window.__dump().tec.prog['SCENES_garden'] === 1);
-window.__tecTalk();                  // 花园提示读完 → 轮换默认提示
-assert('默认提示轮换进度 1', window.__dump().tec.prog._def === 1);
-ids['btn-undo']._ev.click[0]();
-assert('撤销回退花园提示进度', (window.__dump().tec.prog['SCENES_garden'] || 0) === 0);
+window.__tecTalk();
+assert('点击 TEC 只轮换闲聊，不再翻场景档案', !window.__dump().tec.prog['SCENES_garden'] && window.__dump().tec.prog._def === 1);
+assert('TEC 图标不再挂「提示 N」角标（免费提示频道已拆）', !ids['tec-dock'].querySelector('.badge.talk'));
+const hBeforeTecTalk = window.__dump().history;
+window.__tecTalk();
+assert('闲聊轮换进度 2', window.__dump().tec.prog._def === 2);
+assert('闲聊不进撤销栈（没有可撤销的状态）', window.__dump().history === hBeforeTecTalk);
 
 window.__closeFloats();
 window.__reveal('ITEM_shuzhuo');
@@ -835,8 +924,12 @@ assert('TEC 分析 loc:SCENES_body 返回 true', window.__analyze('loc:SCENES_bo
 assert('分析完成（无头同步）后提取到线索 CLUES_V_luheng', window.__dump().captured.includes('CLUES_V_luheng'));
 assert('分析产生线索节点（可拖出使用）', window.__dump().nodes.includes('clue:CLUES_V_luheng'));
 assert('分析确实新增了捕获', window.__dump().captured.length > anBefore);
+assert('首次分析同时解读档案第 1 条（sceneTalks 是分析产出）', window.__dump().tec.prog['SCENES_body'] === 1);
 const anMid = window.__dump().captured.length;
-assert('无新线索可捕获时走到「无线索」分支且返回 true', window.__analyze('loc:SCENES_body') === true && window.__dump().captured.length === anMid);
+assert('再分析：线索已净 → 转档案解读（第 2 条）', window.__analyze('loc:SCENES_body') === true
+  && window.__dump().captured.length === anMid && window.__dump().tec.prog['SCENES_body'] === 2);
+assert('档案读完后再分析：不推进、仍返回 true', (window.__analyze('loc:SCENES_body'),
+  window.__dump().tec.prog['SCENES_body'] === 2));
 assert('线索节点拒绝被再次分析', window.__analyze('clue:CLUES_V_luheng') === false);
 assert('分析后 TEC 对话窗处于打开态', window.__dump().floats.tec === true);
 
@@ -985,8 +1078,8 @@ const tlines = () => twEl.querySelector('.tec-lines').children.length;
 const tl0 = tlines();
 const tp0 = window.__dump().tec.prog['SCENES_garden'] || 0;
 twEl._ev.click[0]();                     /* 点窗内任意位置（真机里子元素点击会冒泡到这里） */
-assert('点 TEC 窗内任意位置 = 说下一句（历史 +1 行）', tlines() === tl0 + 1);
-assert('点 TEC 窗内任意位置推进提示进度', (window.__dump().tec.prog['SCENES_garden'] || 0) === tp0 + 1);
+assert('点 TEC 窗内任意位置 = 说闲聊（历史 +1 行）', tlines() === tl0 + 1);
+assert('点击闲聊不再推进场景档案进度', (window.__dump().tec.prog['SCENES_garden'] || 0) === tp0);
 /* 拖过 TEC 窗之后紧跟的那一次点击不算推进（_dragged 判据） */
 twEl._ev.pointerdown[0]({ button: 0, pointerId: 1, clientX: 400, clientY: 400, stopPropagation(){}, preventDefault(){} });
 twEl._ev.pointermove[0]({ clientX: 470, clientY: 436 });
@@ -1195,11 +1288,12 @@ assert('取回后位置与归位前不同（是放到落点，不是弹回老位
 const backEl20 = findEl('clue:CLUES_V_luheng');
 assert('取回的线索带「新」角标（markFresh 同款）',
   !!backEl20 && backEl20.children.some(c => c._classes.has('new') && c._text === '新'));
-/* TEC 窗口 */
+/* TEC 窗口：点击只闲聊，档案进度只能由分析推进 */
 ids['tec-dock']._ev.dblclick[0]();
 assert('双击 TEC 图标开对话窗', window.__dump().floats.tec === true);
+const tpTec0 = window.__dump().tec.prog['SCENES_body'] || 0;
 window.__tecTalk();
-assert('TEC 交谈推进提示进度', window.__dump().tec.prog['SCENES_body'] === 1);
+assert('点击 TEC 只闲聊，场景档案不再被翻动', (window.__dump().tec.prog['SCENES_body'] || 0) === tpTec0);
 
 console.log('\n=== 22. 侧边栏图标化 ===');
 ids['btn-reset']._ev.click[0]();
@@ -1224,14 +1318,18 @@ assert('日志窗关闭时新日志累加图标徽标', ids['log-icon'].children
 ids['log-icon']._ev.dblclick[0]();
 assert('双击日志图标重开并清徽标', window.__dump().floats.logs === true && !ids['log-icon'].children.some(c => c._classes.has('badge')));
 
-/* 详情内容：线索显示感官类型、物品显示来源场景，操作引导已移除 */
+/* 详情内容：只有「简介 / 状态 / 来源」三样（2026-10-14 收口），操作引导已移除。
+   线索的感官类型并进「状态」行（旧写法是单独一行「感官类型：视觉」）。 */
 window.__reveal('SCENES_body');
 window.__cap('loc:SCENES_body');
 window.__select('clue:CLUES_V_luheng');
-assert('线索详情显示感官类型', (ids['detail-body']._html || '').indexOf('视觉') >= 0);
+assert('线索详情把感官类型并进「状态」行（已捕获 · 视觉）',
+  /状态：已捕获 · 视觉/.test(ids['detail-body']._html || ''));
 window.__select('item:ITEMS_changji');
 const itemHtml = ids['detail-body']._html || '';
 assert('物品详情显示来源场景', itemHtml.indexOf('植物学家的花园') >= 0);
+assert('物品详情不再列「与这些东西存在反应」（黄铜钥匙不该被直接写出来）',
+  itemHtml.indexOf('存在反应') < 0 && itemHtml.indexOf('黄铜钥匙') < 0);
 assert('详情不再含操作引导', itemHtml.indexOf('双击节点进行') < 0 && itemHtml.indexOf('拖到') < 0);
 
 console.log('\n=== 23. 长文本去重：正文 / 日志 / 详情窗 各归其位 ===');
@@ -1244,18 +1342,37 @@ assert('展开场景弹出叙事卡', window.__dump().floats.narr === true);
 assert('日志里不再出现场景正文', !lNew.some(l => l.indexOf('在靠近桌子的边缘') >= 0));
 assert('展开容器完全不写日志（过程不进案卷）', lNew.length === 0);
 
-/* 容器详情窗：无正文、有结构信息、有回看入口。
-   书桌已被改判为**物品**：分类行写「物品」，结构信息用「内容」而不是「出口」。 */
+/* 容器详情窗：无正文、只留「状态 + 来源 + 回看入口」。
+   2026-10-14 收口：**不再列「内容 / 文本入口 / 出口」** ---- 那三样都是剧透
+   （「内容」会提前念出容器里有什么、「文本入口」会提前暴露未来场景名），
+   而且「出口」与「来源」常常是同一个值（书桌正是如此），平白重复一行。
+   书桌已被改判为**物品**：分类行写「物品」。 */
 window.__select('item:ITEM_shuzhuo');
 let dh = ids['detail-body']._html || '';
 assert('容器详情不再含正文', dh.indexOf('在靠近桌子的边缘') < 0);
-assert('书桌的详情窗已改判为「物品」（不再是场景）', dh.indexOf('物品 · item:ITEM_shuzhuo') >= 0);
-assert('容器物品的详情窗给出「内容」行（书桌装了什么）', dh.indexOf('内容：') >= 0);
-assert('「内容」行列出书桌装着的四件东西（手写笔记 / 台灯 / 抽屉 / 垃圾桶）',
-  ['手写笔记','台灯','抽屉','垃圾桶'].every(t => dh.indexOf(t) >= 0));
-assert('容器物品的正文里若带出口也照常列出（书桌 → 植物学家的花园）',
-  dh.indexOf('出口：') >= 0 && dh.indexOf('植物学家的花园') >= 0);
+assert('书桌的详情窗已改判为「物品」（不再是场景）', dh.indexOf('>物品<') >= 0);
+assert('分类行不再带内部 key（旧写法「物品 · item:ITEM_shuzhuo」已撤）', dh.indexOf('item:ITEM_shuzhuo') < 0);
+assert('容器详情不再列「内容」行（里面有什么要展开才知道）', dh.indexOf('内容：') < 0);
+assert('容器详情不再列「文本入口」行', dh.indexOf('文本入口') < 0);
+assert('容器详情不再列「出口」行（导航靠画布上的边，不靠文字复述）', dh.indexOf('出口：') < 0);
 assert('容器详情提供「重看叙事」按钮', dh.indexOf('dt-renarr') >= 0);
+/* 状态用词：**「已探索 / 未探索」**，不写「已展开」——「展开」是玩家的动作，
+   「探索」才是留在界面上的状态（画布节点副标题早就写「已探索」，详情窗跟着统一）。 */
+assert('容器详情状态行写「已探索」（不再写「已展开」）',
+  dh.indexOf('状态：已探索') >= 0 && dh.indexOf('已展开') < 0);
+assert('档案窗与顶栏计数同步用「已探索 / 未探索」（源码检查）',
+  /G\.explored\.has\(sid\) \? "已探索" : "未探索"/.test(html)
+  && html.indexOf('已探索场景 <b>') >= 0);
+assert('整个引擎里不再出现「已展开 / 未展开」（源码检查：状态一律叫「已探索 / 未探索」）',
+  html.indexOf('已展开') < 0 && html.indexOf('未展开') < 0);
+/* 「来源」记的是**把它生出来的那个容器**：书桌是被 __reveal 直接开出来的，没有来源；
+   它生出来的东西才有（手写笔记 ← 书桌）。 */
+window.__select('item:ITEM_sxbj');
+assert('来源照旧：手写笔记的详情窗写「来源：书桌」',
+  (ids['detail-body']._html || '').indexOf('来源：书桌') >= 0);
+/* 「来源」显式排除场景：场景之间的 homeScene 会被**最后一次**展开它的宿主覆盖
+   （实测「植物学家的花园」的来源一度变成「尸体」），写出来是随机的、只会误导。 */
+assert('「来源」行显式排除场景（源码检查）', /n\.kind !== "loc" && n\.homeScene/.test(html));
 
 /* 回看入口能真的把卡叫回来 */
 window.__closeFloats();
@@ -1509,6 +1626,10 @@ assert('最小化先亮落点卡片再缩窗口（消除"闪一下再出现"）'
 assert('TEC 对话窗也接线了"点框内任意位置推进"（挂在窗口根上，头像不再独占）',
   /w\.el\.addEventListener\("click"/.test(html) && /tecTalk\(\)/.test(html)
   && !/av\.addEventListener\("click", \(\) => tecTalk\(\)\)/.test(html));
+assert('展开场景不再吆喝「似乎有话要说」（提示只来自分析）', html.indexOf('似乎有话要说') < 0);
+const tecTalkFn = (() => { const s = html.slice(html.indexOf('function tecTalk(){')); return s.slice(0, s.indexOf('\n}')); })();
+assert('tecTalk 只轮换闲聊：不再读 sceneTalks、不进撤销栈',
+  tecTalkFn.indexOf('sceneTalks') < 0 && tecTalkFn.indexOf('pushHistory') < 0);
 assert('_dragged 的复位在拖动排除表之前（真机里从被排除的子元素上起手也会复位）',
   html.indexOf('el._dragged = false;') > 0
   && html.indexOf('el._dragged = false;') < html.indexOf('closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip")'));
@@ -1707,36 +1828,108 @@ assert('点完线索册仍开着（对照着看画布）', window.__dump().float
 /* 非线索节点收不进册（只有线索能进） */
 assert('非线索节点收不进线索册', window.__ledgerStore('loc:SCENES_garden') === false);
 
-/* ---- 人物：已结识的角色（TEC 不列），点一行 = 叫到画面中央并接着说下一句 ---- */
+/* ---- 人物：常驻两人（TEC / 执行者）+ 已结识的角色 ----
+   常驻成员一进游戏就在册，点一行 = 开各自的窗；其余角色点一行 = 叫到画面中央并接着说下一句。
+   每行左侧必须有一个小头像：有美术稿用像素图，没有的退回首字方块。 */
 ids['people-icon']._ev.dblclick[0]();
 assert('双击人物图标开窗', window.__dump().floats.people === true);
 const peopleBody = document.getElementById('desktop').querySelector('.people-win').querySelector('.syswin-body');
-assert('还没遇到人时名册是空的', peopleBody.querySelectorAll('.goto-item').length === 0 &&
-  peopleBody.children.length === 1);
+const peopleRows = () => [...peopleBody.querySelectorAll('.goto-item')];
+const rowByLabel = (t) => peopleRows().find(r => r.querySelector('.lb').textContent === t);
+/* 还没遇到任何人时：常驻两人已经在册 */
+let rrows = peopleRows();
+assert('一进游戏名册里就有 TEC 与执行者两行（不等「已结识」）',
+  rrows.length === 2 && rrows[0].querySelector('.lb').textContent === 'TEC' &&
+  rrows[1].querySelector('.lb').textContent === '执行者');
+assert('常驻两行标出去哪扇窗（助手窗 / 逻辑阵列）',
+  rrows[0].querySelector('.st').textContent === '助手窗' &&
+  rrows[1].querySelector('.st').textContent === '逻辑阵列');
+/* 头像读取：stub 的 querySelector 只按 class 匹配、**不解析后代标签**（`.av img` 取不到），
+   所以先拿 .av，再按 tagName 找里面那个 img / span。 */
+const avImgOf = (row) => {
+  const av = row.querySelector('.av');
+  if (!av) return null;
+  const im = av.children.find(c => String(c.tagName).toLowerCase() === 'img');
+  return im ? im.src : null;
+};
+const avIniOf = (row) => {
+  const av = row.querySelector('.av');
+  if (!av) return null;
+  const s = av.children.find(c => String(c.tagName).toLowerCase() === 'span');
+  return s ? s.textContent : null;
+};
+assert('名册每行都有小头像（.av）', rrows.every(r => !!r.querySelector('.av')));
+assert('常驻两人用真头像（内联 base64 的 img）',
+  /^data:image\/png;base64,/.test(avImgOf(rrows[0]) || '') &&
+  /^data:image\/png;base64,/.test(avImgOf(rrows[1]) || ''));
+assert('TEC 与执行者不是同一张头像（执行者早有自己的素材）',
+  avImgOf(rrows[0]) !== avImgOf(rrows[1]));
 window.__reveal('SCENES_fkjl');                        /* 这场景点名了朱穗 / 傅柏 */
 const roster = window.__roster();
-assert('展开场景后名册记下遇到的人', roster.map(r => r.id).sort().join(',') === 'CHARS_zs,NPC_FB');
-assert('名册不列 TEC（它有自己的助手窗）', !roster.some(r => r.id === 'CHARS_TEC'));
+assert('展开场景后名册接着记下遇到的人',
+  roster.map(r => r.id).sort().join(',') === 'CHARS_EXEC,CHARS_TEC,CHARS_zs,NPC_FB');
+assert('常驻两人固定排在最前（不按遇到顺序插进来）',
+  roster[0].id === 'CHARS_TEC' && roster[1].id === 'CHARS_EXEC');
+assert('名册把 TEC 也算进来', roster.some(r => r.id === 'CHARS_TEC') && roster.some(r => r.id === 'CHARS_EXEC'));
+/* 剧情角色还没有美术稿 ⇒ 退回首字方块占位（拿到图后换成 img 即可，一行一块） */
+const iniRows = peopleRows().filter(r => !!avIniOf(r));
+assert('没有美术稿的剧情角色用「首字方块」占位', iniRows.length === 2 &&
+  iniRows.map(r => avIniOf(r)).sort().join('') === '傅朱' &&
+  iniRows.every(r => !avImgOf(r)));
+/* 遇到新人 ⇒ 头像库当场解锁（池子现算，没有任何「解锁」写盘逻辑） */
+console.log('  —— 头像解锁 ——');
+assert('结识两人后可选头像 = 常驻 2 + 新解锁 2',
+  window.__avatars().pool.join(',') === 'CHARS_EXEC,CHARS_TEC,NPC_FB,CHARS_zs');
+assert('未解锁数从 4 掉到 2', window.__avatars().locked === 2);
+window.__avatarOpen();
+{
+  const avTiles = ids['desktop'].querySelector('.avatar-win').querySelectorAll('.avatar-pick');
+  const avOpen = avTiles.filter(t => !t.classList.contains('locked'));
+  const iniOf = t => { const s = t.querySelector('.av').children.find(c => String(c.tagName).toLowerCase() === 'span'); return s ? s.textContent : null; };
+  assert('换头像窗列出 4 张可选 + 2 张未解锁', avTiles.length === 6 && avOpen.length === 4);
+  assert('新解锁两位没有美术稿 ⇒ 首字方块占位',
+    avOpen.map(iniOf).filter(Boolean).sort().join('') === '傅朱');
+  assert('解锁计数行跟着涨到「已解锁 4 / 6」',
+    ids['desktop'].querySelector('.avatar-count').textContent === '已解锁 4 / 6');
+}
+window.__avatarPick('CHARS_zs'); window.__avatarConfirm();
+assert('换成没美术稿的人也能落章（avatarId = 朱穗）',
+  window.__dump().investigator.avatarId === 'CHARS_zs' && window.__avatars().win === false);
+{
+  invChipNode._ev.click[0]();
+  const cw = ids['desktop'].querySelectorAll('.cert-win');
+  const p = cw[cw.length - 1].querySelector('.cert-photo');
+  const ini = p.children.find(c => String(c.tagName).toLowerCase() === 'span');
+  assert('证件照退回首字方块（朱）', !!ini && ini.textContent === '朱' && !p.children.some(c => String(c.tagName).toLowerCase() === 'img'));
+}
+window.__avatarOpen(); window.__avatarPick('CHARS_EXEC'); window.__avatarConfirm();
+assert('换回执行者（留给后续用）', window.__dump().investigator.avatarId === 'CHARS_EXEC');
 assert('名册行带对话进度（未交谈 0/1）',
   roster.find(r => r.id === 'CHARS_zs').prog === 0 && roster.find(r => r.id === 'CHARS_zs').total === 1);
 /* 点「朱穗」那一行（傅柏在这个场景里没有对白，走的是「无对话文本」分支） */
-const zsRow = [...document.getElementById('desktop').querySelector('.people-win').querySelector('.syswin-body')
-  .querySelectorAll('.goto-item')].find(r => r.querySelector('.lb').textContent === '朱穗');
+const zsRow = rowByLabel('朱穗');
 assert('名册里找得到「朱穗」这一行', !!zsRow);
 assert('傅柏那行标「无对话文本」（该场景里他确实没词）',
-  [...document.getElementById('desktop').querySelector('.people-win').querySelector('.syswin-body')
-    .querySelectorAll('.goto-item')].find(r => r.querySelector('.lb').textContent === '傅柏')
-    .querySelector('.st').textContent === '无对话文本');
+  rowByLabel('傅柏').querySelector('.st').textContent === '无对话文本');
 fire(zsRow, 'click', {});
 assert('点人物一行 = 选中该角色节点', window.__dump().sel === 'char:CHARS_zs');
 assert('点人物一行 = 说出第一句（对话进度 +1）', window.__dump().talk['char:CHARS_zs'] === 1);
 assert('点完人物窗仍开着（可以接着点下一个人）', window.__dump().floats.people === true);
-const prows = [...document.getElementById('desktop').querySelector('.people-win').querySelector('.syswin-body')
-  .querySelectorAll('.goto-item')];
-assert('名册行随之刷新出对话进度',
-  prows.find(r => r.querySelector('.lb').textContent === '朱穗').querySelector('.st').textContent === '对话 1/1');
-assert('说完的角色行标上 done',
-  prows.find(r => r.querySelector('.lb').textContent === '朱穗')._classes.has('done'));
+assert('名册行随之刷新出对话进度', rowByLabel('朱穗').querySelector('.st').textContent === '对话 1/1');
+assert('说完的角色行标上 done', rowByLabel('朱穗')._classes.has('done'));
+/* 点常驻两行 = 打开各自的窗（他们都没有画布节点，绝不该「叫到画布上」） */
+fire(rowByLabel('TEC'), 'click', {});
+assert('点 TEC 一行 = 开 TEC 助手窗', window.__dump().floats.tec === true);
+assert('点 TEC 一行不会给他造画布节点',
+  !window.__dump().nodes.includes('char:CHARS_TEC') && window.__dump().sel === 'char:CHARS_zs');
+fire(rowByLabel('TEC'), 'click', {});                  /* 再点一下 = 关掉，别影响后面的用例 */
+assert('再点一下 TEC 一行 = 收掉助手窗', window.__dump().floats.tec === false);
+fire(rowByLabel('执行者'), 'click', {});
+assert('点执行者一行 = 开逻辑阵列窗', window.__dump().floats.matrix === true);
+assert('点执行者一行不造画布节点',
+  !window.__dump().nodes.some(k => k.indexOf('char:CHARS_EXEC') === 0));
+fire(rowByLabel('执行者'), 'click', {});
+assert('再点一下执行者一行 = 收掉逻辑阵列窗', window.__dump().floats.matrix === false);
 
 /* ---- 离屏守卫 + 开关窗：换案 / 重置都要把这两扇窗收掉 ---- */
 ids['btn-reset']._ev.click[0]();
@@ -1867,7 +2060,7 @@ assert('再熄灭 → 详情窗又回到「未点亮」', dh30.indexOf('未点�
 /* 选中一个已经没了的节点：占位文案回到「点选任意节点查看信息」（不是「节点已不存在」） */
 window.__select('item:ITEM_taideng');
 window.__select('item:ITEM_shuzhuo');
-assert('切换选中后详情窗换成新节点', (ids['detail-body']._html || '').indexOf('ITEM_shuzhuo') >= 0);
+assert('切换选中后详情窗换成新节点', (ids['detail-body']._html || '').indexOf('书桌') >= 0);
 
 console.log('\n=== 31. 「新」角标：点一下就摘掉 ===');
 ids['btn-reset']._ev.click[0]();
@@ -2222,9 +2415,10 @@ assert('双击唱机：没装唱针时被挡下（只写一条 warn）',
   logs.length === l35 + 1 && logs[logs.length - 1].indexOf('还没有装唱针') >= 0);
 assert('被挡下时不长节点、不捕获录音线索',
   window.__dump().nodes.length === n35 && !window.__dump().captured.includes('CLUES_wmhj'));
-/* 条件写在详情窗里（和「光照条件」一个待遇，玩家不用瞎试） */
+/* 使用条件写在详情窗的「状态」行里（玩家不用瞎试），但只说**要什么**，不说**跟谁配** */
 window.__select('item:ITEMS_changji');
-assert('详情窗标出「待装上：唱针」',
+assert('详情窗状态行标出「待装上 唱针」',
+  /状态：[^<]*待装上[^<]*唱针/.test(ids['detail-body']._html) &&
   ids['detail-body']._html.indexOf('待装上') >= 0 && ids['detail-body']._html.indexOf('唱针') >= 0);
 assert('此时详情窗没有「已装上」', ids['detail-body']._html.indexOf('已装上') < 0);
 
@@ -2233,7 +2427,8 @@ window.__combo('item:ITEMS_cz', 'item:ITEMS_changji');
 assert('装上唱针：记进 n.installed', (window.__dump().installed['item:ITEMS_changji'] || []).includes('ITEMS_cz'));
 assert('唱针装上即消耗（不在画布上了）', !window.__dump().nodes.includes('item:ITEMS_cz'));
 window.__select('item:ITEMS_changji');
-assert('详情窗改标「已装上：唱针」',
+assert('详情窗状态行改标「已装上 唱针」（待装上消失）',
+  /状态：[^<]*已装上[^<]*唱针/.test(ids['detail-body']._html) &&
   ids['detail-body']._html.indexOf('已装上') >= 0 && ids['detail-body']._html.indexOf('待装上') < 0);
 /* 装上的状态是真的状态：进快照，撤销一步就回到"没装上、唱针还在" */
 ids['btn-undo']._ev.click[0]();

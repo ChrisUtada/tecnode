@@ -52,10 +52,12 @@ _verify*.txt
 *.log
 verify-out.txt
 
-# ─── 环境 ───────────────────────────────────────────────────
+# 环境 ───────────────────────────────────────────────────
 .workbuddy/
 node_modules/
-# 头像等素材的来源文件：运行时用的图已 base64 内联进 index.html，这里只是本地留存
-assets/
+# 素材原文件（PNG / 字体）**入库**，放在 src/assets/，由 build.js 构建时内联成 base64。
+# 这里只忽略仓库根目录下临时堆放素材的 assets/（例如从别处解压出来的那一份）。
+# 注意不能写不带斜杠的 `assets/`：那会连 src/assets/ 一起忽略。
+/assets/
 .DS_Store
 Thumbs.db

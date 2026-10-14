@@ -421,8 +421,14 @@ function openIntro(){
   if (x) x.style.display = "none";   /* 开场测试必须完成，不允许关闭 */
   bd.appendChild(w.el);
   introWinEl = w.el;
-  introState = { step: "name", name: "", nameInput: null, answers: [], card: null };
+  introState = { step: "name", name: "", nameInput: null, answers: [], card: null,
+                 avatarId: AVATAR_DEFAULT_ID };
   renderIntro();
+}
+/* 窗标题（三个步骤各一个抬头） */
+function setIntroTitle(t){
+  const el = introWinEl && introWinEl.querySelector(".syswin-title");
+  if (el) el.textContent = t;
 }
 function renderIntro(){
   if (!introWinEl || !introState) return;
@@ -449,6 +455,20 @@ function renderIntro(){
     body.appendChild(btn);
     return;
   }
+  if (st.step === "avatar"){
+    const tip = document.createElement("div");
+    tip.className = "avatar-tip";
+    tip.textContent = AVATAR_TIP;
+    body.appendChild(tip);
+    body.appendChild(buildAvatarPicker(avatarUnlocked(), st.avatarId, avatarLockedCount(), pickIntroAvatar));
+    body.appendChild(avatarCounterNode());
+    const btn = document.createElement("button");
+    btn.className = "primary mx-sync";   /* 与下一步的「确认领证」同一条通栏按钮，流程里看着是一件事 */
+    btn.textContent = "[ 用这张 ]";
+    btn.addEventListener("click", confirmAvatarStep);
+    body.appendChild(btn);
+    return;
+  }
   if (st.step === "card"){
     body.appendChild(buildCert(st.card));
     const btn = document.createElement("button");
@@ -456,6 +476,11 @@ function renderIntro(){
     btn.textContent = "[ 确认领证 ]";
     btn.addEventListener("click", confirmCard);
     body.appendChild(btn);
+    const back = document.createElement("button");
+    back.className = "avatar-back";
+    back.textContent = "[ 换一张头像 ]";
+    back.addEventListener("click", backToAvatarStep);
+    body.appendChild(back);
     return;
   }
   const qi = st.step, q = QUIZ[qi];
@@ -508,14 +533,37 @@ function finishQuiz(){
     if (counts[s] > bestN){ bestN = counts[s]; best = s; }
   });
   introState.card = { name: introState.name, id: genInvId(), sense: best,
-    date: new Date().toISOString().slice(0, 10) };
+    date: new Date().toISOString().slice(0, 10), avatarId: introState.avatarId || AVATAR_DEFAULT_ID };
+  introState.step = "avatar";   /* 答完三问先挑头像，再领证 */
+  setIntroTitle("AVATAR // 选择头像");
+  renderIntro();
+}
+/* 选头像步骤：点一格 = 记下并就地重画（不动步进） */
+function pickIntroAvatar(id){
+  if (!introState || introState.step !== "avatar") return;
+  introState.avatarId = id;
+  if (introState.card) introState.card.avatarId = id;
+  renderIntro();
+}
+/* 头像 → 领证（证件照照选中的那张画） */
+function confirmAvatarStep(){
+  if (!introState || introState.step !== "avatar") return;
+  if (introState.card) introState.card.avatarId = introState.avatarId;
   introState.step = "card";
-  const t = introWinEl.querySelector(".syswin-title");
-  if (t) t.textContent = "INVESTIGATOR // 调查员证";
+  setIntroTitle("INVESTIGATOR // 调查员证");
+  renderIntro();
+}
+/* 领证前反悔：退回选头像那一步 */
+function backToAvatarStep(){
+  if (!introState || introState.step !== "card") return;
+  introState.step = "avatar";
+  setIntroTitle("AVATAR // 选择头像");
   renderIntro();
 }
 function confirmCard(){
   if (!introState || !introState.card) return;
+  /* 老调用路径（直接 confirm 跳过选头像）不拦：拿默认头像补上，免得证件照空着 */
+  if (introState.avatarId) introState.card.avatarId = introState.avatarId;
   investigator = introState.card;
   try { if (store) store.setItem("tec_investigator", JSON.stringify(investigator)); } catch(_){}
   if (introWinEl) introWinEl.classList.add("shrink");
@@ -556,6 +604,108 @@ function genAvatar(id, cell){
   return box;
 }
 
+/* ============ AVATAR // 头像库（测试末尾选，领证后也能换）============
+   可选 = 常驻两人（执行者 / TEC，一开局就在）+ 已结识的人 —— 判据直接沿用名册的 `metChars()`。
+   池子是**现算**的 ⇒「每遇到一个新人物就解锁一张」不需要任何写盘逻辑；
+   未解锁的只画一个虚线「？」占位，**不显示名字**（免得剧透还没出场的人）。
+   选中的 id 记在 `investigator.avatarId`；没记（本轮之前的老存档）就照旧用 cert-avatar.png。 */
+const AVATAR_INITIAL    = ["CHARS_EXEC", "CHARS_TEC"];   /* 初始可选，顺序 = 并排先后 */
+const AVATAR_DEFAULT_ID = "CHARS_EXEC";                  /* 测试流程里默认选中的那张 */
+const AVATAR_TIP = "挑一张头像印在证件上。每结识一位新人物，就会多出一张可选的头像。";
+function avatarNameOf(id){
+  const p = ROSTER_PINNED.find(x => x.id === id);        /* 执行者的名字写在这里，CHARS 里没有它 */
+  if (p && p.name) return p.name;
+  return (CHARS[id] || {}).name || id;
+}
+/* 已解锁的 id（有序：常驻在前，其余沿用名册顺序） */
+function avatarUnlocked(){
+  const ids = AVATAR_INITIAL.slice();
+  metChars().forEach(id => { if (ids.indexOf(id) < 0) ids.push(id); });
+  return ids;
+}
+/* 还没解锁的候选张数（只报数、不报是谁） */
+function avatarLockedCount(){
+  const have = avatarUnlocked();
+  return Object.keys(CHARS).filter(id => have.indexOf(id) < 0).length;
+}
+/* 一格头像框（有美术稿用像素图，没有的用首字方块）—— 与名册共用同一套 `.av` 写法 */
+function buildAvatarFace(id){
+  const box = document.createElement("span");
+  box.className = "av";
+  const art = rosterAvatar(id);
+  if (art){
+    const im = document.createElement("img");
+    im.src = "data:image/png;base64," + art;
+    im.alt = ""; im.draggable = false;
+    box.appendChild(im);
+  } else {
+    const ini = document.createElement("span");
+    ini.className = "ini"; ini.textContent = avatarNameOf(id).slice(0, 1);
+    box.appendChild(ini);
+  }
+  return box;
+}
+/* 选头像的格子阵列：values = 已解锁（有序）/ sel = 当前选中 / locked = 未解锁占位数 */
+function buildAvatarPicker(values, sel, locked, onPick){
+  const grid = document.createElement("div");
+  grid.className = "avatar-grid";
+  values.forEach(id => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "avatar-pick" + (id === sel ? " sel" : "");
+    b.dataset.id = id;
+    b.appendChild(buildAvatarFace(id));
+    const nm = document.createElement("span");
+    nm.className = "nm"; nm.textContent = avatarNameOf(id);
+    b.appendChild(nm);
+    b.addEventListener("click", () => onPick(id));
+    grid.appendChild(b);
+  });
+  for (let i = 0; i < (locked || 0); i++){
+    const d = document.createElement("div");
+    d.className = "avatar-pick locked";
+    const av = document.createElement("span");
+    av.className = "av"; av.textContent = "?";
+    d.appendChild(av);
+    const nm = document.createElement("span");
+    nm.className = "nm"; nm.textContent = "未解锁";
+    d.appendChild(nm);
+    grid.appendChild(d);
+  }
+  return grid;
+}
+/* 解锁计数行：「已解锁 n / m」（m = 可选 + 未解锁 = 常驻 2 + CHARS 全体） */
+function avatarCounterNode(){
+  const d = document.createElement("div");
+  d.className = "avatar-count";
+  const got = avatarUnlocked().length, lock = avatarLockedCount();
+  d.textContent = "已解锁 " + got + " / " + (got + lock);
+  return d;
+}
+/* 证件照内容：选了头像就照那个画（像素图 / 首字方块）；
+   没选（老存档）或该 id 取不到图 ⇒ 退回固定的调查员照片 */
+function fillCertPhoto(box, c){
+  const id = c && c.avatarId;
+  const art = id ? rosterAvatar(id) : null;
+  if (id && art){
+    const im = document.createElement("img");
+    im.src = "data:image/png;base64," + art;
+    im.alt = "avatar";
+    box.appendChild(im);
+    return;
+  }
+  if (id){
+    const ini = document.createElement("span");
+    ini.className = "ini"; ini.textContent = avatarNameOf(id).slice(0, 1);
+    box.appendChild(ini);
+    return;
+  }
+  const im = document.createElement("img");
+  im.src = "data:image/png;base64,@@ASSET:cert-avatar.png@@";
+  im.alt = "avatar";
+  box.appendChild(im);
+}
+
 /* 调查员证（发证 / 回看共用）：头部色带 + 身份区（头像+字段）+ 倾向区 + 签发区 */
 function buildCert(c){
   const wrap = document.createElement("div");
@@ -568,10 +718,7 @@ function buildCert(c){
   sec1.className = "cert-sec cert-id";
   const avBox = document.createElement("div");
   avBox.className = "cert-photo";
-  const avImg = document.createElement("img");
-  avImg.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAADz0lEQVR4Ae2ZPUwUURDHT6OJhRgLC04TlHhCzq/EwspSY7RAC+2kshAKUIJeARZqIRSnBIUC7dXKAmmM0dLKwsSvC3gGJdGjsDBiYWKhssf/jje3s7N7O7tajM3svHn7Zu7/fju8XTMZ+2cKmAKmgClgCpgCpoApYAqYAqaAKZC2AmvSTsjlO39l4jcX8xu/fa0/ldrX+iW3sboCqexCPV3jFcg5fOiIE3z2/KnjS05SRBlBgvKpEXT89NnAHnNj9KZT6qWhi46/a88Bx+ccbZKMIE7plfF1QrzpMHoLFnj/9iUuPfv5U9mz27bnnHHqhCWH3qflG0GCkuoESeSgHokczAN5IAk+4tQiv1YvMoKowsRXJ4isn+F2XupBiGM96mM8LImYH9UaQYJiagTh2UePADlcfrrz5flFbmrgOMjCesgfeFOEoBEkiKVGEM2Dd6tce+tKqJtOCfQf3J8OjCMI8qbuFjGkao0gQU51gnrPFbyUkxNXPTs+NiWUEC+MPH391XzaJBlBwv6oEYS/Hj3d1V4Tlpzduc2BJb4rfwuMh80TuEhA0AgKEGc5pEaQkIcNS4SwN6YUMIIEodW+KE4/KXlfDOvnHiFzQmGci04ezav8NiNI2CgTyAQSFBDCsZ/Tn48Kzv9WfMgPCyndMHqGO1r3ova0naWR+s1/rzacKMb6jfaIOXI2OmrnoMrr79XV81UzMNjrXXAnXYkclIp5HEk0D+rI7tuEJWJZI0iQL9bzubw27UHYwVcHB4TUbnj/i3FnoNn7KTnWgxxZ9Z3YBKEkkASCsJPwMY+zmI941PswH+vEJQd1WA+CEoxVI4iuD6LWt211Qr8Wvjh+VIdbT4sYWo8RRBUhvto5iKxbc0EM3Xn0jB3Dwd+sP45Uz1PoLVgY68JPyhpBgrKJ9SDkRS+Cr22T6j2o0wiCEow1gRhhMGwCQQnGJt6DkFe7FyXde1C3EQQlGJsaQTT//PUe50skjVO//fKdf1KrEUR3gviJn6RJvppLT8a1wH92YQQJG5I6QRtbWnx7D31Xo+9auO/H0lKqvcgIEghS341jXV2+hJRnZ71SFisV35K+3qu+tSO45Yz/W35rNutNyXV2YqpjH8/MqP4mI8iRt9GJrTZHDFKBHPggaHTsIYY8OzR4yvG5OAjCZI4kxOMSZQRBScY2TRDIoYQweWrDFwqTtevVF3vzbavdzJvSguPDuVXsw2UoC8KaJckIEmRu+hwUlRyhjsTCces0goStidyDch0dvuccIU9DmPYi2lukeMOCIQfKc3ORfrMRJAj7B+RdBEAX+P7+AAAAAElFTkSuQmCC";
-  avImg.alt = "avatar";
-  avBox.appendChild(avImg);
+  fillCertPhoto(avBox, c);
   sec1.appendChild(avBox);
   const fields = document.createElement("div");
   fields.className = "cert-fields";
@@ -616,12 +763,64 @@ function mountInvChip(){
   invChipEl.textContent = "▣ " + investigator.name + " · " + investigator.id;
 }
 function closeInvReview(){ if (invReviewEl){ invReviewEl.remove(); invReviewEl = null; } }
+
+/* ---- 换头像（领证之后）：证件窗里的「更换头像」开这扇独立窗 ----
+   池子同样是现算的 ⇒ 之后结识的人会立刻出现在里面，不需要刷新任何东西。 */
+let avatarWinEl = null, avatarPickId = null;
+function closeAvatarWin(){ if (avatarWinEl){ avatarWinEl.remove(); avatarWinEl = null; } }
+function openAvatarWin(){
+  if (!investigator) return false;
+  closeAvatarWin();
+  avatarPickId = investigator.avatarId || AVATAR_DEFAULT_ID;
+  const w = makeWindow("AVATAR // 选择头像", closeAvatarWin);
+  w.el.classList.add("avatar-win");
+  avatarWinEl = w.el;
+  renderAvatarWin();
+  desktopEl.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  return true;
+}
+function renderAvatarWin(){
+  if (!avatarWinEl) return;
+  const body = avatarWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  const tip = document.createElement("div");
+  tip.className = "avatar-tip";
+  tip.textContent = AVATAR_TIP;
+  body.appendChild(tip);
+  body.appendChild(buildAvatarPicker(avatarUnlocked(), avatarPickId, avatarLockedCount(), id => {
+    avatarPickId = id; renderAvatarWin();
+  }));
+  body.appendChild(avatarCounterNode());
+  const btn = document.createElement("button");
+  btn.className = "primary";
+  btn.textContent = "[ 换上这张 ]";
+  btn.addEventListener("click", confirmAvatarPick);
+  body.appendChild(btn);
+}
+function confirmAvatarPick(){
+  if (!investigator || !avatarPickId) return false;
+  investigator.avatarId = avatarPickId;
+  try { if (store) store.setItem("tec_investigator", JSON.stringify(investigator)); } catch(_){}
+  log("调查员头像更换为 <b>" + esc(avatarNameOf(avatarPickId)) + "</b>", "sys");
+  closeAvatarWin();
+  /* 证件窗开着就整扇重开一次，照片立刻换过来（窗位固定，看不见跳动） */
+  const hadCert = !!invReviewEl;
+  closeInvReview();
+  if (hadCert) openCardReview();
+  return true;
+}
+
 function openCardReview(){
   if (!investigator) return;
   closeInvReview();
   const w = makeWindow("INVESTIGATOR // 调查员证", closeInvReview);
   w.el.classList.add("cert-win");
   w.body.appendChild(buildCert(investigator));
+  const btnAv = document.createElement("button");
+  btnAv.textContent = "[ 更换头像 ]";
+  btnAv.addEventListener("click", openAvatarWin);
   const btn = document.createElement("button");
   btn.textContent = "[ 重新测试 ]";
   btn.addEventListener("click", () => {
@@ -633,6 +832,7 @@ function openCardReview(){
   });
   const actions = document.createElement("div");
   actions.className = "cert-actions";
+  actions.appendChild(btnAv);
   actions.appendChild(btn);
   w.body.appendChild(actions);
   desktopEl.appendChild(w.el);

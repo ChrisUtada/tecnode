@@ -77,7 +77,12 @@ window.__ledgerStore = key => ledgerStore(key);
 window.__ledgerTake  = key => ledgerTake(key);
 window.__dropTargets = () => nodeDropTargets();
 window.__peopleToggle = () => togglePeopleWin();
-window.__roster = () => metChars().map(id => { const p = charProgress(id); return { id, name:(CHARS[id] || {}).name || id, prog:p.prog, total:p.total }; });
+window.__roster = () => metChars().map(id => {
+  const pin = ROSTER_PINNED.find(p => p.id === id);
+  const p = charProgress(id);
+  return { id, name:(pin && pin.name) || (CHARS[id] || {}).name || id,
+           pinned:!!pin, art:!!rosterAvatar(id), prog:p.prog, total:p.total };
+});
 window.__mxAssign = (k, s) => assignClue(k, s);
 window.__boardTake = (id, sense, cx, cy) => boardTake(id, sense, cx, cy);   /* 等价于把桌布上的 chip 拖出去 */
 window.__matrixItems = () => matrixItems().map(n => n.key);
@@ -88,9 +93,25 @@ window.__intro = {
   name: v => setIntroName(v),
   begin: () => beginQuiz(),
   answer: i => answerQuestion(i),
+  /* confirm 会**跳过**选头像那一步直接领证（老调用路径保留）：拿默认头像补上 */
   confirm: () => confirmCard(),
+  pick: id => pickIntroAvatar(id),
+  confirmPick: () => confirmAvatarStep(),
+  avatar: () => introState && introState.avatarId,
+  pool: () => avatarUnlocked(),
   finish: () => finishIntro()
 };
+/* 头像库全局态（无头环境量不到点击，量状态）：池子现算 ⇒ 遇到新人后这里立刻变长 */
+window.__avatars = () => ({
+  pool: avatarUnlocked(),
+  locked: avatarLockedCount(),
+  chosen: (investigator && investigator.avatarId) || null,
+  win: !!avatarWinEl,
+  pick: avatarPickId
+});
+window.__avatarOpen = () => openAvatarWin();
+window.__avatarPick = id => { avatarPickId = id; renderAvatarWin(); };
+window.__avatarConfirm = () => confirmAvatarPick();
 window.__select = key => key ? selectNode(key) : clearSelection();
 window.__closeFloats = () => { closeBubble(); closeNarr(); closePwPop(); };
 window.__renarr = sid => renarrScene(sid);
@@ -132,7 +153,8 @@ window.__dump  = () => ({
   matrix: JSON.parse(JSON.stringify(G.matrix)),
   endings: [...G.endings],
   endingOverlay: !!endingState,
-  investigator: investigator ? { name: investigator.name, id: investigator.id, sense: investigator.sense } : null,
+  investigator: investigator ? { name: investigator.name, id: investigator.id, sense: investigator.sense,
+                                 avatarId: investigator.avatarId || null } : null,
   intro: !!introWinEl,
   edges: G.edges.map(e => e.kind + ":" + e.a + ">" + e.b),
   explored: [...G.explored], captured: [...G.captured], tried: [...G.tried],

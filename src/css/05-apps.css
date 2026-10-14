@@ -26,8 +26,6 @@
   .desk-icon.over .icon-glyph{background:linear-gradient(150deg,#38372f,#1f1f19); color:var(--card);
     box-shadow:inset 0 2px 6px rgba(0,0,0,.6), 0 0 0 2px var(--text), 0 0 14px 2px rgba(43,43,38,.35); transform:scale(1.06)}
   .desk-icon .badge{top:-6px; right:0}
-  .desk-icon.pulse .icon-glyph{animation:tecpulse 1.6s infinite}
-  @keyframes tecpulse{0%,100%{box-shadow:var(--raise)}50%{box-shadow:-3px -4px 10px var(--bevel-hi), 4px 6px 14px rgba(86,80,60,.62), 0 0 0 2px var(--edge)}}
   /* TEC「– 收起」的落点 = 桌面右下角那块带头像的助手卡片 #tec-chip（样式见 #case-dock 附近） */
   /* TEC 是常驻助手窗：z 要高于其它浮窗（21~25）与桌面图标（24），始终不被覆盖；
      仍低于拖拽镜像层（40）与瞬时提示 toast/verdict（30） */
@@ -67,13 +65,24 @@
   /* 与 .bag-win.over 同一套虚线高亮：两扇收纳窗都是落点，悬停反馈必须一致 */
   .clue-win.over{outline:2px dashed var(--text); outline-offset:3px}
   /* 人物窗紧挨详情窗左侧（列表 + 详情成一对），避开 #detail-win（right:14 top:60）不叠窗 */
-  .people-win{position:absolute; right:328px; top:60px; width:300px;
+  /* 宽 324 = 300 + 头像加大的 24px：文本列净宽与 24×24 时代一致，描述不会被压窄 */
+  .people-win{position:absolute; right:328px; top:60px; width:324px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
   .people-win .syswin-body{max-height:356px; overflow:auto}
   /* 线索册 = 收纳盒：不分组、无状态列，感官直接标在行尾（整表已按五感排序，排序本身就是分组） */
   .goto-item .st.sense{color:var(--muted); letter-spacing:1px}
   .clue-win .syswin-body .goto-item, .people-win .syswin-body .goto-item{margin:2px 5px}
+  /* 人物名册：每行一个头像（48×48 —— 24×24 在真机上认不出是谁）。
+     素材源图是 72×72，缩到 48 仍是一档下采样，细节还在；再往上放就该换更清晰的图了。
+     只作用于人物窗 —— 档案与线索册同样复用 .goto-item，别把它们一起带下水。 */
+  .people-win .goto-item{align-items:center}
+  .people-win .goto-item .av{flex:0 0 48px; width:48px; height:48px; border-radius:var(--r-sm); overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--bg); border:1px solid var(--edge)}
+  .people-win .goto-item .av img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  .people-win .goto-item .av .ini{font-size:22px; line-height:1; color:var(--muted)}
+  .people-win .goto-item .nm{flex:1 1 auto}
   .goto-item .nm{display:flex; flex-direction:column; min-width:0}
   .goto-item .nm .lb{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .goto-item .ds{font-size:10px; color:var(--faint); line-height:1.35; margin-top:1px;
@@ -192,6 +201,36 @@
   .intro-win input.intro-name{width:100%; font-family:inherit; font-size:14px; padding:7px 10px;
     border:1px solid var(--edge); border-radius:var(--r-btn); background:var(--bg); margin:10px 0; box-shadow:var(--press)}
   .intro-win.shrink{transform:scale(.1); opacity:0; transition:transform .4s, opacity .4s}
+  /* 选头像（测试末尾的步骤 + 领证后的「更换头像」窗，两处共用一套 DOM）：
+     已解锁 = 实心卡片（点击 = 选中，选中态走内嵌 `--press` + 墨色描边，与画布节点同一套语汇）；
+     未解锁 = 虚线空格 + 「?」，**不写名字**（免得剧透还没出场的人）。 */
+  .avatar-tip{font-size:12.5px; color:var(--muted); line-height:1.7; margin-bottom:10px}
+  .avatar-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:10px}
+  .avatar-pick{display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 4px 6px;
+    font-size:11.5px; box-shadow:var(--raise-sm)}
+  /* 这排格子不跟着全局按钮 hover 反色（白底翻黑底会把头像吞掉） */
+  .avatar-pick, .avatar-pick:hover{background:var(--card); color:var(--text); border-color:var(--edge)}
+  .avatar-pick:hover{box-shadow:var(--raise)}
+  .avatar-pick.sel{border-color:var(--line); box-shadow:var(--press)}
+  .avatar-pick .av{width:48px; height:48px; border-radius:var(--r-sm); overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--bg); border:1px solid var(--edge)}
+  .avatar-pick .av img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  .avatar-pick .av .ini{font-size:22px; line-height:1; color:var(--muted)}
+  .avatar-pick .nm{max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .avatar-pick.locked{background:transparent; border-style:dashed; box-shadow:none; cursor:default}
+  .avatar-pick.locked:hover{box-shadow:none}
+  .avatar-pick.locked .av{border-style:dashed; background:transparent;
+    font-size:20px; color:var(--faint)}
+  .avatar-pick.locked .nm{color:var(--faint)}
+  .avatar-count{font-size:11px; color:var(--faint); letter-spacing:1px; margin-bottom:12px}
+  .avatar-win{position:absolute; left:50%; top:70px; margin-left:-190px; width:380px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:26; overflow:hidden}
+  /* 领证页的「换一张头像」= 通栏主按钮下面的一条次级入口，居中收一行 */
+  .intro-win .avatar-back{display:block; margin:8px auto 0; font-size:11.5px}
+  .cert-actions button{margin:0 3px}
+  .cert-photo .ini{font-size:64px; font-weight:700; color:var(--muted)}
   .inv-cert{width:320px; max-width:100%; background:#efece0; border:1px solid var(--edge);
     border-radius:16px; overflow:hidden; box-shadow:var(--win-shadow);
     font-size:14px; line-height:1.8; margin:0 auto}

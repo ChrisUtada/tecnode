@@ -26,7 +26,7 @@
   .node.ent-item .n-title::before{content:"□ "}
   .node.ent-char .n-title::before{content:"● "}
   .node.ent-clue .n-title::before{content:"▲ "}
-  /* 未展开 / 已折叠的虚框样式跟着「容器」走，不跟着 kind 走：
+  /* 未探索 / 已折叠的虚框样式跟着「容器」走，不跟着 kind 走：
      书桌、垃圾桶是物品节点（□、130×46），但同样能展开，虚线提示必须照给。 */
   .node.unexplored{border-style:dashed; background:var(--bg); color:var(--muted); box-shadow:none}
   .node.unexplored .n-title{color:var(--muted)}

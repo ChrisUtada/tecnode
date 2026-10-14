@@ -209,7 +209,7 @@ function center(el){
 function updateCrumbs(){
   const total = Object.keys(G.nodes).length;
   const visible = Object.values(G.nodes).filter(n => !n.hidden && !n.stored).length;
-  crumbs.innerHTML = "节点 <b>" + visible + "/" + total + "</b> · 已展开场景 <b>" +
+  crumbs.innerHTML = "节点 <b>" + visible + "/" + total + "</b> · 已探索场景 <b>" +
     G.explored.size + "/" + Object.keys(SCENES).length + "</b> · 已试组合 <b>" + G.tried.size +
     "</b> · 捕获线索 <b>" + G.captured.size + "</b> · 结局 <b>" + G.endings.size + "/" + ENDINGS.length + "</b>";
 }

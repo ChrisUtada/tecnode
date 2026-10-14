@@ -214,7 +214,7 @@ function tecSay(text){
     }
   }
 }
-const TEC_AVATAR_B64 = "iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAFDklEQVR4Ae2aS2xOQRTHr1ci8dggUdKyqCJUvEUi1SJCglp0JV4hIhG1I1hILbCwQ2wk3htJF8qCiHckjYhHiKCaCEK7sbGSNOIx9/6/7zv/707n3ju3XySOzZlz5syZuWd+zsy9/YJA/2kGNAOaAc2AZkAzoBn4PzMwqFKP/e3Ez19J5vrc9cW4zT5VE7u2F7s/iTg2vyRzJfEZnMTpf/YZ6vvw7c13xY42LV8aGxJkxHbGGLOSwutp6VgWS2LMlLEmJSg2LUWjV3b/hkFtuXfnQTFqSau2urZEC4LquolCdyku8ro/d8eGAMlj9gzxekYlKDa9RaN3DcIOY8eYJN7htATBH/NwvOKjhC2sA/7cn1ZXghwZ8yYI8bFj2EEmCX6Q8IfuKzFv3nGVIMfOpK7wOLUQl3eMawTv7IHeNgzNJI+Nl+N5Pj41fW/aSpBjm1LXICbGFh/kbHy4w7h8+RjeVyZOkvci23ibffPjjaYLcY5VtxmdSfIlB/MrQciERSYmiGsPx+NTq+lSk3HBTsP/csMZNIUEmbj3iM4SBXFhAlGHJrQZE5MEv6xSCXJkLjFBjjgBag5ICL6GI7b3hTWjaZN8yy/4RYFt5IyYvN94vL3VauTFRZejEaHY/DGMz6eXcPJQlCBH8hLfg/j7jC2urQas2X5DDAERLnLEoBIF40tMoqmnmEjHwCmJCbItgb/gsZ+tNiQlx0UKzwddCUImBlhmJmjWggbxLRrrxH0EelKCcFphHKSLICaR70mI8/LJw0zPqqcYMmiRqbPK5PBNGfcePrUs8+dmBmn8tQDvgJgoLUlKEDJnkalv0iCGd8YSP1h89FlsV+fBucI+rGaC0Ps+RVfxyOqKU6hFvSJMQcG6/xBUsCVpKEGOLKUmiONNmTFHml6EKu/4s87bpmPu4hVGop9JksGCMgJtcW5vCEfyepKSzvNCV4KQCYv0Jojjzlt4xZg668Mag9OF/Xz1c/PPmRDTVp40sufVrijkTN/QYrwSJNJRrngT9P71cxl1zjCpkzZ23Fiy9K+m9S9bT//hnb1KkCNFud+kT0cEVdWPNlPz/YbXg/tOz6vvoivr+F3P+0QcPsX0Ji3S46+kJghT8jsZ7B3rp5smCIB9oCUIbL76JnaqtOQgiNYgZMIiMxNkiVcw/7i2V3wvQi3imuMiDWTAj+NgwuHrjptnAdlZiUE8SCUImbBI73uQJW6ZGeSgA0SAENhZwg92jgM7ZNa3doxnqQRxRkgfsBqEebgWwZ6XRO1Z3bJN1Lwb7WdzeTYlyLFTuWTZMYfozkrUvqc1Ig4reAfLixzEV4KQCYus2CmG+VEzPhzZaWoGn1Lwg3SdcvDLmxzEVYKQCYusOEG8jqSEnDjcWvF6+XetShDvGOkVJwi/M6qqx7dk+R2I1hegRmFcXr/a4HlsuhJky0xkrzhBvB4QwvZ/RVeCHDuRO0Gr1q4V70SP7t+PXQL/vQx/34Iz98M+ctQoEX9JYyO6jLx5/Xqup50SJNJbrngTxMSUT5HMYiMm2eiiF6/HlyglqJjb2Fbm/6/Yqe5372IDw9jb04OmkI+2vBZ6y60VQm9fGf4aBMYlF2agaeT4qiqh25TaqVNNV1aSlCBbZiN75hrkIgfzYqeZJBBxflmHceV+/GJ/691mhMokk67TFlwJsmUmsqeuQbV1deIe4ohf1s2kgLAyx8jg8nf1c9zurq5Uz6wEcQZJ/w3W3JGX5b+4ggAAAABJRU5ErkJggg==";
+const TEC_AVATAR_B64 = "@@ASSET:tec-avatar.png@@";
 
 function toggleTecWin(){
   if (tecMin){                                /* 收在右下角卡片上 -> 点图标 = 还原，不是关闭 */
@@ -235,7 +235,7 @@ function openTecWin(){
   avCol.className = "tec-avatar-col";
   const av = document.createElement("div");
   av.id = "tec-avatar"; av.className = "tec-avatar";
-  av.title = "TEC 助手：点对话窗任意位置交谈，拖节点到我身上分析";
+  av.title = "TEC 助手：拖节点到我身上分析，点对话窗任意位置闲聊";
   const avImg = document.createElement("img");
   avImg.src = "data:image/png;base64," + TEC_AVATAR_B64;
   avImg.alt = "TEC"; avImg.draggable = false;
@@ -256,7 +256,7 @@ function openTecWin(){
   main.appendChild(lines);
   const hint = document.createElement("div");
   hint.className = "tec-hint";
-  hint.textContent = "点框内任意位置交谈 · 拖节点到我身上分析";
+  hint.textContent = "拖节点到我身上分析 · 点框内任意位置闲聊";
   main.appendChild(hint);
   body.appendChild(avCol); body.appendChild(main);
   w.body.appendChild(body);
@@ -469,7 +469,10 @@ function tecAnalyzeFinish(key){
   tecTask = null;              /* 进度条的收尾交给 updateTecChip（key 变 null 时会把动画停掉） */
   tecClearAnalyzing();
   if (!n) return false;
-  tecReaction(key);                            /* TEC 对该节点的评述（沿用原有反应表） */
+  /* 场景节点：评述由「档案解读」承担（见下），不走通用反应表（场景在表里没有条目，只会落兜底噪音） */
+  if (n.kind !== "loc") tecReaction(key);      /* TEC 对该节点的评述（沿用原有反应表） */
+  const talks = n.kind === "loc" ? (((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[n.id] || []) : null;
+  const unread = talks ? talks.length - (G.tecProg[n.id] || 0) : 0;
   {
     const fresh = capturableClues(n).filter(id => !G.captured.has(id));
     if (fresh.length){
@@ -487,10 +490,20 @@ function tecAnalyzeFinish(key){
       if (text) tecSay(text);
       log("TEC 捕获「" + esc(n.label) + "」的隐藏线索：" + esc(names), "cap");
       settle();   /* 分析完把新线索带到视野中央（TEC 窗收在右下角，不挡画面） */
-    } else {
+    } else if (!unread){
       tecSay("分析完成：「" + plain(n.label) + "」中没有可以捕获的线索。");
       log("TEC 分析「" + esc(n.label) + "」：无可捕获线索", "warn");
     }
+  }
+  /* 场景档案：每次分析解读一条（提示的唯一来源就是分析；进度记 tecProg，进存档/撤销） */
+  if (talks && unread > 0){
+    const prog = G.tecProg[n.id] || 0;
+    G.tecProg[n.id] = prog + 1;
+    tecSay(plain(talks[prog].text || ""));
+    talkClues(talks[prog].text || "", "TEC");
+    log("TEC 解读了「" + esc(n.label) + "」的档案（" + (prog + 1) + "/" + talks.length + "）", "sys");
+  } else if (talks && !unread){
+    tecSay("「" + plain(n.label) + "」的档案已经全部解读完毕。");
   }
   /* 窗口收在右下角卡片上：分析完成后在卡片角上点一个小圆点，打开 TEC 窗口即清除 */
   if (tecMin && !tecWinEl) tecDot = true;
@@ -506,23 +519,14 @@ function tecAnalyze(key){
 }
 
 function tecTalk(){
+  /* 点击 = 闲聊（defaultTalks 轮换），不给实质提示：提示的唯一来源是「拖节点 → 分析」。
+     不进撤销栈——一句闲聊没有可撤销的状态。 */
   const tec = CHARS["CHARS_TEC"] || {};
-  const ctx = G.lastScene;
-  const st = (tec.sceneTalks || {})[ctx] || [];
-  const prog = G.tecProg[ctx] || 0;
-  let line;
-  if (prog < st.length){
-    pushHistory();
-    G.tecProg[ctx] = prog + 1;
-    line = plain(st[prog].text || "");
-    talkClues(st[prog].text || "", "TEC");
-  } else {
-    const def = (tec.defaultTalks && tec.defaultTalks.length) ? tec.defaultTalks : (tec.talkQueue || []);
-    if (!def.length){ if (!tecWinEl) toggleTecWin(); tecSay("（暂无更多提示）"); return; }
-    const idx = G.tecProg._def || 0;
-    G.tecProg._def = idx + 1;
-    line = plain(def[idx % def.length].text || "");
-  }
+  const def = (tec.defaultTalks && tec.defaultTalks.length) ? tec.defaultTalks : (tec.talkQueue || []);
+  if (!def.length){ if (!tecWinEl) toggleTecWin(); tecSay("（把节点拖到我身上，我来分析）"); return; }
+  const idx = G.tecProg._def || 0;
+  G.tecProg._def = idx + 1;
+  const line = plain(def[idx % def.length].text || "");
   if (!tecWinEl) toggleTecWin();
   tecSay(line);
   updateTecBadge();
@@ -555,20 +559,10 @@ function tecConsult(toolKey){
 }
 
 function updateTecBadge(){
+  /* 提示没有"未读数"了：提示只在分析后产出，图标不再挂「提示 N」角标（免费频道的广告位一并拆掉） */
   const dock = document.getElementById("tec-dock");
-  if (!dock) return;
-  const tec = CHARS["CHARS_TEC"] || {};
-  let unread = 0;
-  G.explored.forEach(sid => {
-    const st = (tec.sceneTalks || {})[sid];
-    if (st) unread += Math.max(0, st.length - (G.tecProg[sid] || 0));
-  });
-  let b = dock.querySelector(".badge.talk");
-  if (unread > 0){
-    if (!b){ b = document.createElement("span"); b.className = "badge talk"; dock.appendChild(b); }
-    b.textContent = "提示 " + unread;
-    dock.classList.add("pulse");
-  } else {
+  if (dock){
+    const b = dock.querySelector(".badge.talk");
     if (b) b.remove();
     dock.classList.remove("pulse");
   }

@@ -69,7 +69,8 @@ function revealScene(sid, silent){
     else focusOn([sn.key].concat(fresh, newKeys));
     renarrScene(sid);
   }
-  if (((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[sid]) log("TEC 似乎有话要说（双击 TEC 图标）", "sys");
+  if (firstTime && !silent && ((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[sid])
+    log("「" + esc(s.title || sid) + "」似乎有可以解读的档案（把场景节点拖给 TEC 分析）", "sys");
   updateTecBadge();
   return added;
 }

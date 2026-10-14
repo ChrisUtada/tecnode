@@ -90,7 +90,7 @@ function refreshGotoWin(){
     d.className = "goto-item";
     const label = document.createElement("span"); label.textContent = SCENES[sid].title || sid;
     const st = document.createElement("span"); st.className = "st";
-    st.textContent = (G.explored.has(sid) ? "已展开" : "未展开") + " · " + (nodeByKey("loc", sid) ? "在画布" : "未在画布");
+    st.textContent = (G.explored.has(sid) ? "已探索" : "未探索") + " · " + (nodeByKey("loc", sid) ? "在画布" : "未在画布");
     d.appendChild(label); d.appendChild(st);
     d.addEventListener("click", () => { gotoScene(sid); closeGotoWin(); });
     body.appendChild(d);
@@ -198,9 +198,13 @@ function takeFromLedger(key){
   return true;
 }
 
-/* ============ ROSTER // 人物：已结识角色的索引 ============
-   已结识 = 画布上有节点 ∪ 文本里点过名 ∪ 在已展开的场景里说过话；TEC 有自己的助手窗，不列进名册。
-   点一行 = 把人叫到画面中央、选中，并接着说下一句（没有节点就补一个）。 */
+/* ============ ROSTER // 人物：名册 ============
+   两部分：
+   · **常驻成员**（TEC / 执行者）—— 一进游戏就在册，不靠「已结识」判定。他们不是「遇到的人」，
+     而是随时可用的两个角色；也没有画布节点，所以点一行 = **打开各自的窗**（助手窗 / 逻辑阵列）。
+   · **遇到的人** —— 已结识 = 画布上有节点 ∪ 文本里点过名 ∪ 在已探索的场景里说过话；
+     点一行 = 把人叫到画面中央、选中，并接着说下一句（没有节点就补一个）。
+   每行左侧一个小头像：有美术稿用像素图，没有的用「首字方块」占位（2026-10-14 用户决定）。 */
 let peopleWinEl = null;
 function closePeopleWin(){ if (peopleWinEl){ peopleWinEl.remove(); peopleWinEl = null; } }
 function togglePeopleWin(){
@@ -212,6 +216,29 @@ function togglePeopleWin(){
   peopleWinEl = w.el;
   refreshPeopleWin();
 }
+/* 常驻成员：一进游戏就在名册里。id 就是名册里的键 —— 执行者没有 CHARS 条目也没关系，
+   name / desc 就地写死；TEC 则从数据里取（保持可编辑）。
+   open = 点这一行做什么（两者都没有画布节点，所以是「开窗」而不是「叫到画布上」）。
+   toggleTecWin / toggleInferWin 都是函数声明，同处一个 <script>，提升后可直接引用。 */
+const ROSTER_PINNED = [
+  { id: "CHARS_TEC",  tag: "助手窗",   open: toggleTecWin },
+  { id: "CHARS_EXEC", tag: "逻辑阵列", open: toggleInferWin,
+    name: "执行者", desc: "逻辑阵列中央的执行者，长按 2.5 秒激活归因。" }
+];
+/* 小头像：TEC / 执行者复用各自窗里的那一张（同一份素材，构建时各内联一次）。
+   剧情角色暂无美术稿 ⇒ 返回 null，名册改用「首字方块」占位。
+   拿到图后：把图放进 src/assets/，在下面按 id 补一行素材占位符（写法与 11-dialog.js 里
+   `TEC_AVATAR_B64` 那行完全一样）即可。
+   ⚠ 两条坑：① 本函数必须**惰性读取**常量 —— 所有切片拼进同一个 <script>，而
+   `EXECUTOR_AVATAR_B64` 定义在 13-matrix.js（本文件之后），顶层直接引用会踩 TDZ。
+   ② 任何**注释里也不要写素材占位符的字面量**：build.js 是对整段源码做替换的，
+   注释同样会被扫到，守卫会以「素材名不合法」直接中止构建。 */
+function rosterAvatar(id){
+  if (id === "CHARS_TEC")  return TEC_AVATAR_B64;
+  if (id === "CHARS_EXEC") return EXECUTOR_AVATAR_B64;
+  return null;
+}
+/* 常驻在前、遇到的在后；CHARS_TEC 已在常驻里，从「遇到的人」里排除，免得排两遍 */
 function metChars(){
   const ids = new Set();
   Object.keys(G.nodes).forEach(k => { if (k.indexOf("char:") === 0) ids.add(k.slice(5)); });
@@ -219,7 +246,8 @@ function metChars(){
   G.explored.forEach(sid => Object.keys(CHARS).forEach(id => {
     if ((CHARS[id].sceneTalks || {})[sid]) ids.add(id);
   }));
-  return Object.keys(CHARS).filter(id => id !== "CHARS_TEC" && ids.has(id));
+  return ROSTER_PINNED.map(p => p.id)
+    .concat(Object.keys(CHARS).filter(id => id !== "CHARS_TEC" && ids.has(id)));
 }
 /* 对话进度：有节点就按真实队列算（含场景对白），没节点时退回基础队列 */
 function charProgress(id){
@@ -242,19 +270,35 @@ function refreshPeopleWin(){
     return;
   }
   list.forEach(id => {
+    const pin = ROSTER_PINNED.find(p => p.id === id);
     const ch = CHARS[id] || {};
-    const pr = charProgress(id);
+    const name = (pin && pin.name) || ch.name || id;
+    const pr = pin ? null : charProgress(id);   /* 常驻成员不走对话进度（他们的词在各自的窗里） */
     const d = document.createElement("div");
-    d.className = "goto-item" + ((pr.total && pr.prog >= pr.total) ? " done" : "");
+    d.className = "goto-item" + ((pr && pr.total && pr.prog >= pr.total) ? " done" : "");
+    /* 小头像：有美术稿用像素图，没有的用「首字方块」占位 */
+    const av = document.createElement("span"); av.className = "av";
+    const art = rosterAvatar(id);
+    if (art){
+      const im = document.createElement("img");
+      im.src = "data:image/png;base64," + art;
+      im.alt = ""; im.draggable = false;
+      av.appendChild(im);
+    } else {
+      const ini = document.createElement("span");
+      ini.className = "ini"; ini.textContent = name.slice(0, 1);
+      av.appendChild(ini);
+    }
     const box = document.createElement("span"); box.className = "nm";
-    const lb = document.createElement("span"); lb.className = "lb"; lb.textContent = ch.name || id;
+    const lb = document.createElement("span"); lb.className = "lb"; lb.textContent = name;
     box.appendChild(lb);
-    const ds = document.createElement("span"); ds.className = "ds"; ds.textContent = ch.desc || "";
+    const ds = document.createElement("span"); ds.className = "ds"; ds.textContent = (pin && pin.desc) || ch.desc || "";
     box.appendChild(ds);
     const st = document.createElement("span"); st.className = "st";
-    st.textContent = pr.total ? (pr.prog ? "对话 " + pr.prog + "/" + pr.total : "未交谈") : "无对话文本";
-    d.appendChild(box); d.appendChild(st);
-    d.addEventListener("click", () => gotoChar(id));
+    st.textContent = pin ? pin.tag
+      : (pr.total ? (pr.prog ? "对话 " + pr.prog + "/" + pr.total : "未交谈") : "无对话文本");
+    d.appendChild(av); d.appendChild(box); d.appendChild(st);
+    d.addEventListener("click", () => { if (pin) pin.open(); else gotoChar(id); });
     body.appendChild(d);
   });
 }
