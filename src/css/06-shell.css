@@ -1,0 +1,96 @@
+  .syswin{overflow:hidden; padding:0}
+  .syswin-bar{display:flex; justify-content:center; align-items:center; position:relative;
+    background:linear-gradient(180deg,rgba(255,252,241,.6),rgba(255,252,241,0)); border-bottom:1px solid var(--edge-soft); padding:5px 6px;
+    cursor:grab; user-select:none}
+  .syswin-bar:active{cursor:grabbing}
+  .syswin-rule{flex:1; min-width:12px; border-top:1px solid var(--edge); margin:0 8px}
+  .syswin-title{font-family:inherit; font-size:10.5px; letter-spacing:2px; font-weight:700;
+    color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .syswin-x{position:absolute; right:5px; top:50%; transform:translateY(-50%);
+    width:18px; height:18px; line-height:16px; text-align:center;
+    border:1px solid var(--edge); border-radius:7px; background:linear-gradient(150deg,var(--face-hi),var(--face-lo));
+    color:var(--text); font-size:12px; cursor:pointer; box-shadow:var(--raise-sm)}
+  .syswin-x:hover{background:var(--text); color:var(--card); box-shadow:none}
+  /* 最小化：只有案件窗有（把案件缩成桌面右下角的案件卡片）。位置排在 × 左边 */
+  .syswin-min{position:absolute; right:28px; top:50%; transform:translateY(-50%);
+    width:18px; height:18px; line-height:16px; text-align:center;
+    border:1px solid var(--edge); border-radius:7px; background:linear-gradient(150deg,var(--face-hi),var(--face-lo));
+    color:var(--text); font-size:12px; cursor:pointer; box-shadow:var(--raise-sm)}
+  .syswin-min:hover{background:var(--text); color:var(--card); box-shadow:none}
+  .syswin-body{padding:10px 12px}
+  .narr-card .syswin-body{max-height:360px; overflow:auto}
+  .bubble .syswin-body{max-height:240px; overflow:auto}
+
+  /* 复古单色滚动条：黑滑块 + 米白轨道（证物袋 / 叙事卡 / 日志 / 详情全局统一） */
+  *{scrollbar-width:thin; scrollbar-color:var(--text) var(--bg)}
+  /* OS 外壳整体不可选中：拖窗口 / 拖浮层时按住正文文字，不会再拉出一条蓝色选区。
+     多数窗口是「整窗拖动」（handle 默认 = 元素自身），正文若可选中就会一边拖一边选。
+     输入框单独放行 —— 密码 / 姓名要能放光标、能拖选。此条必须排在 body 那条之后。 */
+  body{user-select:none; -webkit-user-select:none}
+  input, textarea, [contenteditable]{user-select:text; -webkit-user-select:text}
+  ::-webkit-scrollbar{width:12px; height:12px}
+  ::-webkit-scrollbar-track{background:var(--bg); border-left:1px solid var(--line)}
+  ::-webkit-scrollbar-corner{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--text); border:2px solid var(--bg); border-radius:0}
+  ::-webkit-scrollbar-thumb:hover{background:#000}
+
+  .badge{
+    position:absolute; top:-8px; right:-6px; font-size:9.5px; line-height:1;
+    padding:3px 6px; border-radius:999px; background:var(--text); border:1px solid var(--text);
+    color:var(--card); white-space:nowrap; pointer-events:none;
+  }
+  .badge.cond{color:var(--card); border-color:var(--text); background:var(--text)}
+  .badge.talk{color:var(--card); border-color:var(--text); background:var(--text)}
+  .badge.warn{color:var(--text); border:2px solid var(--text); background:var(--card)}
+  .badge.new{color:var(--card); background:var(--text); border-color:var(--text)}
+  /* 「已固定」（右键钉住，唯一入口）：挂左上角，与右上角的通知类角标分开，不叠字。
+     空心药丸 = 状态（别自动挪我、折叠也不收我），实心药丸 = 通知（新 / 对话 / 条件进入）。 */
+  .badge.pin{left:-6px; right:auto; font-size:9px; padding:2px 5px;
+    color:var(--text); background:var(--card); border:1px solid var(--text)}
+
+  #toast{
+    position:absolute; left:50%; top:14px; transform:translateX(-50%); max-width:560px;
+    background:var(--card); border:1px solid var(--edge);
+    border-radius:var(--r-win); padding:11px 15px; font-size:13px; line-height:1.65;
+    box-shadow:var(--win-shadow); display:none; z-index:30;
+  }
+  #toast.fail{border-width:2px}
+  #toast b{color:var(--text); text-decoration:underline}
+
+  #verdict{
+    position:absolute; right:14px; top:14px; width:300px; background:var(--card);
+    border:1px solid var(--edge); border-radius:var(--r-win); padding:12px 14px; font-size:12px; line-height:1.6;
+    display:none; box-shadow:var(--win-shadow); z-index:30;
+  }
+  #verdict h4{font-size:12px; font-weight:700; letter-spacing:1px; margin-bottom:8px}
+  #verdict .vrow{display:flex; gap:8px; align-items:baseline; padding:3px 0}
+  #verdict .dot{width:7px; height:7px; border-radius:50%; flex:0 0 7px; margin-top:5px}
+  #verdict code{font-family:inherit; font-size:11px; color:var(--muted)}
+  #verdict .close{float:right; cursor:pointer; color:var(--faint); font-size:14px; line-height:1; margin-top:-2px}
+
+  .detail-win{position:absolute; right:14px; top:60px; width:300px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win); box-shadow:var(--win-shadow); z-index:22; overflow:hidden}
+  .detail-win .syswin-body{max-height:380px; overflow:auto; padding:12px 14px; font-size:13px; line-height:1.7}
+  #detail-body .dt{font-size:15px; font-weight:700; margin-bottom:2px}
+  #detail-body .dmeta{font-size:11px; color:var(--faint); margin-bottom:10px}
+  #detail-body .ddesc{color:var(--text); white-space:pre-wrap}
+  #detail-body .drow{font-size:12px; color:var(--muted); margin-top:7px}
+  /* 详情窗内不放任何内层方框（"框套框"很难看）：行间只留白、不用虚线，按钮降级成纯文字链接 */
+  #detail-body button{background:none; border:0; border-radius:0; box-shadow:none; padding:0;
+    font-size:12px; color:var(--muted); text-decoration:underline; text-underline-offset:3px}
+  #detail-body button:hover{background:none; border:0; color:var(--text)}
+  #detail-body button:active{box-shadow:none; transform:none}
+  #detail-body .empty{color:var(--faint); font-size:12px}
+
+  .log-win{position:absolute; right:14px; bottom:96px; width:320px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win); box-shadow:var(--win-shadow); z-index:21; overflow:hidden}
+  .log-win .log-body{max-height:340px; overflow:auto; padding:8px 10px; font-size:12px; line-height:1.6}
+  #log div{padding:4px 5px; border-bottom:1px solid var(--line2); color:var(--text)}
+  #log div.sys{color:var(--text); font-weight:700}
+  #log div.sys::before{content:"▍ "}
+  #log div.warn{color:var(--muted)}
+  #log div.warn::before{content:"※ "}
+  #log div.err{background:var(--text); color:var(--card)}
+  #log div.cap{color:var(--text); text-decoration:underline}
+  #log div.act{background:var(--bg)}
+  #log div.act b{color:var(--text)}

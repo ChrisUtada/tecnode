@@ -1,0 +1,353 @@
+/* ============ INFERENCE_MATRIX // 逻辑阵列 ============ */
+/* ============ 逻辑阵列：桌布式推演窗 ============
+   桌布几何与 CSS .mx-board 的尺寸对应（DOM stub 里 offsetWidth 是常量，量不出真尺寸时退回这两个值）。
+   560×420：去掉文字标签后窗体收边，但**五芒星绝对大小不变**——顶点间距与 640×460 版一致，
+   仅整体平移（水平 -40px、垂直 -20px）重新居中：五芒星**形心与桌布中心重合**，
+   这样中央头像正好坐在星的中枢上（五芒星横跨 332px、纵跨 316px，是窗体缩小的物理下限）。 */
+const MX_W = 560, MX_H = 420;
+/* 星阵外圆半径：五感顶点外接圆(≈175) + 20 缓冲，圆心 = 桌布中心 = 五芒星形心。
+   外圆与五芒星合成一条路径（先圆后星），常显框与长按描线共用。 */
+const MX_CIRCLE_R = 195;
+/* 五感锚点：环绕中央执行者的方位（桌布宽高的分数）。数值按 560×420 反推：
+   顶点（卡中心）= (MX_ANCHORS.xy × 桌布) + 27px 卡占位，换算后与原 640×460 版的顶点绝对坐标一致。 */
+/* 五感锚点：以「卡片中心」近似正五边形（桌布坐标下半径≈137px，绕板心 72° 均布）摆放，
+   这样证据（卡片中心）正好是五芒星的五个顶点。锚点 top 已减去卡片占位（≈27px）：
+   去掉文字标签后 chip 从锚点顶起，margin4 + 半卡高23 即中心偏移。 */
+const MX_ANCHORS = { vision:[.5000,.0192], hearing:[.7971,.3073], touch:[.6840,.7727], smell:[.3160,.7727], taste:[.2029,.3073] };
+/* 执行者头像：暂借 TEC 的（同风格同尺寸），新头像做好只改这一行 */
+const EXECUTOR_AVATAR_B64 = "iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAD50lEQVR4Ae2aP2gUQRTGzz+NeI2gYBBEQkxAQUWEU8RComATBHsrU1lapbC0Tmmllb0gaQRNZWECIlFQSAxBBImgxCaijWiy63fcfHtv3szs7u1FXprZN29m3ttvfvd29i6tlv2ZAqaAKWAKmAI7VYFdw5L4pzu3/vTmcnT24VDktrs3KbsuKrC32NVMz4ev35sJrEQ1goZNoO1aw/VGyTFzp84LWds3xgjyqbPla6wGzd+8kT21Jh899j6tME65j9rcRpAibbBA2zvZ9G4q9xLkjr2PYIGCov+Hg6JrED+Byp54JSql/tg94Hxjz1tGkKJ4NEG8Hu8Q/CBr87T7jrWBAdQ+W3NP0ldHD9CI3OT12m/ydzYpj76LRHQaQYpYwQThvMK14fih/js9c/Fyds7Z6OQZ3F9cyy5ut0aVlPzue+1/63TydWbaeRxpFtcc3Ic0nvuNIFaEbO8plsY6JpPkOHsMri13N/OdXzzl1pyeKX0vO29zUkEQBkm1Cn60seRgnhEEJYQ2mSCsJ5EEcrDDsEEQ5se2IIjXhc3rpZKDdYwgKCG0pQnidZmoUHL2Lz1wlvpxZtqx2WCS4C9LDNZBawRBCaGtnKAnB887v05MHjkphM67Qc7ZC1ecca9fPs9sjaT5z++cede/LVR6T0aQI2/RCD5JF6f6ezRy/LPDvYjDJIWv4B9pBPn1ae47aeT1a3o2u0TN4X7YTbVGkKJ8bTWI4+JphX48nX6/ep91gST40Q9bmg9/Xa0RpCibTJD0zR7Hw84XzjlLYeec1Pmh+XG+bBtBrAjZyQTROi3sWF3nEY4n2chD8sf2G0GKYskE4dcEbcfwdEo955SdjzwVHUS3ESRKkztKv/mCIK49eEdS4nfddc03groS13ORXIM4HRDDJPA4ycZ8yR/aX9U6iGc1CEoIbWmC8BlHLRLiFLov7fuY9fHTjQfiBP7i5zF2eW3k5R0U4DSCFJFKP8Wk9TWiQJA0n/s1gqoihuMaQawI2aVrEK3XNbGjGkmhNai7MF0gDnVXZhpBipS11SCOq5G059wJZwp/o+g4t4y6yUE8IwhKCO3ACEJ8jSSMk9pBkYP4RhCUENqBE4Q88Bu+9u6Ed7uqf3NHHlprBCkKDZyga1NT2X9/rC4vO6mNTUw4tuR/Ojc30JyNIGdbioYJVNTE6TGBHDmKRuWfZ9QYDoWa8mV9nV1R9uGRkWw81ywsUnWNMoKgrNCWJkgiBvFADuyqW4kkxClLlBEEJYU2mSCQUzchQt7B3SAslSQjSJE6maCx8XHn/6GVOI27V1dWku7VCFK2LlrVnUYO338sSUYQK0j2X/jsN0+TP2FGAAAAAElFTkSuQmCC";
+/* 执行者表情：配方不匹配时在头像上方弹出（心碎，16×16 像素，含气泡框） */
+const EXEC_EMOTE_HEARTBROKEN_B64 = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAABGdBTUEAALGPC/xhBQAAABVQTFRFAAAA/7/U5u/55ubm/wBUnsLp////vxedWQAAAAF0Uk5TAEDm2GYAAABXSURBVAjXPY3RCcAwCET9cYPQDTpBVhC/SyGZQN1/hJ4aegg+Dz2JV+mhN0o37QYHiIYkmCiqIOTANQowW+2EydCCMO3zk/Mn84Ln+EXEc2aDtncnTuMDvLQk1hSuZ+MAAAAASUVORK5CYII=";
+
+let inferWinEl = null;
+function closeInferWin(){ if (inferWinEl){ inferWinEl.remove(); inferWinEl = null; } }
+function toggleInferWin(){
+  if (inferWinEl){ closeInferWin(); return; }
+  const w = makeWindow("INFERENCE // 逻辑阵列", closeInferWin);
+  w.el.classList.add("infer-win");
+  desktopEl.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  inferWinEl = w.el;
+  refreshInferWin();
+}
+/* 阵列内的线索卡：只能拖出桌布移除（与外部「拖进拖出」一致，卡上不再放 ×）。
+   桌布 overflow:hidden，所以拖动时把卡片克隆到全局 #drag-layer 跟随指针，松手落在桌布外即移除。 */
+function makeMatrixNodeDraggable(card, cid, sense){
+  let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
+  card.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
+    sr = desktopEl.getBoundingClientRect();
+    try { card.setPointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+  card.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+    moved = true;
+    card.classList.add("dragging");
+    if (!mirror){
+      const layer = document.getElementById("drag-layer");
+      const r = card.getBoundingClientRect();
+      offx = e.clientX - r.left; offy = e.clientY - r.top;
+      mirror = card.cloneNode(true);
+      mirror.classList.add("drag-mirror");
+      mirror.classList.remove("dragging");
+      mirror.style.position = "absolute";
+      mirror.style.transform = "none";
+      mirror.style.width = r.width + "px"; mirror.style.height = r.height + "px";
+      mirror.style.left = (r.left - sr.left) + "px";
+      mirror.style.top  = (r.top  - sr.top ) + "px";
+      mirror.style.visibility = "hidden";
+      layer.appendChild(mirror);
+      card.style.visibility = "hidden";
+      void mirror.offsetWidth;             /* 强制布局，显示即正确位置 */
+      mirror.style.visibility = "visible";
+    }
+    mirror.style.left = (e.clientX - offx - sr.left) + "px";
+    mirror.style.top  = (e.clientY - offy - sr.top ) + "px";
+  });
+  const finish = e => {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove("dragging");
+    if (mirror){ mirror.remove(); mirror = null; }
+    card.style.visibility = "";
+    if (!moved) return;                    /* 纯点击，不移除 */
+    const bd = inferWinEl && inferWinEl.querySelector(".mx-board");
+    if (bd){
+      const r = bd.getBoundingClientRect();
+      const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      if (!inside){                        /* 拖出桌布 → 移除该条 */
+        pushHistory();
+        G.matrix[sense] = G.matrix[sense].filter(x => x !== cid);
+        render(); refreshInferWin();
+        return;
+      }
+    }
+    refreshInferWin();                     /* 仍在桌布内：复位 */
+  };
+  card.addEventListener("pointerup", finish);
+  card.addEventListener("pointercancel", () => {
+    dragging = false; card.classList.remove("dragging");
+    if (mirror){ mirror.remove(); mirror = null; }
+    card.style.visibility = "";
+  });
+}
+function refreshInferWin(){
+  if (!inferWinEl) return;
+  const body = inferWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+
+  const board = document.createElement("div");
+  board.className = "mx-board";
+  body.appendChild(board);
+  const bw = board.offsetWidth || MX_W, bh = board.offsetHeight || MX_H;
+  const cx = bw / 2, cy = bh / 2;
+
+  /* 连线层铺在最底：放五芒星描线（faint 框常显，长按时描出亮线） */
+  const links = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  links.setAttribute("class", "mx-links");
+  links.setAttribute("width", bw); links.setAttribute("height", bh);
+  board.appendChild(links);
+
+  /* 五感锚点 + 归位线索 chip（同感官按序向下叠；连线终点用解析坐标，不量 DOM） */
+  const verts = {};   /* 五感星形顶点（board 坐标）：证据落在哪，五芒星就连到哪 */
+  Object.keys(SENSES).forEach(sense => {
+    const a = MX_ANCHORS[sense];
+    const ax = a[0] * bw, ay = a[1] * bh;
+    const anchor = document.createElement("div");
+    anchor.className = "mx-anchor";
+    anchor.style.left = ax + "px"; anchor.style.top = ay + "px";
+    anchor.title = SENSES[sense];   /* 无文字标签：感官名只进 tooltip，不进排布 */
+    const list = G.matrix[sense];
+    let child = null;
+    if (list.length){
+      list.forEach((cid, i) => {
+        const chip = document.createElement("div");
+        let cls = "mx-chip node ent-node ent-clue";
+        if (G.captured.has(cid)) cls += " got";
+        chip.className = cls;
+        const sub = G.captured.has(cid) ? "线索 · 已捕获" : "线索";
+        chip.innerHTML = "<div class='n-title'>" + esc((CLUES[cid] || {}).label || cid) + "</div>" +
+                        "<div class='n-sub'>" + esc(sub) + "</div>";
+        anchor.appendChild(chip);
+        if (i === 0) child = chip;   /* 顶点取该感官第一条线索的中心 */
+        makeMatrixNodeDraggable(chip, cid, sense);
+      });
+    }
+    board.appendChild(anchor);
+    /* 记录该感官的星形顶点：用卡片实测中心；stub 量不出时退回解析坐标（锚点+27） */
+    const cr = child ? child.getBoundingClientRect() : null;
+    const br = board.getBoundingClientRect();
+    verts[sense] = (cr && cr.width) ? { x: cr.left + cr.width / 2 - br.left, y: cr.top + cr.height / 2 - br.top }
+                                    : { x: ax, y: ay + 27 };
+  });
+
+  /* 星阵 = 外圆 + 五芒星，合成一条路径：常显虚线框与长按描线都包含它。
+     蓄力时按路径顺序描绘——先描外圆（划定法阵），再描五芒星（建立逻辑归因）。
+     外圆半径 = 五感顶点外接圆(≈175) + 20 缓冲；圆心 = 桌布中心 = 五芒星形心。 */
+  const STAR_ORDER = ["vision","touch","taste","hearing","smell"];   /* 顺时针 视觉→触觉→味觉→听觉→嗅觉 */
+  const pts = STAR_ORDER.map(s => verts[s]).filter(Boolean);
+  if (pts.length === 5){
+    let d = "M" + (cx - MX_CIRCLE_R) + " " + cy +
+            " a" + MX_CIRCLE_R + "," + MX_CIRCLE_R + " 0 1,1 " + (MX_CIRCLE_R * 2) + ",0" +
+            " a" + MX_CIRCLE_R + "," + MX_CIRCLE_R + " 0 1,1 " + (-MX_CIRCLE_R * 2) + ",0";
+    d += " M" + pts[0].x + " " + pts[0].y;
+    for (let i = 1; i < pts.length; i++) d += " L" + pts[i].x + " " + pts[i].y;
+    d += " Z";
+    const frame = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    frame.setAttribute("class", "mx-star-frame");
+    frame.setAttribute("d", d);
+    links.appendChild(frame);
+    const draw = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    draw.setAttribute("class", "mx-star-draw");
+    draw.setAttribute("d", d);
+    draw.setAttribute("pathLength", "100");   /* 归一化长度 → dasharray:100 即整条线 */
+    links.appendChild(draw);
+  }
+
+  /* 中央执行者：长按激活归因 */
+  const exec = document.createElement("div");
+  exec.className = "mx-exec";
+  exec.title = "长按 2.5 秒激活归因";
+  const av = document.createElement("div"); av.className = "mx-avatar";
+  const img = document.createElement("img");
+  img.src = "data:image/png;base64," + EXECUTOR_AVATAR_B64;
+  img.alt = "执行者"; img.draggable = false;
+  av.appendChild(img);
+  exec.appendChild(av);   /* 执行者只留头像：头像即五芒星中枢，标签/提示已移除 */
+  exec.addEventListener("pointerdown", riteStart);
+  board.appendChild(exec);
+}
+/* 长按蓄力：pointerdown 起 2.5s 完成 → executeInference；pointerup / pointerleave 提前 = 中断复位。
+   无头环境 setTimeout 返回 0 就立即完成（与 enterCase 换档的兜底同款）。 */
+let riteTimer = null;
+function riteEnd(commit){
+  if (riteTimer){ clearTimeout(riteTimer); riteTimer = null; }
+  if (inferWinEl){
+    const ex = inferWinEl.querySelector(".mx-exec");
+    if (ex){
+      ex.classList.remove("charging");
+      if (ex._riteOff){
+        ex.removeEventListener("pointerup", ex._riteOff);
+        ex.removeEventListener("pointerleave", ex._riteOff);
+        ex._riteOff = null;
+      }
+    }
+    const bd = inferWinEl.querySelector(".mx-board");
+    if (bd) bd.classList.remove("charging");
+  }
+  if (commit) executeInference();
+}
+function riteStart(e){
+  if (e && e.button !== 0) return;
+  if (!inferWinEl || riteTimer) return;
+  const ex = inferWinEl.querySelector(".mx-exec");
+  if (!ex) return;
+  ex.classList.add("charging");
+  const bd = inferWinEl.querySelector(".mx-board");
+  if (bd) bd.classList.add("charging");   /* 描星与头像震颤起；窗体不抖（窗口震动只属于真名结局） */
+  const t = setTimeout(() => riteEnd(true), 2500);
+  if (!t){ riteEnd(true); return; }
+  riteTimer = t;
+  const off = () => riteEnd(false);
+  ex._riteOff = off;
+  ex.addEventListener("pointerup", off);
+  ex.addEventListener("pointerleave", off);
+}
+function assignClue(clueKey, sense){
+  const n = G.nodes[clueKey];
+  if (!n || n.kind !== "clue") return false;
+  const c = CLUES[n.id];
+  if (!c || c.type !== sense){ toast("「" + esc(n.label) + "」的感官类型不是" + SENSES[sense], true); return false; }
+  if (G.matrix[sense].indexOf(n.id) >= 0) return false;
+  pushHistory();
+  G.matrix[sense].push(n.id);
+  render(); refreshInferWin();
+  return true;
+}
+/* 配方不匹配：头像上方弹心碎表情（1.4s 自动消失；连发时先撤旧的再弹，重置动画） */
+function showExecEmote(){
+  if (!inferWinEl) return;
+  const ex = inferWinEl.querySelector(".mx-exec");
+  if (!ex) return;
+  const old = ex.querySelector(".mx-emote");
+  if (old) old.remove();
+  const em = document.createElement("div");
+  em.className = "mx-emote";
+  const im = document.createElement("img");
+  im.src = "data:image/png;base64," + EXEC_EMOTE_HEARTBROKEN_B64;
+  im.alt = "心碎"; im.draggable = false;
+  em.appendChild(im);
+  ex.appendChild(em);
+  setTimeout(() => em.remove(), 1500);
+}
+function executeInference(){
+  const inMatrix = new Set();
+  Object.keys(G.matrix).forEach(s => G.matrix[s].forEach(id => inMatrix.add(id)));
+  const hit = ENDINGS.find(e => {
+    const r = e.recipe || [];
+    return r.length === inMatrix.size && r.every(id => inMatrix.has(id));
+  });
+  if (hit){ refreshInferWin(); triggerEnding(hit); }
+  else { showExecEmote(); log("推演失败：当前阵列不匹配任何结局配方", "warn"); }
+}
+
+/* ============ 结局演出（步进状态机：setTimeout 自动推进 / 点击跳过 / 钩子手动推进） ============ */
+let endingState = null;
+function triggerEnding(ending){
+  G.endings.add(ending.id);
+  /* 只有捕获「真名」（真结局）才点亮下一案的地址 */
+  if (ending.isTrueCapture) unlockNextCase(CASE_ID);
+  log("<b>结局达成：" + esc(ending.name) + "</b>", "cap");
+  /* 真名结局：先让推演器整窗冲击震动一拍，再落下结局遮罩 */
+  const shock = !!(ending.isTrueCapture && inferWinEl);
+  if (shock){
+    inferWinEl.classList.add("shock");
+    setTimeout(() => { if (inferWinEl) inferWinEl.classList.remove("shock"); }, 1000);
+  }
+  endingState = { ending, step: 0, stages: buildStages(ending) };
+  const t = shock ? setTimeout(playEndingStage, 900) : 0;
+  if (!t) playEndingStage();
+}
+function buildStages(e){
+  const st = [];
+  (e.lines || []).forEach(l => st.push({ html: esc(l.text), delay: l.delay || 1200 }));
+  if (e.isTrueCapture && e.truename) st.push({ html: "<div class='truename'>真名已识别<br>『" + esc(e.truename) + "』</div>", delay: 2000 });
+  st.push({ html: esc(e.message || ""), delay: 1600 });
+  st.push({ html: "<div style='text-align:center'><span class='ebtn'>" + (e.isTrueCapture ? "确认捕获" : "收下这份记录") + "</span></div>", final: true });
+  return st;
+}
+function playEndingStage(){
+  const st = endingState; if (!st) return;
+  const overlay = document.getElementById("ending-overlay");
+  if (st.step >= st.stages.length){ closeEnding(); return; }
+  const stage = st.stages[st.step];
+  const eol = overlay.querySelector(".eol") || (function(){ const d = document.createElement("div"); d.className = "eol"; overlay.appendChild(d); return d; })();
+  const div = document.createElement("div");
+  div.innerHTML = stage.html;
+  eol.appendChild(div);
+  overlay.style.display = "block";
+  st.step++;
+  if (!stage.final) st.timer = setTimeout(playEndingStage, stage.delay);
+}
+function closeEnding(){
+  const overlay = document.getElementById("ending-overlay");
+  overlay.style.display = "none";
+  overlay.innerHTML = "";
+  endingState = null;
+  updateCrumbs();
+}
+
+/* ============ 记忆场景放映卡（A-001 日期闪回） ============ */
+let memoryPlay = null;
+function showMemoryCard(n, s){
+  closeNarr();
+  const w = makeWindow("MEMORY // " + (s.title || n.id), closeNarr);
+  const c = w.el;
+  c.className = "narr-card memory syswin";
+  c.title = "单击任意位置推进下一行，按住可拖动";
+  makeFloatDraggable(c, true);                       /* 整卡可拖（与对话气泡一致），点/拖靠 _dragged 区分 */
+  c.addEventListener("click", () => { if (!c._dragged) advanceMemory(); });
+  world.appendChild(c);
+  anchorAboveOrBelow(c, n, 14);            /* 锚在节点上方，上方放不下则退到下方，不盖节点 */
+  narrEl = c;
+  const lines = narrText(s.content || s.desc || "").split("\n").map(t => t.trim()).filter(Boolean);
+  sceneTags(n.id).forEach(t => {
+    if (t.kind !== "char") return;
+    const ch = CHARS[t.id];
+    const st = ch && (ch.sceneTalks || {})[n.id];
+    (st || []).forEach(l => lines.push("——" + (ch.name || t.id) + "：" + plain(l.text || "")));
+  });
+  memoryPlay = { el: c, body: w.body, lines: lines, idx: 0, typing: false, cur: null, curText: "" };
+  playMemoryLine();
+}
+function playMemoryLine(){
+  const mp = memoryPlay;
+  if (!mp || !narrEl || mp.el !== narrEl){ memoryPlay = null; return; }
+  if (mp.idx >= mp.lines.length){ memoryPlay = null; return; }
+  const txt = mp.lines[mp.idx];
+  const d = document.createElement("div");
+  d.className = txt.startsWith("——") ? "mem-line talk" : "mem-line";
+  mp.body.appendChild(d);
+  mp.idx++;
+  /* 每行也走打字机；打完就停在那儿等玩家点 —— 不再 700ms 自动换行（改成点击推进） */
+  mp.typing = true; mp.cur = d; mp.curText = txt;
+  typeInto(d, txt, { done: () => { mp.typing = false; } });
+}
+/* 单次推进：本行还在打字 -> 先补全本句；已打完 -> 换下一行（视觉小说通行做法） */
+function advanceMemory(){
+  const mp = memoryPlay;
+  if (!mp) return false;
+  if (mp.typing){
+    cancelType(mp.cur);
+    if (mp.cur) mp.cur.textContent = mp.curText;
+    mp.typing = false;
+    return true;
+  }
+  playMemoryLine();
+  return true;
+}

@@ -1,0 +1,319 @@
+  .pw-pop.shake{animation:shake .32s}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+  .bubble{position:absolute; width:230px; background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    padding:9px 12px; font-size:12.5px; line-height:1.6; z-index:16; box-shadow:var(--win-shadow); cursor:pointer}
+  .narr-card{position:absolute; width:330px; background:var(--card); border:1px solid var(--edge);
+    border-radius:var(--r-win); padding:13px 15px; font-size:12.5px; line-height:1.8;
+    z-index:16; box-shadow:var(--win-shadow); cursor:pointer; white-space:pre-wrap; animation:pop .45s ease}
+  #icons{position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none; z-index:24}
+  .desk-icon{position:absolute; width:64px; text-align:center; cursor:pointer; user-select:none; pointer-events:auto}
+  /* 桌面图标：柔和浮雕的圆角按键（暖白高光 + 右下暖墨软影），选中 / 命中时变成「按下」的深色内嵌态 */
+  .desk-icon .icon-glyph{width:44px; height:44px; margin:0 auto; border:1px solid var(--edge);
+    background:linear-gradient(150deg,var(--face-hi) 0%,var(--card) 52%,var(--face-lo) 100%);
+    border-radius:var(--r-sm); font-size:20px; line-height:42px; color:var(--text);
+    box-shadow:var(--raise); transition:box-shadow .14s, transform .14s}
+  .desk-icon:hover .icon-glyph{box-shadow:-3px -4px 10px var(--bevel-hi), 4px 6px 13px rgba(86,80,60,.36)}
+  .desk-icon .icon-label{font-size:11px; margin-top:5px; color:var(--muted); border-radius:999px;
+    padding:1px 6px; display:inline-block; border:1px solid transparent}
+  /* 「变黑」不做过渡：按下 / 选中 / 拖过都必须立刻生效。
+     背景是 linear-gradient，过渡既慢（120~140ms）又会发灰，正是"点下去有滞后"的来源；
+     同时把按下态也算作变黑，指针一按就有反馈，不必等松手。 */
+  .desk-icon:active .icon-glyph,
+  .desk-icon.sel .icon-glyph{background:linear-gradient(150deg,#38372f,#1f1f19); color:var(--card);
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.3)}
+  .desk-icon:active .icon-label,
+  .desk-icon.sel .icon-label{background:var(--text); color:var(--card)}
+  .desk-icon.over .icon-glyph{background:linear-gradient(150deg,#38372f,#1f1f19); color:var(--card);
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.6), 0 0 0 2px var(--text), 0 0 14px 2px rgba(43,43,38,.35); transform:scale(1.06)}
+  .desk-icon .badge{top:-6px; right:0}
+  .desk-icon.pulse .icon-glyph{animation:tecpulse 1.6s infinite}
+  @keyframes tecpulse{0%,100%{box-shadow:var(--raise)}50%{box-shadow:-3px -4px 10px var(--bevel-hi), 4px 6px 14px rgba(86,80,60,.62), 0 0 0 2px var(--edge)}}
+  /* TEC「– 收起」的落点 = 桌面右下角那块带头像的助手卡片 #tec-chip（样式见 #case-dock 附近） */
+  /* TEC 是常驻助手窗：z 要高于其它浮窗（21~25）与桌面图标（24），始终不被覆盖；
+     仍低于拖拽镜像层（40）与瞬时提示 toast/verdict（30） */
+  .tec-win{position:absolute; right:14px; bottom:96px; width:332px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:28; overflow:hidden}
+  .tec-win .tec-lines{max-height:240px; overflow:auto; margin-bottom:8px}
+  .tec-win .tec-line{font-size:12px; line-height:1.7; padding:3px 0; border-bottom:1px dashed var(--line2)}
+  .tec-win .tec-hint{font-size:10.5px; color:var(--faint); margin-top:6px}
+  .bag-win{position:absolute; left:14px; bottom:96px; width:280px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; cursor:grab; overflow:hidden}
+  .bag-win:active{cursor:grabbing}
+  .bag-win .syswin-body{max-height:300px; overflow:auto}
+  /* 拖节点悬停在证物袋窗口上：与 #tec-chip.over / .tec-avatar.over 同一套虚线高亮
+     （outline 画在本元素盒子外侧，不受自身 overflow:hidden 影响） */
+  .bag-win.over{outline:2px dashed var(--text); outline-offset:3px}
+  .bag-item{display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+    padding:6px 8px; border-radius:var(--r-btn); cursor:pointer; font-size:12.5px; transition:background .12s, box-shadow .12s}
+  .bag-item:hover{background:var(--bg); box-shadow:var(--press)}
+  .bag-item .src{color:var(--faint); font-size:10.5px; white-space:nowrap}
+  .bag-empty{color:var(--faint); font-size:12px; padding:4px 2px}
+  .goto-win{position:absolute; left:50%; top:80px; margin-left:-150px; width:300px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+  .goto-win .syswin-body{max-height:320px; overflow:auto}
+  .goto-item{display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+    padding:6px 8px; border-radius:var(--r-btn); cursor:pointer; font-size:12.5px; transition:background .12s, box-shadow .12s}
+  .goto-item:hover{background:var(--bg); box-shadow:var(--press)}
+  .goto-item .st{color:var(--faint); font-size:10.5px; white-space:nowrap}
+  /* 线索册（收纳盒）/ 人物（名册）：与档案同一族的清单窗（行复用 .goto-item，拖动排除表已覆盖它） */
+  .clue-win{position:absolute; left:96px; top:80px; width:326px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; cursor:grab; overflow:hidden}
+  .clue-win:active{cursor:grabbing}
+  .clue-win .syswin-body{max-height:356px; overflow:auto; padding:0}
+  /* 与 .bag-win.over 同一套虚线高亮：两扇收纳窗都是落点，悬停反馈必须一致 */
+  .clue-win.over{outline:2px dashed var(--text); outline-offset:3px}
+  /* 人物窗紧挨详情窗左侧（列表 + 详情成一对），避开 #detail-win（right:14 top:60）不叠窗 */
+  .people-win{position:absolute; right:328px; top:60px; width:300px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+  .people-win .syswin-body{max-height:356px; overflow:auto}
+  /* 线索册 = 收纳盒：不分组、无状态列，感官直接标在行尾（整表已按五感排序，排序本身就是分组） */
+  .goto-item .st.sense{color:var(--muted); letter-spacing:1px}
+  .clue-win .syswin-body .goto-item, .people-win .syswin-body .goto-item{margin:2px 5px}
+  .goto-item .nm{display:flex; flex-direction:column; min-width:0}
+  .goto-item .nm .lb{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .goto-item .ds{font-size:10px; color:var(--faint); line-height:1.35; margin-top:1px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .goto-item.done .st{color:var(--line2)}
+  /* 阵列桌布：大版纸面窗——执行者居中，线索环绕五感锚点，虚线连向中央（与主舞台同一张"纸"） */
+  .infer-win{position:absolute; left:50%; top:40px; margin-left:-280px; width:560px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+  .infer-win .syswin-body{padding:0}
+  /* 桌布本体：与 #stage 共用纸纹变量；整块都是线索落点。尺寸与 JS 的 MX_W/MX_H 对应，改动要同步 */
+  .mx-board{position:relative; width:560px; height:420px; overflow:hidden;
+    background-color:var(--bg);
+    background-image:var(--paper-grain), var(--paper-fleck);
+    background-size:200px 200px, 360px 360px; background-repeat:repeat, repeat;
+    background-blend-mode:soft-light, multiply}
+  .mx-board.over{outline:2px dashed var(--text); outline-offset:-6px}
+  .mx-links{position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none}
+  /* 星阵 = 逻辑阵列本体：外圆 + 五芒星（外圆 = 法阵，五感顶点 = 证据，红色微光 #c0392b 同核准印章）。
+     常显虚线框 + 长按描线共用同一条路径（先圆后星，pathLength 归一化后顺序描绘）。 */
+  .mx-star-frame{fill:none; stroke:#c0392b; stroke-width:1.25; stroke-dasharray:5 5; opacity:.42;
+    filter:drop-shadow(0 0 2px rgba(192,57,43,.35))}
+  .mx-star-draw{fill:none; stroke:#c0392b; stroke-width:1.75; stroke-dasharray:100; stroke-dashoffset:100; opacity:.95;
+    filter:drop-shadow(0 0 4px rgba(192,57,43,.6)) drop-shadow(0 0 9px rgba(192,57,43,.38))}
+  .mx-board.charging .mx-star-draw{animation:mxdraw 2.5s linear forwards}
+  @keyframes mxdraw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+  /* 蓄力仪式（与描星同步 2.5s）：头像剧烈震颤 + 红光渐盛。
+     窗体本身在蓄力时不抖——整窗震动只留给真名结局（.infer-win.shock），
+     否则点一下头像就会闪一下窗抖。 */
+  .mx-exec.charging .mx-avatar{animation:mx-av-quiver .1s linear infinite, mx-av-glow 2.5s ease-in forwards}
+  @keyframes mx-av-quiver{
+    0%,100%{transform:translate(0,0) rotate(0deg)} 25%{transform:translate(1.6px,-1.1px) rotate(.9deg)}
+    50%{transform:translate(-1.1px,1.6px) rotate(-.7deg)} 75%{transform:translate(1.1px,1.1px) rotate(.5deg)}
+  }
+  @keyframes mx-av-glow{
+    0%{box-shadow:var(--raise)}
+    55%{box-shadow:0 0 12px 2px rgba(192,57,43,.5), var(--raise)}
+    100%{box-shadow:0 0 22px 7px rgba(192,57,43,.68), 0 0 44px 16px rgba(192,57,43,.3), var(--raise)}
+  }
+  /* 真名结局判定：整窗冲击震动（衰减式先猛后缓，含轻微旋转）；
+     结局遮罩近乎不透明，所以震完这一拍再落下遮罩，震动才看得见 */
+  .infer-win.shock{animation:mx-win-shock .9s cubic-bezier(.36,.07,.19,.97) both}
+  @keyframes mx-win-shock{
+    0%{transform:translate(0,0) rotate(0deg)}
+    6%{transform:translate(-4px,3px) rotate(-.5deg)}
+    12%{transform:translate(4px,-3px) rotate(.5deg)}
+    18%{transform:translate(-3.4px,2.4px) rotate(-.42deg)}
+    24%{transform:translate(3.4px,-2.4px) rotate(.42deg)}
+    30%{transform:translate(-2.8px,2px) rotate(-.34deg)}
+    36%{transform:translate(2.8px,-2px) rotate(.34deg)}
+    44%{transform:translate(-2.2px,1.6px) rotate(-.26deg)}
+    52%{transform:translate(2.2px,-1.6px) rotate(.26deg)}
+    60%{transform:translate(-1.6px,1.1px) rotate(-.18deg)}
+    70%{transform:translate(1.6px,-1.1px) rotate(.18deg)}
+    80%{transform:translate(-1px,.7px) rotate(-.1deg)}
+    90%{transform:translate(1px,-.7px) rotate(.1deg)}
+    100%{transform:translate(0,0) rotate(0deg)}
+  }
+  /* 感官锚点：五感环绕中央排布，归位的线索 chip 叠在锚点下方（无文字标签，排布留给五芒星本身） */
+  .mx-anchor{position:absolute; width:140px; margin-left:-70px; text-align:center}
+  /* 逻辑阵列里的线索卡：复用外部节点观感（纸面渐变 / 圆角 / 浮雕），保持流内排布 */
+  .mx-chip.node{
+    position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    margin:4px auto 0; border-radius:var(--r-sm);
+    background:linear-gradient(150deg,var(--face-hi) 0%,var(--card) 55%,var(--face-lo) 100%);
+    box-shadow:var(--raise); cursor:grab; text-align:center; padding:0; gap:0;
+    font-size:12.5px; font-weight:500; line-height:1.2}
+  .mx-chip.node.dragging{cursor:grabbing; opacity:.94;
+    box-shadow:0 1px 0 rgba(255,253,246,.9) inset, -6px -8px 18px rgba(255,252,241,.5), 12px 18px 30px rgba(78,72,54,.34)}
+  .mx-chip.node .n-title{padding:0 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+  .mx-chip.node .n-sub{font-size:10px; color:var(--faint); line-height:1.3; margin-top:2px}
+  .mx-chip.node.got .n-sub{color:var(--line2)}
+  /* 中央执行者：长按 2.5s 激活归因（蓄力 = 描出五芒星，见 .mx-star-draw） */
+  .mx-exec{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); text-align:center;
+    cursor:pointer; user-select:none; padding:6px}
+  .mx-exec .mx-avatar{width:72px; height:72px; border-radius:14px; overflow:hidden; margin:0 auto;
+    border:1px solid var(--edge); box-shadow:var(--raise); background:var(--face-hi)}
+  .mx-exec .mx-avatar img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  /* 配方不匹配：头像上方弹心碎表情（替代 toast；1.4s 自动消失，连发先撤旧的）。
+     源图仅 16×16，气泡保持 46px——再放大心形反而糊/抢戏 */
+  .mx-emote{position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%);
+    width:46px; height:46px; padding:6px; background:var(--card); border:1px solid var(--edge);
+    border-radius:var(--r-sm); box-shadow:var(--raise); pointer-events:none;
+    animation:mx-emote-pop 1.4s ease forwards}
+  .mx-emote img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  @keyframes mx-emote-pop{
+    0%{opacity:0; transform:translateX(-50%) translateY(8px) scale(.5)}
+    16%{opacity:1; transform:translateX(-50%) translateY(0) scale(1.12)}
+    28%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
+    78%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
+    100%{opacity:0; transform:translateX(-50%) translateY(-10px) scale(.9)}
+  }
+  /* 结局清单：弱化存在，收在桌布左下角 */
+  .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
+  .memory{background:#dcd8c2; border:3px double #2b2b26; border-radius:var(--r-win); box-shadow:var(--win-shadow)}
+  .memory .syswin-bar{background:#2b2b26}
+  .memory .syswin-title{color:#e6e3d2}
+  .memory .syswin-rule{border-color:#8a8672}
+  .memory .syswin-x{border-color:#8a8672; color:#e6e3d2; background:transparent}
+  .mem-line{margin-bottom:6px}
+  .mem-line.talk{color:#5c584a}
+  #ending-overlay{position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(24,23,20,.97);
+    z-index:100; display:none; color:#e6e3d2; cursor:pointer; user-select:none}
+  #ending-overlay .eol{max-width:640px; margin:12vh auto 0; padding:0 26px; font-size:15px; line-height:2.1; white-space:pre-wrap}
+  #ending-overlay .eol .truename{font-size:26px; letter-spacing:6px; text-align:center; margin:20px 0}
+  #ending-overlay .eol .ebtn{display:inline-block; margin-top:28px; padding:8px 22px; border:1px solid #e6e3d2; cursor:pointer}
+  #ending-overlay .eol .ebtn:hover{background:#e6e3d2; color:#2b2b26}
+  #ending-overlay .eskip{position:absolute; right:18px; bottom:14px; font-size:11px; color:#8a8672}
+  #intro-backdrop{position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(43,43,38,.45); z-index:90}
+  .intro-win{position:absolute; left:50%; top:90px; margin-left:-210px; width:420px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win); box-shadow:var(--win-shadow); overflow:hidden}
+  .intro-win .syswin-body{padding:16px 18px; font-size:13px; line-height:1.9}
+  .intro-win .quiz-prog{font-size:11px; color:var(--faint); margin-bottom:8px; letter-spacing:2px}
+  .intro-win .quiz-q{font-weight:700; margin-bottom:10px}
+  .intro-win .quiz-opt{display:block; width:100%; text-align:left; margin-bottom:6px}
+  .intro-win input.intro-name{width:100%; font-family:inherit; font-size:14px; padding:7px 10px;
+    border:1px solid var(--edge); border-radius:var(--r-btn); background:var(--bg); margin:10px 0; box-shadow:var(--press)}
+  .intro-win.shrink{transform:scale(.1); opacity:0; transition:transform .4s, opacity .4s}
+  .inv-cert{width:320px; max-width:100%; background:#efece0; border:1px solid var(--edge);
+    border-radius:16px; overflow:hidden; box-shadow:var(--win-shadow);
+    font-size:14px; line-height:1.8; margin:0 auto}
+  .cert-head{background:#2b2b26; color:#e6e3d2; text-align:center; font-weight:700;
+    letter-spacing:3px; padding:10px 0; font-size:15px}
+  .cert-sec{padding:12px 14px; border-top:1px solid var(--line)}
+  .cert-sec.dashed{border-top:1px dashed var(--line)}
+  .cert-sec.cert-id{border-top:none; text-align:center}
+  .cert-photo{width:156px; height:156px; background:var(--card); margin:0 auto 10px;
+    border:1px solid var(--edge); border-radius:10px; padding:6px;
+    display:flex; align-items:center; justify-content:center; overflow:hidden; box-shadow:var(--press)}
+  .cert-photo img{width:144px; height:144px; image-rendering:pixelated; display:block}
+  .cert-photo .px{width:18px; height:18px}
+  .cert-photo .px.on{background:#2b2b26}
+  .cert-name{font-size:24px; font-weight:700; letter-spacing:3px; margin-top:4px}
+  .cert-idno{font-size:14px; color:var(--muted); letter-spacing:1px; margin-top:5px}
+  .cert-frow{margin-top:8px; color:var(--muted); font-size:13.5px}
+  .cert-sense{font-size:21px; font-weight:700; letter-spacing:2px; text-align:center}
+  .cert-flavor{font-size:13px; color:var(--muted); margin-top:6px; text-align:center}
+  .cert-issue{display:flex; justify-content:space-between; align-items:center}
+  .cert-stamp{width:58px; height:58px; border:2.5px solid #c0392b; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    color:#c0392b; font-size:11px; font-weight:700; line-height:1.25; letter-spacing:1px;
+    transform:rotate(-12deg); opacity:.85; box-shadow:inset 0 0 0 1px rgba(192,57,43,.3)}
+  .cert-actions{margin-top:14px; text-align:center}
+  .cert-win{position:absolute; left:50%; top:70px; margin-left:-190px; width:380px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+  /* 案件地图（CASE MAP）：外壳固定，每案一个地址卡 */
+  .map-win{position:absolute; left:50%; top:90px; margin-left:-210px; width:420px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+  .map-win .syswin-body{max-height:360px; overflow:auto}
+  .map-tip{font-size:12.5px; color:var(--muted); line-height:1.7; margin-bottom:10px}
+  .map-card{display:flex; align-items:center; gap:10px; border:1px solid var(--edge); border-radius:var(--r-sm);
+    background:var(--card); padding:10px 12px; margin-bottom:8px; box-shadow:var(--raise-sm);
+    transition:box-shadow .14s, transform .12s, background .12s}
+  .map-card.locked{opacity:.55; border-style:dashed; box-shadow:none}
+  .map-card.clickable{cursor:pointer}
+  .map-card.clickable:hover{background:var(--bg); box-shadow:var(--press); transform:translateY(1px)}
+  .map-glyph{width:34px; height:34px; border:1px solid var(--edge); border-radius:var(--r-btn);
+    background:var(--bg); box-shadow:var(--press); display:flex;
+    align-items:center; justify-content:center; font-size:16px; flex:0 0 auto}
+  .map-meta{flex:1; min-width:0}
+  .map-title{font-size:13.5px; font-weight:700; letter-spacing:.5px}
+  .map-note{font-size:11.5px; color:var(--muted); margin-top:2px}
+  .map-state{font-size:11px; border:1px solid var(--edge); border-radius:999px; padding:2px 8px; flex:0 0 auto}
+  .map-state.on{background:var(--text); color:var(--card)}
+  .map-state.lock{border-style:dashed; color:var(--muted)}
+  .map-state.pend{border-style:dotted; color:var(--muted)}
+  /* 刚进入过的案件地址：保留点亮标记，回访地图时可见 */
+  .map-card.ignite{border-color:#c0392b}
+  .map-card.ignite .map-glyph{color:#c0392b; border-color:#c0392b}
+  /* 切案过场：案件窗淡出 / 淡入。收起 / 展开是带位移缩放的，走 JS 内联过渡（见 closeCase / enterCase） */
+  #case-win{transition:opacity .18s ease}
+  #case-win.case-switching{opacity:0}
+  /* 案件离屏有两个落点（互斥）：
+     – 收起 → 桌面右下角的案件卡片 #case-dock（右侧浮窗都锚在 bottom:96px，底部这条 96px 是空的，不会打架）
+     × 关闭 → 桌面左侧的「案件地图」图标 #map-icon（图标用 .badge 打一个「已关闭」角标）
+     卡片只用 visibility 隐藏、保留布局，方便随时量取收缩目标点 */
+  #case-dock{position:absolute; right:16px; bottom:14px; width:170px;
+    display:flex; align-items:center; gap:9px; padding:8px 10px; text-align:left; cursor:pointer;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win); box-shadow:var(--win-shadow);
+    opacity:0; visibility:hidden; pointer-events:none; transition:opacity .2s ease; z-index:23}
+  #case-dock.on{opacity:1; visibility:visible; pointer-events:auto}
+  #case-dock:hover{background:var(--bg)}
+  #case-dock .cd-glyph{width:32px; height:32px; border:1px solid var(--edge); border-radius:var(--r-btn);
+    background:var(--bg); box-shadow:var(--press); display:flex;
+    align-items:center; justify-content:center; font-size:15px; flex:0 0 auto}
+  #case-dock .cd-meta{min-width:0; flex:1}
+  #case-dock .cd-code{font-size:9.5px; letter-spacing:1px; font-weight:700; line-height:1.1}
+  #case-dock .cd-title{font-size:11.5px; margin-top:1px; line-height:1.2;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #case-dock .cd-sub{font-size:9.5px; color:var(--muted); margin-top:2px; line-height:1.1;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  /* TEC「– 收起」的落点：桌面右下角一块带头像的助手卡片。
+     与案件卡片 #case-dock（bottom:14px）**上下错开**（bottom:84px），两张卡片不会叠在一起。
+     和案件卡片一样：只靠 visibility 隐藏、保留布局盒，收起 / 展开动画随时量得到目标点。 */
+  #tec-chip{position:absolute; right:16px; bottom:84px; width:196px;
+    display:flex; align-items:center; gap:9px; padding:8px 10px; text-align:left; cursor:pointer;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win); box-shadow:var(--win-shadow);
+    opacity:0; visibility:hidden; pointer-events:none; transition:opacity .2s ease; z-index:23}
+  #tec-chip.on{opacity:1; visibility:visible; pointer-events:auto}
+  #tec-chip:hover{background:var(--bg)}
+  /* 拖节点悬停在卡片上：与窗内助手头像 (#tec-avatar.over) 用同一套虚线高亮 */
+  #tec-chip.over{outline:2px dashed var(--text); outline-offset:3px}
+  #tec-chip .tc-av{width:32px; height:32px; border-radius:var(--r-btn); overflow:hidden; flex:0 0 auto;
+    border:1px solid var(--edge); background:var(--face-hi); box-shadow:var(--press)}
+  #tec-chip .tc-av img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  #tec-chip .tc-meta{min-width:0; flex:1}
+  #tec-chip .tc-name{font-size:9.5px; letter-spacing:1px; font-weight:700; line-height:1.1}
+  /* 状态行留固定行高，卡片高度就不会随文案变 —— 收起 / 展开动画量出来的落点才稳定 */
+  #tec-chip .tc-status{font-size:10.5px; color:var(--muted); margin-top:2px; line-height:1.2; min-height:13px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  /* 进度条常驻占位（高度不变），空闲时用 opacity 藏起来。
+     注意别用 visibility：父层 visibility:hidden 能被后代的 visible 反盖回来，卡片熄掉时进度条反而会露出来。 */
+  #tec-chip .tc-bar{height:4px; border-radius:3px; background:var(--face-lo); box-shadow:var(--press);
+    overflow:hidden; margin-top:4px; opacity:0; transition:opacity .15s ease}
+  #tec-chip.busy .tc-bar{opacity:1}
+  /* 用长写而不是 animation 简写：简写一旦被后续 inline/长写覆盖就整组复位，
+     animation-duration 会掉回 0s（真机踩过）。长写留 1s 兜底，运行期由 inline 覆盖。 */
+  #tec-chip .tc-bar i{display:block; height:100%; width:0; border-radius:3px;
+    background:linear-gradient(90deg,var(--muted),var(--text));
+    animation-name:tecana; animation-duration:1s; animation-timing-function:linear; animation-fill-mode:forwards}
+  #tec-chip .tc-dot{position:absolute; right:-4px; top:-4px; width:11px; height:11px; border-radius:999px;
+    background:var(--text); box-shadow:0 0 0 2px var(--card), 0 0 0 3px var(--edge); animation:pop .3s ease}
+  .tec-win .tec-body{display:flex; gap:10px; align-items:stretch}
+  .tec-win .tec-avatar-col{display:flex; flex-direction:column; align-items:center; gap:5px; width:74px; flex:0 0 74px; padding-top:2px}
+  .tec-win .tec-avatar{width:60px; height:60px; border-radius:12px; overflow:hidden; border:1px solid var(--edge); box-shadow:var(--raise-sm); cursor:pointer; background:var(--face-hi); pointer-events:auto}
+  .tec-win .tec-avatar img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  .tec-win .tec-avatar.over{outline:2px dashed var(--text); outline-offset:3px}
+  .tec-win .tec-avatar-label{font-size:10.5px; font-weight:700; letter-spacing:1px; color:var(--muted)}
+  .tec-win .tec-main{flex:1 1 auto; min-width:0; display:flex; flex-direction:column}
+  .tec-win .tec-analyzing{margin:0 0 8px; padding:7px 9px; border-radius:var(--r-sm); background:var(--bg); box-shadow:var(--press)}
+  .tec-win .tec-analyzing .ta-head{font-size:11px; color:var(--muted); margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .tec-win .tec-analyzing .ta-bar{height:6px; border-radius:4px; background:var(--face-lo); box-shadow:var(--press); overflow:hidden}
+  .tec-win .tec-analyzing .ta-bar i{display:block; height:100%; width:0; border-radius:4px;
+    background:linear-gradient(90deg,var(--muted),var(--text)); animation:tecana linear forwards}
+  @keyframes tecana{from{width:0}to{width:100%}}
+
+  #inv-chip{border:1px solid var(--card); color:var(--card); font-size:11px; padding:4px 8px;
+    cursor:pointer; letter-spacing:1px; white-space:nowrap}
+  #inv-chip:hover{background:var(--card); color:var(--text)}
+  .bubble, .narr-card{cursor:grab}
+  .bubble:active, .narr-card:active{cursor:grabbing}

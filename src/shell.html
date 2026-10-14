@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>T.E.C-OS 节点原型 MVP v2</title>
+<style>
+@@CSS@@
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">T.E.C-OS<small>节点原型 v2 · 案件 A-001</small></div>
+  <div class="crumbs" id="crumbs"></div>
+  <div class="tools">
+    <label class="tog" title="关闭后，合成所用的道具不会消失，方便反复试">
+      <input type="checkbox" id="tg-consume" checked> 合成消耗
+    </label>
+    <label class="tog" title="选中节点时，淡化与它无关的节点和连线">
+      <input type="checkbox" id="tg-focus" checked> 聚焦选中
+    </label>
+    <label class="tog" title="有节点新长出来时（展开场景 / 组合出结果 / 命令产出 / TEC 分析），自动平移把它带到视野中央（不缩放；拖动节点或拖动、滚轮滚动画布即可打断）">
+      <input type="checkbox" id="tg-reveal" checked> 新节点自动居中
+    </label>
+    <button id="btn-relayout" title="重新排布所有节点；节点上的「已固定」都会被解除">自动布局</button>
+    <button id="btn-fit">适应窗口</button>
+    <button id="btn-undo">撤销</button>
+    <button id="btn-reset" class="danger">重置</button>
+    <button id="btn-reach" class="primary">检查可达性</button>
+  </div>
+</header>
+
+<main>
+  <div id="desktop">
+    <div id="case-win">
+      <div class="syswin-bar case-bar"><span class="syswin-rule"></span><span class="syswin-title" id="case-title">CASE A-001 // 植物学家的花园</span><span class="syswin-rule"></span><span class="syswin-min" id="case-min" title="收起：把案件缩成桌面右下角的案件卡片（进度会保存，点卡片即可展开）">–</span><span class="syswin-x" id="case-x" title="关闭：把案件放进桌面左侧的「案件地图」图标（进度会保存，进案件地图即可展开）">×</span></div>
+      <div id="stage">
+    <div id="world">
+      <svg id="edges"></svg>
+      <div id="glow"></div>
+      <div id="nodes"></div>
+    </div>
+      </div><!-- /#stage -->
+    </div><!-- /#case-win -->
+    <div id="icons">
+      <div class="desk-icon" id="infer-icon" data-app="infer"><div class="icon-glyph">◈</div><div class="icon-label">推演器</div></div>
+      <div class="desk-icon" id="goto-icon"  data-app="goto"><div class="icon-glyph">▤</div><div class="icon-label">档案</div></div>
+      <div class="desk-icon" id="clue-icon"  data-app="clues"><div class="icon-glyph">※</div><div class="icon-label">线索册</div></div>
+      <div class="desk-icon" id="people-icon" data-app="people"><div class="icon-glyph">●</div><div class="icon-label">人物</div></div>
+      <div class="desk-icon" id="bag-dock"   data-app="bag"><div class="icon-glyph">▣</div><div class="icon-label">证物袋</div></div>
+      <div class="desk-icon" id="tec-dock"   data-app="tec"><div class="icon-glyph">◉</div><div class="icon-label">TEC</div></div>
+      <div class="desk-icon" id="log-icon"><div class="icon-glyph">≡</div><div class="icon-label">日志</div></div>
+      <div class="desk-icon" id="map-icon"  data-app="map"><div class="icon-glyph">▦</div><div class="icon-label">案件地图</div></div>
+    </div>
+    <div id="case-dock" title="案件已收起：单击展开，按住可拖动">
+      <div class="cd-glyph">▣</div>
+      <div class="cd-meta">
+        <div class="cd-code" id="cd-code">CASE A-001</div>
+        <div class="cd-title" id="cd-title">植物学家的花园</div>
+        <div class="cd-sub" id="cd-sub">进度已保存 · 点此展开</div>
+      </div>
+    </div>
+    <div id="tec-chip" title="TEC 已收起：单击展开对话窗，按住可拖动">
+      <div class="tc-av"><img id="tc-av-img" alt="TEC" draggable="false"></div>
+      <div class="tc-meta">
+        <div class="tc-name">TEC // 助手</div>
+        <div class="tc-status" id="tc-status">助手已收起 · 点此展开</div>
+        <div class="tc-bar"><i id="tc-bar-fill"></i></div>
+      </div>
+    </div>
+        <div id="toast"></div>
+    <div id="drag-layer"></div>
+    <div id="verdict"></div>
+    <div class="syswin detail-win" id="detail-win" style="display:none">
+      <div class="syswin-bar"><span class="syswin-rule"></span><span class="syswin-title">DETAIL // 节点详情</span><span class="syswin-rule"></span><span class="syswin-x" id="detail-x">×</span></div>
+      <div class="syswin-body" id="detail-body"><div class="empty">点选任意节点查看信息。</div></div>
+    </div>
+    <div class="syswin log-win" id="log-win">
+      <div class="syswin-bar"><span class="syswin-rule"></span><span class="syswin-title">SYS_LOGS // 因果追踪</span><span class="syswin-rule"></span><span class="syswin-x" id="log-x">×</span></div>
+      <div class="syswin-body log-body" id="log"></div>
+    </div>
+  </div><!-- /#desktop -->
+</main>
+<div id="ending-overlay"></div>
+
+<script type="application/json" id="gamedata">@@GAMEDATA@@</script>
+<script>
+@@JS@@
+</script>
+</body>
+</html>

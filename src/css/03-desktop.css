@@ -1,0 +1,33 @@
+  main{flex:1; display:flex; min-height:0}
+  /* 桌面层：固定外壳（图标 / 浮窗）都挂在这里，不随案件窗口变化。
+     底色走同色系微渐变，让左侧图标栏读起来像一块磨砂面板，而不是纯色平地 */
+  #desktop{flex:1; position:relative; overflow:hidden;
+    background:linear-gradient(180deg,#efece0 0%, var(--bg) 46%, #e2ddca 100%)}
+  /* 案件窗口：默认最大化，把画布装进一扇窗；标题栏显示案件编号与名称 */
+  #case-win{position:absolute; left:100px; right:16px; top:14px; bottom:16px; z-index:1;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); display:flex; flex-direction:column; overflow:hidden}
+  #case-win .case-bar{cursor:default}
+  #case-win .case-bar .syswin-title{letter-spacing:2px}
+  /* 桌布：暖象牙纸。细颗粒(soft-light，均值中性，不压暗底色) + 零星纸屑(multiply) + 大面积色斑 */
+  #stage{flex:1; position:relative; overflow:hidden; cursor:grab;
+    background-color:var(--bg);
+    background-image:
+      var(--paper-grain),
+      var(--paper-fleck),
+      radial-gradient(58% 48% at 14% 18%, rgba(176,166,138,.20), rgba(176,166,138,0) 68%),
+      radial-gradient(52% 44% at 82% 26%, rgba(198,189,162,.18), rgba(198,189,162,0) 70%),
+      radial-gradient(64% 56% at 58% 88%, rgba(164,157,134,.16), rgba(164,157,134,0) 72%),
+      /* 最后一层：纸边压暗，模拟一张被拍下来的纸。放在背景栈里，不会盖到节点和窗口上 */
+      radial-gradient(80% 70% at 50% 50%, rgba(112,104,82,0) 45%, rgba(112,104,82,.14) 100%);
+    background-size:200px 200px, 360px 360px, auto, auto, auto, auto;
+    background-repeat:repeat, repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    background-blend-mode:soft-light, multiply, normal, normal, normal, normal;
+  }
+  #stage.grabbing{cursor:grabbing}
+  #world{position:absolute; left:0; top:0; width:2000px; height:1300px; transform-origin:0 0}
+  #edges{position:absolute; left:0; top:0; width:2000px; height:1300px; overflow:visible; pointer-events:none}
+  #nodes{position:absolute; left:0; top:0; width:100%; height:100%}
+  /* 顶层拖拽镜像层：拖动节点时把它浮到窗口/图标之上（z 高于 #icons:24 与浮窗:25） */
+  #drag-layer{position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none; z-index:40}
+  .drag-mirror{transition:none !important; animation:none !important; margin:0 !important; pointer-events:none !important}

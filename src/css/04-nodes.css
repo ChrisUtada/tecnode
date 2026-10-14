@@ -1,0 +1,49 @@
+  .node{
+    position:absolute; background:linear-gradient(150deg,var(--face-hi) 0%,var(--card) 55%,var(--face-lo) 100%);
+    border:1px solid var(--edge); border-radius:var(--r-sm);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:grab; user-select:none; box-shadow:var(--raise);
+    transition:left .34s cubic-bezier(.4,0,.2,1), top .34s cubic-bezier(.4,0,.2,1),
+               box-shadow .12s, border-color .12s, transform .12s;
+  }
+  .node:hover{box-shadow:-3px -4px 10px var(--bevel-hi), 4px 6px 13px var(--bevel-lo)}
+  .node .n-title{font-size:12.5px; font-weight:500; line-height:1.2; text-align:center; padding:0 7px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+  .node .n-sub{font-size:10px; color:var(--faint); line-height:1.3; margin-top:2px}
+  .node.sel{outline:2px solid #2b2b26; outline-offset:2px; z-index:5}
+  .node.dim{opacity:.32}
+  .node.pop{animation:pop .45s ease}
+  @keyframes pop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+  .node.dragging{cursor:grabbing; z-index:20; opacity:.94; transition:none;
+    box-shadow:0 1px 0 rgba(255,253,246,.9) inset, -6px -8px 18px rgba(255,252,241,.5), 12px 18px 30px rgba(78,72,54,.34)}
+  .node.over{background:linear-gradient(150deg,#38372f,#1f1f19); color:var(--card); z-index:10; transform:scale(1.06);
+    box-shadow:inset 0 2px 8px rgba(0,0,0,.5), 0 0 0 2px var(--text), 0 0 16px 3px rgba(43,43,38,.4)}
+  .node.over .n-sub{color:var(--line2)}
+  .node.bad{border-color:var(--text); background:var(--bg)}
+
+  .node.scene-node{width:152px; height:54px}
+  .node.scene-node .n-title::before{content:"■ "}
+  .node.ent-item .n-title::before{content:"□ "}
+  .node.ent-char .n-title::before{content:"● "}
+  .node.ent-clue .n-title::before{content:"▲ "}
+  /* 未展开 / 已折叠的虚框样式跟着「容器」走，不跟着 kind 走：
+     书桌、垃圾桶是物品节点（□、130×46），但同样能展开，虚线提示必须照给。 */
+  .node.unexplored{border-style:dashed; background:var(--bg); color:var(--muted); box-shadow:none}
+  .node.unexplored .n-title{color:var(--muted)}
+  .node.collapsed{border-style:dashed; background:var(--bg); box-shadow:none}
+  /* 节点上的「捕」按钮已移除：捕获统一走「拖节点到 TEC 分析」 */
+  .node.scene-node.hub{border:3px double #2b2b26}
+  .node.ent-node{width:130px; height:46px}
+  .node.ent-clue.got{background:linear-gradient(150deg,#38372f,#1f1f19); color:var(--card);
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.28)}
+  .node.ent-clue.got .n-sub{color:var(--line2)}
+  .node.lit{border-color:#e3b341; background:#fffbeb;
+    box-shadow:0 0 14px 3px rgba(255,196,66,.55), 0 0 46px 14px rgba(255,214,120,.30), var(--raise)}
+  #glow{position:absolute; width:560px; height:560px; border-radius:50%; pointer-events:none; display:none;
+    background:radial-gradient(circle, rgba(255,213,110,.38) 0%, rgba(255,213,110,.15) 42%, transparent 68%)}
+  .pw-pop{position:absolute; width:190px; background:var(--card); border:1px solid var(--edge); border-radius:var(--r-sm);
+    padding:10px; z-index:15; box-shadow:var(--win-shadow)}
+  .pw-pop .pw-title{font-size:12px; color:var(--muted); margin-bottom:7px}
+  .pw-pop .pw-row{display:flex; gap:6px}
+  .pw-pop input{flex:1; min-width:0; font-family:inherit; font-size:14px; padding:5px 8px;
+    border:1px solid var(--edge); border-radius:var(--r-btn); letter-spacing:3px; background:var(--bg); box-shadow:var(--press)}

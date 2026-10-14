@@ -10,14 +10,21 @@ cdp-*.log
 _*.py
 _patch_*.py
 _mk_*.py
+_mk_*.cjs
+_probe_*.cjs
 _sync_tpl.py
 _verify_dbg.js
 _dump.html
 _geo.html
+# 重构期间的一次性产物（注意：不要写 _*.html —— 会误吞要提交的 _template.html）
+_index.ref.html
+_gamedata.json
+_*.woff2
 
 # ─── 截图 / 测试页 / 预览页 ─────────────────────────────────
 shot-*.png
 _shot-*.png
+_spot*.png
 screenshot-*
 case-*-check.png
 index-*
@@ -43,5 +50,7 @@ verify-out.txt
 # ─── 环境 ───────────────────────────────────────────────────
 .workbuddy/
 node_modules/
+# 头像等素材的来源文件：运行时用的图已 base64 内联进 index.html，这里只是本地留存
+assets/
 .DS_Store
 Thumbs.db
