@@ -225,17 +225,18 @@ const ROSTER_PINNED = [
   { id: "CHARS_EXEC", tag: "逻辑阵列", open: toggleInferWin,
     name: "执行者", desc: "逻辑阵列中央的执行者，长按 2.5 秒激活归因。" }
 ];
-/* 小头像：TEC / 执行者复用各自窗里的那一张（同一份素材，构建时各内联一次）。
+/* 小头像：TEC / 执行者复用各自窗里的那一张（同一份素材）。rosterAvatar 返回的是
+   「完整可用的 src」（构建时由素材占位符换成 assets/ 外链或 data: 内联）。
    剧情角色暂无美术稿 ⇒ 返回 null，名册改用「首字方块」占位。
    拿到图后：把图放进 src/assets/，在下面按 id 补一行素材占位符（写法与 11-dialog.js 里
-   `TEC_AVATAR_B64` 那行完全一样）即可。
+   `TEC_AVATAR` 那行完全一样）即可。
    ⚠ 两条坑：① 本函数必须**惰性读取**常量 —— 所有切片拼进同一个 <script>，而
-   `EXECUTOR_AVATAR_B64` 定义在 13-matrix.js（本文件之后），顶层直接引用会踩 TDZ。
+   `EXECUTOR_AVATAR` 定义在 13-matrix.js（本文件之后），顶层直接引用会踩 TDZ。
    ② 任何**注释里也不要写素材占位符的字面量**：build.js 是对整段源码做替换的，
    注释同样会被扫到，守卫会以「素材名不合法」直接中止构建。 */
 function rosterAvatar(id){
-  if (id === "CHARS_TEC")  return TEC_AVATAR_B64;
-  if (id === "CHARS_EXEC") return EXECUTOR_AVATAR_B64;
+  if (id === "CHARS_TEC")  return TEC_AVATAR;
+  if (id === "CHARS_EXEC") return EXECUTOR_AVATAR;
   return null;
 }
 /* 常驻在前、遇到的在后；CHARS_TEC 已在常驻里，从「遇到的人」里排除，免得排两遍 */
@@ -281,7 +282,7 @@ function refreshPeopleWin(){
     const art = rosterAvatar(id);
     if (art){
       const im = document.createElement("img");
-      im.src = "data:image/png;base64," + art;
+      im.src = art;
       im.alt = ""; im.draggable = false;
       av.appendChild(im);
     } else {

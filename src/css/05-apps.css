@@ -354,5 +354,49 @@
   #inv-chip{border:1px solid var(--card); color:var(--card); font-size:11px; padding:4px 8px;
     cursor:pointer; letter-spacing:1px; white-space:nowrap}
   #inv-chip:hover{background:var(--card); color:var(--text)}
+  /* 播放器「– 最小化」的落点：桌面右下角第三块卡片。
+     与案件卡片（bottom:14px）/ TEC 卡片（bottom:84px）上下错开（bottom:154px），三张不叠。
+     和它们一样只靠 visibility 隐藏、保留布局盒。 */
+  #music-dock{position:absolute; right:16px; bottom:154px; width:238px;
+    display:flex; align-items:center; gap:9px; padding:8px 10px; text-align:left; cursor:pointer;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win); box-shadow:var(--win-shadow);
+    opacity:0; visibility:hidden; pointer-events:none; transition:opacity .2s ease; z-index:23}
+  #music-dock.on{opacity:1; visibility:visible; pointer-events:auto}
+  #music-dock:hover{background:var(--bg)}
+  #music-dock .md-glyph{width:32px; height:32px; border:1px solid var(--edge); border-radius:var(--r-btn);
+    background:var(--bg); box-shadow:var(--press); display:flex;
+    align-items:center; justify-content:center; font-size:15px; flex:0 0 auto}
+  #music-dock .md-meta{min-width:0; flex:1}
+  #music-dock .md-name{font-size:9.5px; letter-spacing:1px; font-weight:700; line-height:1.1}
+  #music-dock .md-prog{height:8px; border-radius:4px; background:var(--face-lo); box-shadow:var(--press);
+    overflow:hidden; margin-top:3px}
+  #music-dock .md-prog i{display:block; height:100%; width:0; background:var(--line); border-radius:4px}
+  #music-dock .md-sub{font-size:9.5px; color:var(--muted); margin-top:2px; line-height:1.1;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums}
+  #music-dock .md-ctrl{display:flex; flex-direction:column; gap:4px; flex:0 0 auto}
+  #music-dock .md-ctrl button{width:28px; height:22px; padding:0; font-size:10px; line-height:1}
+  /* 播放器窗：与 TEC 窗同规格（宽 332、右下贴边、同族边框圆角阴影），清单超高滚动 */
+  .music-win{position:absolute; right:14px; bottom:96px; width:332px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+  .music-win .syswin-body{max-height:240px; overflow:auto}
+  .music-win .music-head{padding:4px 2px 8px; font-size:12px; color:var(--line2)}
+  .music-win .music-list{display:flex; flex-direction:column; gap:6px; margin-top:4px}
+  /* 曲目行只负责选曲：点行播放/暂停，当前曲反色高亮；播放/暂停键只在底部控制区有一个 */
+  .music-win .music-row{display:flex; align-items:center; gap:10px; padding:6px 8px;
+    border-radius:var(--r-btn); cursor:pointer; transition:background .12s, box-shadow .12s}
+  .music-win .music-row:hover{background:var(--bg); box-shadow:var(--press)}
+  .music-win .music-row.cur{background:var(--line); color:var(--card)}
+  .music-win .music-name{flex:1 1 auto; font-size:14px; color:var(--text); pointer-events:none}
+  .music-win .music-row.cur .music-name{color:var(--card)}
+  /* 底部播放区：进度条（可点跳转）+ 时间 + 图标控制键 */
+  .music-win .music-player{margin-top:10px; padding-top:8px; border-top:1px dashed var(--line2);
+    display:flex; flex-direction:column; gap:6px}
+  .music-win .music-prog{height:10px; border-radius:5px; background:var(--face-lo); box-shadow:var(--press);
+    overflow:hidden; cursor:pointer}
+  .music-win .music-prog i{display:block; height:100%; width:0; background:var(--line); border-radius:5px}
+  .music-win .music-time{font-size:10.5px; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums}
+  .music-win .music-ctrl{display:flex; gap:6px; justify-content:flex-end}
+  .music-win .music-ibtn{width:34px; height:26px; padding:0; font-size:11px; line-height:1}
   .bubble, .narr-card{cursor:grab}
   .bubble:active, .narr-card:active{cursor:grabbing}

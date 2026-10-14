@@ -60,7 +60,7 @@ function runCommand(n, cmd){
     gotClues(cmd.successMessage || "");
     noteSeen(cmd.successMessage || "");
     /* 装上的零件：记在节点上（进快照，撤销 / 续档跟着走），后续命令用 requires 认它 */
-    if (cmd.installs){ n.installed = Object.assign({}, n.installed); n.installed[need] = true; }
+    if (cmd.installs){ n.installed = Object.assign({}, n.installed); n.installed[need] = true; refreshMusicIcon(); }
     if (cmd.onSuccess) applyPayload(cmd.onSuccess, n.key);
     if (tgConsume.checked && REUSABLE_TOOLS.indexOf(need) < 0) deleteNode("item:" + need);
     settleSelect(settle(), n.key);

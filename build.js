@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // -*- coding: utf-8 -*-
-/* build.js —— 把 src/ 与 data/ 拼装成单文件成品（Node，零第三方依赖）
+/* build.js —— 把 src/ 与 data/ 拼装成成品（Node，零第三方依赖）
  *
- *   node build.js          写出 index.html、_template.html 与 editor.html
- *   node build.js --check  只在内存构建，与盘上现存的三个产物比对；
+ *   node build.js          写出 index.html、_template.html、tecnode-standalone.html 与 editor.html
+ *   node build.js --check  只在内存构建，与盘上现存的四个产物比对；
  *                          不一致说明「源码改了但没重新构建」（或产物被手改过），非零退出
  *
  * 拼装规则（勿改，改了就不是逐字节等价）：
@@ -14,12 +14,17 @@
  *     CSS = src/css/01-font.css + 02-base.css + src/editor/*.css，JS = src/editor/*.js），
  *     gamedata 同样包在 <script type="application/json" id="gamedata"> 里，--check 的归一化直接适用
  *
- * 素材内联（@@ASSET:<文件名>@@）：
- *   图片/字体等二进制素材放 src/assets/，源码里只写占位符，
- *   例如  const TEC_AVATAR_B64 = "@@ASSET:tec-avatar.png@@";
- *        src:url(data:font/ttf;base64,@@ASSET:font.ttf@@) format("truetype");
- *   构建时把占位符整体换成该文件的 base64（不带 data: 前缀，mime 由源码自己写）。
- *   这样源码可读、原图可 diff 可替换，而成品仍是单文件。
+ * 素材双模式（@@ASSET:<文件名>@@）：
+ *   图片/字体/音频等二进制素材放 src/assets/，源码里只写占位符（占位符本身就代表一个
+ *   「完整可用的 src」），例如
+ *       const TEC_AVATAR = "@@ASSET:tec-avatar.png@@";
+ *       src:url(@@ASSET:font.ttf@@) format("truetype");
+ *       { id: "Air_Bach", src: "@@ASSET:Air_Bach.ogg@@" }
+ *   external 模式（index.html / _template.html）：占位符 → assets/<文件名>，
+ *     成品走外链 —— HTML 轻、浏览器按文件缓存、音频可流式可拖进度。构建时把
+ *     src/assets/* 复制到根目录 assets/（已在 .gitignore，属构建产物）。
+ *   inline 模式（tecnode-standalone.html / editor.html）：占位符 → data:<mime>;base64,<正文>，
+ *     单文件自包含，双击即玩、离线分发。mime 由扩展名推导（MIME 表）。
  */
 "use strict";
 
@@ -31,12 +36,24 @@ const NL = "\r\n";
 const PLACEHOLDERS = ["@@CSS@@", "@@GAMEDATA@@", "@@JS@@"];
 const DATA_PLACEHOLDER = "__GAME_DATA_A001__";
 const ASSET_DIR = path.join("src", "assets");
+const ASSET_OUT_DIR = "assets";
 const INDEX_FILE = "index.html";
 const TPL_FILE = "_template.html";
+const STANDALONE_FILE = "tecnode-standalone.html";
 const EDITOR_FILE = "editor.html";
 
-/* 把 @@ASSET:<filename>@@ 换成 src/assets/<filename> 的 base64（纯 base64，无 data: 前缀） */
-function inlineAssets(text, where) {
+/* 内联模式的 data: 前缀需要显式 mime，按扩展名推导；没登记的扩展名直接报错 */
+const MIME = {
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+  ".svg": "image/svg+xml", ".webp": "image/webp",
+  ".ttf": "font/ttf", ".otf": "font/otf", ".woff": "font/woff", ".woff2": "font/woff2",
+  ".ogg": "audio/ogg", ".oga": "audio/ogg", ".mp3": "audio/mpeg", ".wav": "audio/wav",
+  ".m4a": "audio/mp4", ".flac": "audio/flac"
+};
+
+/* 把 @@ASSET:<filename>@@ 换成完整可用的 src：
+ *   external → assets/<filename>        inline → data:<mime>;base64,<正文> */
+function resolveAssets(text, where, mode) {
   let hits = 0;
   const out = text.replace(/@@ASSET:([^@]+)@@/g, (m, name) => {
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) {
@@ -45,12 +62,18 @@ function inlineAssets(text, where) {
     const p = path.join(ROOT, ASSET_DIR, name);
     if (!fs.existsSync(p)) throw new Error(where + " 引用了不存在的素材：" + ASSET_DIR + "/" + name);
     hits++;
-    return fs.readFileSync(p).toString("base64");
+    if (mode === "external") return ASSET_OUT_DIR + "/" + name;
+    const mime = MIME[path.extname(name).toLowerCase()];
+    if (!mime) {
+      throw new Error(where + " 的素材 " + name + " 扩展名没有登记 mime（内联模式需要），" +
+                      "请把它加进 build.js 顶部的 MIME 表");
+    }
+    return "data:" + mime + ";base64," + fs.readFileSync(p).toString("base64");
   });
   /* base64 字母表不含 @，所以替换后不该再有残留 */
   const left = out.match(/@@ASSET:/g);
   if (left) throw new Error(where + " 里还有 " + left.length + " 个 @@ASSET: 未被替换（命名是否多写了 @ ？）");
-  if (hits) console.log("  内联素材 " + hits + " 处 ← " + ASSET_DIR + "/");
+  if (hits) console.log("  素材 " + hits + " 处 ← " + ASSET_DIR + "/（" + mode + "）");
   return out;
 }
 
@@ -64,17 +87,17 @@ function readSlices(dir, ext) {
 }
 
 /* 通用拼装：一个壳 + 一组 CSS 切片 + 一组 JS 切片 → inject(dataText)。
-   index/_template 与 editor 共用这一条路径，保证切片拼接规则
-   （"\r\n" 连接、素材内联、函数式替换防 $& 误伤）只有一份实现。 */
-function assembleTarget(shellLabel, shellFile, css, js, cssWhere, jsWhere) {
+   index/_template/standalone 与 editor 共用这一条路径，保证切片拼接规则
+   （"\r\n" 连接、素材解析、函数式替换防 $& 误伤）只有一份实现。 */
+function assembleTarget(shellLabel, shellFile, css, js, cssWhere, jsWhere, mode) {
   const shell = fs.readFileSync(shellFile, "utf8");
   for (const ph of PLACEHOLDERS) {
     const n = shell.split(ph).length - 1;
     if (n !== 1) throw new Error(shellLabel + " 里占位符 " + ph + " 出现 " + n + " 次（应为 1 次）");
   }
 
-  const cssText = inlineAssets(css.map((f) => f.text).join(NL), cssWhere);
-  const jsText = inlineAssets(js.map((f) => f.text).join(NL), jsWhere);
+  const cssText = resolveAssets(css.map((f) => f.text).join(NL), cssWhere, mode);
+  const jsText = resolveAssets(js.map((f) => f.text).join(NL), jsWhere, mode);
 
   /* 用函数式替换：避免 CSS/JS 里的 $& / $1 被当成替换语法 */
   const inject = (dataText) =>
@@ -109,25 +132,52 @@ function assemble() {
   const rawData = fs.readFileSync(path.join(ROOT, "data", "case-a001.json"), "utf8");
   const compactData = JSON.stringify(JSON.parse(rawData));   /* 单行注入 */
 
-  const game = assembleTarget(
+  const gameCss = readSlices(path.join(ROOT, "src", "css"), ".css");
+  const gameJs = readSlices(path.join(ROOT, "src", "js"), ".js");
+
+  /* index / _template 走外链（轻、可缓存、音频可流式）；
+     standalone 单文件全内联（双击即玩、离线分发）。同一份源码两种产物。 */
+  const gameExt = assembleTarget(
     "src/shell.html", path.join(ROOT, "src", "shell.html"),
-    readSlices(path.join(ROOT, "src", "css"), ".css"),
-    readSlices(path.join(ROOT, "src", "js"), ".js"),
-    "src/css/", "src/js/");
+    gameCss, gameJs,
+    "src/css/", "src/js/", "external");
+  const gameInl = assembleTarget(
+    "src/shell.html", path.join(ROOT, "src", "shell.html"),
+    gameCss, gameJs,
+    "src/css/", "src/js/", "inline");
 
   const editor = assembleTarget(
     "src/editor/shell.html", path.join(ROOT, "src", "editor", "shell.html"),
     readSharedBaseCss().concat(readSlices(path.join(ROOT, "src", "editor"), ".css")),
     readSlices(path.join(ROOT, "src", "editor"), ".js"),
-    "src/css/ + src/editor/", "src/editor/");
+    "src/css/ + src/editor/", "src/editor/", "inline");
 
   return {
-    index: game.inject(compactData),
-    template: game.inject(DATA_PLACEHOLDER),
+    index: gameExt.inject(compactData),
+    template: gameExt.inject(DATA_PLACEHOLDER),
+    standalone: gameInl.inject(compactData),
     editor: editor.inject(compactData),
-    stats: Object.assign({ dataBytes: Buffer.byteLength(compactData, "utf8") }, game.stats),
+    stats: Object.assign({ dataBytes: Buffer.byteLength(compactData, "utf8") }, gameExt.stats),
+    statsInl: gameInl.stats,
     editorStats: editor.stats,
   };
+}
+
+/* 外链产物引用 assets/<name>：构建时把 src/assets/* 复制到根目录 assets/
+   （.gitignore 里只忽略根目录的 /assets/，源素材 src/assets/ 照常入库） */
+function copyAssets() {
+  const src = path.join(ROOT, "src", "assets");
+  if (!fs.existsSync(src)) return;
+  const dst = path.join(ROOT, ASSET_OUT_DIR);
+  fs.mkdirSync(dst, { recursive: true });
+  let n = 0;
+  for (const f of fs.readdirSync(src).sort()) {
+    const p = path.join(src, f);
+    if (!fs.statSync(p).isFile()) continue;
+    fs.copyFileSync(p, path.join(dst, f));
+    n++;
+  }
+  console.log("  外链素材目录 " + ASSET_OUT_DIR + "/ 同步 " + n + " 个文件 ← " + ASSET_DIR + "/");
 }
 
 function write(file, text) {
@@ -166,7 +216,10 @@ function sizeCell(srcBytes, builtBytes) {
 
 console.log("切片统计： css " + built.stats.cssFiles + " 片 " + sizeCell(built.stats.srcCssBytes, built.stats.cssBytes) +
             " 字节   js " + built.stats.jsFiles + " 片 " + sizeCell(built.stats.srcJsBytes, built.stats.jsBytes) +
-            " 字节   data " + built.stats.dataBytes.toLocaleString() + " 字节");
+            " 字节（external，index/_template 用）");
+console.log("       　 css " + built.statsInl.cssFiles + " 片 " + sizeCell(built.statsInl.srcCssBytes, built.statsInl.cssBytes) +
+            " 字节   js " + built.statsInl.jsFiles + " 片 " + sizeCell(built.statsInl.srcJsBytes, built.statsInl.jsBytes) +
+            " 字节（inline，standalone 用）");
 console.log("编辑器　： css " + built.editorStats.cssFiles + " 片 " + sizeCell(built.editorStats.srcCssBytes, built.editorStats.cssBytes) +
             " 字节   js " + built.editorStats.jsFiles + " 片 " + sizeCell(built.editorStats.srcJsBytes, built.editorStats.jsBytes) + " 字节");
 console.log("");
@@ -175,7 +228,12 @@ if (CHECK) {
   /* 与盘上现存的产物比对（gamedata 行归一化）。
      两者一致 = 源码与产物同步；不一致 = 忘了 node build.js，或产物被手工改过。 */
   let bad = 0;
-  const pairs = [[INDEX_FILE, built.index, "index"], [TPL_FILE, built.template, "template"], [EDITOR_FILE, built.editor, "editor"]];
+  const pairs = [
+    [INDEX_FILE, built.index, "index"],
+    [TPL_FILE, built.template, "template"],
+    [STANDALONE_FILE, built.standalone, "standalone"],
+    [EDITOR_FILE, built.editor, "editor"]
+  ];
   for (const [file, text, label] of pairs) {
     const p = path.join(ROOT, file);
     if (!fs.existsSync(p)) {
@@ -198,10 +256,12 @@ if (CHECK) {
 }
 
 console.log("写出成品：");
-write("index.html", built.index);
-write("_template.html", built.template);
-write("editor.html", built.editor);
+copyAssets();
+write(INDEX_FILE, built.index);
+write(TPL_FILE, built.template);
+write(STANDALONE_FILE, built.standalone);
+write(EDITOR_FILE, built.editor);
 console.log("");
 console.log("提示：改功能编辑 src/js/*，改样式编辑 src/css/*，改数据编辑 data/case-a001.json（或用 editor.html 编辑后导出覆盖），" +
-            "换图片/字体放 src/assets/*（源码里用 @@ASSET:<文件名>@@ 引用），编辑器源码在 src/editor/*，" +
-            "然后 node build.js && node verify.js");
+            "换图片/字体/音频放 src/assets/*（源码里用 @@ASSET:<文件名>@@ 引用，index 走外链 assets/、standalone 走内联），" +
+            "编辑器源码在 src/editor/*，然后 node build.js && node verify.js");

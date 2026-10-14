@@ -113,6 +113,7 @@ function attemptCombo(toolKey, targetKey){
   if (hit.field === "useItem" && hit.installs && owner){
     owner.installed = Object.assign({}, owner.installed);
     owner.installed[tool.id] = true;
+    refreshMusicIcon();          /* 装上的是唱针 ⇒ 解锁桌面播放器图标 */
   }
 
   /* 消耗：与角色对话/询问不消耗任何东西 */

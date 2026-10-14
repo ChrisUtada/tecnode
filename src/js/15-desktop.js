@@ -60,12 +60,15 @@ function openApp(app){
   else if (app === "tec") toggleTecWin();
   else if (app === "log") toggleLogWin();
   else if (app === "map") toggleMapWin();
+  else if (app === "music") toggleMusicWin();
 }
 function selectIcon(el){
   document.querySelectorAll(".desk-icon.sel").forEach(x => x.classList.remove("sel"));
   el.classList.add("sel");
 }
-function attachIcon(el, app){
+/* attachIcon(el, app, onQuick)：onQuick 提供时「单击 = 选中并直接打开」
+   （播放器图标用，用户要求单击即开）；不提供时保持全桌一致的双击打开。 */
+function attachIcon(el, app, onQuick){
   app = app || el.dataset.app;
   let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
   el.addEventListener("pointerdown", e => {
@@ -87,9 +90,12 @@ function attachIcon(el, app){
   el.addEventListener("pointerup", e => {
     if (!dragging) return;
     dragging = false;
-    if (!moved) selectIcon(el);
+    if (!moved){
+      selectIcon(el);
+      if (onQuick) onQuick();
+    }
   });
-  el.addEventListener("dblclick", () => openApp(app));
+  if (!onQuick) el.addEventListener("dblclick", () => openApp(app));
 }
 /* 默认站位：桌面层左侧竖排。
    图标现在在案件窗之外的独立栏里，不用再避开画布左上角的 hint，所以从桌面顶部开始排；
@@ -122,6 +128,8 @@ document.getElementById("case-min").addEventListener("click", e => {
   stowCase();
 });
 attachDock(document.getElementById("case-dock"));
+attachDock(document.getElementById("music-dock"), restoreMusicWin);   /* 播放器最小化卡片：单击唤回 */
+initMusicDock();        /* 卡片上的播放/暂停、停止控制键（renderMusicDock 负责换键面） */
 initTecChip();          /* 右下角的 TEC 助手卡片：头像取 base64 + 可拖动 + 单击展开 */
 makeFloatDraggable(document.getElementById("detail-win"), false);
 makeFloatDraggable(document.getElementById("log-win"), false);
@@ -157,6 +165,7 @@ document.getElementById("btn-reset").addEventListener("click", () => {
   closeBagWin();             /* 证物袋窗同理：常驻于离屏/回访，不常驻于重置 */
   closeClueWin();            /* 线索册窗与证物袋同级：同样只在此处与换案时清 */
   boot();
+  refreshMusicIcon();        /* 重置后重新评估唱针状态：若针已不在，图标/窗口/最小化卡片一并收 */
   log("已重置为初始状态", "sys");
 });
 document.getElementById("btn-reach").addEventListener("click", () => {

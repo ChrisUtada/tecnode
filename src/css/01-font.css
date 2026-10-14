@@ -1,5 +1,5 @@
   @font-face{
     font-family:'VonwaonBitmap';
-    src:url(data:font/ttf;base64,@@ASSET:font.ttf@@) format('truetype');
+    src:url(@@ASSET:font.ttf@@) format('truetype');
     font-weight:100 900; font-style:normal; font-display:swap;
   }

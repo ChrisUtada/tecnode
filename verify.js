@@ -131,10 +131,15 @@ function torchOn(){
 }
 
 console.log('\n=== 21. 适性测试 + 选头像 + 调查员证 ===');
-/* 头像材质直接从成品里取（源码里 `const X_AVATAR_B64 = "..."` 构建时已内联成裸 base64），
-   这样「证件照到底用的是哪一张」能断言到位，而不是只查「有个 img」。 */
-const b64Of = (name) => { const m = html.match(new RegExp(name + '\\s*=\\s*"([A-Za-z0-9+/=]+)"')); return m ? m[1] : null; };
-const TEC_B64 = b64Of('TEC_AVATAR_B64'), EXEC_B64 = b64Of('EXECUTOR_AVATAR_B64');
+/* index 成品走素材外链：头像 src = assets/<文件名>（standalone 才是 data: 内联）。
+   断言「证件照到底用的是哪一张」→ 比 src 指向的素材名，并核对素材目录里文件真实存在。 */
+const TEC_SRC = 'assets/tec-avatar.png', EXEC_SRC = 'assets/executor-avatar.png';
+assert('外链素材目录里有头像文件',
+  fs.existsSync(path.join(__dirname, 'assets', 'tec-avatar.png')) &&
+  fs.existsSync(path.join(__dirname, 'assets', 'executor-avatar.png')) &&
+  fs.existsSync(path.join(__dirname, 'assets', 'emote-heartbroken.png')) &&
+  fs.existsSync(path.join(__dirname, 'assets', 'cert-avatar.png')) &&
+  fs.existsSync(path.join(__dirname, 'assets', 'font.ttf')));
 const introNode = () => ids['stage'].querySelector('.intro-win');
 /* 证件照的 img：stub 的 `.cert-photo img` 取不到（querySelector 不解析后代），按 tagName 找 */
 const certImgIn = (root) => {
@@ -186,15 +191,15 @@ console.log('  —— 头像 → 领证 ——');
 window.__intro.confirmPick();
 assert('确认头像后进入领证步骤', window.__intro.step() === 'card');
 assert('默认那张（执行者）不在时用选中的（TEC）',
-  certImgIn(introNode()) !== 'data:image/png;base64,' + EXEC_B64);
-assert('证件照 = TEC 的头像', certImgIn(introNode()) === 'data:image/png;base64,' + TEC_B64);
+  certImgIn(introNode()) !== EXEC_SRC);
+assert('证件照 = TEC 的头像', certImgIn(introNode()) === TEC_SRC);
 assert('领证页留了反悔入口（换一张头像）', !!introNode().querySelector('.avatar-back'));
 introNode().querySelector('.avatar-back')._ev.click[0]();
 assert('点「换一张」退回选头像步骤', window.__intro.step() === 'avatar');
 assert('退回后仍记着刚才选的 TEC', introNode().querySelector('.avatar-pick.sel').querySelector('.nm').textContent === 'TEC');
 clickAvatarTile(introNode(), '执行者');
 window.__intro.confirmPick();
-assert('改选执行者后证件照随之更换', certImgIn(introNode()) === 'data:image/png;base64,' + EXEC_B64);
+assert('改选执行者后证件照随之更换', certImgIn(introNode()) === EXEC_SRC);
 
 const inv = (window.__intro.confirm(), window.__dump().investigator);
 assert('生成调查员', !!inv);
@@ -225,7 +230,7 @@ assert('换头像写回 investigator', window.__dump().investigator.avatarId ===
 assert('落盘（localStorage 里的也换了）',
   JSON.parse(localStorage.getItem('tec_investigator')).avatarId === 'CHARS_TEC');
 assert('换完窗自己关掉', window.__avatars().win === false);
-assert('证件窗自动重开、照片已换', certImgIn(ids['desktop'].querySelector('.cert-win')) === 'data:image/png;base64,' + TEC_B64);
+assert('证件窗自动重开、照片已换', certImgIn(ids['desktop'].querySelector('.cert-win')) === TEC_SRC);
 assert('换头像不留画布节点', window.__dump().nodes.filter(k => k.indexOf('char:') === 0).length === 0);
 
 ids['btn-reset']._ev.click[0]();
@@ -1201,7 +1206,7 @@ assert('真名结局判定时整窗冲击震动（源码检查）',
 assert('配方不匹配改为头像弹心碎表情（源码检查）',
   html.indexOf('.mx-emote{') > 0 &&
   html.indexOf('animation:mx-emote-pop 1.4s ease forwards') > 0 &&
-  html.indexOf('EXEC_EMOTE_HEARTBROKEN_B64') > 0 &&
+  html.indexOf('EXEC_EMOTE_HEARTBROKEN') > 0 &&
   html.indexOf('function showExecEmote(){') > 0 &&
   html.indexOf('else { showExecEmote(); log("推演失败') > 0 &&
   html.indexOf('toast("配方不匹配，再想想"') < 0);
@@ -1632,7 +1637,7 @@ assert('tecTalk 只轮换闲聊：不再读 sceneTalks、不进撤销栈',
   tecTalkFn.indexOf('sceneTalks') < 0 && tecTalkFn.indexOf('pushHistory') < 0);
 assert('_dragged 的复位在拖动排除表之前（真机里从被排除的子元素上起手也会复位）',
   html.indexOf('el._dragged = false;') > 0
-  && html.indexOf('el._dragged = false;') < html.indexOf('closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip")'));
+  && html.indexOf('el._dragged = false;') < html.indexOf('closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip,.music-row")'));
 assert('气泡与记忆放映卡都接线了"点击推进"，且用 _dragged 挡掉拖过的那次点击',
   /c\.addEventListener\("click", \(\) => \{ if \(!c\._dragged\) advanceMemory\(\); \}\)/.test(html)
   && /if \(b\._dragged\) return;/.test(html) && /advanceMemory/.test(html));
@@ -1655,8 +1660,8 @@ assert('标题栏同时有最小化 #case-min 与关闭 #case-x', /id="case-min"
 assert('两条路是分开的函数（parkCase / stowCase / closeCase）',
   /function parkCase\(p\)/.test(html) && /function stowCase\(\)\{ return parkCase\("dock"\); \}/.test(html)
   && /function closeCase\(\)\{ return parkCase\("icon"\); \}/.test(html));
-assert('拖动排除表覆盖了地图地址卡 / TEC 头像 / TEC 最小化键 / 阵列执行者与线索 chip',
-  /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.syswin-min,\.tec-avatar,\.mx-exec,\.mx-chip"\)/.test(html));
+assert('拖动排除表覆盖了地图地址卡 / TEC 头像 / TEC 最小化键 / 阵列执行者与线索 chip / 播放器曲目行',
+  /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.syswin-min,\.tec-avatar,\.mx-exec,\.mx-chip,\.music-row"\)/.test(html));
 /* 触发 stub 里注册的事件处理器 */
 const fire = (el, t, o) => (el._ev[t] || []).forEach(f => f(Object.assign(
   { button: 0, clientX: 0, clientY: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o)));
@@ -1859,9 +1864,9 @@ const avIniOf = (row) => {
   return s ? s.textContent : null;
 };
 assert('名册每行都有小头像（.av）', rrows.every(r => !!r.querySelector('.av')));
-assert('常驻两人用真头像（内联 base64 的 img）',
-  /^data:image\/png;base64,/.test(avImgOf(rrows[0]) || '') &&
-  /^data:image\/png;base64,/.test(avImgOf(rrows[1]) || ''));
+assert('常驻两人用真头像（src 指向外链素材）',
+  /^assets\//.test(avImgOf(rrows[0]) || '') &&
+  /^assets\//.test(avImgOf(rrows[1]) || ''));
 assert('TEC 与执行者不是同一张头像（执行者早有自己的素材）',
   avImgOf(rrows[0]) !== avImgOf(rrows[1]));
 window.__reveal('SCENES_fkjl');                        /* 这场景点名了朱穗 / 傅柏 */
@@ -2513,6 +2518,47 @@ assert('「无文本入口」的分支仍带 `!condRoutes[n.id]` 守卫（源码
 assert('计数与通知类实心药丸统一叫 `.badge.cnt`（源码检查）',
   (html.match(/className = "badge cnt"/g) || []).length === 5 && html.indexOf('.badge.cnt{') >= 0);
 assert('condRoutes 保留（可达性检查还在用）（源码检查）', html.indexOf('const condRoutes = {}') >= 0);
+
+console.log('\n=== 37. 内置音乐库 + 桌面播放器（唱机装唱针后解锁） ===');
+/* 唱机初始就在画布上（boot 装载），但此刻还没装唱针 */
+assert('装针前 changjiNeedleFitted = false', window.__music.state().fitted === false);
+assert('装针前桌面无播放器图标', window.__music.state().icon === false);
+assert('内置音乐库含 Air (Bach)', window.__music.state().lib.some(m => m.id === 'Air_Bach' && m.title === 'Air (Bach)'));
+assert('装针前唱机详情无「播放音乐」按钮',
+  (window.__select('item:ITEMS_changji'), ids['detail-body']._html.indexOf("id='dt-play-music'") < 0));
+/* 双构建：index 成品走外链 assets/（standalone 才内联 data:） */
+assert('index 成品音乐走外链 assets/（素材双构建 external）', html.indexOf('assets/Air_Bach.ogg') >= 0);
+assert('成品无素材占位符残留', html.indexOf('@@ASSET:') < 0);
+assert('外链素材目录已生成（assets/Air_Bach.ogg 在盘上）', fs.existsSync(path.join(__dirname, 'assets', 'Air_Bach.ogg')));
+/* 模拟装针（等同把唱针拖到唱机：installed[ITEMS_cz]=true + 桌面图标刷新） */
+window.__music.fitNeedle();
+assert('装针后 changjiNeedleFitted = true', window.__music.state().fitted === true);
+assert('装针后桌面出现播放器图标', window.__music.state().icon === true);
+assert('装针后唱机详情出现「播放音乐」按钮',
+  (window.__select('item:ITEMS_changji'), ids['detail-body']._html.indexOf("id='dt-play-music'") >= 0));
+/* 播放器窗列出内置音乐（目前 1 首） */
+window.__music.open();
+const mw37 = ids['desktop'].querySelector('.music-win');
+assert('播放器窗开出来了', !!mw37);
+assert('播放器窗列出 1 首内置音乐', mw37 && mw37.querySelectorAll('.music-row').length === 1);
+/* 最小化 → 右下角播放器卡片 → 唤回 */
+window.__music.min();
+assert('最小化后窗体藏起、右下角卡片亮出', window.__music.state().min === true && window.__music.state().dock === true);
+window.__music.restore();
+assert('唤回后窗体回来、卡片熄掉',
+  window.__music.state().min === false && window.__music.state().dock === false && !!ids['desktop'].querySelector('.music-win'));
+window.__music.close();
+assert('× 关闭后窗体与卡片都收', !ids['desktop'].querySelector('.music-win') && window.__music.state().dock === false);
+/* 源码检查：两处安装成功路径 + boot / 重置都刷新图标，卡片样式与单击开窗已接线 */
+assert('combo 安装后刷新图标（源码检查）', /owner\.installed\[tool\.id\] = true;\r?\n\s*refreshMusicIcon\(\);/.test(html));
+assert('runCommand 安装后刷新图标（源码检查）', html.indexOf('n.installed[need] = true; refreshMusicIcon();') >= 0);
+assert('boot 与重置后都刷新图标（源码检查）',
+  (html.match(/boot\(\);\r?\n\s*refreshMusicIcon\(\);/g) || []).length === 2);
+assert('播放器图标单击开窗（源码检查）', html.indexOf('attachIcon(el, "music", toggleMusicWin)') >= 0);
+assert('openApp 分发 music 应用（源码检查）', html.indexOf('app === "music") toggleMusicWin()') >= 0);
+assert('最小化卡片样式与唤回接线已写（源码检查）',
+  html.indexOf('#music-dock{position:absolute') >= 0 &&
+  html.indexOf('attachDock(document.getElementById("music-dock"), restoreMusicWin)') >= 0);
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

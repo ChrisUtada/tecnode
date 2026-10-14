@@ -151,6 +151,8 @@ function attachDock(el, onPick){
   let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
   el.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
+    /* 卡片内控制键（播放器最小化卡片的播放/暂停、停止）不启动拖动，也不吃掉它们自己的 click */
+    if (e.target && e.target.closest && e.target.closest("button")) return;
     if (el.style.left === "" || el.style.left == null){
       const r = el.getBoundingClientRect(), sr = desktopEl.getBoundingClientRect();
       el.style.left = (r.left - sr.left) + "px";
@@ -173,8 +175,13 @@ function attachDock(el, onPick){
     el.style.top  = Math.max(0, Math.min((r.height ||  800) - h, oy + e.clientY - sy)) + "px";
   });
   el.addEventListener("pointerup", () => { dragging = false; });
-  /* 落点默认展开案件；TEC 助手卡片传了 onPick，就展开 TEC 对话窗 */
-  el.addEventListener("click", () => { if (!moved){ if (onPick) onPick(); else enterCase(CASE_ID); } });
+  /* 落点默认展开案件；TEC 助手卡片传了 onPick，就展开 TEC 对话窗。
+     点的是卡片内控制键时不唤回（键自己的 click 已处理）。 */
+  el.addEventListener("click", e => {
+    if (moved) return;
+    if (e && e.target && e.target.closest && e.target.closest("button")) return;
+    if (onPick) onPick(); else enterCase(CASE_ID);
+  });
 }
 /* 收缩 / 展开的位移与缩放：把案件窗和右下角卡片的中心对上。
    卡片只用 visibility 隐藏、保留布局盒，所以隐藏时也量得到（这是选它当落点的一个原因）。 */
@@ -635,7 +642,7 @@ function buildAvatarFace(id){
   const art = rosterAvatar(id);
   if (art){
     const im = document.createElement("img");
-    im.src = "data:image/png;base64," + art;
+    im.src = art;
     im.alt = ""; im.draggable = false;
     box.appendChild(im);
   } else {
@@ -689,7 +696,7 @@ function fillCertPhoto(box, c){
   const art = id ? rosterAvatar(id) : null;
   if (id && art){
     const im = document.createElement("img");
-    im.src = "data:image/png;base64," + art;
+    im.src = art;
     im.alt = "avatar";
     box.appendChild(im);
     return;
@@ -701,7 +708,7 @@ function fillCertPhoto(box, c){
     return;
   }
   const im = document.createElement("img");
-  im.src = "data:image/png;base64,@@ASSET:cert-avatar.png@@";
+  im.src = "@@ASSET:cert-avatar.png@@";
   im.alt = "avatar";
   box.appendChild(im);
 }
@@ -762,6 +769,227 @@ function mountInvChip(){
   }
   invChipEl.textContent = "▣ " + investigator.name + " · " + investigator.id;
 }
+/* ============ 内置音乐库 + 播放器 ============
+   歌曲源文件放 src/assets/，源码里用素材占位符引用 —— 占位符本身就代表一个
+   「完整可用的 src」：index 成品里是 assets/ 外链（可缓存、可流式），
+   standalone 单文件里是 data: 内联（离线自包含）。以后要加更多曲子，
+   只往 MUSIC_LIB 里再塞一条即可。
+   入口：唱针装入唱机后，桌面图标列出现「播放器」图标（单击开窗）；
+   窗体可 – 最小化成桌面右下角的播放器卡片 #music-dock，点卡片唤回。 */
+const MUSIC_LIB = [
+  { id: "Air_Bach", title: "Air (Bach)", src: "@@ASSET:Air_Bach.ogg@@" }
+];
+let musicAudio = null, musicCurrent = null;
+function fmtTime(s){
+  if (!isFinite(s) || s < 0) return "--:--";
+  s = Math.round(s);
+  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+/* 进度 / 时间：窗口开着就刷窗内进度条与时间行；最小化卡片上的迷你进度条与时间**始终**刷
+   （用户要求最小化时也要能看到进度）。 */
+function renderMusicProgress(){
+  const cur = musicAudio ? musicAudio.currentTime : 0;
+  const dur = musicAudio && musicAudio.duration && isFinite(musicAudio.duration) ? musicAudio.duration : 0;
+  const pct = dur ? Math.min(100, cur / dur * 100) : 0;
+  if (musicWinEl && !musicMin){
+    const fill = musicWinEl.querySelector(".music-prog i");
+    const time = musicWinEl.querySelector(".music-time");
+    if (fill) fill.style.width = pct + "%";
+    if (time) time.textContent = fmtTime(cur) + " / " + fmtTime(dur);
+  }
+  const dfill = document.getElementById("md-prog-fill");
+  if (dfill) dfill.style.width = pct + "%";
+  const dsub = document.getElementById("md-sub");
+  if (dsub) dsub.textContent = musicCurrent ? (fmtTime(cur) + " / " + fmtTime(dur)) : "已停止 · 点此展开";
+}
+/* 播放/暂停切换后的联动：窗开着刷整窗（换键面图标），最小化卡片换键面 */
+function syncMusicPlayState(){
+  if (musicWinEl && !musicMin) renderMusicWin();
+  renderMusicDock();
+}
+function renderMusicDock(){
+  const pp = document.getElementById("md-pp");
+  if (pp) pp.textContent = (musicCurrent && musicAudio && !musicAudio.paused) ? "⏸" : "▶";
+  /* 卡片首行显示当前曲名（不放「播放器」字样）；没在播时退回应用名 */
+  const nm = document.getElementById("md-name");
+  if (nm){
+    const t = musicCurrent ? MUSIC_LIB.find(m => m.id === musicCurrent) : null;
+    nm.textContent = t ? t.title : "MUSIC // 播放器";
+  }
+  renderMusicProgress();
+}
+/* 最小化卡片上的控制键（播放/暂停、停止）：建卡时接线一次 */
+function initMusicDock(){
+  const pp = document.getElementById("md-pp"), st = document.getElementById("md-stop");
+  if (!pp || !st || !pp.addEventListener) return;
+  pp.addEventListener("click", e => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (musicCurrent) playMusic(musicCurrent);
+  });
+  st.addEventListener("click", e => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    stopMusic();
+  });
+}
+function playMusic(id){
+  const t = MUSIC_LIB.find(m => m.id === id);
+  if (!t || typeof Audio === "undefined") return false;
+  if (!musicAudio){
+    musicAudio = new Audio();
+    musicAudio.addEventListener("timeupdate", renderMusicProgress);
+    musicAudio.addEventListener("loadedmetadata", renderMusicProgress);
+    musicAudio.addEventListener("play", syncMusicPlayState);
+    musicAudio.addEventListener("pause", syncMusicPlayState);
+  }
+  if (musicCurrent === id && !musicAudio.paused){ musicAudio.pause(); return false; }   /* 再点一次 = 暂停 */
+  if (musicCurrent === id){                    /* 续播：不动 src，接着上次的进度，绝不能重设 src（会归零） */
+    const p = musicAudio.play();
+    if (p && p.catch) p.catch(() => {});
+    return true;
+  }
+  musicAudio.loop = true;                 /* 唱机循环，贴合叙事 */
+  musicAudio.src = t.src;
+  const p = musicAudio.play();
+  if (p && p.catch) p.catch(() => {});    /* 无手势被拦时静默 */
+  musicCurrent = id;
+  if (musicWinEl) renderMusicWin();
+  renderMusicDock();                      /* 最小化卡片首行的曲名同步 */
+  return true;
+}
+function stopMusic(){
+  if (musicAudio) musicAudio.pause();
+  musicCurrent = null;
+  if (musicWinEl) renderMusicWin();
+  renderMusicDock();
+}
+
+/* 播放器桌面图标：唱机装上唱针后解锁（installed 已进存档，刷新即还原）。
+   与其他 desk-icon 同栏同站位（ICON_LAYOUT 动态追加一条，重排后不留洞）。 */
+let musicWinEl = null, musicMin = false, musicIconEl = null;
+function changjiNeedleFitted(){
+  const c = nodeByKey("item", "ITEMS_changji");
+  return !!(c && c.installed && c.installed["ITEMS_cz"]);
+}
+function refreshMusicIcon(){
+  const on = changjiNeedleFitted();
+  if (on && !musicIconEl){
+    const el = document.createElement("div");
+    el.className = "desk-icon";
+    el.id = "music-icon";
+    el.dataset.app = "music";
+    el.innerHTML = '<div class="icon-glyph">♪</div><div class="icon-label">播放器</div>';
+    document.getElementById("icons").appendChild(el);
+    attachIcon(el, "music", toggleMusicWin);   /* 用户要求单击即开（其他图标是双击开） */
+    musicIconEl = el;
+    if (!ICON_LAYOUT.some(r => r[0] === "music-icon")) ICON_LAYOUT.push(["music-icon", "music"]);
+    resetIconPositions();
+  } else if (!on && musicIconEl){
+    if (musicWinEl) closeMusicWin();           /* 针没了（重置/换案），窗与最小化卡片一并收 */
+    musicIconEl.remove();
+    musicIconEl = null;
+    const i = ICON_LAYOUT.findIndex(r => r[0] === "music-icon");
+    if (i >= 0){ ICON_LAYOUT.splice(i, 1); resetIconPositions(); }
+  }
+}
+/* 窗体三态：开着（musicWinEl 有、musicMin=false）/ 最小化（musicWinEl 有、musicMin=true，
+   窗体藏起、右下角 #music-dock 亮出）/ 关着（musicWinEl 无）。 */
+function updateMusicDock(){
+  const d = document.getElementById("music-dock");
+  if (d) d.classList.toggle("on", !!(musicWinEl && musicMin));
+}
+function closeMusicWin(){
+  if (musicWinEl){ musicWinEl.remove(); musicWinEl = null; }
+  musicMin = false;
+  updateMusicDock();
+}
+function minMusicWin(){
+  if (!musicWinEl || musicMin) return;
+  musicMin = true;
+  musicWinEl.style.display = "none";
+  updateMusicDock();
+}
+function restoreMusicWin(){
+  if (!musicWinEl) return openMusicWin();
+  musicMin = false;
+  musicWinEl.style.display = "";
+  renderMusicWin();          /* 最小化期间播放状态可能变过，唤回时按当前状态重绘 */
+  updateMusicDock();
+}
+function toggleMusicWin(){
+  if (musicWinEl){ if (musicMin) restoreMusicWin(); else closeMusicWin(); return; }
+  openMusicWin();
+}
+function openMusicWin(){
+  closeMusicWin();
+  const w = makeWindow("MUSIC // 播放器", closeMusicWin, minMusicWin);
+  w.el.classList.add("music-win");
+  musicWinEl = w.el;
+  renderMusicWin();
+  desktopEl.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  return true;
+}
+function renderMusicWin(){
+  if (!musicWinEl) return;
+  const body = musicWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  const head = document.createElement("div");
+  head.className = "music-head";
+  head.textContent = "内置音乐 · " + MUSIC_LIB.length + " 首";
+  body.appendChild(head);
+  const list = document.createElement("div");
+  list.className = "music-list";
+  MUSIC_LIB.forEach(t => {
+    /* 曲目行只负责选曲（点行播放/暂停当前曲），不放播放键 —— 播放/暂停收拢在底部控制区，全窗只有一个 */
+    const row = document.createElement("div");
+    row.className = "music-row" + (musicCurrent === t.id ? " cur" : "");
+    row.title = musicCurrent === t.id ? "播放中 · 点击暂停" : "播放这首";
+    const name = document.createElement("span");
+    name.className = "music-name";
+    name.textContent = t.title;
+    row.appendChild(name);
+    row.addEventListener("click", () => playMusic(t.id));
+    list.appendChild(row);
+  });
+  body.appendChild(list);
+  if (musicCurrent){
+    /* 底部播放区：进度条（可点跳转）+ 时间 + 图标控制键（播放/暂停、停止） */
+    const player = document.createElement("div");
+    player.className = "music-player";
+    const prog = document.createElement("div");
+    prog.className = "music-prog";
+    prog.title = "播放进度 · 点击跳转";
+    const fill = document.createElement("i");
+    prog.appendChild(fill);
+    prog.addEventListener("click", e => {
+      if (!musicAudio || !musicAudio.duration || !isFinite(musicAudio.duration)) return;
+      const r = prog.getBoundingClientRect();
+      const k = Math.min(1, Math.max(0, (e.clientX - r.left) / Math.max(1, r.width)));
+      musicAudio.currentTime = k * musicAudio.duration;
+      renderMusicProgress();
+    });
+    const time = document.createElement("div");
+    time.className = "music-time";
+    const ctrl = document.createElement("div");
+    ctrl.className = "music-ctrl";
+    const pp = document.createElement("button");
+    pp.className = "music-ibtn";
+    pp.title = (musicAudio && !musicAudio.paused) ? "暂停" : "播放";
+    pp.textContent = (musicAudio && !musicAudio.paused) ? "⏸" : "▶";
+    pp.addEventListener("click", () => playMusic(musicCurrent));
+    const stop = document.createElement("button");
+    stop.className = "music-ibtn";
+    stop.title = "停止";
+    stop.textContent = "■";
+    stop.addEventListener("click", stopMusic);
+    ctrl.appendChild(pp); ctrl.appendChild(stop);
+    player.appendChild(prog); player.appendChild(time); player.appendChild(ctrl);
+    body.appendChild(player);
+    renderMusicProgress();
+  }
+}
+
 function closeInvReview(){ if (invReviewEl){ invReviewEl.remove(); invReviewEl = null; } }
 
 /* ---- 换头像（领证之后）：证件窗里的「更换头像」开这扇独立窗 ----

@@ -170,3 +170,21 @@ window.__dump  = () => ({
 });
 
 boot();
+refreshMusicIcon();          /* 还原存档时若唱机已装针，桌面播放器图标要补回来 */
+
+/* 无头验证 / 调试用的音乐钩子（不依赖真实音频设备：只查 DOM 与库状态） */
+window.__music = {
+  state: () => ({ lib: MUSIC_LIB.map(m => ({ id: m.id, title: m.title })), current: musicCurrent,
+    fitted: changjiNeedleFitted(), icon: !!musicIconEl,
+    win: !!musicWinEl, min: musicMin,
+    time: musicAudio ? Math.round(musicAudio.currentTime * 10) / 10 : 0,
+    paused: musicAudio ? musicAudio.paused : true,
+    dock: (() => { const d = document.getElementById("music-dock"); return !!(d && d.classList && d.classList.contains("on")); })() }),
+  fitNeedle: () => { let c = nodeByKey("item", "ITEMS_changji");
+    if (!c) c = ensureNode("item", "ITEMS_changji", { label: "唱机" });
+    c.installed = Object.assign({}, c.installed); c.installed["ITEMS_cz"] = true; refreshMusicIcon(); },
+  open: () => { if (musicWinEl && musicMin) return restoreMusicWin(); return openMusicWin(); },
+  min: () => minMusicWin(),
+  restore: () => restoreMusicWin(),
+  close: () => closeMusicWin()
+};

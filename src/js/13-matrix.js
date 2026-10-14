@@ -15,9 +15,9 @@ const MX_CIRCLE_R = 195;
    去掉文字标签后 chip 从锚点顶起，margin4 + 半卡高23 即中心偏移。 */
 const MX_ANCHORS = { vision:[.5000,.0192], hearing:[.7971,.3073], touch:[.6840,.7727], smell:[.3160,.7727], taste:[.2029,.3073] };
 /* 执行者头像：暂借 TEC 的（同风格同尺寸），新头像做好只改这一行 */
-const EXECUTOR_AVATAR_B64 = "@@ASSET:executor-avatar.png@@";
+const EXECUTOR_AVATAR = "@@ASSET:executor-avatar.png@@";
 /* 执行者表情：配方不匹配时在头像上方弹出（心碎，16×16 像素，含气泡框） */
-const EXEC_EMOTE_HEARTBROKEN_B64 = "@@ASSET:emote-heartbroken.png@@";
+const EXEC_EMOTE_HEARTBROKEN = "@@ASSET:emote-heartbroken.png@@";
 
 let inferWinEl = null;
 function closeInferWin(){ if (inferWinEl){ inferWinEl.remove(); inferWinEl = null; } }
@@ -176,7 +176,7 @@ function refreshInferWin(){
   exec.title = "长按 2.5 秒激活归因";
   const av = document.createElement("div"); av.className = "mx-avatar";
   const img = document.createElement("img");
-  img.src = "data:image/png;base64," + EXECUTOR_AVATAR_B64;
+  img.src = EXECUTOR_AVATAR;
   img.alt = "执行者"; img.draggable = false;
   av.appendChild(img);
   exec.appendChild(av);   /* 执行者只留头像：头像即五芒星中枢，标签/提示已移除 */
@@ -269,7 +269,7 @@ function showExecEmote(){
   const em = document.createElement("div");
   em.className = "mx-emote";
   const im = document.createElement("img");
-  im.src = "data:image/png;base64," + EXEC_EMOTE_HEARTBROKEN_B64;
+  im.src = EXEC_EMOTE_HEARTBROKEN;
   im.alt = "心碎"; im.draggable = false;
   em.appendChild(im);
   ex.appendChild(em);

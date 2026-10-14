@@ -48,7 +48,7 @@ function makeFloatDraggable(el, inWorld, handle){
     el._dragged = false;
     /* 交互子元素（按钮/输入框/清单项/× 关窗键/阵列执行者与线索 chip）不启动拖动——否则 setPointerCapture
        会把 click 重定向到窗口自身，行内可点的清单项永远收不到 click。新增可点清单项时记得往这里加。 */
-    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip")) return;
+    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip,.music-row")) return;
     /* CSS 定位的浮窗（right/bottom/margin 居中），首次拖动时换算成 left/top，并清掉 margin 防止跳位 */
     if (el.style.left === "" || el.style.left == null){
       const r = el.getBoundingClientRect(), sr = desktopEl.getBoundingClientRect();

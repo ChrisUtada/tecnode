@@ -2,7 +2,7 @@
 
 把 T.E.C-OS（案件 A-001）的交互从「命令行 + 超链接」改成 **Nodes 式节点图**：**拖拽 = 合成**。
 
-单文件、零依赖、真实 A-001 数据内嵌。双击 `index.html` 就能玩。**没有改动 `chrisutada.github.io` 仓库里的任何文件。**
+零依赖、真实 A-001 数据内嵌，**素材双构建**：`index.html` 走 `assets/` 外链（HTML 仅 ~310KB，音频可缓存可流式），`tecnode-standalone.html` 全内联（单文件，双击即玩、离线分发）。**没有改动 `chrisutada.github.io` 仓库里的任何文件。**
 
 > 界面主题：复古单色系统风（灵感来自 PC-98 时代 OS / 早期 Windows 界面）——米白 + 墨色的单色世界，圆角细黑框窗口、中文像素字体（凤凰点阵体 Vonwaon Bitmap 12px，Haoyu Qiu / CC0）；唯一的彩色是台灯点亮时的暖黄光晕。主题纯 CSS 实现，交互逻辑与类名钩子未动。
 >
@@ -69,7 +69,7 @@
 
 > 所有浮窗（叙事卡 / 对话气泡 / TEC 对话窗 / 密码窗 / 各应用窗口）统一为**系统窗口样式**：标题栏（`SCENE_FEED //`、`DIALOG //`、`TEC //`、`LOCK //`、`STORAGE //`、`ARCHIVE //`、`INFERENCE //` 命名），**整个窗口都可拖动**（× 按钮和输入框除外），用右上角 **× 关闭**（点空白不会收起，方便对照文本继续探索）。**外壳整体 `user-select:none`** —— 按住窗口拖过正文文字不会拉出蓝色选区（输入框单独放行）。**点框内任意位置不关窗**：叙事卡/气泡上它是「继续」，其余窗口是空操作。**边框一律是 `1px solid var(--edge)` 的整圈描边**——叙事卡与顶部提示条都不再有「左侧加粗色带」，和其余窗口完全一致。
 
-| 拖 黑胶 / 唱针 → 唱机 | 对应唱机的 `useItem` 命令（放入黑胶 / 播放音乐） |
+| 拖 黑胶 / 唱针 → 唱机 | 对应唱机的 `useItem` 命令（放入黑胶 / 播放音乐）。**装上唱针后**：唱机详情里出现「▶ 播放音乐」按钮（循环播放 `Air (Bach)`），桌面图标列出现 ♪「播放器」图标（**单击即开**，其他图标是双击），点开是 `MUSIC // 播放器` 独立窗，列出内置音乐库（`src/js/16-cases.js` 的 `MUSIC_LIB`，以后加曲只往数组塞一条）；窗可「– 最小化」成桌面右下角的播放器卡片 `#music-dock`（与案件卡片 / TEC 卡片上下错开），点卡片唤回 |
 | 双击线索节点 | 捕获线索 |
 | 单击节点 | **选中并聚焦邻居 + 打开 `DETAIL // 节点详情` 检查器**：无关节点和连线被淡化（顶栏「聚焦选中」开关可关闭）；详情检查器选中即开、取消选中/点空白/× 即关。**它是信息表，不是第二个阅读器**：**只放「简介 / 状态 / 来源」三样** —— 简介是描述文本（同一段描述只在别处都看不到时才在这里出现，如：有命令的物品、线索、角色），状态是这一刻的状态（物品点亮 / 使用条件 / 线索捕获 / 场景展开 / 角色对话进度），来源是「在哪展开、在哪遇见」；场景与容器另给「**[ 重看场景叙事 ]**」按钮把叙事卡叫回来。**它刻意不列结构关系**（容器里装着什么、谁的正文指向它、它跟谁有反应）——那是玩家该自己动手试出来的。**「状态」那一行是实时的**：点亮台灯 / 捕获线索 / 展开场景 / 推进对话之后它会自己变（`render()` 末尾统一刷新），不用重新点一下节点。**点一下也顺手摘掉节点上的「新」角标** —— 详见下方「去重规则」 |
 | 空白处拖动 / 滚轮 | 平移 / 缩放画布 |
@@ -149,7 +149,7 @@
 node verify.js
 ```
 
-用最小 DOM stub 真实执行 `index.html` 里的脚本（不是读代码看），**730 项断言全绿**：
+用最小 DOM stub 真实执行 `index.html` 里的脚本（不是读代码看），**752 项断言全绿**：
 
 ```
 ✅ 左抽屉拿到手电筒          ✅ 手电筒 → 黑影：解锁「尸体」场景
@@ -328,15 +328,17 @@ node _cdp_excerpt.cjs       # 文本物摘录：真鼠标点详情窗正文里�
 
 | 路径 | 用途 |
 |---|---|
-| `index.html` | 【构建产物】单文件成品，双击即玩 |
-| `_template.html` | 【构建产物】同上，但 gamedata 位留 `__GAME_DATA_A001__` 占位符（换案件时注入用） |
-| `build.js` | 构建脚本（Node，零第三方依赖）：`node build.js` 写出两个产物；`node build.js --check` 只校验、不改盘 |
+| `index.html` | 【构建产物】主成品，素材走 `assets/` 外链（HTML ~310KB；**需与 `assets/` 目录同在**） |
+| `tecnode-standalone.html` | 【构建产物】全内联单文件版，双击即玩、离线分发（一个文件拷到哪都能玩） |
+| `assets/` | 【构建产物】`node build.js` 从 `src/assets/*` 复制出的外链素材目录（.gitignore 忽略） |
+| `_template.html` | 【构建产物】与 `index.html` 同构建（只差 gamedata 位留 `__GAME_DATA_A001__` 占位符，换案件时注入用） |
+| `build.js` | 构建脚本（Node，零第三方依赖）：`node build.js` 写出四个产物；`node build.js --check` 只校验、不改盘 |
 | `src/shell.html` | 文档骨架（`<head>` + `<body>`），三个占位符 `@@CSS@@` / `@@GAMEDATA@@` / `@@JS@@` |
 | `src/css/01..06-*.css` | 样式，按文件名数字前缀排序后拼接 |
 | `src/js/01..17-*.js` | 引擎脚本，同上排序拼接（拼回同一个 `<script>`，作用域与拆分前完全一致，无 import/export） |
-| `src/assets/*` | 图片与字体**原文件**（PNG / TTF）。源码里用 `@@ASSET:<文件名>@@` 引用，构建时被换成 base64 —— 原文件入库可 diff、可替换，成品仍是单文件 |
+| `src/assets/*` | 图片 / 字体 / 音频**原文件**。源码里用 `@@ASSET:<文件名>@@` 引用（占位符代表一个完整可用的 src）；原文件入库可 diff、可替换 |
 | `data/case-a001.json` | 案件 A-001 数据（美化 JSON，构建时压成单行注入，产物里仍是一整行） |
-| `verify.js` | 无头验证器（730 项断言，含案件库切案 / 各存各档 / 案件窗离屏两个落点 / 可拖动案件卡片 / 线索册与人物名册 / 右键钉住与折叠反馈 / 详情窗状态实时刷新 / 「新」角标 / **书桌与垃圾桶的「容器物品」身份** / **日志只记结果不记过程（含对话台词不入卷）** / **文本物「摘录」：读到就长出边** / **场景节点不再挂「条件进入」角标** / **线索归位 = 收进桌布（拖出桌布取回）**） |
+| `verify.js` | 无头验证器（752 项断言，含案件库切案 / 各存各档 / 案件窗离屏两个落点 / 可拖动案件卡片 / 线索册与人物名册 / 右键钉住与折叠反馈 / 详情窗状态实时刷新 / 「新」角标 / **书桌与垃圾桶的「容器物品」身份** / **日志只记结果不记过程（含对话台词不入卷）** / **文本物「摘录」：读到就长出边** / **场景节点不再挂「条件进入」角标** / **线索归位 = 收进桌布（拖出桌布取回）** / **唱机装唱针后解锁桌面播放器（单击开窗 / 最小化到右下角卡片）+ 内置音乐库 + 详情播放按钮** / **素材双构建（外链 index + 内联 standalone）**） |
 | `README.md` | 本文 |
 
 **拆分当时**（提交 `26e812c`）构建的产物与拆分前的 `index.html` 逐字节一致（只有 gamedata 那一行是重新序列化的同值 JSON），所以 `verify.js` 无需任何改动。
@@ -346,9 +348,9 @@ node _cdp_excerpt.cjs       # 文本物摘录：真鼠标点详情窗正文里�
 ### 构建
 
 ```bash
-node build.js          # 从 src/ + data/ 拼出 index.html 与 _template.html
-node build.js --check  # 不改盘：比对「源码构建结果」与盘上产物，不一致就非零退出（提示该重新构建了）
-node verify.js         # 730 项断言
+node build.js          # 从 src/ + data/ 拼出 index.html / _template.html / tecnode-standalone.html / editor.html，并同步 assets/
+node build.js --check  # 不改盘：比对「源码构建结果」与盘上四个产物，不一致就非零退出（提示该重新构建了）
+node verify.js         # 752 项断言
 ```
 
 改完任何源码都要跑一遍 `node build.js`，否则盘上的 `index.html` 还是旧的。
@@ -359,25 +361,31 @@ node verify.js         # 730 项断言
 | 样式 | `src/css/` 对应文件 |
 | 案件数据 | `data/case-a001.json` |
 | 文档骨架 / DOM 结构 | `src/shell.html` |
-| 图片 / 字体 | 把新文件放进 `src/assets/`，源码里改成 `@@ASSET:<文件名>@@` |
+| 图片 / 字体 / 音频 | 把新文件放进 `src/assets/`，源码里改成 `@@ASSET:<文件名>@@` |
 
-### 素材（图片 / 字体）
+### 素材（图片 / 字体 / 音频）—— 双构建
 
-运行时必须是**单文件**（`file://` 双击即玩），所以图片和字体在成品里只能是 base64 内联。但 base64 不该出现在源码里：一行几千字符的乱码既看不出画的是什么，也没法替换或 diff。
+base64 不该出现在源码里：一行几千字符的乱码既看不出画的是什么，也没法替换或 diff。而「全内联单文件」与「外链可缓存」是两种发布场景，`build.js` 用**同一份源码**各出一份产物：
 
-于是二进制素材放 `src/assets/`（**入库**），源码只写占位符，`build.js` 构建时把它换成该文件的 base64：
+- **external 模式** → `index.html` / `_template.html`：占位符换成 `assets/<文件名>`，HTML 轻、浏览器按文件缓存、音频可流式可拖进度；构建时把 `src/assets/*` 复制到根目录 `assets/`（构建产物，.gitignore 忽略）。
+- **inline 模式** → `tecnode-standalone.html` / `editor.html`：占位符换成 `data:<mime>;base64,<正文>`（mime 由 build.js 按扩展名推导，MIME 表在 build.js 顶部），单文件自包含、双击即玩。
+
+于是二进制素材放 `src/assets/`（**入库**），源码只写占位符 —— 占位符本身就代表一个**完整可用的 src**，源码不感知模式差异：
 
 ```js
 /* src/js/11-dialog.js —— 源码里看得懂 */
-const TEC_AVATAR_B64 = "@@ASSET:tec-avatar.png@@";
+const TEC_AVATAR = "@@ASSET:tec-avatar.png@@";
+
+/* src/js/16-cases.js —— 音乐也是普通素材 */
+{ id: "Air_Bach", title: "Air (Bach)", src: "@@ASSET:Air_Bach.ogg@@" }
 ```
 
 ```css
-/* src/css/01-font.css —— mime 留在源码里，占位符只贡献 base64 正文 */
-src:url(data:font/ttf;base64,@@ASSET:font.ttf@@) format("truetype");
+/* src/css/01-font.css —— 占位符直接进 url() */
+src:url(@@ASSET:font.ttf@@) format("truetype");
 ```
 
-规则：`@@ASSET:<文件名>@@` → `src/assets/<文件名>` 的 base64（纯正文，不带 `data:` 前缀，mime 由源码自己写）。构建时会校验：素材名只允许字母数字与 `._-`、文件必须存在、替换后不得有残留占位符，任一不满足就报错退出。
+规则：external 时 `@@ASSET:<文件名>@@` → `assets/<文件名>`；inline 时 → `data:<mime>;base64,<正文>`。构建时会校验：素材名只允许字母数字与 `._-`、文件必须存在、inline 模式下扩展名必须在 MIME 表里登记过、替换后不得有残留占位符，任一不满足就报错退出。
 
 | 文件 | 用途 | 引用处 |
 |---|---|---|
@@ -385,6 +393,7 @@ src:url(data:font/ttf;base64,@@ASSET:font.ttf@@) format("truetype");
 | `executor-avatar.png` | 推演器中央「执行者」头像 | `src/js/13-matrix.js` |
 | `emote-heartbroken.png` | 配方不匹配时的心碎表情 | `src/js/13-matrix.js` |
 | `cert-avatar.png` | 调查员证上的**兜底**照片（选了头像就不用它；老存档 / 未选时用它） | `src/js/16-cases.js` |
+| `Air_Bach.ogg` | 唱机装上唱针后可播放的内置音乐（Bach《Air》，弦乐） | `src/js/16-cases.js` |
 | `font.ttf` | 凤凰点阵体 Vonwaon Bitmap 12px（CC0 1.0，已子集化） | `src/css/01-font.css` |
 
 > **字体的格式标签为什么是 `truetype`**：这份点阵字体的字节实际是 sfnt/TTF（文件头 `00010000`，表含 `glyf`/`loca`/`maxp`），而不是 woff2。早期版本把它写成 `data:font/woff2` / `format("woff2")`，2026-10-14 改正为 `data:font/ttf` / `format("truetype")`。
@@ -437,7 +446,7 @@ src:url(data:font/ttf;base64,@@ASSET:font.ttf@@) format("truetype");
 - **线索册是收纳盒、不是索引清单**：收纳走 `ledgerStore()`（与证物袋共用同一套 `stored` 机制，`storedIn === "LEDGER"`），节点**离开画布但保留连边**，可撤销、重置回退；`ledgerTake()` 取回（`requireCase()` 守卫；放回 ※ 图标旁、`markFresh(n)` 点亮「新」角标）。窗口只列 `ledgerItems()`——**没收纳进去的不显示**，因此「五感分组 / 空组写无 / 待归位·已归位」这一层整体取消；感官由 `ledgerRank()` 决定排序（五感键序 × 1000 + 线索在数据里的书写序），并标在行尾 `.st.sense`。窗口在 `render()` 末尾统一刷新（关着时是空操作），图标角标在 `updateLedgerBadge()` 里跟着刷。
 - **人物名册 = 常驻两人 + 「已结识」的人**。`ROSTER_PINNED` 里钉着 **TEC**（点行 = 开助手窗）与**执行者**（点行 = 开逻辑阵列）—— 他们不是「遇到的人」，没有画布节点，所以既不算进 `metChars()` 的三来源、也绝不在画布上造节点（`char:CHARS_TEC` 仍被 `sceneTags()` 过滤）。其余角色的「已结识」三来源：画布上有 `char:` 节点 ∪ `seenTexts` 里的 `[char:]` 标签 ∪ 在已探索场景里说过话（`sceneTalks` 命中）。点一行走 `gotoChar()`：没有节点就补一个（`homeScene` 记 `G.lastScene`），再 `centerOnNode` + `selectNode` + `showCharLine`——与双击节点**同一条对话路径**，因此节点可能"无词"（角色对白挂在来源场景上：换个场景遇到的同一个人，`sceneTalks` 自然可能为空，名册照实标「无对话文本」）。
 - **头像库（`AVATAR`，2026-10-14）——「测试末尾选头像 + 领证后换头像」**：可选池 = **常驻两人（执行者 / TEC）+ 已结识的人**，判据直接沿用名册的 `metChars()`。三条约定：① **池子是现算的**（`avatarUnlocked()` 每次都重数）⇒「每遇到一个新人物就解锁一张」不需要任何写盘逻辑，`investigator.avatarId` 是唯一落盘字段；② 初始 `AVATAR_INITIAL = ["CHARS_EXEC", "CHARS_TEC"]`、默认选中 `AVATAR_DEFAULT_ID = "CHARS_EXEC"`；③ **未解锁只画虚线「?」+「未解锁」，不显示名字** —— 免得剧透还没出场的人。选角界面是 3 列格子（`buildAvatarPicker()`，测试流程与换头像窗共用；`button` 在 `makeFloatDraggable` 的排除表里，所以窗内的格子点得动）。**没美术稿的角色（目前 4 位剧情角色）走首字方块**，`fillCertPhoto()` 按 `avatarId` 画证件照、`avatarId` 缺失（本轮之前的老存档）时退回固定的 `cert-avatar.png`。测试流程：登记姓名 → 三道题 → **`AVATAR // 选择头像`** → `INVESTIGATOR // 调查员证`（领证页有「[ 换一张头像 ]」退回来改）；领证后从证件窗的「[ 更换头像 ]」开 `AVATAR // 选择头像` 独立窗，确认后写盘 + 重开证件窗把照片换过来。调试钩子：`__intro.pick()/confirmPick()/avatar()/pool()`、`__avatars()`、`__avatarOpen()/__avatarPick()/__avatarConfirm()`。
-- **名册每行一个头像（48×48，窗宽 324 = 300 + 这 24px）**：`rosterAvatar(id)` 返回 null 就用「首字方块」占位（`.ini` 22px）。2026-10-14 用户反馈 24×24 真机认不出，翻倍；素材源图 72×72，缩到 48 仍是一档下采样。目前只有 TEC（`tec-avatar.png`）与执行者（`executor-avatar.png`）有美术稿，四位剧情角色走占位、等图 —— 拿到图后放进 `src/assets/`，在 `rosterAvatar()` 里按 id 补一行素材占位符即可（写法与 `11-dialog.js` 的 `TEC_AVATAR_B64` 完全一样）。⚠ 该函数必须**惰性**读取常量：所有切片拼进同一个 `<script>`，`EXECUTOR_AVATAR_B64` 定义在 `13-matrix.js`（`12-panels.js` 之后），顶层引用会踩 TDZ。
+- **名册每行一个头像（48×48，窗宽 324 = 300 + 这 24px）**：`rosterAvatar(id)` 返回 null 就用「首字方块」占位（`.ini` 22px）。2026-10-14 用户反馈 24×24 真机认不出，翻倍；素材源图 72×72，缩到 48 仍是一档下采样。目前只有 TEC（`tec-avatar.png`）与执行者（`executor-avatar.png`）有美术稿，四位剧情角色走占位、等图 —— 拿到图后放进 `src/assets/`，在 `rosterAvatar()` 里按 id 补一行素材占位符即可（写法与 `11-dialog.js` 的 `TEC_AVATAR` 完全一样）。⚠ 该函数必须**惰性**读取常量：所有切片拼进同一个 `<script>`，`EXECUTOR_AVATAR` 定义在 `13-matrix.js`（`12-panels.js` 之后），顶层引用会踩 TDZ。
 - **两扇桌面层清单窗都落在桌面层**（z-index 25），和档案 / 推演器一样**离屏（– 收起 / × 关闭）时仍然开着**，但行点击都先过 `requireCase()` 闸门（动作上加门，不是开窗上加）；换案 / 重置走 `boot()` 统一收掉。版面上线索册在**左侧**（`left:96px`，避开桌面图标栏），人物窗在**详情窗左侧**（`right:328px; top:60px`，与 `#detail-win` 并排成「列表 + 详情」一对，实测两者留 14px 缝不叠窗）。两扇窗都进了 `nodeDropTargets()`（线索册窗口 + ※ 图标是线索落点，`dropTargetEl` 按变量解析），顺序排在静态图标之前。
 - **归位 = 把这枚线索收进桌布（画布上不再留一份）**：`assignClue()` 除了把 id 记进 `G.matrix[感官]`，还会把节点置 `stored` / `storedIn = "MATRIX"` —— 与证物袋 / 线索册**共用同一套 `stored` 机制**，所以「离开画布但保留连边、可撤销、跟着续档走」都是白拿的（`paintEdges` 本来就跳过 stored 节点）。命令行情的依据：桌布自己就是这份线索的清单，「拖上台」和「拖进袋 / 册」在玩家手里是同一个动作，落点之后节点也该同样消失。**回头路只有一条**：把桌布上的 chip 拖出去（`boardTake(cid, sense, cx, cy)`）—— 它在画布上重新出现，落在松手那一点（**先 `toWorld()` 再减半张卡**：卡片尺寸是世界单位，在屏幕坐标里先减会差一个镜头缩放倍率，k=0.35 时能偏出 120 多世界像素），并照例亮一次「新」。`storedIn` 各认各的，所以桌布上的线索不会被证物袋 / 线索册重复登记。**归位与取回都不调 `layout()`**：收纳入袋 / 入册那两处会顺手跑 260 轮弹簧迭代，把画布上别的节点全推走（真机实测 18 个节点全动、最大 210px、平均 64px —— 那正是「自动布局」按钮被删掉的那个毛病）。
 - **槽位 / 结局状态进快照可撤销，`G.matrix` 只记线索 id**。**阵列内的线索卡复用外部 `.node` 风格**（纸面渐变、圆角、浮雕，捕获后呈暗色观感；副标题写「线索 · 已归位」与画布上那枚「已捕获」分开说，tooltip 写明「拖出桌布 = 取回画布」），**卡上没有 ×，拖出桌布是唯一的回头路**。**五感文字标签已整体移除**（短横线、虚线落点框一并去掉），锚点只以卡片位置暗示感官归属，`MX_ANCHORS` 按「锚点+27px=卡片中心」重算，顶点仍是半径≈175px 的近似正五边形。左下角的结局清单已临时移除；**常驻虚线落点框已去掉**（靠五芒星本身撑结构）。**中央执行者只留头像**（`assets/zxz.png`，「执 行 者」标签与状态提示已移除，头像居中五芒星中枢）。**五芒星阵列**：五感顶点按星序连成五角星，描线用 `#c0392b` 红 + `drop-shadow` 光晕（`.mx-star-frame` 常显淡红光、`.mx-star-draw` 蓄力强红光），长按执行者时 `.mx-star-draw` 用 `stroke-dashoffset`（`pathLength=100`）在 2.5s 内把整条星线描出即触发；松手中断则复位。结局演出是**步进状态机**（浏览器里 setTimeout 自动推进、点击立即跳过、无头测试用钩子手动推进）。
@@ -468,4 +477,4 @@ src:url(data:font/ttf;base64,@@ASSET:font.ttf@@) format("truetype");
 - **卡片拖动必须吞掉"拖完紧跟的那一次 click"**：`attachDock` 用 `moved` 标记（`pointerdown` 复位、位移 > 5px 置真、`click` 里 `if (!moved) enterCase(...)`），否则按住把卡片拖走会顺手把案件展开。**别用 `setTimeout` 复位 `moved`** —— 无头 stub 里 `setTimeout = () => 0`，回调永不执行会**永久吞掉后续点击**。卡片拖动后不复位（切案也保留玩家摆的位置），`z-index:23` 高于浮窗。
 - **两个落点靠 `caseParkedAt()` 消歧**：`caseOpen ? null : (caseDockOn ? "dock" : (caseHeld ? "icon" : null))`。`enterCase` 从它返回的地方放大展开；`doEnterCase` 进新案时会把两个落点一起清掉，保证互斥。
 - **「案件地图」图标被拖走后，切案 / 重置会被 `resetIconPositions()` 拉回左侧竖排原位**（它就在 `ICON_LAYOUT` 里）。所以"有关闭的案件"只体现在角标上、不体现在位置上；关闭动画也总是飞向图标的当前位置（而不是某个写死的坐标）。
-- **字体：凤凰点阵体 Vonwaon Bitmap 12px**（作者 Haoyu Qiu，CC0 1.0）。按 `index.html` 中实际出现的 1406 个字符子集化，输出 sfnt/TTF 后内联为 base64 `@font-face`（源文件 257 KB / base64 343 KB，见 `src/assets/font.ttf`），`body` 的 `font-family` 以 `"VonwaonBitmap"` 为首，保留 `"SimSun","NSimSun","MS Mincho","MS Gothic",serif` 作为兜底，用于用户输入名或子集未覆盖的字符。字体是矢量轮廓但绘制成像素块，因此在 12px 整数倍时最锐利，其它字号仍保持可读。由于该字体只有单权重，`@font-face` 声明覆盖 `100–900` 并配合 `body{ font-synthesis:none }`，避免浏览器对 `font-weight:700` 的文字做伪粗（faux-bold）而导致发虚。
+- **字体：凤凰点阵体 Vonwaon Bitmap 12px**（作者 Haoyu Qiu，CC0 1.0）。按 `index.html` 中实际出现的 1406 个字符子集化，输出 sfnt/TTF（源文件 257 KB，见 `src/assets/font.ttf`）：standalone 内联为 base64 `@font-face`，index 成品走 `assets/font.ttf` 外链，`body` 的 `font-family` 以 `"VonwaonBitmap"` 为首，保留 `"SimSun","NSimSun","MS Mincho","MS Gothic",serif` 作为兜底，用于用户输入名或子集未覆盖的字符。字体是矢量轮廓但绘制成像素块，因此在 12px 整数倍时最锐利，其它字号仍保持可读。由于该字体只有单权重，`@font-face` 声明覆盖 `100–900` 并配合 `body{ font-synthesis:none }`，避免浏览器对 `font-weight:700` 的文字做伪粗（faux-bold）而导致发虚。

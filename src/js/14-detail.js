@@ -63,6 +63,9 @@ function paintDetail(){
     }));
     if (needFit.length) st.push("待装上 " + [...new Set(needFit)].join("、"));
     if (st.length) html += "<div class='drow'>状态：" + esc(st.join(" · ")) + "</div>";
+    /* 唱机装上唱针后：详情里直接给一个播放按钮（音乐随游戏内置，base64 内联） */
+    if (n.id === "ITEMS_changji" && n.installed && n.installed["ITEMS_cz"])
+      html += "<div class='drow'><button id='dt-play-music'>▶ 播放音乐</button></div>";
   }
 
   /* 来源：物品 / 容器物品 / 线索 / 人物都可能记着「从哪来」（在哪展开、在哪遇见）。
@@ -143,6 +146,9 @@ function takeExcerpt(target, srcKey){
 detailBody.addEventListener("click", e => {
   const b = (e.target && e.target.closest) ? e.target.closest("button.ex") : null;
   if (b) takeExcerpt(b.getAttribute("data-ex"), sel);
+  /* 唱机详情里的「播放音乐」按钮：直接播放内置曲目（无手势被拦时静默） */
+  const pm = (e.target && e.target.closest) ? e.target.closest("#dt-play-music") : null;
+  if (pm) playMusic("Air_Bach");
 });
 
 /* 「新」角标**只有玩家点过这个节点才会摘**：这里把 DOM 上那枚角标摘掉，同时清 n.unread

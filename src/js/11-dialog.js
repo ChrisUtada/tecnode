@@ -214,7 +214,8 @@ function tecSay(text){
     }
   }
 }
-const TEC_AVATAR_B64 = "@@ASSET:tec-avatar.png@@";
+/* 素材占位符本身就代表一个完整可用的 src（index 成品 = assets/ 外链，standalone = data: 内联） */
+const TEC_AVATAR = "@@ASSET:tec-avatar.png@@";
 
 function toggleTecWin(){
   if (tecMin){                                /* 收在右下角卡片上 -> 点图标 = 还原，不是关闭 */
@@ -237,7 +238,7 @@ function openTecWin(){
   av.id = "tec-avatar"; av.className = "tec-avatar";
   av.title = "TEC 助手：拖节点到我身上分析，点对话窗任意位置闲聊";
   const avImg = document.createElement("img");
-  avImg.src = "data:image/png;base64," + TEC_AVATAR_B64;
+  avImg.src = TEC_AVATAR;
   avImg.alt = "TEC"; avImg.draggable = false;
   av.appendChild(avImg);
   const avLabel = document.createElement("div");
@@ -400,7 +401,7 @@ function showTecChip(v){
 /* 卡片与「案件卡片 #case-dock」是两个独立落点：本卡片排在上方（bottom:84px vs 14px），不叠在一起 */
 function initTecChip(){
   const img = document.getElementById("tc-av-img");
-  if (img) img.src = "data:image/png;base64," + TEC_AVATAR_B64;
+  if (img) img.src = TEC_AVATAR;
   attachDock(document.getElementById("tec-chip"), openTecWin);   /* 单击展开；拖完那一次不误展开 */
   showTecChip(false);
 }
