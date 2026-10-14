@@ -518,6 +518,10 @@
   .badge.talk{color:var(--card); border-color:var(--text); background:var(--text)}
   .badge.warn{color:var(--text); border:2px solid var(--text); background:var(--card)}
   .badge.new{color:var(--card); background:var(--text); border-color:var(--text)}
+  /* 「已固定」（右键钉住，唯一入口）：挂左上角，与右上角的通知类角标分开，不叠字。
+     空心药丸 = 状态（别自动挪我、折叠也不收我），实心药丸 = 通知（新 / 对话 / 条件进入）。 */
+  .badge.pin{left:-6px; right:auto; font-size:9px; padding:2px 5px;
+    color:var(--text); background:var(--card); border:1px solid var(--text)}
 
   #toast{
     position:absolute; left:50%; top:14px; transform:translateX(-50%); max-width:560px;
@@ -582,7 +586,7 @@
     <label class="tog" title="有节点新长出来时（展开场景 / 组合出结果 / 命令产出 / TEC 分析），自动平移把它带到视野中央（不缩放；拖动节点或拖动、滚轮滚动画布即可打断）">
       <input type="checkbox" id="tg-reveal" checked> 新节点自动居中
     </label>
-    <button id="btn-relayout">自动布局</button>
+    <button id="btn-relayout" title="重新排布所有节点；节点上的「已固定」都会被解除">自动布局</button>
     <button id="btn-fit">适应窗口</button>
     <button id="btn-undo">撤销</button>
     <button id="btn-reset" class="danger">重置</button>
@@ -1147,13 +1151,23 @@ function recomputeHidden(){
 function toggleCollapse(sid){
   if (!G.explored.has(sid)) return;
   pushHistory();
-  if (G.collapsed.has(sid)){ G.collapsed.delete(sid); unstoreScene(sid); } else G.collapsed.add(sid);
+  const collapsing = !G.collapsed.has(sid);
+  if (collapsing) G.collapsed.add(sid); else { G.collapsed.delete(sid); unstoreScene(sid); }
   closeBubble(); closeNarr(); closePwPop();   /* 锚在画布上的浮层收掉；TEC 是常驻助手窗，保留 */
   recomputeHidden(); layout(); render();
-  log((G.collapsed.has(sid) ? "收起场景「" : "展开场景「") + esc(SCENES[sid].title || sid) + "」", "sys");
+  log((collapsing ? "收起场景「" : "展开场景「") + esc(SCENES[sid].title || sid) + "」", "sys");
+  /* 折叠不是「全收」：已固定的节点、以及跟场外还有连线的节点会留在画布上。
+     必须报个数，否则玩家看到"有的收有的不收"只会当成 bug（留在画布上的都有「已固定」角标可查） */
+  if (collapsing){
+    const left = Object.values(G.nodes).filter(x => !x.isScene && !x.stored && !x.hidden && x.homeScene === sid).length;
+    if (left) log("「" + esc(SCENES[sid].title || sid) + "」另有 " + left + " 个节点留在画布上（已固定 / 与场外相连）", "sys");
+  }
 }
 
-/* ============ 节点收纳：把节点放回场景（现场=仓库，画布=线索板） ============ */
+/* ============ 节点收纳：把节点放回场景（现场=仓库，画布=线索板） ============
+   机制保留、入口已移除：拖到折叠场景上「放回现场」那条路在 v2 里与证物袋 / 线索册重叠
+   （没有清单、只能整场展开才能取回），已改为提示。这里只剩内部 / 测试入口（window.__store），
+   以及展开场景时的取回（unstoreScene）——旧存档里 storedIn = 场景 的节点仍能正常取回。 */
 function storeNode(key, sid){
   const n = G.nodes[key];
   if (!n || n.isScene || n.stored) return false;
@@ -1328,7 +1342,7 @@ function layout(){
     list.forEach(n => { if (free(n)){ n.x += (W / 2 - n.x) * 0.0022; n.y += (H / 2 - n.y) * 0.0022; } });
   }
   list.forEach(n => {
-    if (n.pinned) return;                  /* 手动摆过的节点不再动 */
+    if (n.pinned) return;                  /* 右键钉住的节点不再动 */
     n.x = Math.max(60, Math.min(W - 220, n.x));
     n.y = Math.max(50, Math.min(H - 120, n.y));
   });
@@ -1369,16 +1383,17 @@ function render(){
     } else if (n.isScene && !G.explored.has(n.id) && inbound[n.id] === 0 && !sceneLocs(n.id).length){
       const b = document.createElement("span"); b.className = "badge warn"; b.textContent = "无文本入口"; el.appendChild(b);
     }
+    /* 已固定：右键钉住的节点。必须看得见——它同时意味着「自动布局不挪它」
+       与「折叠不收它」，不标出来玩家只会看到"有的收有的不收"而判定成 bug */
+    if (n.pinned){
+      const b = document.createElement("span"); b.className = "badge pin"; b.textContent = "已固定"; el.appendChild(b);
+    }
     if (n.fresh){
       const b = document.createElement("span"); b.className = "badge new"; b.textContent = "新"; el.appendChild(b);
     }
     if (n.kind === "char"){
       const unread = charTalkQueue(n).length - (G.talkProg[n.key] || 0);
       if (unread > 0){ const b = document.createElement("span"); b.className = "badge talk"; b.textContent = "对话 " + unread; el.appendChild(b); }
-    }
-    if (n.isScene && G.collapsed.has(n.id)){
-      const storedCnt = Object.values(G.nodes).filter(x => x.stored && x.storedIn === n.id).length;
-      if (storedCnt > 0){ const b = document.createElement("span"); b.className = "badge cond"; b.textContent = "存放 " + storedCnt; el.appendChild(b); }
     }
     attachInteractions(el, n);
     nodeLayer.appendChild(el);
@@ -1397,6 +1412,7 @@ function render(){
   /* 重建 DOM 后恢复选中态并重挂聚焦淡化 */
   if (sel && G.nodes[sel] && G.nodes[sel].el) G.nodes[sel].el.classList.add("sel"); else sel = null;
   applyFocus();
+  paintDetail();     /* 详情窗「状态」跟着图一起刷新（点亮 / 捕获 / 展开 / 对话进度都会变） */
 }
 function paintEdges(){
   svg.innerHTML = "";
@@ -1611,7 +1627,7 @@ function attachInteractions(el, n){
       ic.classList.remove("over");
     });
 
-    if (!moved){ selectNode(n.key); return; }
+    if (!moved){ clearFresh(n); selectNode(n.key); return; }   /* 点一下 = 不再是「新」 */
 
     if (iconHit){
       /* 松手落在桌面图标上 → 对应功能，自己弹回原位 */
@@ -1643,18 +1659,24 @@ function attachInteractions(el, n){
     }
 
     if (target && target.dataset.key){
-      /* 松手落在别的节点上 → 组合（落在折叠场景上 → 放回现场），自己被弹回原位 */
+      /* 松手落在别的节点上 → 组合，自己被弹回原位 */
       const tn = G.nodes[target.dataset.key];
       springBack(el, ox, oy);
-      if (tn && tn.isScene && G.collapsed.has(tn.id)){ storeNode(n.key, tn.id); return; }
+      /* 折叠的场景节点：既不收纳也不组合。原来这里会把节点「放回现场」（storeNode），
+         但那与证物袋 / 线索册重叠（还没有清单、只能整场展开才能取回），入口已移除。
+         组合也不放行：折叠后里面的东西看不见，隔空命中的结果没有着力点。 */
+      if (tn && tn.isScene && G.collapsed.has(tn.id)){
+        toast("<b>" + esc(tn.label) + "</b><br>场景已折叠：先双击展开，或把节点拖到证物袋", true);
+        return;
+      }
       attemptCombo(n.key, target.dataset.key);
       return;
     }
-    /* 松手落在空白处 → 就停在这里，并锁定，之后自动布局不再挪它 */
+    /* 松手落在空白处 → 就停在这里。**不再自动钉住**（钉住只由右键控制，见 togglePin）：
+       这里只改位置，所以下一次自动布局仍可能把它重排走 —— 想留住这一摆位就右键钉住它。 */
     const rawX = parseFloat(el.style.left) || n.x, rawY = parseFloat(el.style.top) || n.y;
     n.x = Math.max(60, Math.min(2000 - 220, rawX));
     n.y = Math.max(50, Math.min(1300 - 120, rawY));
-    n.pinned = true;
     if (n.x !== rawX || n.y !== rawY){
       /* 拖到画布「框边」→ 越界被夹回：必须用 springBack 让节点与连线同帧走完，
          不能只写一次 left/top（CSS 过渡期间节点在滑、连线已跳到终点 → 看着就是"断线"）。 */
@@ -1668,12 +1690,29 @@ function attachInteractions(el, n){
   });
 
   el.addEventListener("dblclick", () => {
+    clearFresh(n);          /* 双击也算「点过」：角标立刻摘掉 */
     if (n.isScene){
       if (G.collapsed.has(n.id) || G.explored.has(n.id)){ toggleCollapse(n.id); selectNode(n.key); return; }
       revealScene(n.id); selectNode(n.key); return;
     }
     runPrimary(n);
   });
+
+  /* 右键 = 钉住 / 取消钉住（不弹提示：状态由节点左上角的「已固定」角标表达）。
+     这是**唯一**的钉住入口：拖动只改位置，不再顺手钉住（旧版拖到空白即锁定，容易被当成 bug）。 */
+  el.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    togglePin(n);
+  });
+}
+/* 钉住 = 位置锁定（自动布局不再挪它）+ 折叠时不被收回。**只能由右键进入**（拖动不再自动钉住）。
+   两个后果都不需要玩家记，看见角标就够 */
+function togglePin(n){
+  if (!requireCase()) return;
+  pushHistory();
+  n.pinned = !n.pinned;
+  render();
 }
 
 /* 屏幕坐标命中测试：取「离光标最近」的那个节点，避免多节点重叠时选错 */
@@ -2677,7 +2716,7 @@ function clearSelection(){
   sel = null;
   nodeLayer.querySelectorAll(".node.sel").forEach(e => e.classList.remove("sel"));
   document.querySelectorAll(".desk-icon.sel").forEach(x => x.classList.remove("sel"));
-  detailBody.innerHTML = "<div class='empty'>点选任意节点查看信息。</div>";
+  detailPlaceholder();
   setDetailWin(false);
   applyFocus();
 }
@@ -3289,13 +3328,20 @@ function advanceMemory(){
 }
 
 /* ============ 详情面板 ============ */
-function selectNode(key){
-  const n = G.nodes[key];
-  if (!n) { detailBody.innerHTML = "<div class='empty'>节点已不存在。</div>"; return; }
-  nodeLayer.querySelectorAll(".node.sel").forEach(e => e.classList.remove("sel"));
-  if (n.el) n.el.classList.add("sel");
-  sel = key;
-  if (!detailWinOpen) setDetailWin(true);   /* 选中节点时自动弹出详情窗 */
+/* 占位内容（清空选中 / 重置）。顺手把签名对上，免得下一次 paintDetail 误判「内容没变」而跳过重绘。 */
+function detailPlaceholder(msg){
+  const html = "<div class='empty'>" + (msg || "点选任意节点查看信息。") + "</div>";
+  detailBody.__sig = html;
+  detailBody.innerHTML = html;
+}
+
+/* 把「当前选中节点」的实时状态写进 #detail-body。selectNode 会调它，render() 末尾也会调它 ——
+   所以点亮台灯 / 捕获线索 / 展开场景 / 推进对话之后，详情窗里那一行「状态」自己就变了，
+   不必重新点一下节点（旧版只在点选那一刻渲染一次，所以台灯点亮后详情窗还写着「未点亮」）。
+   内容与上次逐字相同就直接跳过，不重建 DOM —— 免得打断 hover、把滚动位置弹回顶部。 */
+function paintDetail(){
+  const n = sel ? G.nodes[sel] : null;
+  if (!n){ detailPlaceholder(sel ? "节点已不存在。" : null); return; }
 
   let html = "<div class='dt'>" + esc(n.label) + "</div>";
   html += "<div class='dmeta'>" + (n.isScene ? "场景" : kindName(n.kind)) + " · " + n.key + "</div>";
@@ -3306,27 +3352,14 @@ function selectNode(key){
     html += "<div class='drow'>文本入口：" + (ins.length ? esc(ins.join("、")) : "<span style='color:#2b2b26'>无</span>") + "</div>";
     html += "<div class='drow'>出口：" + (sceneLocs(n.id).length ? esc(sceneLocs(n.id).map(x => SCENES[x].title).join("、")) : "无") + "</div>";
     html += "<div class='drow'>状态：" + (G.explored.has(n.id) ? "已展开" : "未展开") + "</div>";
-    const storedLabels = Object.values(G.nodes).filter(x => x.stored && x.storedIn === n.id).map(x => x.label);
-    html += "<div class='drow'>现场存放：" + (storedLabels.length ? esc(storedLabels.join("、")) + "（展开场景取回）" : "无") + "</div>";
     /* 正文只在叙事卡里出现一次；详情窗只给结构信息 + 回看入口（去重） */
     if (G.explored.has(n.id)) html += "<div class='drow'><button id='dt-renarr'>[ 重看场景叙事 ]</button></div>";
-    detailBody.innerHTML = html;
-    const rb = document.getElementById("dt-renarr");
-    if (rb) rb.addEventListener("click", () => renarrScene(n.id));
-    applyFocus();
-    return;
-  }
-
-  if (n.kind === "clue"){
+  } else if (n.kind === "clue"){
     const c = CLUES[n.id] || {};
     html += "<div class='ddesc'>" + esc(plain(c.desc || "（无描述）")) + "</div>";
     html += "<div class='drow'>感官类型：" + (SENSES[c.type] || c.type || "未知") + "</div>";
     html += "<div class='drow'>状态：" + (G.captured.has(n.id) ? "已捕获" : "未捕获") + "</div>";
-    detailBody.innerHTML = html;
-    applyFocus();
-    return;
-  }
-  if (n.kind === "char"){
+  } else if (n.kind === "char"){
     const c = CHARS[n.id] || {};
     html += "<div class='ddesc'>" + esc(plain(c.desc || "（无描述）")) + "</div>";
     html += "<div class='drow'>对话进度：" + (G.talkProg[n.key] || 0) + "/" + charTalkQueue(n).length + "</div>";
@@ -3336,39 +3369,63 @@ function selectNode(key){
       const names = [...seen].map(k => labelOf("item", k) || labelOf("clue", k) || k);
       html += "<div class='drow'>对这些东西有反应：" + esc(names.join("、")) + "</div>";
     }
-    detailBody.innerHTML = html;
-    applyFocus();
-    return;
+  } else {
+    /* 物品 */
+    const it = ITEMS[n.id] || {};
+    /* 物品描述统一由详情窗承载（不论有没有命令）：无命令物品的双击只是选中，
+       描述就在详情窗里读 —— 不再靠顶部提示条闪一下。 */
+    html += "<div class='ddesc'>" + esc(plain(it.desc || "（无描述）")) + "</div>";
+    /* 需要光的物品：把条件写在详情窗里，玩家不用瞎试 */
+    const litCmd = (it.commands || []).find(c => c.requiresLit);
+    if (litCmd){
+      html += "<div class='drow'>光照条件：" + (lightOn(litCmd.requiresLit) ? "充足" : "不足 · 需先点亮光源") + "</div>";
+    }
+    /* 自己能发光的物品（台灯 / 手电筒）：开关状态 + 它的用途，一并写在详情窗里 */
+    if (isToggleLight(n.id)){
+      html += "<div class='drow'>状态：" + (n.lit ? "已点亮" : "未点亮") +
+        (it.needsLitToUse ? (n.lit ? " · 可以照亮黑暗里的东西" : " · 先点亮它，才能照亮黑暗里的东西") : "") + "</div>";
+    }
+    if (n.homeScene && SCENES[n.homeScene]) html += "<div class='drow'>来源：" + esc(SCENES[n.homeScene].title) + "</div>";
+    const outs = [];
+    for (const f in (it.presentReactions || {})) outs.push({ tool:f, r:it.presentReactions[f] });
+    if (outs.length){
+      html += "<div class='drow'>与这些东西存在反应：" +
+        esc(outs.map(o => {
+          const nm = labelOf("item", o.tool) || labelOf("clue", o.tool) || o.tool;
+          return (ITEMS[o.tool] || {}).needsLitToUse ? nm + "（须先点亮）" : nm;
+        }).join("、")) + "</div>";
+    }
+    const cond = condRoutes[n.id];
+    if (cond) html += "<div class='drow'>参与条件跳转</div>";
   }
 
-  /* 物品 */
-  const it = ITEMS[n.id] || {};
-  /* 物品描述统一由详情窗承载（不论有没有命令）：无命令物品的双击只是选中，
-     描述就在详情窗里读 —— 不再靠顶部提示条闪一下。 */
-  html += "<div class='ddesc'>" + esc(plain(it.desc || "（无描述）")) + "</div>";
-  /* 需要光的物品：把条件写在详情窗里，玩家不用瞎试 */
-  const litCmd = (it.commands || []).find(c => c.requiresLit);
-  if (litCmd){
-    html += "<div class='drow'>光照条件：" + (lightOn(litCmd.requiresLit) ? "充足" : "不足 · 需先点亮光源") + "</div>";
-  }
-  /* 自己能发光的物品（台灯 / 手电筒）：开关状态 + 它的用途，一并写在详情窗里 */
-  if (isToggleLight(n.id)){
-    html += "<div class='drow'>状态：" + (n.lit ? "已点亮" : "未点亮") +
-      (it.needsLitToUse ? (n.lit ? " · 可以照亮黑暗里的东西" : " · 先点亮它，才能照亮黑暗里的东西") : "") + "</div>";
-  }
-  if (n.homeScene && SCENES[n.homeScene]) html += "<div class='drow'>来源：" + esc(SCENES[n.homeScene].title) + "</div>";
-  const outs = [];
-  for (const f in (it.presentReactions || {})) outs.push({ tool:f, r:it.presentReactions[f] });
-  if (outs.length){
-    html += "<div class='drow'>与这些东西存在反应：" +
-      esc(outs.map(o => {
-        const nm = labelOf("item", o.tool) || labelOf("clue", o.tool) || o.tool;
-        return (ITEMS[o.tool] || {}).needsLitToUse ? nm + "（须先点亮）" : nm;
-      }).join("、")) + "</div>";
-  }
-  const cond = condRoutes[n.id];
-  if (cond) html += "<div class='drow'>参与条件跳转</div>";
+  if (detailBody.__sig === html) return;     /* 状态没变：原样留着，不动 DOM */
+  detailBody.__sig = html;
   detailBody.innerHTML = html;
+  const rb = document.getElementById("dt-renarr");
+  if (rb) rb.addEventListener("click", () => renarrScene(n.id));
+}
+
+/* 「新」角标是一次性的：玩家**点过这个节点**就摘掉，不必等下一次重绘。
+   旧版只有 render() 会重建节点层，而点选只刷详情面板，所以点完角标还挂着，
+   要等别的操作触发 render() 才一起消失 —— 看着就是"点了它也不消"。
+   只在角标**已经画在屏上**时才动手（n.el 为空说明还没重绘出来，留着让 render 正常亮一下）。
+   刻意不放进 selectNode：从线索册 / 人物名册**点清单行**也会 selectNode，那不是"点节点"，
+   取回来的线索该照常亮一次「新」。 */
+function clearFresh(n){
+  const el = n.el;
+  const b = (el && el.querySelector) ? el.querySelector(".badge.new") : null;
+  if (b && b.remove){ b.remove(); n.fresh = false; }
+}
+
+function selectNode(key){
+  const n = G.nodes[key];
+  if (!n){ sel = null; detailPlaceholder("节点已不存在。"); return; }
+  nodeLayer.querySelectorAll(".node.sel").forEach(e => e.classList.remove("sel"));
+  if (n.el) n.el.classList.add("sel");
+  sel = key;
+  if (!detailWinOpen) setDetailWin(true);   /* 选中节点时自动弹出详情窗 */
+  paintDetail();
   applyFocus();
 }
 
@@ -3566,7 +3623,7 @@ document.getElementById("btn-relayout").addEventListener("click", () => {
   if (!requireCase()) return;
   Object.values(G.nodes).forEach(n => { n.pinned = false; });
   layout(); render();
-  log("已重新自动布局（手动摆过的位置被清除）", "sys");
+  log("已重新自动布局：全部「已固定」都已解除", "sys");
 });
 document.getElementById("btn-undo").addEventListener("click", () => {
   if (!requireCase()) return;
@@ -4275,7 +4332,7 @@ function boot(opts){
   applyView();
   logBox.innerHTML = "";
   setDetailWin(false);
-  detailBody.innerHTML = "<div class='empty'>点选任意节点查看信息。</div>";
+  detailPlaceholder();
   updateCaseChrome();
   /* 续档：直接恢复目标案快照（不重放起始场景的叙事卡） */
   if (opts.fromSnapshot){
@@ -4324,6 +4381,7 @@ window.__collapse = sid => toggleCollapse(sid);
 window.__store = (key, sid) => storeNode(key, sid);
 window.__bag = key => bagStore(key);
 window.__bagTake = key => bagTake(key);
+window.__pin = key => { const n = G.nodes[key]; if (n) togglePin(n); };
 window.__bagToggle = () => toggleBagWin();
 window.__cap = key => attemptCapture(key);
 window.__noteSeen = t => noteSeen(t);
