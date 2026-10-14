@@ -162,7 +162,7 @@ function show(tag){
 }
 
 console.log('\n=== 2. 展开「书桌」 ===');
-window.__reveal('SCENE_shuzhuo'); show();
+window.__reveal('ITEM_shuzhuo'); show();
 
 console.log('\n=== 3. 抽屉 → 打开右侧抽屉 ===');
 window.__choice('ITEM_chouti', 0, 1); show();
@@ -207,7 +207,7 @@ console.log('\n=== 断言 ===');
 
 /* 重跑一次干净的链路做严格断言 */
 ids['btn-reset']._ev.click[0]();
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__choice('ITEM_chouti', 0, 1);
 window.__reveal('SCENES_body');
 assert('重置后剪刀在画布上', window.__dump().nodes.includes('item:ITEMS_jd'));
@@ -254,7 +254,7 @@ console.log('\n=== 11. 从零开始的完整链路 ===');
 ids['tg-consume'].checked = true;
 ids['btn-reset']._ev.click[0]();
 window.__reveal('SCENES_garden');
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);   // 左抽屉 → 手电筒
 window.__choice('ITEM_chouti', 0, 1);   // 右抽屉 → 剪刀 + 木盒
 assert('左抽屉拿到手电筒', window.__dump().nodes.includes('item:ITEM_shoudiantong'));
@@ -305,7 +305,7 @@ const preLock = window.__dump().pos[startKey];
 window.__pin(startKey);                        /* 右键 = 唯一的钉住入口 */
 assert('右键钉住生效', window.__dump().pos[startKey].pinned === true);
 const locked = { x: preLock.x, y: preLock.y };
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__reveal('SCENES_body');
 const after2 = window.__dump();
 assert('钉住后自动布局没有挪走它',
@@ -337,7 +337,7 @@ assert('未越界松手：DOM 与模型仍一致',
 /* 拖到另一个节点上 → 组合 */
 ids['btn-reset']._ev.click[0]();
 window.__reveal('SCENES_garden');
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__choice('ITEM_chouti', 0, 1);   // 右抽屉 → 剪刀
 window.__reveal('SCENES_body');
 const jdEl = findEl('item:ITEMS_jd');
@@ -370,7 +370,7 @@ assert('原地点击被标记为已选中', gEl._classes.has('sel'));
 console.log('\n=== 13. 交互节点化 ===');
 ids['btn-reset']._ev.click[0]();
 window.__reveal('SCENES_garden');   /* 新开局只有一个「未展开」的花园节点：本段要用花园内容物（唱机等），先展开 */
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 
 window.__cmd('ITEM_chouti', 0);   // 双击抽屉 → 应弹出左右抽屉两个场景节点
 const ch = window.__dump();
@@ -406,7 +406,7 @@ assert('密码弹窗打开无异常', true);
 console.log('\n=== 13b. 手写笔记（物品）+ 光照门 ===');
 ids['btn-reset']._ev.click[0]();
 window.__reveal('SCENES_garden');
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 const nb0 = window.__dump();
 assert('书桌上的手写笔记是物品节点（不再是场景节点）',
   nb0.nodes.includes('item:ITEM_sxbj') && !nb0.nodes.includes('loc:SCENES_sxbj'));
@@ -435,16 +435,16 @@ assert('新长出的节点与手写笔记之间有实体边',
 assert('再次翻笔记不会重复长（节点数不变）',
   (window.__cmd('ITEM_sxbj', 0), window.__dump().nodes.length === nbLit.nodes.length));
 /* 长出来的东西归属书桌：折叠书桌应把它们一并收起 */
-window.__collapse('SCENE_shuzhuo');
+window.__collapse('ITEM_shuzhuo');
 assert('折叠书桌后长出的植物笔记被一并隐藏（homeScene 继承了书桌）',
   window.__dump().hidden.includes('item:ITEMS_dsc'));
-window.__collapse('SCENE_shuzhuo');
+window.__collapse('ITEM_shuzhuo');
 
 /* ---- 13c. 手电筒：点亮之后才照得亮黑影（发光工具门） ---- */
 console.log('\n=== 13c. 手电筒：点亮后才照得亮黑影 ===');
 ids['btn-reset']._ev.click[0]();
 window.__reveal('SCENES_garden');
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__closeFloats();
 window.__choice('ITEM_chouti', 0, 0);          // 左抽屉 → 手电筒
 const tc0 = window.__dump();
@@ -513,14 +513,14 @@ assert('展开首个场景 → 铺开画面并记下聚焦决定', !!fd && fd.on
 
 /* 2) 画布上已有内容时再展开场景 → 聚焦，且把这次新长出来的节点都框进来 */
 const nodesBeforeD2 = window.__dump().nodes;
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__closeFloats();
 fd = window.__dump().focus;
 assert('再展开场景 → 聚焦（centered，而不再是 fit）', !!fd && fd.on === true && fd.why === 'centered');
 assert('聚焦朝新节点走：框住的集合里有此前不在画布上的节点',
   !!fd && fd.keys.some(k => nodesBeforeD2.indexOf(k) < 0));
 assert('聚焦把触发它的场景节点也一起框住（"新东西"和"它长在哪儿"同框）',
-  !!fd && fd.keys.indexOf('loc:SCENE_shuzhuo') >= 0);
+  !!fd && fd.keys.indexOf('item:ITEM_shuzhuo') >= 0);
 
 /* 3) 选项命令产出物品（抽屉 → 手电筒）→ 聚焦到新物品 */
 window.__choice('ITEM_chouti', 0, 0);
@@ -613,10 +613,10 @@ ids['btn-undo']._ev.click[0]();
 assert('撤销回退花园提示进度', (window.__dump().tec.prog['SCENES_garden'] || 0) === 0);
 
 window.__closeFloats();
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 assert('首次展开场景弹叙事卡', window.__dump().floats.narr === true);
 window.__closeFloats();
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 assert('重复展开不再弹叙事卡', window.__dump().floats.narr === false);
 
 /* TEC dock 咨询：itemReactions 命中 / 未命中 */
@@ -629,7 +629,7 @@ assert('TEC 分析台灯无反应', window.__tec('item:ITEM_taideng') === false)
 console.log('\n=== 15. 浮层拖动 + 场景折叠 + 聚焦 ===');
 ids['btn-reset']._ev.click[0]();
 window.__closeFloats();
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 
 /* 叙事卡整窗可拖动（标题栏只是窗口的一部分）且拖动不触发收起 */
 const card = ids['world'].children.find(c => c._classes.has('narr-card'));
@@ -652,12 +652,12 @@ window.__closeFloats();
 
 /* 场景折叠：书桌的内容物被隐藏，被"出口"引用的节点留下 */
 const visBefore = window.__dump().nodes.length - window.__dump().hidden.length;
-window.__collapse('SCENE_shuzhuo');
+window.__collapse('ITEM_shuzhuo');
 const c1 = window.__dump();
-assert('折叠记入 collapsed', c1.collapsed.includes('SCENE_shuzhuo'));
+assert('折叠记入 collapsed', c1.collapsed.includes('ITEM_shuzhuo'));
 assert('折叠后台灯被隐藏', c1.hidden.includes('item:ITEM_taideng'));
 assert('折叠后可见节点数减少', (c1.nodes.length - c1.hidden.length) < visBefore);
-window.__collapse('SCENE_shuzhuo');
+window.__collapse('ITEM_shuzhuo');
 assert('再次双击展开：台灯恢复可见', !window.__dump().hidden.includes('item:ITEM_taideng'));
 
 /* 聚焦选中 */
@@ -665,7 +665,7 @@ window.__select('loc:SCENES_garden');
 const f1 = window.__dump();
 assert('聚焦后存在被淡化的节点', f1.dim.length > 0);
 assert('选中节点自身不被淡化', !f1.dim.includes('loc:SCENES_garden'));
-assert('邻居（书桌）不被淡化', !f1.dim.includes('loc:SCENE_shuzhuo'));
+assert('邻居（书桌）不被淡化', !f1.dim.includes('item:ITEM_shuzhuo'));
 window.__select(null);
 assert('清除选中后淡化清空', window.__dump().dim.length === 0);
 
@@ -681,11 +681,11 @@ ids['btn-undo']._ev.click[0]();
 assert('撤销后注射器回到画布', !window.__dump().stored.includes('item:ITEMS_zsq'));
 
 /* 「放回现场」入口已移除：拖到折叠的场景节点上不再收纳，改为明确反馈 */
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__closeFloats();
-window.__collapse('SCENE_shuzhuo');            // 折叠书桌
+window.__collapse('ITEM_shuzhuo');            // 折叠书桌
 const zsqEl = findEl('item:ITEMS_zsq');        // 注射器属于花园，仍然可见
-const deskEl = findEl('loc:SCENE_shuzhuo');    // 折叠的场景节点还在画布上
+const deskEl = findEl('item:ITEM_shuzhuo');    // 折叠的场景节点还在画布上
 assert('折叠后书桌节点仍在画布', !!deskEl);
 if (zsqEl && deskEl){
   const bx = parseFloat(deskEl.style.left), by = parseFloat(deskEl.style.top);
@@ -696,9 +696,9 @@ if (zsqEl && deskEl){
     String(ids['toast']._html).indexOf('已折叠') >= 0 && String(ids['toast']._html).indexOf('证物袋') >= 0);
 }
 /* 旧档兼容：storedIn = 场景 的节点，展开该场景时照旧取回 */
-window.__store('item:ITEMS_zsq', 'SCENE_shuzhuo');
+window.__store('item:ITEMS_zsq', 'ITEM_shuzhuo');
 assert('（兼容旧档）节点仍可被收进场景', window.__dump().stored.includes('item:ITEMS_zsq'));
-window.__collapse('SCENE_shuzhuo');            // 展开书桌
+window.__collapse('ITEM_shuzhuo');            // 展开书桌
 assert('展开书桌后仍能取回', !window.__dump().stored.includes('item:ITEMS_zsq'));
 /* 两处「存放」文案已撤（角标 + 详情窗），机制注释仍在 */
 assert('「存放」角标与「现场存放」详情行都已撤掉（源码检查）',
@@ -785,7 +785,7 @@ window.__reveal('SCENES_garden');   /* 「手电筒 → 黑影」的目标黑影
 window.__closeFloats();
 
 /* 捕获：手电筒 → 黑影 → 尸体场景，捕获尸体的 hiddenClue（真结局线索） */
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);        // 左抽屉 → 手电筒
 torchOn();   /* 手电筒先点亮：发光工具门 */
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
@@ -810,7 +810,7 @@ console.log('\n=== 18b. TEC 拖入分析：延迟后提取线索 / 无线索提�
 ids['btn-reset']._ev.click[0]();
 window.__reveal('SCENES_garden');   /* 黑影在花园里：保持这条链路真实可走 */
 window.__closeFloats();
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);
 torchOn();   /* 手电筒先点亮：发光工具门 */
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
@@ -1014,7 +1014,7 @@ if (memCard){
 window.__closeFloats();
 
 /* 集齐真结局配方（五感各一，全部走正常玩法链路） */
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);                        // 左抽屉 → 手电筒
 torchOn();                                                        // 手电筒先点亮
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');  // 手电筒 → 黑影 ⇒ 尸体
@@ -1113,7 +1113,7 @@ assert('顶栏前往/推演按钮已移除（源码检查）', html.indexOf('id=
 ids['infer-icon']._ev.dblclick[0]();
 assert('双击推演器图标开窗', window.__dump().floats.matrix === true);
 /* 拖线索到推演器图标 = 直接归槽（拖放路径由 bag>tec>infer>goto 优先级保证，此处用钩子验证归槽逻辑） */
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);
 torchOn();   /* 手电筒先点亮：发光工具门 */
 window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
@@ -1190,23 +1190,29 @@ console.log('\n=== 23. 长文本去重：正文 / 日志 / 详情窗 各归其�
 ids['btn-reset']._ev.click[0]();
 /* 展开「书桌」——叙事卡出现，但正文不再被镜像进日志 */
 const lBefore = logs.length;
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 const lNew = logs.slice(lBefore);
 assert('展开场景弹出叙事卡', window.__dump().floats.narr === true);
 assert('日志里不再出现场景正文', !lNew.some(l => l.indexOf('在靠近桌子的边缘') >= 0));
-assert('日志只留一行场景事件', lNew.some(l => l.indexOf('叙事卡已放映') >= 0));
+assert('展开容器完全不写日志（过程不进案卷）', lNew.length === 0);
 
-/* 场景详情窗：无正文、有结构信息、有回看入口 */
-window.__select('loc:SCENE_shuzhuo');
+/* 容器详情窗：无正文、有结构信息、有回看入口。
+   书桌已被改判为**物品**：分类行写「物品」，结构信息用「内容」而不是「出口」。 */
+window.__select('item:ITEM_shuzhuo');
 let dh = ids['detail-body']._html || '';
-assert('场景详情不再含正文', dh.indexOf('在靠近桌子的边缘') < 0);
-assert('场景详情保留结构信息（出口）', dh.indexOf('出口：') >= 0);
-assert('场景详情提供「重看场景叙事」按钮', dh.indexOf('dt-renarr') >= 0);
+assert('容器详情不再含正文', dh.indexOf('在靠近桌子的边缘') < 0);
+assert('书桌的详情窗已改判为「物品」（不再是场景）', dh.indexOf('物品 · item:ITEM_shuzhuo') >= 0);
+assert('容器物品的详情窗给出「内容」行（书桌装了什么）', dh.indexOf('内容：') >= 0);
+assert('「内容」行列出书桌装着的四件东西（手写笔记 / 台灯 / 抽屉 / 垃圾桶）',
+  ['手写笔记','台灯','抽屉','垃圾桶'].every(t => dh.indexOf(t) >= 0));
+assert('容器物品的正文里若带出口也照常列出（书桌 → 植物学家的花园）',
+  dh.indexOf('出口：') >= 0 && dh.indexOf('植物学家的花园') >= 0);
+assert('容器详情提供「重看叙事」按钮', dh.indexOf('dt-renarr') >= 0);
 
 /* 回看入口能真的把卡叫回来 */
 window.__closeFloats();
 assert('关闭后无叙事卡', window.__dump().floats.narr === false);
-window.__renarr('SCENE_shuzhuo');
+window.__renarr('ITEM_shuzhuo');
 assert('「重看叙事」重新弹出卡', window.__dump().floats.narr === true);
 window.__closeFloats();
 
@@ -1245,16 +1251,16 @@ assert('动作结果仍记进日志（信息不丢）', logs.some(l => l.indexOf
    新场景 / 新物品节点当场冒出来、被消耗的节点当场消失，文字提示只是复述已知信息。 */
 ids['btn-reset']._ev.click[0]();
 window.__reveal('SCENES_garden');
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__choice('ITEM_chouti', 0, 1);        /* 右抽屉 → 剪刀 */
 window.__reveal('SCENES_body');              /* 绷带在这个场景里 */
 const lcBefore = logs.length;
 ids['toast'].innerHTML = '__sentinel__';
 window.__combo('item:ITEMS_jd', 'item:ITEMS_bd');      /* 剪刀 → 绷带：必定成功的组合 */
 assert('组合成功不再弹提示条', ids['toast'].innerHTML === '__sentinel__');
-assert('组合成功仍写进日志（反应正文 + 获得 / 消耗）',
+assert('组合成功仍写进日志（反应正文）',
   logs.length > lcBefore &&
-  logs.slice(lcBefore).some(l => l.indexOf('陆珩松的尸体') >= 0 && l.indexOf('消耗') >= 0));
+  logs.slice(lcBefore).some(l => l.indexOf('陆珩松的尸体') >= 0));
 assert('组合成功的效果仍落在画布上（新场景出现 / 绷带消失）',
   window.__dump().nodes.includes('loc:SCENES_lhsdst') && !window.__dump().nodes.includes('item:ITEMS_bd'));
 ids['toast'].innerHTML = '__sentinel__';
@@ -1279,7 +1285,7 @@ assert('地图标出当前案件', mapText('.map-state').indexOf('当前') >= 0)
 mapDbl();
 
 /* 先在 A-001 里做出进度：展开场景 + 一次抽屉选择（会进撤销栈） */
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__reveal('SCENES_choutiyi');
 window.__goto('SCENES_garden');
 window.__choice('ITEM_chouti', 0, 0);
@@ -1324,7 +1330,7 @@ assert('图标站位已复位', document.getElementById('infer-icon').style.top 
 assert('刚进入的地址被记为点亮', ci.lastEntered === 'A002');
 
 /* 在 A-002 里做出自己的进度 */
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__reveal('SCENES_choutier');
 const a2nodes = window.__dump().nodes.length;
 assert('A-002 已产生自己的进度', a2nodes > fresh && a2nodes !== a1nodes);
@@ -1496,7 +1502,7 @@ assert('案件窗未被隐藏', document.getElementById('case-win').style.displa
 assert('开着的时候两个落点都是空的', ci0.held === false && ci0.dock === false && !badgeOf() && !dockOn());
 
 /* 做出进度（会进撤销栈） */
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__choice('ITEM_chouti', 0, 0);
 /* 关窗前先往证物袋里放一件证物，用于验证离屏后取不出 */
 window.__reveal('SCENES_garden');
@@ -1554,7 +1560,7 @@ assert('展开状态在地图上标回「当前」', mapText('.map-state')[0] ==
 mapDbl();
 
 /* ---- – 收起：走桌面右下角的独立卡片，不碰「案件地图」图标 ---- */
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 const nMin = window.__dump().nodes.length;
 fire(ids['case-min'], 'click', {});
 const ci4 = window.__caseInfo();
@@ -1767,12 +1773,12 @@ assert('拖动不再是钉住入口（源码里已无 n.pinned = true，唯一�
   /function togglePin\(n\)\{[\s\S]*?n\.pinned = !n\.pinned/.test(html));
 
 /* 折叠反馈：已固定的不被收回，且必须报出数量；没钉住的同类照常收回 */
-window.__reveal('SCENE_shuzhuo');
+window.__reveal('ITEM_shuzhuo');
 window.__closeFloats();
 window.__pin('item:ITEM_taideng');
 assert('台灯被钉住', window.__dump().pos['item:ITEM_taideng'].pinned === true);
 const lc29 = logs.length;
-window.__collapse('SCENE_shuzhuo');
+window.__collapse('ITEM_shuzhuo');
 assert('折叠时报告"另有 N 个节点留在画布上"',
   logs.slice(lc29).some(l => l.indexOf('另有 1 个节点留在画布上') >= 0));
 assert('被钉住的台灯留在画布上', !!findEl('item:ITEM_taideng'));
@@ -1785,8 +1791,7 @@ const lc29b = logs.length;
 ids['btn-relayout']._ev.click[0]();
 assert('自动布局把全部「已固定」解掉',
   window.__dump().pos['item:ITEM_taideng'].pinned === false && !hasPin(findEl('item:ITEM_taideng')));
-assert('自动布局的日志点明解除',
-  logs.slice(lc29b).some(l => l.indexOf('已固定') >= 0 && l.indexOf('都已解除') >= 0));
+assert('自动布局不再写日志（桌面操作不进案卷）', logs.length === lc29b);
 
 console.log('\n=== 30. 详情窗「状态」实时刷新 ===');
 ids['btn-reset']._ev.click[0]();
@@ -1797,7 +1802,7 @@ assert('render() 末尾会刷新详情面板（源码检查）',
 assert('详情面板内容没变时不重建 DOM（签名比对，源码检查）',
   html.indexOf('if (detailBody.__sig === html) return;') >= 0);
 
-window.__reveal('SCENE_shuzhuo');                    /* 台灯在书桌上 */
+window.__reveal('ITEM_shuzhuo');                    /* 台灯在书桌上 */
 window.__select('item:ITEM_taideng');
 let dh30 = ids['detail-body']._html || '';
 assert('详情窗：台灯初始「未点亮」', dh30.indexOf('未点亮') >= 0 && dh30.indexOf('已点亮') < 0);
@@ -1811,8 +1816,8 @@ dh30 = ids['detail-body']._html || '';
 assert('再熄灭 → 详情窗又回到「未点亮」', dh30.indexOf('未点亮') >= 0 && dh30.indexOf('已点亮') < 0);
 /* 选中一个已经没了的节点：占位文案回到「点选任意节点查看信息」（不是「节点已不存在」） */
 window.__select('item:ITEM_taideng');
-window.__select('loc:SCENE_shuzhuo');
-assert('切换选中后详情窗换成新节点', (ids['detail-body']._html || '').indexOf('SCENE_shuzhuo') >= 0);
+window.__select('item:ITEM_shuzhuo');
+assert('切换选中后详情窗换成新节点', (ids['detail-body']._html || '').indexOf('ITEM_shuzhuo') >= 0);
 
 console.log('\n=== 31. 「新」角标：点一下就摘掉 ===');
 ids['btn-reset']._ev.click[0]();
@@ -1826,7 +1831,13 @@ const clickNode = el => {
 };
 const badges0 = newOnBoard();
 assert('展开场景后，新长出来的节点挂着「新」角标', badges0.length > 0);
-assert('「新」只挂在部分节点上（不是所有节点都有）', badges0.length < ids['nodes'].children.length);
+/* 口径是「还没点过」，不是「刚冒出来」：展开完这一屏节点玩家一个都还没点过 → 一屏全带角标。
+   （旧版靠 render() 把 fresh 擦掉制造出「只有部分节点有」，那个"部分"是重绘的副作用，
+     也正是「钉一下就全没了」的病根。） */
+assert('角标口径 = 还没点过：此刻画布上的节点都带「新」',
+  badges0.length === ids['nodes'].children.length);
+assert('起始场景节点也带「新」（它是玩家还没点过的第一个节点）',
+  badges0.indexOf('loc:SCENES_garden') >= 0);
 const firstNew = badges0[0];
 clickNode(findEl(firstNew));
 assert('点一下之后该节点的「新」角标立刻消失（不依赖整层重绘）', !hasNew(findEl(firstNew)));
@@ -1834,6 +1845,41 @@ assert('同时刻其余节点的「新」还在', newOnBoard().length === badges
 assert('点的是它（选中态落在该节点）', window.__dump().sel === firstNew);
 clickNode(findEl(firstNew));
 assert('再点一次（已没有角标）不出错、依然是干净的', !hasNew(findEl(firstNew)));
+
+/* ---- 重绘不是摘角标的理由 ----
+   旧版把「新」角标挂在 n.fresh 上，而 fresh 是「本轮镜头聚焦」的一次性标记、render() 末尾就擦，
+   于是任何一次重绘（右键钉住 / 自动布局 / 展开别的容器 / 撤销）都会把全场角标一起洗掉。
+   现在角标认 n.unread，只有玩家点过这个节点才会清。 */
+const beforeRedraw = newOnBoard();
+assert('对照组：此刻画布上还有多个「新」角标（' + beforeRedraw.length + ' 个）', beforeRedraw.length >= 2);
+const ntPinKey = beforeRedraw[0], ntOtherKey = beforeRedraw[1];
+window.__pin(ntPinKey);                   /* 右键钉住：togglePin → pushHistory → render() */
+assert('右键钉住（一次重绘）后，角标没有被洗掉', newOnBoard().length === beforeRedraw.length);
+assert('被钉住的那个节点自己还带「新」', hasNew(findEl(ntPinKey)));
+ids['btn-relayout']._ev.click[0]();       /* 自动布局：又一次 render() */
+assert('自动布局（又一次重绘）后，角标依然在', newOnBoard().length === beforeRedraw.length);
+window.__reveal('SCENES_body');           /* 展开别的容器：再来一次 render() */
+assert('展开别的场景（又一次重绘）后，角标依然在（且新场景的节点也带上了）',
+  newOnBoard().length >= beforeRedraw.length && newOnBoard().length > beforeRedraw.length);
+/* 撤销会 restore() 整张图重建 —— 「新」属于玩家知识，和 seenTexts 一样不随快照回滚 */
+window.__pin(ntPinKey);                   /* 再右键 = 取消钉住（进撤销栈） */
+ids['btn-undo']._ev.click[0]();           /* 撤销 → restore() + render() */
+assert('撤销（restore 整张图重建）后，角标依然在', hasNew(findEl(ntPinKey)) && newOnBoard().length >= beforeRedraw.length);
+/* 而真正点一下，照旧只摘它一个 */
+const keepN = newOnBoard().length;
+clickNode(findEl(ntOtherKey));
+assert('点一下仍然只摘掉它自己的角标', !hasNew(findEl(ntOtherKey)) && newOnBoard().length === keepN - 1);
+
+/* 源码检查：角标认 unread 不认 fresh；unread 不进快照，由 restore() 接力带回 */
+assert('render() 画「新」角标认的是 n.unread（源码检查）',
+  /if \(n\.unread\)\{[\s\S]{0,160}?badge new/.test(html));
+assert('render() 末尾只擦 fresh，不碰 unread（源码检查）',
+  /n\.fresh = false;   \/\* 只擦「聚焦用」的一次性标记/.test(html));
+assert('新节点同时点亮 fresh + unread（markFresh，源码检查）',
+  html.indexOf('function markFresh(n){ if (n){ n.fresh = true; n.unread = true; } return n; }') >= 0);
+assert('unread 不进快照（源码检查）',
+  !/nodes\[k\] = \{[^}]*unread/.test(html) &&
+  /Object\.keys\(G\.nodes\)\.forEach\(k => \{ if \(unread\[k\]\) G\.nodes\[k\]\.unread = true; \}\);/.test(html));
 
 /* 点清单行（线索册 / 人物名册）也会 selectNode，但那是"点行"不是"点节点"：
    取回来的线索该照常亮一次「新」，等玩家真去点它才摘 */
@@ -1856,6 +1902,125 @@ assert('clearFresh 不在 selectNode 里（否则点清单行会误摘，源码�
   !/function selectNode\(key\)\{[\s\S]{0,400}?clearFresh\(n\)/.test(html));
 assert('clearFresh 只在角标已画出来时才摘（源码检查：先查 .badge.new）',
   /function clearFresh\(n\)\{[\s\S]*?querySelector\("\.badge\.new"\)/.test(html));
+
+console.log('\n=== 32. 书桌 / 垃圾桶：从场景改判为容器物品 ===');
+/* 身份：它们不再出现在 scenes 表里，而是带 content 的物品 —— 于是既被当作「物品」看待，
+   又仍然能装东西（双击展开 / 折叠 / 内容物摆在四周）。「物品本身也可以用来装物品」。 */
+const gd = JSON.parse(jsonText);
+assert('书桌已从 scenes 表移除', !gd.scenes.SCENE_shuzhuo);
+assert('垃圾桶已从 scenes 表移除', !gd.scenes.SCENES_ljt);
+assert('书桌改判为物品，且带 content（所以它还是容器）',
+  !!(gd.items.ITEM_shuzhuo && gd.items.ITEM_shuzhuo.content));
+assert('垃圾桶改判为物品，且带 content', !!(gd.items.ITEMS_ljt && gd.items.ITEMS_ljt.content));
+assert('正文里对书桌的引用已从 [loc:] 改成 [item:]（书桌不再是「出口」）',
+  gd.scenes.SCENES_garden.content.indexOf('[item:ITEM_shuzhuo]') >= 0 &&
+  gd.scenes.SCENES_garden.content.indexOf('[loc:SCENE_shuzhuo]') < 0);
+assert('源码里不再有任何 n.isScene 的分支（容器身份由 kind + 数据表现算）',
+  html.indexOf('n.isScene') < 0);
+
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+window.__closeFloats();
+assert('书桌以**物品**节点键出现在画布上', window.__dump().nodes.includes('item:ITEM_shuzhuo'));
+assert('书桌未展开时垃圾桶还没上画布', !window.__dump().nodes.includes('item:ITEMS_ljt'));
+const deskEl2 = findEl('item:ITEM_shuzhuo');
+assert('书桌节点是物品样式（ent-item），不再是场景样式（scene-node）',
+  !!deskEl2 && deskEl2._classes.has('ent-item') && !deskEl2._classes.has('scene-node'));
+assert('书桌节点仍带「未探索」虚框提示（虚线样式已改挂容器、不再只认场景）',
+  !!deskEl2 && deskEl2._classes.has('unexplored'));
+assert('书桌副标题仍是「未探索 · 双击展开」',
+  !!deskEl2 && (deskEl2._html || '').indexOf('未探索 · 双击展开') >= 0);
+
+/* 双击展开 → 内容物照旧铺开 */
+window.__reveal('ITEM_shuzhuo');
+const dExp = window.__dump();
+assert('展开书桌后里面的四件东西都上画布',
+  ['ITEM_sxbj','ITEM_taideng','ITEM_chouti','ITEMS_ljt'].every(i => dExp.nodes.includes('item:' + i)));
+assert('内容物以「实体边」挂在书桌节点上',
+  dExp.edges.includes('entity:item:ITEM_shuzhuo>item:ITEM_taideng'));
+/* 书桌正文里的「返回 [loc:SCENES_garden]」照旧是一条通路：容器物品也认 [loc]，机制没有分叉 */
+assert('书桌仍有一条「出口」边通往它正文里写的花园',
+  dExp.edges.includes('move:item:ITEM_shuzhuo>loc:SCENES_garden'));
+const lg32 = logs.length;
+window.__combo('item:ITEM_shuzhuo', 'loc:SCENES_garden');
+assert('把书桌拖到花园上 = 前往花园（不因为书桌是物品就断掉这条路）',
+  logs.slice(lg32).some(l => l.indexOf('前往场景') >= 0));
+
+/* 折叠 / 展开照旧可用 */
+window.__collapse('ITEM_shuzhuo');
+assert('折叠书桌：内容物被收起', window.__dump().hidden.includes('item:ITEM_taideng'));
+assert('折叠书桌被记进 collapsed', window.__dump().collapsed.includes('ITEM_shuzhuo'));
+window.__collapse('ITEM_shuzhuo');
+assert('再展开：台灯回来', !window.__dump().hidden.includes('item:ITEM_taideng'));
+
+/* 垃圾桶自己也是容器（容器里还能装容器） */
+window.__reveal('ITEMS_ljt');
+assert('展开垃圾桶：里面的纸片上画布', window.__dump().nodes.includes('item:ITEMS_wbfs'));
+assert('垃圾桶同样是物品样式的容器节点',
+  !!findEl('item:ITEMS_ljt') && findEl('item:ITEMS_ljt')._classes.has('ent-item'));
+
+/* 不改动的地方：档案（前往）只列场景；容器物品既进不去，也收不了 */
+assert('档案（前往）清单里没有书桌', window.__gotoList().indexOf('ITEM_shuzhuo') < 0);
+assert('档案（前往）清单里没有垃圾桶', window.__gotoList().indexOf('ITEMS_ljt') < 0);
+window.__goto('ITEM_shuzhuo');
+assert('对容器物品「前往」是空操作（档案只认场景）',
+  !window.__dump().nodes.some(k => k.indexOf('loc:ITEM_shuzhuo') === 0) &&
+  html.indexOf('if (!SCENES[sid]) return;') >= 0);
+assert('容器物品进不了证物袋', window.__bag('item:ITEM_shuzhuo') === false);
+assert('容器物品进不了线索册', window.__ledgerStore('item:ITEM_shuzhuo') === false);
+assert('拒收不留痕：书桌仍在画布上', window.__dump().nodes.includes('item:ITEM_shuzhuo'));
+
+/* 花园没因为书桌改判而丢掉「枢纽」角标：容器物品里的 [loc] 照样记一票 */
+assert('统计容器里的 [loc] 通路（源码检查）', /sceneLocs\(iid\)\.forEach/.test(html));
+assert('花园仍是枢纽节点（入 5 / 出 0 → 仍达阈值）',
+  !!findEl('loc:SCENES_garden') && findEl('loc:SCENES_garden')._classes.has('hub'));
+
+console.log('\n=== 33. 日志只记「结果」，不记「过程」 ===');
+/* 用户要求：「日志内容太过详尽，只要保留重点就行」。
+   口径写进了 log() 上方的注释 —— 这里按「过程不进案卷 / 失败照记」逐条钉住。 */
+ids['btn-reset']._ev.click[0]();
+/* 桌面操作：没有可撤销时那条 warn 照写（重置刚清空撤销栈，这一次必定失败） */
+let l33 = logs.length;
+ids['btn-undo']._ev.click[0]();
+assert('没有可撤销的操作仍然记一条 warn', logs.length === l33 + 1 &&
+  logs[logs.length - 1].indexOf('没有可撤销的操作') >= 0);
+assert('撤销失败的文案是 warn 级（源码检查）',
+  /log\("没有可撤销的操作", "warn"\)/.test(html));
+
+window.__reveal('SCENES_garden');
+window.__reveal('SCENES_body');
+/* 结果类一律保留：捕获线索照旧记进案卷 */
+l33 = logs.length;
+window.__cap('loc:SCENES_body');                       /* → clue:CLUES_V_luheng */
+assert('捕获线索照旧记进案卷（cap）', logs.slice(l33).some(l => l.indexOf('的隐藏线索') >= 0));
+
+l33 = logs.length;
+assert('收入证物袋不写日志', window.__bag('item:ITEM_lianmu') === true && logs.length === l33);
+l33 = logs.length;
+assert('从证物袋取回不写日志', window.__bagTake('item:ITEM_lianmu') === true && logs.length === l33);
+l33 = logs.length;
+assert('推演归位不写日志',
+  window.__mxAssign('clue:CLUES_V_luheng', 'vision') === true && logs.length === l33);
+l33 = logs.length;
+assert('收进线索册不写日志', window.__ledgerStore('clue:CLUES_V_luheng') === true && logs.length === l33);
+l33 = logs.length;
+assert('从线索册取回不写日志', window.__ledgerTake('clue:CLUES_V_luheng') === true && logs.length === l33);
+l33 = logs.length;
+ids['btn-undo']._ev.click[0]();                        /* 撤销成功：同样不写日志 */
+assert('撤销成功不写日志', logs.length === l33);
+
+/* 源码检查：口径注释在位，被砍的文案确实没了 */
+assert('日志口径写在 log() 上方（源码检查）',
+  html.indexOf('日志口径：「结果」，不是「过程」') >= 0);
+assert('展开 / 收起容器的日志已删除（源码检查）',
+  html.indexOf('展开场景「') < 0 && html.indexOf('收起「') < 0);
+assert('收纳类日志已删除（源码检查）',
+  html.indexOf('」收入证物袋') < 0 && html.indexOf('从证物袋取出「') < 0 && html.indexOf('」收进线索册') < 0);
+assert('桌面操作类日志已删除（源码检查）',
+  html.indexOf('已重新自动布局') < 0 && html.indexOf('已撤销上一步') < 0 &&
+  html.indexOf('可达性：文本可达') < 0 && html.indexOf('已把案件') < 0);
+assert('推演 / 放映类日志已删除（源码检查）',
+  html.indexOf('移出逻辑阵列') < 0 && html.indexOf('记忆放映）') < 0);
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

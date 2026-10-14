@@ -135,9 +135,11 @@
   .node.ent-item .n-title::before{content:"□ "}
   .node.ent-char .n-title::before{content:"● "}
   .node.ent-clue .n-title::before{content:"▲ "}
-  .node.scene-node.unexplored{border-style:dashed; background:var(--bg); color:var(--muted); box-shadow:none}
-  .node.scene-node.unexplored .n-title{color:var(--muted)}
-  .node.scene-node.collapsed{border-style:dashed; background:var(--bg); box-shadow:none}
+  /* 未展开 / 已折叠的虚框样式跟着「容器」走，不跟着 kind 走：
+     书桌、垃圾桶是物品节点（□、130×46），但同样能展开，虚线提示必须照给。 */
+  .node.unexplored{border-style:dashed; background:var(--bg); color:var(--muted); box-shadow:none}
+  .node.unexplored .n-title{color:var(--muted)}
+  .node.collapsed{border-style:dashed; background:var(--bg); box-shadow:none}
   /* 节点上的「捕」按钮已移除：捕获统一走「拖节点到 TEC 分析」 */
   .node.scene-node.hub{border:3px double #2b2b26}
   .node.ent-node{width:130px; height:46px}
@@ -704,7 +706,10 @@ function blankGraph(){
 }
 function snapshot(){
   const nodes = {};
-  for (const k in G.nodes){ const n = G.nodes[k]; nodes[k] = { key:n.key, kind:n.kind, id:n.id, label:n.label, x:n.x, y:n.y, isScene:n.isScene, lit:n.lit, pinned:n.pinned, homeScene:n.homeScene, stored:n.stored, storedIn:n.storedIn, bagFrom:n.bagFrom }; }
+  /* 节点上只存「图结构 + 真正会变的状态」；容器身份不存（kind + 数据表现算），
+     「新」角标（n.unread）也不存 —— 那是"玩家还没点过这个节点"，属于玩家知识，
+     跟 seenTexts 一个性质，不随撤销 / 续档回滚（见 restore 里的接力）。 */
+  for (const k in G.nodes){ const n = G.nodes[k]; nodes[k] = { key:n.key, kind:n.kind, id:n.id, label:n.label, x:n.x, y:n.y, lit:n.lit, pinned:n.pinned, homeScene:n.homeScene, stored:n.stored, storedIn:n.storedIn, bagFrom:n.bagFrom }; }
   return JSON.stringify({
     nodes: nodes, edges: G.edges,
     explored:[...G.explored], captured:[...G.captured], tried:[...G.tried],
@@ -717,8 +722,13 @@ function snapshot(){
 function pushHistory(){ history.push(snapshot()); if (history.length > 60) history.shift(); }
 function restore(str){
   const s = JSON.parse(str);
+  /* 玩家知识不随快照回滚：seenTexts（听说过什么）与 unread（还没点过哪些节点）都接力带回新图。
+     不接力的话，撤销 / 续档会顺手把全场「新」角标洗掉 —— 和"右键钉一下就没了"是同一类毛病。 */
+  const unread = {};
+  Object.keys(G.nodes).forEach(k => { if (G.nodes[k].unread) unread[k] = true; });
   G = { nodes:s.nodes, edges:s.edges, explored:new Set(s.explored), captured:new Set(s.captured), tried:new Set(s.tried), talkProg: s.talkProg || {}, tecProg: s.tecProg || {}, lastScene: s.lastScene || null, collapsed: new Set(s.collapsed || []), seenTexts: G.seenTexts || [],
     matrix: s.matrix || {vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings: new Set(s.endings || []) };
+  Object.keys(G.nodes).forEach(k => { if (unread[k]) G.nodes[k].unread = true; });
   Object.values(G.nodes).forEach(n => { n.el = null; });
   recomputeHidden();
 }
@@ -793,6 +803,17 @@ function edgeBetween(aId, bId, kind){
   return G.edges.some(e => e.kind === kind && ((e.a === aId && e.b === bId) || (e.a === bId && e.b === aId)));
 }
 
+/* ============ 日志口径：「结果」，不是「过程」 ============
+   日志窗是本案的**案卷**，只记玩家关心的事，不记操作流水。写之前先问一句：
+   「这条是玩家读得懂的结果吗，还是我刚替他按了一下按钮？」
+   ✅ 记：捕获线索 / 结局 / 案件解锁、组合结果与失败、使用物品的结果、前往、
+          一切失败与拦截（缺线索 / 缺工具 / 密码错 / 推演不匹配）、人物与 TEC 对白、
+          开局与换案的一条标记、以及「另有 N 个节点留在画布上」这类**有东西没被收走**的警告。
+   ❌ 不记：展开与收起容器、收入与取出（证物袋 / 线索册）、叙事卡与记忆卡放映、
+          自动布局 / 撤销 / 重置等桌面操作、案件窗离屏、可达性统计，以及
+          「［消耗 X］［出现 X］［获得 X］」这类附属小行（已经并进上一条结果里）。
+   理由：展开容器是全局最高频动作，一次一屏日志会把它冲成流水账；
+   而真正要回头查的「我什么时候拿到这条线索」反被埋掉。（2026-10-14 按用户要求收口） */
 function log(msg, kind){
   const d = document.createElement("div");
   if (kind) d.className = kind;
@@ -844,23 +865,52 @@ function lookupReaction(ownerKind, ownerId, toolId){
   return null;
 }
 
+/* ============ 容器解析：场景 / 会装东西的物品 ============
+   场景天生是容器：content 里的 [item] / [char] 是被它收着的对象，[loc] 是通往别处的出口。
+   物品也可以是容器 —— 只要它在 ITEMS 里带上 content 字段（书桌、垃圾桶就是这样），
+   于是它同样「双击展开、可折叠、内容物摆在四周」，只是画布上仍是物品节点的样子（□ 前缀）。
+   下面这套一律按 id 查表（先场景后物品）：节点键用 containerKey(id)，标题用 containerTitle(id)。 */
+function containerData(id){ return SCENES[id] || ((ITEMS[id] && ITEMS[id].content) ? ITEMS[id] : null); }
+function isContainerId(id){ return !!containerData(id); }
+function containerKind(id){ return SCENES[id] ? "loc" : "item"; }
+function containerKey(id){ return containerKind(id) + ":" + id; }
+function containerTitle(id){ const c = containerData(id); return c ? (c.title || c.label || id) : id; }
+/* 节点是不是容器：kind 与数据表对得上、且它的数据是容器（带 content）。画布上它是唯一可展开的一类节点。 */
+function isContainerNode(n){ return !!n && n.kind === containerKind(n.id) && isContainerId(n.id); }
+/* 节点的数据对象（场景 / 物品 / 容器物品 / 角色 / 线索）。取代散落各处的三目链 ——
+   旧写法靠「是不是场景」这一个 flag 分流到 SCENES，书桌这类容器物品一改判身份就会查空表。 */
+function nodeData(n){
+  if (!n) return null;
+  if (n.kind === "loc")  return SCENES[n.id];
+  if (n.kind === "item") return ITEMS[n.id];
+  if (n.kind === "char") return CHARS[n.id];
+  if (n.kind === "clue") return CLUES[n.id];
+  return null;
+}
+
 /* ============ 场景解析 ============ */
 function sceneTags(sid){
-  const s = SCENES[sid];
+  const s = containerData(sid);
   if (!s) return [];
   return parseTags(s.content).filter(t => t.kind !== "loc" && labelOf(t.kind, t.id) &&
     !(t.kind === "char" && t.id === "CHARS_TEC"));
 }
 function sceneLocs(sid){
-  const s = SCENES[sid];
+  const s = containerData(sid);
   if (!s) return [];
   return parseTags(s.content).filter(t => t.kind === "loc" && SCENES[t.id]).map(t => t.id);
 }
 
-/* 场景入/出边统计（用于枢纽标记） */
+/* 场景入/出边统计（用于枢纽标记）。容器物品里的 [loc] 也算一条通路：
+   它们自己不是场景、不参与枢纽判定，但它指向的场景照常记一票 —— 否则花园会因为
+   书桌改成物品而平白掉一个「枢纽」角标（通路其实还在，只是承载它的节点换了身份）。 */
 const inbound = {}, outbound = {};
 for (const sid in SCENES){ inbound[sid] = 0; outbound[sid] = 0; }
 for (const sid in SCENES) sceneLocs(sid).forEach(t => { outbound[sid]++; inbound[t] = (inbound[t] || 0) + 1; });
+for (const iid in ITEMS){
+  if (!(ITEMS[iid] && ITEMS[iid].content)) continue;
+  sceneLocs(iid).forEach(t => { inbound[t] = (inbound[t] || 0) + 1; });
+}
 const isHub = sid => (inbound[sid] + outbound[sid]) >= 5;
 
 /* 条件入口统计 */
@@ -882,30 +932,39 @@ function ensureNode(kind, id, opts){
   const key = kind + ":" + id;
   if (G.nodes[key]) return G.nodes[key];
   const o = opts || {};
+  /* 不再往节点上写「是不是场景」这类身份 flag：容器与否由 isContainerNode(n) 现算
+     （kind + 数据表即可判定），节点只留「位置 / 标签 / 状态」这些真正会变的东西。 */
   G.nodes[key] = {
     key, kind, id,
     label: o.label || labelOf(kind, id) || id,
-    x: o.x, y: o.y, fresh: true,
-    isScene: kind === "loc"
+    x: o.x, y: o.y, fresh: true, unread: true
   };
   return G.nodes[key];
 }
+/* 「刚上画布 / 刚被取回」的节点有两件事要记，别混成一个 flag：
+     fresh  —— 只给这一轮的镜头聚焦用，render() 末尾就擦（一次性）；
+     unread —— 节点上那枚「新」角标，一直挂着，**只由玩家点这个节点**摘（clearFresh）。
+   混在一起的后果：任何一次重绘都会顺手把角标洗掉（右键钉住、自动布局、撤销…全中招）。 */
+function markFresh(n){ if (n){ n.fresh = true; n.unread = true; } return n; }
 function link(aKey, bKey, kind){
   if (!G.nodes[aKey] || !G.nodes[bKey]) return;
   if (edgeBetween(aKey, bKey, kind)) return;
   G.edges.push({ a:aKey, b:bKey, kind });
 }
 
-/* 揭示一个场景的内容（可重复调用，幂等） */
+/* 揭示一个容器（场景 / 书桌这类会装东西的物品）的内容。可重复调用，幂等。
+   sid 既可以是场景 id，也可以是容器物品的 id —— 键由 containerKind() 决定。 */
 function revealScene(sid, silent){
-  const s = SCENES[sid];
+  const s = containerData(sid);
   if (!s) return 0;
-  /* 画布上此时只有这一个「未探索」的场景节点？展开后需要重排视野（只平移会溢出）。 */
+  /* 画布上此时只有这一个「未探索」的容器节点？展开后需要重排视野（只平移会溢出）。 */
   const soloBefore = Object.keys(G.nodes).length <= 1;
-  const sn = ensureNode("loc", sid, { label: s.title || sid });
+  const sn = ensureNode(containerKind(sid), sid, { label: containerTitle(sid) });
   const firstTime = !G.explored.has(sid);
   G.explored.add(sid);
-  G.lastScene = sid;
+  /* G.lastScene 是「玩家最后打开的**场景**」，供 TEC 的 sceneTalks 与相遇人物的 homeScene 兜底：
+     展开容器物品（书桌 / 垃圾桶）时不改它，否则 TEC 的上下文会指到一个没有 sceneTalks 的 id 上。 */
+  if (SCENES[sid]) G.lastScene = sid;
 
   const home = { x: sn.x, y: sn.y };
   let added = 0;
@@ -927,12 +986,8 @@ function revealScene(sid, silent){
     link(sn.key, tn.key, "move");
   });
 
-  if (!silent){
-    log("展开场景 <b>" + esc(s.title || sid) + "</b>：" + sceneTags(sid).length + " 个对象、" +
-        sceneLocs(sid).length + " 个出口", "sys");
-    if (!added && !silent) log("（此场景的节点此前已经出现在画布上了）", "sys");
-  }
-  unstoreScene(sid);   /* 展开场景时取回存放在这里的节点 */
+  /* 展开容器不写日志：这是全局最高频的动作，日志只留「结果 / 剧情 / 失败」（口径见 log() 上方） */
+  unstoreScene(sid);   /* 展开容器时取回存放在这里的节点 */
   const fresh = freshKeys();   /* 抢在 render() 之前：本次新建的 + 从收纳里取回的，都要一起框住 */
   layout();          /* 必须重新布局，否则新节点没有坐标 */
   render();
@@ -956,7 +1011,7 @@ function spawnItems(ids, nearKey){
   ids.forEach((iid, i) => {
     const existed = !!G.nodes["item:" + iid];
     const n = ensureNode("item", iid, { x: sx + 60 + i * 26, y: sy + 60 + i * 26 });
-    if (existed) n.fresh = false;
+    if (existed) n.fresh = false;   /* 本来就在画布上的：不抢镜头，也不重挂「新」角标 */
     n.homeScene = (G.nodes[nearKey] || {}).homeScene || null;
   });
 }
@@ -973,13 +1028,16 @@ function attemptCombo(toolKey, targetKey){
   const triedKey = toolKey + ">" + targetKey;
   pushHistory();
 
-  /* 1) 场景 ← 场景：视为"前往" */
-  if (tool.isScene && target.isScene){
-    if (sceneLocs(tool.id).indexOf(target.id) >= 0 || sceneLocs(target.id).indexOf(tool.id) >= 0){
-      revealScene(target.id);
-      log("前往场景 <b>" + esc(target.label) + "</b>", "act");
-      return;
-    }
+  /* 1) 目标是个场景，且拖过来的容器（场景 / 书桌这类容器物品）文本里正好列着它 → 视为"前往"。
+        书桌、垃圾桶是物品，但它们 content 里的 [loc:…]（如书桌的「返回花园」）照样是一条通路。 */
+  if (target.kind === "loc" && (tool.kind === "loc" || isContainerNode(tool)) &&
+      (sceneLocs(tool.id).indexOf(target.id) >= 0 || sceneLocs(target.id).indexOf(tool.id) >= 0)){
+    revealScene(target.id);
+    log("前往场景 <b>" + esc(target.label) + "</b>", "act");
+    return;
+  }
+  /* 两个场景之间没有直接通路：这是"走不过去"，明确说清楚，不往下走反应表 */
+  if (tool.kind === "loc" && target.kind === "loc"){
     fail(tool, target, "这两个场景之间没有直接通路");
     return;
   }
@@ -1001,14 +1059,14 @@ function attemptCombo(toolKey, targetKey){
     if (uc){ hit = { field:"useItem", react:{ text:uc.successMessage || "", results:uc.onSuccess || {} } }; owner = target; }
   }
 
-  /* 4) 目标是场景：扫描场景内的物品 / 角色 */
-  if (!hit && target.isScene){
+  /* 4) 目标是容器（场景 / 书桌这类会装东西的物品）：扫描它收着的对象 */
+  if (!hit && isContainerNode(target)){
     for (const t of sceneTags(target.id)){
       const h = lookupReaction(t.kind, t.id, tool.id);
       if (h){ hit = h; owner = nodeByKey(t.kind, t.id) || ensureNode(t.kind, t.id); break; }
     }
   }
-  if (!hit && tool.isScene){
+  if (!hit && isContainerNode(tool)){
     for (const t of sceneTags(tool.id)){
       const h = lookupReaction(t.kind, t.id, target.id);
       if (h){ hit = h; owner = nodeByKey(t.kind, t.id) || ensureNode(t.kind, t.id); break; }
@@ -1036,7 +1094,7 @@ function attemptCombo(toolKey, targetKey){
   if (results.scene && SCENES[results.scene]){
     const isNew = !nodeByKey("loc", results.scene);
     const sn = ensureNode("loc", results.scene, { label: SCENES[results.scene].title });
-    sn.fresh = true;
+    markFresh(sn);
     if (isNew) link(owner ? owner.key : targetKey, sn.key, "cond");
     gained.push("新场景「" + sn.label + "」");
   }
@@ -1049,7 +1107,7 @@ function attemptCombo(toolKey, targetKey){
   parseTags(text).forEach(t => {
     if (t.kind === "clue" && CLUES[t.id] && !nodeByKey("clue", t.id)){
       const cn = ensureNode("clue", t.id, {});
-      cn.fresh = true;
+      markFresh(cn);
       link(owner ? owner.key : targetKey, cn.key, "entity");
       gained.push("线索「" + cn.label + "」");
     }
@@ -1063,7 +1121,7 @@ function attemptCombo(toolKey, targetKey){
   if (consume){
     const keepTool = REUSABLE_TOOLS.indexOf(tool.id) >= 0 || tool.kind === "clue";
     if (!keepTool){ killed.push(tool); }
-    if (target !== tool && !target.isScene && target.key !== (owner && owner.key)) killed.push(target);
+    if (target !== tool && !isContainerNode(target) && target.key !== (owner && owner.key)) killed.push(target);
     else if (owner && owner.kind === "item" && owner.id !== tool.id && REUSABLE_TOOLS.indexOf(owner.id) < 0) killed.push(owner);
   }
   const killedSet = {};
@@ -1095,7 +1153,7 @@ function deleteNode(key){
 
 /* ============ 捕获：提取节点的 hiddenClue ============ */
 function capturableClues(n){
-  const data = n.isScene ? SCENES[n.id] : n.kind === "char" ? CHARS[n.id] : n.kind === "item" ? ITEMS[n.id] : null;
+  const data = nodeData(n);
   if (!data || !data.hiddenClue) return [];
   const ids = new Set(data.hiddenClue.ids || []);
   parseTags(data.hiddenClue.text || "").forEach(t => { if (t.kind === "clue") ids.add(t.id); });
@@ -1104,7 +1162,7 @@ function capturableClues(n){
 function attemptCapture(key){
   const n = G.nodes[key];
   if (!n || n.kind === "clue") return;
-  const data = n.isScene ? SCENES[n.id] : n.kind === "char" ? CHARS[n.id] : ITEMS[n.id];
+  const data = nodeData(n);
   const hc = (data && data.hiddenClue) || {};
   const all = capturableClues(n);
   const fresh = all.filter(id => !G.captured.has(id));
@@ -1116,7 +1174,7 @@ function attemptCapture(key){
   pushHistory();
   fresh.forEach(id => {
     const cn = ensureNode("clue", id, {});
-    cn.fresh = true;
+    markFresh(cn);
     link(key, cn.key, "entity");
     G.captured.add(id);
   });
@@ -1133,7 +1191,7 @@ function recomputeHidden(){
   while (changed){
     changed = false;
     G.collapsed.forEach(sid => {
-      const sceneKey = "loc:" + sid;
+      const sceneKey = containerKey(sid);   /* 折叠的可能是场景，也可能是书桌这类容器物品 */
       Object.values(G.nodes).forEach(n => {
         if (n.stored || n.hidden || n.pinned || n.key === sceneKey) return;
         if (n.homeScene !== sid) return;
@@ -1155,12 +1213,11 @@ function toggleCollapse(sid){
   if (collapsing) G.collapsed.add(sid); else { G.collapsed.delete(sid); unstoreScene(sid); }
   closeBubble(); closeNarr(); closePwPop();   /* 锚在画布上的浮层收掉；TEC 是常驻助手窗，保留 */
   recomputeHidden(); layout(); render();
-  log((collapsing ? "收起场景「" : "展开场景「") + esc(SCENES[sid].title || sid) + "」", "sys");
   /* 折叠不是「全收」：已固定的节点、以及跟场外还有连线的节点会留在画布上。
      必须报个数，否则玩家看到"有的收有的不收"只会当成 bug（留在画布上的都有「已固定」角标可查） */
   if (collapsing){
-    const left = Object.values(G.nodes).filter(x => !x.isScene && !x.stored && !x.hidden && x.homeScene === sid).length;
-    if (left) log("「" + esc(SCENES[sid].title || sid) + "」另有 " + left + " 个节点留在画布上（已固定 / 与场外相连）", "sys");
+    const left = Object.values(G.nodes).filter(x => !isContainerNode(x) && !x.stored && !x.hidden && x.homeScene === sid).length;
+    if (left) log("「" + esc(containerTitle(sid)) + "」另有 " + left + " 个节点留在画布上（已固定 / 与场外相连）", "sys");
   }
 }
 
@@ -1170,24 +1227,22 @@ function toggleCollapse(sid){
    以及展开场景时的取回（unstoreScene）——旧存档里 storedIn = 场景 的节点仍能正常取回。 */
 function storeNode(key, sid){
   const n = G.nodes[key];
-  if (!n || n.isScene || n.stored) return false;
+  if (!n || isContainerNode(n) || n.stored) return false;   /* 容器（场景 / 书桌 / 垃圾桶）是不可收纳的落脚点 */
   pushHistory();
   n.stored = true; n.storedIn = sid; n.homeScene = sid; n.pinned = false;
   closeBubble(); closePwPop();
-  log("已把「" + esc(n.label) + "」放回「" + esc(SCENES[sid].title || sid) + "」", "sys");
   recomputeHidden(); layout(); render();
   return true;
 }
 function unstoreScene(sid){
-  const sn = G.nodes["loc:" + sid];
+  const sn = G.nodes[containerKey(sid)];
   let i = 0;
   Object.values(G.nodes).forEach(n => {
     if (!n.stored || n.storedIn !== sid) return;
-    n.stored = false; n.hidden = false; n.fresh = true;
+    n.stored = false; n.hidden = false; markFresh(n);
     if (sn){ n.x = sn.x + 60 + (i % 4) * 40; n.y = sn.y + 60 + Math.floor(i / 4) * 40; }
     i++;
   });
-  if (i) log("从「" + esc(SCENES[sid].title || sid) + "」取回 " + i + " 个节点", "sys");
 }
 
 /* ============ 证物袋：随身携带的收纳 dock（与场景收纳共用 stored 机制） ============ */
@@ -1197,11 +1252,10 @@ function bagItems(){ return Object.values(G.nodes).filter(n => n.stored && n.sto
 
 function bagStore(key){
   const n = G.nodes[key];
-  if (!n || n.isScene || n.stored) return false;
+  if (!n || isContainerNode(n) || n.stored) return false;   /* 容器（场景 / 书桌 / 垃圾桶）进不了袋子 */
   pushHistory();
   n.bagFrom = n.homeScene || null;   /* 记住来源场景，用于清单标注 */
   n.stored = true; n.storedIn = "BAG"; n.pinned = false;
-  log("已把「" + esc(n.label) + "」收入证物袋", "sys");
   recomputeHidden(); layout(); render(); refreshBagWin();
   return true;
 }
@@ -1211,13 +1265,12 @@ function bagTake(key){
   /* 案件窗关着时不能取：取出是放回画布的操作，不能对看不见的画布施展 */
   if (!requireCase()) return false;
   pushHistory();
-  n.stored = false; n.storedIn = null; n.hidden = false; n.fresh = true;
+  n.stored = false; n.storedIn = null; n.hidden = false; markFresh(n);
   /* 取回到袋子附近的画布位置（屏幕坐标换算成世界坐标） */
   const dock = document.getElementById("bag-dock");
   const r = dock.getBoundingClientRect();
   const wpt = toWorld(r.left + r.width / 2, r.top - 40);
   n.x = wpt.x; n.y = wpt.y;
-  log("从证物袋取出「" + esc(n.label) + "」", "sys");
   layout(); render(); refreshBagWin();
   return true;
 }
@@ -1248,7 +1301,7 @@ function refreshBagWin(){
     d.className = "bag-item";
     const label = document.createElement("span"); label.textContent = n.label;
     const src = document.createElement("span"); src.className = "src";
-    src.textContent = n.bagFrom && SCENES[n.bagFrom] ? "来自 " + SCENES[n.bagFrom].title : "";
+    src.textContent = n.bagFrom && containerData(n.bagFrom) ? "来自 " + containerTitle(n.bagFrom) : "";
     d.appendChild(label); d.appendChild(src);
     d.addEventListener("click", () => bagTake(n.key));
     body.appendChild(d);
@@ -1296,8 +1349,8 @@ function layout(){
 
   const seed = n => {
     if (n.x != null) return;
-    if (n.isScene){
-      const i = Object.keys(G.nodes).filter(k => G.nodes[k].isScene).indexOf(n.key);
+    if (isContainerNode(n)){                       /* 容器（场景 + 书桌这类物品）按网格落位 */
+      const i = Object.keys(G.nodes).filter(k => isContainerNode(G.nodes[k])).indexOf(n.key);
       n.x = 200 + (i % 5) * 380;
       n.y = 160 + Math.floor(i / 5) * 300;
     } else {
@@ -1307,7 +1360,7 @@ function layout(){
   };
   list.forEach(seed);
 
-  const R = n => n.isScene ? 80 : 68;
+  const R = n => isContainerNode(n) ? 80 : 68;
   const free = n => !n.pinned;
   for (let it = 0; it < 260; it++){
     for (let i = 0; i < list.length; i++){
@@ -1359,11 +1412,13 @@ function render(){
   Object.values(G.nodes).forEach(n => {
     if (n.hidden || n.stored){ n.el = null; return; }
     const el = document.createElement("div");
-    const kindCls = n.isScene ? "scene-node" : "ent-node ent-" + n.kind;
+    /* 画布上的长相只看 kind：场景是宽节点（■），书桌 / 垃圾桶是普通物品节点（□）。
+       「能不能展开」是容器的事 —— 由 unexplored / collapsed 两个类表达，与 kind 无关。 */
+    const kindCls = n.kind === "loc" ? "scene-node" : "ent-node ent-" + n.kind;
     let cls = "node " + kindCls;
-    if (n.isScene && !G.explored.has(n.id)) cls += " unexplored";
-    if (n.isScene && G.collapsed.has(n.id)) cls += " collapsed";
-    if (n.isScene && isHub(n.id)) cls += " hub";
+    if (isContainerNode(n) && !G.explored.has(n.id)) cls += " unexplored";
+    if (isContainerNode(n) && G.collapsed.has(n.id)) cls += " collapsed";
+    if (n.kind === "loc" && isHub(n.id)) cls += " hub";
     if (n.kind === "clue" && G.captured.has(n.id)) cls += " got";
     if (n.fresh) cls += " pop";
     if (n.lit) cls += " lit";
@@ -1374,13 +1429,13 @@ function render(){
     el.style.top  = n.y + "px";
     el.dataset.key = n.key;
 
-    let sub = n.isScene ? (G.collapsed.has(n.id) ? "已折叠 · 双击展开" : (G.explored.has(n.id) ? "已探索" : "未探索 · 双击展开")) : kindName(n.kind);
+    let sub = isContainerNode(n) ? (G.collapsed.has(n.id) ? "已折叠 · 双击展开" : (G.explored.has(n.id) ? "已探索" : "未探索 · 双击展开")) : kindName(n.kind);
     if (n.kind === "clue" && G.captured.has(n.id)) sub = "线索 · 已捕获";
     el.innerHTML = "<div class='n-title'>" + esc(n.label) + "</div><div class='n-sub'>" + esc(sub) + "</div>";
 
-    if (n.isScene && !G.explored.has(n.id) && condRoutes[n.id] && !inbound[n.id]){
+    if (n.kind === "loc" && !G.explored.has(n.id) && condRoutes[n.id] && !inbound[n.id]){
       const b = document.createElement("span"); b.className = "badge cond"; b.textContent = "条件进入"; el.appendChild(b);
-    } else if (n.isScene && !G.explored.has(n.id) && inbound[n.id] === 0 && !sceneLocs(n.id).length){
+    } else if (n.kind === "loc" && !G.explored.has(n.id) && inbound[n.id] === 0 && !sceneLocs(n.id).length){
       const b = document.createElement("span"); b.className = "badge warn"; b.textContent = "无文本入口"; el.appendChild(b);
     }
     /* 已固定：右键钉住的节点。必须看得见——它同时意味着「自动布局不挪它」
@@ -1388,7 +1443,11 @@ function render(){
     if (n.pinned){
       const b = document.createElement("span"); b.className = "badge pin"; b.textContent = "已固定"; el.appendChild(b);
     }
-    if (n.fresh){
+    /* 「新」角标认 n.unread（不是 n.fresh）：unread 一直挂着，**只有玩家点过这个节点才会被
+       clearFresh() 摘掉**。旧版拿 n.fresh 当条件，而 fresh 是「本轮镜头聚焦」的一次性标记 ——
+       render() 末尾就会擦掉它，于是任何一次重绘（右键钉住 / 自动布局 / 撤销 / 折叠…）
+       都会把全场「新」角标一起洗掉，看着就像"钉一下所有新都没了"。 */
+    if (n.unread){
       const b = document.createElement("span"); b.className = "badge new"; b.textContent = "新"; el.appendChild(b);
     }
     if (n.kind === "char"){
@@ -1398,7 +1457,7 @@ function render(){
     attachInteractions(el, n);
     nodeLayer.appendChild(el);
     n.el = el;
-    n.fresh = false;
+    n.fresh = false;   /* 只擦「聚焦用」的一次性标记；n.unread（角标）留着等玩家来点 */
   });
 
   paintEdgesFor(420);
@@ -1639,7 +1698,7 @@ function attachInteractions(el, n){
         if (n.kind === "clue") assignClue(n.key, (CLUES[n.id] || {}).type);
         else toast("只有线索能进推演器", true);
       } else if (iconHit === "goto-icon"){
-        if (n.isScene) gotoScene(n.id);
+        if (n.kind === "loc") gotoScene(n.id);   /* 档案里列的是场景；容器物品（书桌）不在此列 */
         else toast("只有场景能进档案", true);
       }
       return;
@@ -1662,11 +1721,12 @@ function attachInteractions(el, n){
       /* 松手落在别的节点上 → 组合，自己被弹回原位 */
       const tn = G.nodes[target.dataset.key];
       springBack(el, ox, oy);
-      /* 折叠的场景节点：既不收纳也不组合。原来这里会把节点「放回现场」（storeNode），
-         但那与证物袋 / 线索册重叠（还没有清单、只能整场展开才能取回），入口已移除。
-         组合也不放行：折叠后里面的东西看不见，隔空命中的结果没有着力点。 */
-      if (tn && tn.isScene && G.collapsed.has(tn.id)){
-        toast("<b>" + esc(tn.label) + "</b><br>场景已折叠：先双击展开，或把节点拖到证物袋", true);
+      /* 折叠的容器节点（场景 / 书桌 / 垃圾桶）：既不收纳也不组合。原来这里会把节点
+         「放回现场」（storeNode），但那与证物袋 / 线索册重叠（还没有清单、只能整场展开才能取回），
+         入口已移除。组合也不放行：折叠后里面的东西看不见，隔空命中的结果没有着力点。 */
+      if (tn && isContainerNode(tn) && G.collapsed.has(tn.id)){
+        toast("<b>" + esc(tn.label) + "</b><br>" + (tn.kind === "loc" ? "场景已折叠" : "已折叠") +
+              "：先双击展开，或把节点拖到证物袋", true);
         return;
       }
       attemptCombo(n.key, target.dataset.key);
@@ -1691,7 +1751,7 @@ function attachInteractions(el, n){
 
   el.addEventListener("dblclick", () => {
     clearFresh(n);          /* 双击也算「点过」：角标立刻摘掉 */
-    if (n.isScene){
+    if (isContainerNode(n)){   /* 容器一律双击展开 / 折叠（书桌、垃圾桶也一样） */
       if (G.collapsed.has(n.id) || G.explored.has(n.id)){ toggleCollapse(n.id); selectNode(n.key); return; }
       revealScene(n.id); selectNode(n.key); return;
     }
@@ -1909,10 +1969,7 @@ function runCommand(n, cmd){
     gotClues(cmd.successMessage || "");
     noteSeen(cmd.successMessage || "");
     if (cmd.onSuccess) applyPayload(cmd.onSuccess, n.key);
-    if (tgConsume.checked && REUSABLE_TOOLS.indexOf(need) < 0){
-      deleteNode("item:" + need);
-      log("　［消耗 " + esc(needLabel) + "］", "sys");
-    }
+    if (tgConsume.checked && REUSABLE_TOOLS.indexOf(need) < 0) deleteNode("item:" + need);
     settleSelect(settle(), n.key);
     return;
   }
@@ -1944,7 +2001,6 @@ function runCommand(n, cmd){
     if (kids.length){
       spawnItems(kids, n.key);
       kids.forEach(iid => link(n.key, "item:" + iid, "entity"));
-      log("　［出现 " + esc(kids.map(i => labelOf("item", i) || i).join("、")) + "］", "sys");
     }
     settleSelect(settle(), n.key);
     return;
@@ -1957,7 +2013,7 @@ function applyPayload(payload, nearKey){
   if (payload.items) spawnItems(payload.items, nearKey);
   if (payload.scene && SCENES[payload.scene]){
     const sn = ensureNode("loc", payload.scene, { label: SCENES[payload.scene].title });
-    sn.fresh = true;
+    markFresh(sn);
   }
   gotClues(payload.message || payload.text || "");
   noteSeen(payload.message || payload.text || "");
@@ -1965,7 +2021,7 @@ function applyPayload(payload, nearKey){
 function gotClues(text){
   parseTags(text).forEach(t => {
     if (t.kind === "clue" && CLUES[t.id]){
-      if (!nodeByKey("clue", t.id)){ const cn = ensureNode("clue", t.id, {}); cn.fresh = true; }
+      if (!nodeByKey("clue", t.id)){ const cn = ensureNode("clue", t.id, {}); markFresh(cn); }
       G.captured.add(t.id);
     }
   });
@@ -2036,7 +2092,7 @@ function spawnChoiceNodes(n, cmd){
       if (!existed){
         sn.x = n.x + (i - (opts.length - 1) / 2) * 190;
         sn.y = n.y + 110;
-        sn.fresh = true;
+        markFresh(sn);
         added.push("「" + sn.label + "」");
       }
       link(n.key, sn.key, "cond");
@@ -2271,7 +2327,8 @@ function showNarrCard(n, s){
   closeNarr();
   const text = narrText(s.content || s.desc || "");
   if (!text) return;
-  const w = makeWindow("SCENE_FEED // " + (s.title || n.id), closeNarr);
+  /* 卡头按 kind 取名：书桌 / 垃圾桶是物品，别把它们的叙事卡标成「 SCENE_FEED 」 */
+  const w = makeWindow((n.kind === "loc" ? "SCENE_FEED" : "OBJECT_FEED") + " // " + (s.title || s.label || n.id), closeNarr);
   const c = w.el;
   c.className = "narr-card syswin";
   w.body.textContent = text;                 /* 先放全文 → 按整卡实测高度定位 */
@@ -2282,15 +2339,14 @@ function showNarrCard(n, s){
   w.body.style.minHeight = (w.body.offsetHeight || 0) + "px";
   narrEl = c;
   typeInto(w.body, text);                    /* 清空重放为打字机 */
-  /* 全文只留在卡片里；日志只记一行事件，不再镜像正文（去重） */
-  log("〔场景〕<b>" + esc(s.title || "") + "</b>：叙事卡已放映", "sys");
+  /* 全文只留在卡片里：正文不进日志，也不再单记一条「叙事卡已放映」（放映是过程，不是结果） */
 }
 
 /* 重看场景叙事（详情窗按钮与测试钩子共用同一入口） */
 function renarrScene(sid){
-  const node = G.nodes["loc:" + sid];
+  const node = G.nodes[containerKey(sid)];
   if (!node) return;
-  const s = SCENES[sid] || {};
+  const s = containerData(sid) || {};
   if (SCENE_MEMORY.indexOf(sid) >= 0) showMemoryCard(node, s); else showNarrCard(node, s);
 }
 
@@ -2588,11 +2644,11 @@ function tecAnalyzeFinish(key){
   {
     const fresh = capturableClues(n).filter(id => !G.captured.has(id));
     if (fresh.length){
-      const src = n.isScene ? SCENES[n.id] : (n.kind === "char" ? CHARS[n.id] : ITEMS[n.id]);
+      const src = nodeData(n);
       const hc = (src && src.hiddenClue) || {};
       fresh.forEach(id => {
         const cn = ensureNode("clue", id, {});
-        cn.fresh = true;
+        markFresh(cn);
         link(key, cn.key, "entity");
         G.captured.add(id);
       });
@@ -2742,10 +2798,11 @@ function heardScenes(){
   return [...known].filter(id => SCENES[id]);
 }
 function gotoScene(sid){
+  if (!SCENES[sid]) return;                 /* 档案里只有场景；容器物品（书桌 / 垃圾桶）不在此列 */
   const isNew = !nodeByKey("loc", sid);
   if (isNew) pushHistory();
   const sn = ensureNode("loc", sid, { label: SCENES[sid].title });
-  if (isNew){ sn.fresh = true; layout(); }
+  if (isNew){ markFresh(sn); layout(); }
   render();
   const r = stage.getBoundingClientRect();
   view.x = r.width / 2 - (sn.x + 76) * view.k;
@@ -2813,10 +2870,9 @@ function ledgerItems(){
 function ledgerStore(key){
   const n = G.nodes[key];
   if (!n || n.stored) return false;
-  if (n.isScene || n.kind !== "clue"){ toast("只有线索能收进线索册", true); return false; }
+  if (n.kind !== "clue"){ toast("只有线索能收进线索册", true); return false; }
   pushHistory();
   n.stored = true; n.storedIn = "LEDGER"; n.pinned = false;
-  log("已把「" + esc(n.label) + "」收进线索册", "sys");
   recomputeHidden(); layout(); render(); refreshClueWin();
   return true;
 }
@@ -2826,7 +2882,7 @@ function ledgerTake(key){
   /* 案件窗关着时不能取：取出是放回画布的操作，不能对看不见的画布施展 */
   if (!requireCase()) return false;
   pushHistory();
-  n.stored = false; n.storedIn = null; n.hidden = false; n.fresh = true;
+  n.stored = false; n.storedIn = null; n.hidden = false; markFresh(n);
   /* 取回到线索册图标附近的画布位置（屏幕坐标换算成世界坐标） */
   const icon = document.getElementById("clue-icon");
   if (icon){
@@ -2834,7 +2890,6 @@ function ledgerTake(key){
     const wpt = toWorld(r.left + r.width / 2, r.top - 40);
     n.x = wpt.x; n.y = wpt.y;
   }
-  log("从线索册取出「" + esc(n.label) + "」", "sys");
   layout(); render(); refreshClueWin();
   return true;
 }
@@ -3054,7 +3109,6 @@ function makeMatrixNodeDraggable(card, cid, sense){
       if (!inside){                        /* 拖出桌布 → 移除该条 */
         pushHistory();
         G.matrix[sense] = G.matrix[sense].filter(x => x !== cid);
-        log("「" + esc((CLUES[cid] || {}).label || cid) + "」移出逻辑阵列", "sys");
         render(); refreshInferWin();
         return;
       }
@@ -3199,7 +3253,6 @@ function assignClue(clueKey, sense){
   if (G.matrix[sense].indexOf(n.id) >= 0) return false;
   pushHistory();
   G.matrix[sense].push(n.id);
-  log("「" + esc(n.label) + "」归入" + SENSES[sense] + "槽位", "sys");
   render(); refreshInferWin();
   return true;
 }
@@ -3296,7 +3349,6 @@ function showMemoryCard(n, s){
     const st = ch && (ch.sceneTalks || {})[n.id];
     (st || []).forEach(l => lines.push("——" + (ch.name || t.id) + "：" + plain(l.text || "")));
   });
-  log("<b>" + esc(s.title || "") + "</b>（记忆放映）", "sys");
   memoryPlay = { el: c, body: w.body, lines: lines, idx: 0, typing: false, cur: null, curText: "" };
   playMemoryLine();
 }
@@ -3344,16 +3396,27 @@ function paintDetail(){
   if (!n){ detailPlaceholder(sel ? "节点已不存在。" : null); return; }
 
   let html = "<div class='dt'>" + esc(n.label) + "</div>";
-  html += "<div class='dmeta'>" + (n.isScene ? "场景" : kindName(n.kind)) + " · " + n.key + "</div>";
+  html += "<div class='dmeta'>" + kindName(n.kind) + " · " + n.key + "</div>";
 
-  if (n.isScene){
-    const s = SCENES[n.id] || {};
-    const ins = Object.keys(SCENES).filter(x => sceneLocs(x).indexOf(n.id) >= 0).map(x => SCENES[x].title);
-    html += "<div class='drow'>文本入口：" + (ins.length ? esc(ins.join("、")) : "<span style='color:#2b2b26'>无</span>") + "</div>";
-    html += "<div class='drow'>出口：" + (sceneLocs(n.id).length ? esc(sceneLocs(n.id).map(x => SCENES[x].title).join("、")) : "无") + "</div>";
+  if (isContainerNode(n)){
+    /* 容器：场景给「文本入口 / 出口」，容器物品（书桌 / 垃圾桶）给「内容 / 来源」——
+       两者共用「状态 + 回看重看」两行。正文只在叙事卡里出现一次，这里不重复。 */
+    if (n.kind === "loc"){
+      const ins = Object.keys(SCENES).filter(x => sceneLocs(x).indexOf(n.id) >= 0).map(x => SCENES[x].title);
+      html += "<div class='drow'>文本入口：" + (ins.length ? esc(ins.join("、")) : "<span style='color:#2b2b26'>无</span>") + "</div>";
+      html += "<div class='drow'>出口：" + (sceneLocs(n.id).length ? esc(sceneLocs(n.id).map(x => SCENES[x].title).join("、")) : "无") + "</div>";
+    } else {
+      const inside = sceneTags(n.id).map(t => labelOf(t.kind, t.id)).filter(Boolean);
+      html += "<div class='drow'>内容：" + (inside.length ? esc(inside.join("、")) : "无") + "</div>";
+      /* 容器物品的正文里也可能带出口（书桌的「返回 [loc:SCENES_garden]」就是一条） */
+      const outs = sceneLocs(n.id);
+      if (outs.length) html += "<div class='drow'>出口：" + esc(outs.map(x => containerTitle(x)).join("、")) + "</div>";
+      if (n.homeScene && containerData(n.homeScene)) html += "<div class='drow'>来源：" + esc(containerTitle(n.homeScene)) + "</div>";
+    }
     html += "<div class='drow'>状态：" + (G.explored.has(n.id) ? "已展开" : "未展开") + "</div>";
     /* 正文只在叙事卡里出现一次；详情窗只给结构信息 + 回看入口（去重） */
-    if (G.explored.has(n.id)) html += "<div class='drow'><button id='dt-renarr'>[ 重看场景叙事 ]</button></div>";
+    if (G.explored.has(n.id))
+      html += "<div class='drow'><button id='dt-renarr'>[ " + (n.kind === "loc" ? "重看场景叙事" : "重看叙事") + " ]</button></div>";
   } else if (n.kind === "clue"){
     const c = CLUES[n.id] || {};
     html += "<div class='ddesc'>" + esc(plain(c.desc || "（无描述）")) + "</div>";
@@ -3385,7 +3448,8 @@ function paintDetail(){
       html += "<div class='drow'>状态：" + (n.lit ? "已点亮" : "未点亮") +
         (it.needsLitToUse ? (n.lit ? " · 可以照亮黑暗里的东西" : " · 先点亮它，才能照亮黑暗里的东西") : "") + "</div>";
     }
-    if (n.homeScene && SCENES[n.homeScene]) html += "<div class='drow'>来源：" + esc(SCENES[n.homeScene].title) + "</div>";
+    /* 来源容器：可能是场景，也可能是书桌 / 垃圾桶这类容器物品 */
+    if (n.homeScene && containerData(n.homeScene)) html += "<div class='drow'>来源：" + esc(containerTitle(n.homeScene)) + "</div>";
     const outs = [];
     for (const f in (it.presentReactions || {})) outs.push({ tool:f, r:it.presentReactions[f] });
     if (outs.length){
@@ -3406,16 +3470,15 @@ function paintDetail(){
   if (rb) rb.addEventListener("click", () => renarrScene(n.id));
 }
 
-/* 「新」角标是一次性的：玩家**点过这个节点**就摘掉，不必等下一次重绘。
-   旧版只有 render() 会重建节点层，而点选只刷详情面板，所以点完角标还挂着，
-   要等别的操作触发 render() 才一起消失 —— 看着就是"点了它也不消"。
+/* 「新」角标**只有玩家点过这个节点才会摘**：这里把 DOM 上那枚角标摘掉，同时清 n.unread
+   （render() 画角标认的就是 unread，重绘不会动它 —— 只有这里会清）。
    只在角标**已经画在屏上**时才动手（n.el 为空说明还没重绘出来，留着让 render 正常亮一下）。
    刻意不放进 selectNode：从线索册 / 人物名册**点清单行**也会 selectNode，那不是"点节点"，
    取回来的线索该照常亮一次「新」。 */
 function clearFresh(n){
   const el = n.el;
   const b = (el && el.querySelector) ? el.querySelector(".badge.new") : null;
-  if (b && b.remove){ b.remove(); n.fresh = false; }
+  if (b && b.remove){ b.remove(); n.unread = false; n.fresh = false; }
 }
 
 function selectNode(key){
@@ -3429,7 +3492,7 @@ function selectNode(key){
   applyFocus();
 }
 
-window.__reveal = function(sid){ revealScene(sid); selectNode("loc:" + sid); };
+window.__reveal = function(sid){ revealScene(sid); selectNode(containerKey(sid)); };
 window.__cmd = function(id, i){ const n = nodeByKey("item", id); if (n) runCommand(n, (ITEMS[id].commands || [])[i]); };
 window.__choice = function(id, ci, oi){
   const n = nodeByKey("item", id);
@@ -3442,7 +3505,7 @@ window.__choice = function(id, ci, oi){
   if (r.scene && SCENES[r.scene]){
     const isNew = !nodeByKey("loc", r.scene);
     const sn = ensureNode("loc", r.scene, { label: SCENES[r.scene].title });
-    sn.fresh = true;
+    markFresh(sn);
     link(n.key, sn.key, "cond");
     revealScene(r.scene);
     layout(); render();
@@ -3470,10 +3533,7 @@ window.__pw = function(id){
   const pwMsg = plain(os.message || "打开了。");
   log("「" + esc(n.label) + "」已打开：" + esc(pwMsg), "act");
   noteSeen(os.message || "");
-  if (os.items){
-    spawnItems(os.items, n.key);
-    log("　［获得 " + esc(os.items.map(i => labelOf("item", i) || i).join("、")) + "］", "sys");
-  }
+  if (os.items) spawnItems(os.items, n.key);
   gotClues(os.message || "");
   if (tgConsume.checked){ deleteNode(n.key); }
   settleSelect(settle(), n.key);
@@ -3623,14 +3683,12 @@ document.getElementById("btn-relayout").addEventListener("click", () => {
   if (!requireCase()) return;
   Object.values(G.nodes).forEach(n => { n.pinned = false; });
   layout(); render();
-  log("已重新自动布局：全部「已固定」都已解除", "sys");
 });
 document.getElementById("btn-undo").addEventListener("click", () => {
   if (!requireCase()) return;
   if (!history.length){ log("没有可撤销的操作", "warn"); return; }
   restore(history.pop());
   layout(); render();
-  log("已撤销上一步", "sys");
 });
 document.getElementById("btn-reset").addEventListener("click", () => {
   if (!requireCase()) return;
@@ -3664,8 +3722,6 @@ document.getElementById("btn-reach").addEventListener("click", () => {
   }
   verdict.innerHTML = html;
   verdict.style.display = "block";
-  log("可达性：文本可达 " + seen.size + " / 条件 " + extra.size + " / 孤岛 " + bad.length +
-      (bad.length ? " → " + bad.map(s => SCENES[s].title).join("、") : ""), bad.length ? "err" : "sys");
 });
 
 /* ============ 适性测试 + 调查员证（开场流程） ============ */
@@ -4015,7 +4071,6 @@ function doEnterCase(id, from){
    两条路都先存盘、都不弹案件地图，只是落点不同。 */
 function parkCase(p){
   if (!caseOpen || switchingCase) return false;
-  const c = caseById(CASE_ID);
   const cw = document.getElementById("case-win");
   const finish = () => {
     switchingCase = false;
@@ -4029,9 +4084,6 @@ function parkCase(p){
     closeBubble(); closeNarr(); closePwPop();
     clearSelection();
     setDetailWin(false);
-    log(p === "dock"
-      ? "已把案件 <b>" + esc(c ? c.code : CASE_ID) + "</b> 收起到桌面右下角的卡片：进度已保存，点卡片即可展开。"
-      : "已把案件 <b>" + esc(c ? c.code : CASE_ID) + "</b> 关闭到桌面「案件地图」图标：进度已保存，进案件地图即可展开。", "sys");
   };
   /* – 收起：带收缩动画缩到右下角卡片（落点先亮出来当靶子，案件窗再缩过去）。
      × 关闭：不做收缩动画，直接离屏 —— 用户反馈"缩进图标"那下不舒服。
