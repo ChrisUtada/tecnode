@@ -332,10 +332,11 @@ node _cdp_excerpt.cjs       # 文本物摘录：真鼠标点详情窗正文里�
 | `tecnode-standalone.html` | 【构建产物】全内联单文件版，双击即玩、离线分发（一个文件拷到哪都能玩） |
 | `assets/` | 【构建产物】`node build.js` 从 `src/assets/*` 复制出的外链素材目录（.gitignore 忽略） |
 | `_template.html` | 【构建产物】与 `index.html` 同构建（只差 gamedata 位留 `__GAME_DATA_A001__` 占位符，换案件时注入用） |
-| `build.js` | 构建脚本（Node，零第三方依赖）：`node build.js` 写出四个产物；`node build.js --check` 只校验、不改盘 |
+| `build.js` | 构建脚本（Node，零第三方依赖）：`node build.js` 写出 index / _template / standalone（以及 `src/editor/` 在盘上时的 editor.html）并同步 `assets/`；`node build.js --check` 只校验、不改盘 |
+| `src/editor/` | 【可选】案件数据节点编辑器的源码（方案见 `EDITOR_PLAN.md`）。**尚未入库** —— 目录不在盘上时 `build.js` 跳过 editor.html，其余三个产物照常构建；`--check` 也不拿它比对。判据只认 `src/editor/shell.html` 在不在：壳在就照常拼、照常报错（缺切片 / 命名不规范都是真 bug） |
 | `src/shell.html` | 文档骨架（`<head>` + `<body>`），三个占位符 `@@CSS@@` / `@@GAMEDATA@@` / `@@JS@@` |
 | `src/css/01..06-*.css` | 样式，按文件名数字前缀排序后拼接 |
-| `src/js/01..17-*.js` | 引擎脚本，同上排序拼接（拼回同一个 `<script>`，作用域与拆分前完全一致，无 import/export） |
+| `src/js/00..17-*.js` | 引擎脚本，同上排序拼接（拼回同一个 `<script>`，作用域与拆分前完全一致，无 import/export） |
 | `src/assets/*` | 图片 / 字体 / 音频**原文件**。源码里用 `@@ASSET:<文件名>@@` 引用（占位符代表一个完整可用的 src）；原文件入库可 diff、可替换 |
 | `data/case-a001.json` | 案件 A-001 数据（美化 JSON，构建时压成单行注入，产物里仍是一整行） |
 | `verify.js` | 无头验证器（756 项断言，含案件库切案 / 各存各档 / 案件窗离屏两个落点 / 可拖动案件卡片 / 线索册与人物名册 / 右键钉住与折叠反馈 / 详情窗状态实时刷新 / 「新」角标 / **书桌与垃圾桶的「容器物品」身份** / **日志只记结果不记过程（含对话台词不入卷）** / **文本物「摘录」：读到就长出边** / **场景节点不再挂「条件进入」角标** / **线索归位 = 收进桌布（拖出桌布取回）** / **唱机装唱针后解锁桌面播放器（单击开窗 / 最小化到右下角卡片）+ 内置音乐库 + 详情播放按钮** / **素材双构建（外链 index + 内联 standalone）** / **角色对话窗（TEC 式头像+历史）+ 台词不循环（人物与 TEC 说完即停）**） |
@@ -348,12 +349,14 @@ node _cdp_excerpt.cjs       # 文本物摘录：真鼠标点详情窗正文里�
 ### 构建
 
 ```bash
-node build.js          # 从 src/ + data/ 拼出 index.html / _template.html / tecnode-standalone.html / editor.html，并同步 assets/
-node build.js --check  # 不改盘：比对「源码构建结果」与盘上四个产物，不一致就非零退出（提示该重新构建了）
+node build.js          # 从 src/ + data/ 拼出 index.html / _template.html / tecnode-standalone.html（+ editor.html，若 src/editor/ 在盘上），并同步 assets/
+node build.js --check  # 不改盘：比对「源码构建结果」与盘上产物（editor 缺席时只比三个），不一致就非零退出（提示该重新构建了）
 node verify.js         # 756 项断言
 ```
 
 改完任何源码都要跑一遍 `node build.js`，否则盘上的 `index.html` 还是旧的。
+
+> **换机器 / 刚 clone 完，第一件事就是 `node build.js`**：`assets/` 被 `.gitignore` 忽略，不随仓库流转，而 `index.html` 走外链要读它。不构建的话头像破图、音乐没声、字体掉回 SimSun 兜底。`src/editor/` 没入库不影响这一步（editor 目标会被跳过）。
 
 | 想改什么 | 改哪里 |
 |---|---|

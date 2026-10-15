@@ -2,8 +2,9 @@
 // -*- coding: utf-8 -*-
 /* build.js —— 把 src/ 与 data/ 拼装成成品（Node，零第三方依赖）
  *
- *   node build.js          写出 index.html、_template.html、tecnode-standalone.html 与 editor.html
- *   node build.js --check  只在内存构建，与盘上现存的四个产物比对；
+ *   node build.js          写出 index.html、_template.html、tecnode-standalone.html，
+ *                          以及 src/editor/ 在盘上时的 editor.html（见下方「editor 是可选项」）
+ *   node build.js --check  只在内存构建，与盘上现存的产物比对；
  *                          不一致说明「源码改了但没重新构建」（或产物被手改过），非零退出
  *
  * 拼装规则（勿改，改了就不是逐字节等价）：
@@ -13,6 +14,9 @@
  *   - editor.html 与 index.html 同规则构建（壳在 src/editor/shell.html，
  *     CSS = src/css/01-font.css + 02-base.css + src/editor/*.css，JS = src/editor/*.js），
  *     gamedata 同样包在 <script type="application/json" id="gamedata"> 里，--check 的归一化直接适用
+ *   - **editor 是可选项**：src/editor/shell.html 不在盘上时跳过 editor 目标（另一台机器
+ *     没提交编辑器源码的常见情形），index/_template/standalone 照常构建。判据只认「壳在不在」：
+ *     壳在就照常拼、照常报错（缺切片 / 命名不规范都是真 bug，不能一起吞掉）。
  *
  * 素材双模式（@@ASSET:<文件名>@@）：
  *   图片/字体/音频等二进制素材放 src/assets/，源码里只写占位符（占位符本身就代表一个
@@ -146,20 +150,25 @@ function assemble() {
     gameCss, gameJs,
     "src/css/", "src/js/", "inline");
 
-  const editor = assembleTarget(
+  /* 这台机器有没有编辑器源码。只认「壳」：壳不在就是没有，跳过；
+     壳在但里面缺东西，交给 assembleTarget / readSlices 照常抛错。 */
+  const hasEditor = fs.existsSync(path.join(ROOT, "src", "editor", "shell.html"));
+
+  const editor = hasEditor ? assembleTarget(
     "src/editor/shell.html", path.join(ROOT, "src", "editor", "shell.html"),
     readSharedBaseCss().concat(readSlices(path.join(ROOT, "src", "editor"), ".css")),
     readSlices(path.join(ROOT, "src", "editor"), ".js"),
-    "src/css/ + src/editor/", "src/editor/", "inline");
+    "src/css/ + src/editor/", "src/editor/", "inline") : null;
 
   return {
     index: gameExt.inject(compactData),
     template: gameExt.inject(DATA_PLACEHOLDER),
     standalone: gameInl.inject(compactData),
-    editor: editor.inject(compactData),
+    editor: hasEditor ? editor.inject(compactData) : null,
+    hasEditor: hasEditor,
     stats: Object.assign({ dataBytes: Buffer.byteLength(compactData, "utf8") }, gameExt.stats),
     statsInl: gameInl.stats,
-    editorStats: editor.stats,
+    editorStats: hasEditor ? editor.stats : null,
   };
 }
 
@@ -220,8 +229,13 @@ console.log("切片统计： css " + built.stats.cssFiles + " 片 " + sizeCell(b
 console.log("       　 css " + built.statsInl.cssFiles + " 片 " + sizeCell(built.statsInl.srcCssBytes, built.statsInl.cssBytes) +
             " 字节   js " + built.statsInl.jsFiles + " 片 " + sizeCell(built.statsInl.srcJsBytes, built.statsInl.jsBytes) +
             " 字节（inline，standalone 用）");
-console.log("编辑器　： css " + built.editorStats.cssFiles + " 片 " + sizeCell(built.editorStats.srcCssBytes, built.editorStats.cssBytes) +
-            " 字节   js " + built.editorStats.jsFiles + " 片 " + sizeCell(built.editorStats.srcJsBytes, built.editorStats.jsBytes) + " 字节");
+if (built.editorStats) {
+  console.log("编辑器　： css " + built.editorStats.cssFiles + " 片 " + sizeCell(built.editorStats.srcCssBytes, built.editorStats.cssBytes) +
+              " 字节   js " + built.editorStats.jsFiles + " 片 " + sizeCell(built.editorStats.srcJsBytes, built.editorStats.jsBytes) + " 字节");
+} else {
+  console.log("编辑器　： 跳过 —— 盘上没有 src/editor/shell.html（这台机器没有编辑器源码）。" +
+              "index / _template / standalone 与 assets/ 照常构建。");
+}
 console.log("");
 
 if (CHECK) {
@@ -232,8 +246,8 @@ if (CHECK) {
     [INDEX_FILE, built.index, "index"],
     [TPL_FILE, built.template, "template"],
     [STANDALONE_FILE, built.standalone, "standalone"],
-    [EDITOR_FILE, built.editor, "editor"]
   ];
+  if (built.hasEditor) pairs.push([EDITOR_FILE, built.editor, "editor"]);
   for (const [file, text, label] of pairs) {
     const p = path.join(ROOT, file);
     if (!fs.existsSync(p)) {
@@ -250,6 +264,11 @@ if (CHECK) {
     console.log("✓ " + file + " 与源码构建结果逐字节一致（gamedata 行归一化后，共 " +
                 (text.split(NL).length - 1) + " 行）");
   }
+  if (!built.hasEditor) {
+    /* 说清楚，免得有人以为 editor.html 也被校验过了 */
+    console.log("· 编辑器　： 跳过（src/editor/ 缺失，editor.html 不参与比对" +
+                (fs.existsSync(path.join(ROOT, EDITOR_FILE)) ? "；盘上那份是旧的、无法重新生成" : "") + "）");
+  }
   if (bad) { console.error("\n=> 产物已过期，请运行：node build.js"); process.exit(1); }
   console.log("\n=> 源码与产物同步，无需重新构建");
   process.exit(0);
@@ -260,8 +279,10 @@ copyAssets();
 write(INDEX_FILE, built.index);
 write(TPL_FILE, built.template);
 write(STANDALONE_FILE, built.standalone);
-write(EDITOR_FILE, built.editor);
+if (built.editor) write(EDITOR_FILE, built.editor);
+else console.log("  跳过 editor.html（src/editor/ 缺失）");
 console.log("");
 console.log("提示：改功能编辑 src/js/*，改样式编辑 src/css/*，改数据编辑 data/case-a001.json（或用 editor.html 编辑后导出覆盖），" +
             "换图片/字体/音频放 src/assets/*（源码里用 @@ASSET:<文件名>@@ 引用，index 走外链 assets/、standalone 走内联），" +
-            "编辑器源码在 src/editor/*，然后 node build.js && node verify.js");
+            (built.hasEditor ? "编辑器源码在 src/editor/*，" : "") +
+            "然后 node build.js && node verify.js");
