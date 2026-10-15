@@ -221,6 +221,16 @@
     background:var(--face-lo); box-shadow:var(--press); overflow:hidden}
   .gd-plant .gd-prog i{display:block; height:100%; width:0; background:var(--line); border-radius:4px}
   .gd-hint{margin-top:8px; font-size:10.5px; color:var(--faint); line-height:1.6}
+  /* 开花后点花浮现的叙事框：嵌在花园窗内、花朵上/下方，随窗移动；满宽、限高可滚，与浮窗同族 */
+  .gd-narr{position:absolute; left:8px; width:calc(100% - 16px); max-height:158px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-btn);
+    box-shadow:var(--win-shadow); z-index:6; display:flex; flex-direction:column; overflow:hidden}
+  .gd-narr-head{padding:3px 7px; border-bottom:1px solid var(--edge-soft);
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:10px; letter-spacing:1px; color:var(--muted)}
+  .gd-narr-x{cursor:pointer; padding:0 3px; color:var(--muted)}
+  .gd-narr-x:hover{color:var(--text)}
+  .gd-narr-body{padding:6px 8px; overflow:auto; font-size:10.5px; line-height:1.7; color:var(--text)}
   /* 结局清单：弱化存在，收在桌布左下角 */
   .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
   .memory{background:#dcd8c2; border:3px double #2b2b26; border-radius:var(--r-win); box-shadow:var(--win-shadow)}

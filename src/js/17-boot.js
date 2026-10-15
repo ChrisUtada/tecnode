@@ -102,7 +102,8 @@ window.__garden = {
     plots: gardenOK() ? gardenPlots().map(p => ({ stage: gardenStageOf(p), at: p.at, hit: !!p.hit, x: p.x, y: p.y })) : null,
     icon: !!gardenIconEl, win: !!gardenWinEl
   }),
-  grant: () => grantGardenSeed(),
+  grant: (msg) => grantGardenSeed(msg),
+  narr: () => G.garden ? G.garden.narr : null,
   plant: (cx, cy) => gardenPlant(cx, cy),
   plantAt: ms => { if (!gardenOK()) return false;
     const i = gardenPlots().length;
@@ -111,6 +112,11 @@ window.__garden = {
     refreshGardenWin(); refreshGardenIcon(); return true; },
   open: () => openGardenWin(),
   close: () => closeGardenWin()
+};
+/* 真名结局的「真名形成说明」原文（开花后点花叙事框的内容来源；验证用） */
+window.__trueEndingMsg = () => {
+  const e = (typeof ENDINGS !== "undefined") && ENDINGS.find(x => x.isTrueCapture);
+  return e ? (e.message || null) : null;
 };
 window.__playStep = () => { if (memoryPlay) advanceMemory(); else if (endingState) playEndingStage(); };
 window.__intro = {

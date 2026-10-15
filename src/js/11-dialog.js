@@ -123,9 +123,10 @@ function openDlgWin(n, ch, lineText){
   d.textContent = lineText;
   lines.appendChild(d);
   lines.scrollTop = lines.scrollHeight;
-  /* 每说一句都重新锚定（旧气泡的规矩）：台词追加窗体变高，底边始终压在人物上方 12px；
-     上方被视图上沿裁掉就退到人物下方，不盖住节点本身。 */
-  anchorAboveOrBelow(dlgWinEl, n, 12);
+  /* 仅首次为该角色开窗时锚定一次（旧气泡规矩：底边压在人物上方 12px，上方放不下退下方）。
+     同角色后续台词只追加不重锚定 —— 否则玩家拖动对话框后，一点「继续对话」就会弹回原位。
+     首次开窗后位置交还玩家自由拖动，刷新/换角色重开时仍会重新锚定。 */
+  if (!sameChar) anchorAboveOrBelow(dlgWinEl, n, 12);
   return dlgWinEl;
 }
 function showCharLine(n){

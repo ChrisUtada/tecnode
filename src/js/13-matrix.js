@@ -383,7 +383,9 @@ function buildStages(e){
   const st = [];
   (e.lines || []).forEach(l => st.push({ html: esc(l.text), delay: l.delay || 1200 }));
   if (e.isTrueCapture && e.truename) st.push({ html: "<div class='truename'>真名已识别<br>『" + esc(e.truename) + "』</div>", delay: 2000 });
-  st.push({ html: esc(e.message || ""), delay: 1600 });
+  /* 真名结局的大段「真名形成说明」不放进遮罩播 —— 改为开花后点花、用花园里的叙事框承载
+     （16-cases.js 的 openGardenNarr）。其余结局的 message 仍是遮罩主内容，照旧显示。 */
+  if (!e.isTrueCapture && e.message) st.push({ html: esc(e.message || ""), delay: 1600 });
   st.push({ html: "<div style='text-align:center'><span class='ebtn'>" + (e.isTrueCapture ? "确认捕获" : "收下这份记录") + "</span></div>", final: true });
   return st;
 }

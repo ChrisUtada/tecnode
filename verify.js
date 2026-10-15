@@ -2592,9 +2592,10 @@ assert('花卉素材五档全部入库并被成品引用（external 外链 flowe
 assert('桌面图标库注册了 flower 字形（自绘像素花）', html.indexOf('flower: "M10 3h4v4h-4z') >= 0);
 assert('真结局触发只解锁下一案，种子不在 triggerEnding 里发（源码检查）',
   html.indexOf('if (ending.isTrueCapture){ unlockNextCase(CASE_ID); }') >= 0);
-assert('种子改在结局遮罩末帧「确认捕获」点击后才发（源码检查）',
-  html.indexOf('const wasTrue = !!(endingState.ending && endingState.ending.isTrueCapture);') >= 0 &&
-  html.indexOf('if (wasTrue) grantGardenSeed();') >= 0);
+assert('种子改在结局遮罩末帧「确认捕获」点击后才发，并带上真名说明（源码检查）',
+  html.indexOf('const e = endingState.ending;') >= 0 &&
+  html.indexOf('const wasTrue = !!(e && e.isTrueCapture);') >= 0 &&
+  html.indexOf('if (wasTrue) grantGardenSeed(e && e.message);') >= 0);
 assert('执行者头顶的种子对话框按状态重建（源码检查）',
   html.indexOf('if (G.garden && G.garden.seed) exec.appendChild(buildSeedPop())') >= 0);
 assert('种子气泡里只有一张图、没有任何文字节点（源码检查）',
@@ -2816,6 +2817,95 @@ assert('每株都带进度条、按真实进度出条（45s ≈ 25%，开花 = 1
     return g.indexOf('25%') >= 0 && g.indexOf('100%') >= 0; })());
 assert('档位行只剩档位名（倒计时文字从 DOM 退场）',
   plants39.every(pl => ['种子','嫩芽','展叶','舒叶','开花'].indexOf(pl.querySelector('.gd-stage')._text) >= 0));
+window.__garden.close();
+
+console.log('\n=== 40. 真名结局：大段说明移出遮罩 → 开花后点花用花园叙事框承载 ===');
+/* ---- 源码检查 ---- */
+assert('真结局遮罩不再推 message 阶段（大段说明改由开花后点花承载；仅非真结局仍保留）',
+  (() => {
+    const pushes = html.match(/st\.push\(\{ html: esc\(e\.message \|\| ""\), delay: 1600 \}\);/g) || [];
+    /* 每一处 message 推送都必须包在「非真结局」的 if 守卫里 —— 真结局那处已被移出 */
+    const allGuarded = pushes.every(p => html.indexOf('if (!e.isTrueCapture && e.message) ' + p) >= 0);
+    return pushes.length >= 1 && allGuarded;
+  })());
+assert('其余结局的 message 仍在遮罩里照旧显示（仅真结局移出）',
+  html.indexOf('if (!e.isTrueCapture && e.message) st.push({ html: esc(e.message || "")') >= 0);
+assert('确认捕获把真结局 message 传给 grantGardenSeed（源码检查）',
+  html.indexOf('if (wasTrue) grantGardenSeed(e && e.message);') >= 0);
+assert('grantGardenSeed 接收并存储 message 到 G.garden.narr（源码检查）',
+  html.indexOf('function grantGardenSeed(msg){') >= 0 &&
+  html.indexOf('if (msg) G.garden.narr = msg;') >= 0);
+assert('旧档迁移：有株无 narr 时回填真名说明（源码检查）',
+  html.indexOf('if (G.garden.plots.some(Boolean) && !G.garden.narr) G.garden.narr = trueEndingMessage();') >= 0 &&
+  html.indexOf('function trueEndingMessage()') >= 0);
+assert('开花后点花浮现叙事框：openGardenNarr 把 .gd-narr 注入 .gd-field（源码检查）',
+  html.indexOf('function openGardenNarr(p, plant){') >= 0 &&
+  /field\.appendChild\(box\)/.test(html) &&
+  html.indexOf('box.className = "gd-narr";') >= 0);
+assert('花株 click 接线：未拖动 + 已 bloom + 有 narr 才触发（源码检查）',
+  html.indexOf('el.addEventListener("click", () => {') >= 0 &&
+  html.indexOf('if (!el.classList.contains("bloom")) return;') >= 0 &&
+  html.indexOf('toggleGardenNarr(p, el);') >= 0);
+assert('叙事框样式已写（嵌花园窗、满宽、限高可滚，与浮窗同族）',
+  html.indexOf('.gd-narr{position:absolute; left:8px; width:calc(100% - 16px); max-height:158px;') >= 0);
+
+/* ---- 运行时：复现真名结局（与 §38 同一套五感配方） ---- */
+ids['btn-reset']._ev.click[0]();
+window.__closeFloats();
+const mx40 = window.__dump().matrix;
+Object.keys(mx40).forEach(sense => mx40[sense].forEach(cid => window.__boardTake(cid, sense)));
+[["CLUES_V_luheng","vision"],["CLUES_nm","hearing"],["CLUES_mc","touch"],
+ ["CLUES_CBKW","taste"],["CLUES_xds","smell"]].forEach(([id, sense]) => {
+  window.__ensure("clue", id);
+  window.__mxAssign("clue:" + id, sense);
+});
+window.__infer();
+assert('推演命中真结局：遮罩落下，种子尚未发',
+  window.__dump().endingOverlay === true && window.__dump().garden.seed === false);
+/* 点穿遮罩到末帧「确认捕获」；末帧显示时检查遮罩正文不含大段说明 */
+const ov40 = ids['ending-overlay'];
+let g40 = 0, sawFinal = false;
+while (ov40._ev.click && ov40._ev.click.length && g40 < 40 && !sawFinal){
+  ov40._ev.click[0](); g40++;
+  const eol = ov40.children.find(c => c._classes.has('eol'));
+  const txt = eol ? eol.children.map(ch => ch._html || '').join('') : '';
+  if (txt.indexOf('ebtn') >= 0) sawFinal = true;   /* 末帧 = 确认捕获按钮 */
+}
+const eol40 = ov40.children.find(c => c._classes.has('eol'));
+const ovTxt40 = eol40 ? eol40.children.map(ch => ch._html || '').join('') : '';
+assert('真结局遮罩不播放大段说明（message 已移出，由开花后点花承载）',
+  ovTxt40.indexOf('呋喃香豆素') < 0);
+assert('点穿遮罩到末帧「确认捕获」', sawFinal === true);
+ov40._ev.click[0]();   /* 确认 → 谢幕 + 发种子（带 message） */
+assert('确认捕获后：遮罩关闭、种子到手、花园图标出现',
+  window.__dump().endingOverlay === false && window.__dump().garden.seed === true &&
+  window.__garden.state().icon === true);
+/* message 已随种子记下（移出遮罩、收进 G.garden.narr） */
+const msg40 = window.__trueEndingMsg();
+assert('真名说明已存入 G.garden.narr（内容与案件数据一致）',
+  typeof msg40 === 'string' && msg40.length > 50 && window.__garden.narr() === msg40);
+/* 下种一枚并直接催熟到开花，打开花园窗 */
+window.__garden.plant(70, 24);
+window.__garden.plantAt(200000);   /* 这枚 ms>=190000 → 已 bloom */
+window.__garden.open();
+const gw40 = ids['desktop'].querySelector('.garden-win');
+assert('花园窗已开、存在开花株', !!gw40 && gw40.querySelectorAll('.gd-plant.bloom').length >= 1);
+/* 点开花株 → 花上方浮现叙事框，正文含真名说明 */
+const bloom40 = gw40.querySelector('.gd-plant.bloom');
+bloom40._ev.click[0]();
+const narr40 = gw40.querySelector('.gd-narr');
+assert('点开花株：花园窗内浮现叙事框 .gd-narr', !!narr40);
+assert('叙事框正文即真名说明（不进遮罩、改在花上承载）',
+  !!narr40 && String(narr40.querySelector('.gd-narr-body')._text || '').indexOf('呋喃香豆素') >= 0);
+assert('叙事框嵌在 .gd-field 内、跟随花园窗',
+  !!narr40 && !!narr40.parentNode && narr40.parentNode._classes.has('gd-field'));
+/* 再点同一株 → 关闭 */
+bloom40._ev.click[0]();
+assert('再点同一株：叙事框关闭', !gw40.querySelector('.gd-narr'));
+/* 点未开花株 → 不弹（只有 bloom 才触发） */
+const nonBloom40 = Array.from(gw40.querySelectorAll('.gd-plant')).find(p => !p._classes.has('bloom'));
+if (nonBloom40) nonBloom40._ev.click[0]();
+assert('点未开花株：不弹出叙事框', !gw40.querySelector('.gd-narr'));
 window.__garden.close();
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));

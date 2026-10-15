@@ -379,6 +379,16 @@
     background:var(--face-lo); box-shadow:var(--press); overflow:hidden}
   .gd-plant .gd-prog i{display:block; height:100%; width:0; background:var(--line); border-radius:4px}
   .gd-hint{margin-top:8px; font-size:10.5px; color:var(--faint); line-height:1.6}
+  /* 开花后点花浮现的叙事框：嵌在花园窗内、花朵上/下方，随窗移动；满宽、限高可滚，与浮窗同族 */
+  .gd-narr{position:absolute; left:8px; width:calc(100% - 16px); max-height:158px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-btn);
+    box-shadow:var(--win-shadow); z-index:6; display:flex; flex-direction:column; overflow:hidden}
+  .gd-narr-head{padding:3px 7px; border-bottom:1px solid var(--edge-soft);
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:10px; letter-spacing:1px; color:var(--muted)}
+  .gd-narr-x{cursor:pointer; padding:0 3px; color:var(--muted)}
+  .gd-narr-x:hover{color:var(--text)}
+  .gd-narr-body{padding:6px 8px; overflow:auto; font-size:10.5px; line-height:1.7; color:var(--text)}
   /* 结局清单：弱化存在，收在桌布左下角 */
   .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
   .memory{background:#dcd8c2; border:3px double #2b2b26; border-radius:var(--r-win); box-shadow:var(--win-shadow)}
@@ -2555,9 +2565,10 @@ function openDlgWin(n, ch, lineText){
   d.textContent = lineText;
   lines.appendChild(d);
   lines.scrollTop = lines.scrollHeight;
-  /* 每说一句都重新锚定（旧气泡的规矩）：台词追加窗体变高，底边始终压在人物上方 12px；
-     上方被视图上沿裁掉就退到人物下方，不盖住节点本身。 */
-  anchorAboveOrBelow(dlgWinEl, n, 12);
+  /* 仅首次为该角色开窗时锚定一次（旧气泡规矩：底边压在人物上方 12px，上方放不下退下方）。
+     同角色后续台词只追加不重锚定 —— 否则玩家拖动对话框后，一点「继续对话」就会弹回原位。
+     首次开窗后位置交还玩家自由拖动，刷新/换角色重开时仍会重新锚定。 */
+  if (!sameChar) anchorAboveOrBelow(dlgWinEl, n, 12);
   return dlgWinEl;
 }
 function showCharLine(n){
@@ -3877,7 +3888,9 @@ function buildStages(e){
   const st = [];
   (e.lines || []).forEach(l => st.push({ html: esc(l.text), delay: l.delay || 1200 }));
   if (e.isTrueCapture && e.truename) st.push({ html: "<div class='truename'>真名已识别<br>『" + esc(e.truename) + "』</div>", delay: 2000 });
-  st.push({ html: esc(e.message || ""), delay: 1600 });
+  /* 真名结局的大段「真名形成说明」不放进遮罩播 —— 改为开花后点花、用花园里的叙事框承载
+     （16-cases.js 的 openGardenNarr）。其余结局的 message 仍是遮罩主内容，照旧显示。 */
+  if (!e.isTrueCapture && e.message) st.push({ html: esc(e.message || ""), delay: 1600 });
   st.push({ html: "<div style='text-align:center'><span class='ebtn'>" + (e.isTrueCapture ? "确认捕获" : "收下这份记录") + "</span></div>", final: true });
   return st;
 }
@@ -4321,9 +4334,10 @@ document.getElementById("ending-overlay").addEventListener("click", () => {
   if (cur && cur.final){
     /* 末帧 = 「确认捕获 / 收下这份记录」。种子在这一刻才发（不是 triggerEnding）：
        玩家亲手点了确认，执行者头顶的对话框才挂出来 —— 谢幕与奖励一起落定。 */
-    const wasTrue = !!(endingState.ending && endingState.ending.isTrueCapture);
+    const e = endingState.ending;                 /* closeEnding 会清空 endingState，先存住 */
+    const wasTrue = !!(e && e.isTrueCapture);
     closeEnding();
-    if (wasTrue) grantGardenSeed();
+    if (wasTrue) grantGardenSeed(e && e.message);   /* 大段「真名形成说明」随种子记下，留待开花后点花呈现 */
     return;
   }
   clearTimeout(endingState.timer);
@@ -5467,24 +5481,34 @@ const GARDEN_STAGE_NAME = ["种子", "嫩芽", "展叶", "舒叶", "开花"];
 const GARDEN_STAGES = [0, 45000, 90000, 135000, 180000];
 /* 株的位置记成花圃地面的百分比（x/y ∈ 8..92 / 30..85），不跟窗体像素走 —— 换机器、缩放都不歪 */
 const GARDEN_X = [8, 92], GARDEN_Y = [30, 85];
-let gardenWinEl = null, gardenIconEl = null, gardenTimer = null, gardenDragLive = false;
+let gardenWinEl = null, gardenIconEl = null, gardenTimer = null, gardenDragLive = false, gardenNarrEl = null;
 
 function gardenOK(){ return !!G.garden; }
+/* 真名结局的大段「真名形成说明」：从案件数据里取（用于开花后点花呈现）；旧档里已有株却缺
+   narr 字段时回填，保证换机器 / 续档也能点花看到说明。 */
+function trueEndingMessage(){
+  const e = (typeof ENDINGS !== "undefined") && ENDINGS.find(x => x.isTrueCapture);
+  return e ? (e.message || "") : "";
+}
 /* 花圃清单：老档归一化 —— 旧「槽位时代」的存档里数组带 null 占位、株上没有坐标，
    在这里过滤 + 补一个散开的默认位置；正常路径只是原样返回。 */
 function gardenPlots(){
-  if (!G.garden) G.garden = { seed:false, plots:[] };
+  if (!G.garden) G.garden = { seed:false, plots:[], narr:null };
   if (!Array.isArray(G.garden.plots)) G.garden.plots = [];
   G.garden.plots = G.garden.plots.filter(Boolean);
   G.garden.plots.forEach((p, i) => {
     if (typeof p.x !== "number") p.x = 24 + (i % 4) * 18;
     if (typeof p.y !== "number") p.y = 58;
   });
+  /* 旧档迁移：捕获过真名、有株、但没存 narr（早期版本没这字段）→ 补回真名说明 */
+  if (G.garden.plots.some(Boolean) && !G.garden.narr) G.garden.narr = trueEndingMessage();
   return G.garden.plots;
 }
-/* 真结局发种子（确认捕获那一刻调，15-desktop.js）：只发一枚，种下之后（或旧档已有株）不再发 */
-function grantGardenSeed(){
-  if (!gardenOK()) G.garden = { seed:false, plots:[] };
+/* 真结局发种子（确认捕获那一刻调，15-desktop.js，带 message）：只发一枚，种下之后（或旧档
+   已有株）不再发；message 随种子一起记进 G.garden.narr，留待开花后点花用叙事框承载。 */
+function grantGardenSeed(msg){
+  if (!gardenOK()) G.garden = { seed:false, plots:[], narr:null };
+  if (msg) G.garden.narr = msg;          /* 幂等：重发（同结局）也只是覆盖同一段说明 */
   if (G.garden.seed || G.garden.plots.some(Boolean)) return;
   G.garden.seed = true;
   refreshInferWin();          /* 执行者头顶的对话框（窗开着立刻可见；重开会按状态重建） */
@@ -5587,12 +5611,13 @@ function openGardenWin(){
   refreshGardenWin();
   startGardenTicker();
 }
-function closeGardenWin(){ if (gardenWinEl){ gardenWinEl.remove(); gardenWinEl = null; } }
+function closeGardenWin(){ if (gardenWinEl){ closeGardenNarr(); gardenWinEl.remove(); gardenWinEl = null; } }
 function refreshGardenWin(){
   if (!gardenWinEl) return;
   const body = gardenWinEl.querySelector(".syswin-body");
   if (!body) return;
   body.innerHTML = "";
+  gardenNarrEl = null;            /* 重绘会换掉花株 DOM，叙事框一并清掉 */
   const field = document.createElement("div");
   field.className = "gd-field";
   gardenPlots().forEach(p => {
@@ -5659,6 +5684,55 @@ function makeGardenPlantDraggable(el, p){
   };
   el.addEventListener("pointerup", finish);
   el.addEventListener("pointercancel", finish);
+  /* 开花后点花：在花的上/下方浮现叙事框（仅点击、拖过不算）。点同一株关闭、点别株切换。 */
+  el.addEventListener("click", () => {
+    if (moved) return;                                  /* 刚拖过 → 吞掉这次点击 */
+    if (!el.classList.contains("bloom")) return;          /* 没开花不弹 */
+    if (!G.garden || !G.garden.narr) return;             /* 没有说明文字（非真结局）不弹 */
+    toggleGardenNarr(p, el);
+  });
+}
+
+/* ---- 开花后点花：嵌在花园窗内的叙事框（承载真名结局的 message）----
+   作为 .gd-field 的绝对定位子元素：优先贴在花上方，上方放不下（贴顶）退到花下方；横向满宽、贴左。
+   同一时刻只开一个；点同一株关闭、点别株切换。 */
+function closeGardenNarr(){ if (gardenNarrEl){ gardenNarrEl.remove(); gardenNarrEl = null; } }
+function openGardenNarr(p, plant){
+  if (!G.garden || !G.garden.narr) return;
+  closeGardenNarr();
+  const field = gardenWinEl && gardenWinEl.querySelector(".gd-field");
+  if (!field) return;
+  const box = document.createElement("div");
+  box.className = "gd-narr";
+  box._p = p;
+  const head = document.createElement("div");
+  head.className = "gd-narr-head";
+  head.textContent = "花魄 · 真名";
+  const x = document.createElement("span");
+  x.className = "gd-narr-x"; x.textContent = "×"; x.title = "关闭";
+  x.addEventListener("click", e => { e.stopPropagation(); closeGardenNarr(); });
+  head.appendChild(x);
+  const body = document.createElement("div");
+  body.className = "gd-narr-body";
+  body.textContent = G.garden.narr;
+  box.appendChild(head); box.appendChild(body);
+  field.appendChild(box);
+  /* 先按实际尺寸定位：优先花上方，上方不够（贴顶或花靠上）则退到花下方；都溢则夹回窗口内 */
+  const fr = field.getBoundingClientRect();
+  const fh = fr.height || 190, fw = fr.width || 278;
+  const py = p.y / 100 * fh;
+  const bh = box.offsetHeight || 120;
+  const gap = 8;
+  let top = py - gap - bh;
+  if (top < 4) top = py + gap;                          /* 上方放不下 → 下方 */
+  if (top + bh > fh - 4) top = Math.max(4, fh - bh - 4);/* 整体仍溢 → 夹进窗口 */
+  box.style.top = top + "px";
+  box.style.left = "8px";
+  gardenNarrEl = box;
+}
+function toggleGardenNarr(p, plant){
+  if (gardenNarrEl && gardenNarrEl._p === p){ closeGardenNarr(); return; }
+  openGardenNarr(p, plant);
 }
 /* 每秒看一眼：窗开着才动 DOM；跨过开花那一刻弹一枚 toast（每株一次，记在株上）。
    存档回来时花早已开过（超过 10 秒）就静默补记，不补弹。
@@ -5783,7 +5857,8 @@ window.__garden = {
     plots: gardenOK() ? gardenPlots().map(p => ({ stage: gardenStageOf(p), at: p.at, hit: !!p.hit, x: p.x, y: p.y })) : null,
     icon: !!gardenIconEl, win: !!gardenWinEl
   }),
-  grant: () => grantGardenSeed(),
+  grant: (msg) => grantGardenSeed(msg),
+  narr: () => G.garden ? G.garden.narr : null,
   plant: (cx, cy) => gardenPlant(cx, cy),
   plantAt: ms => { if (!gardenOK()) return false;
     const i = gardenPlots().length;
@@ -5792,6 +5867,11 @@ window.__garden = {
     refreshGardenWin(); refreshGardenIcon(); return true; },
   open: () => openGardenWin(),
   close: () => closeGardenWin()
+};
+/* 真名结局的「真名形成说明」原文（开花后点花叙事框的内容来源；验证用） */
+window.__trueEndingMsg = () => {
+  const e = (typeof ENDINGS !== "undefined") && ENDINGS.find(x => x.isTrueCapture);
+  return e ? (e.message || null) : null;
 };
 window.__playStep = () => { if (memoryPlay) advanceMemory(); else if (endingState) playEndingStage(); };
 window.__intro = {

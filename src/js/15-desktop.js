@@ -145,9 +145,10 @@ document.getElementById("ending-overlay").addEventListener("click", () => {
   if (cur && cur.final){
     /* 末帧 = 「确认捕获 / 收下这份记录」。种子在这一刻才发（不是 triggerEnding）：
        玩家亲手点了确认，执行者头顶的对话框才挂出来 —— 谢幕与奖励一起落定。 */
-    const wasTrue = !!(endingState.ending && endingState.ending.isTrueCapture);
+    const e = endingState.ending;                 /* closeEnding 会清空 endingState，先存住 */
+    const wasTrue = !!(e && e.isTrueCapture);
     closeEnding();
-    if (wasTrue) grantGardenSeed();
+    if (wasTrue) grantGardenSeed(e && e.message);   /* 大段「真名形成说明」随种子记下，留待开花后点花呈现 */
     return;
   }
   clearTimeout(endingState.timer);
