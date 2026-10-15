@@ -424,6 +424,19 @@
   .memory .syswin-x{border-color:#8a8672; color:#e6e3d2; background:#2b2b26}
   .mem-line{margin-bottom:6px}
   .mem-line.talk{color:#5c584a}
+  /* ---- 回忆小剧场（.mem-play）：沿用 .memory 血统（黑标题栏 + 暗纸身 #dcd8c2 + 3px 双线黑框），
+     再把「旁白 / 带头像的多人对话」排出来。比放映卡宽一档，头像列才不挤（332 宽时头像会顶掉正文）。
+     这里全部用字面色值、不碰 :root token：它和结局遮罩一样是"另一种纸"，不该反染全局配色。 ---- */
+  .memory.mem-play{width:420px}
+  .mem-play .mem-line{margin-bottom:8px; line-height:1.85}
+  .mem-play .mem-say{display:flex; gap:9px; align-items:flex-start; margin-bottom:9px}
+  .mem-play .mp-av{flex:0 0 40px; width:40px; height:40px; border-radius:9px; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; background:#ccc7ad; border:1px solid #8a8672}
+  .mem-play .mp-av img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  .mem-play .mp-ini{font-size:19px; font-weight:700; color:#5c584a}
+  .mem-play .mp-say-main{flex:1 1 auto; min-width:0}
+  .mem-play .mp-name{font-size:11px; font-weight:700; letter-spacing:1px; color:#5c584a; margin-bottom:1px}
+  .mem-play .mp-text{font-size:13px; line-height:1.8}
   #ending-overlay{position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(24,23,20,.97);
     z-index:100; display:none; color:#e6e3d2; cursor:pointer; user-select:none}
   #ending-overlay .eol{max-width:640px; margin:12vh auto 0; padding:0 26px; font-size:15px; line-height:2.1; white-space:pre-wrap}
@@ -889,7 +902,7 @@ function iconSvg(name, size){
    每个案件一份与 <script id="gamedata"> 同构的数据对象。applyCaseData() 负责把数据
    装进下面这些模块级绑定，因此它们必须是 let（切换案件时整体替换）。 */
 let DATA, SCENES, ITEMS, CHARS, CLUES, START, ENDINGS;
-let REUSABLE_TOOLS, LIGHT_SOURCES, SCENE_MEMORY;
+let REUSABLE_TOOLS, LIGHT_SOURCES, SCENE_MEMORY, MEMORIES;
 
 function applyCaseData(data){
   DATA   = data || {};
@@ -910,6 +923,8 @@ function applyCaseData(data){
   LIGHT_SOURCES  = cfg.lightSources  || ["ITEM_taideng"];
   /* 日期闪回场景：首次展开时放 MEMORY 放映卡 */
   SCENE_MEMORY   = cfg.memoryScenes  || ["SCENES_0602", "SCENES_0704"];
+  /* 回忆小剧场：时间 × 地点 × 人物 三者凑齐后演出的脚本（见 13-matrix.js 的 lookupMemory） */
+  MEMORIES       = DATA.memories || [];
 }
 applyCaseData(JSON.parse(document.getElementById("gamedata").textContent));
 /* 五感槽位名 */
@@ -947,8 +962,9 @@ function snapshot(){
   /* 节点上只存「图结构 + 真正会变的状态」；容器身份不存（kind + 数据表现算），
      「新」角标（n.unread）也不存 —— 那是"玩家还没点过这个节点"，属于玩家知识，
      跟 seenTexts 一个性质，不随撤销 / 续档回滚（见 restore 里的接力）。
-     `installed` 要存：它是**真的会变的状态**（给唱机装上唱针），装没装上得跟着撤销 / 续档走。 */
-  for (const k in G.nodes){ const n = G.nodes[k]; nodes[k] = { key:n.key, kind:n.kind, id:n.id, label:n.label, x:n.x, y:n.y, lit:n.lit, pinned:n.pinned, homeScene:n.homeScene, stored:n.stored, storedIn:n.storedIn, bagFrom:n.bagFrom, installed:n.installed }; }
+     `installed` 要存：它是**真的会变的状态**（给唱机装上唱针），装没装上得跟着撤销 / 续档走。
+     `place` 同理：时间节点绑上的「发生地点」（回忆小剧场的第一步），撤销要能把这一步退回去。 */
+  for (const k in G.nodes){ const n = G.nodes[k]; nodes[k] = { key:n.key, kind:n.kind, id:n.id, label:n.label, x:n.x, y:n.y, lit:n.lit, pinned:n.pinned, homeScene:n.homeScene, stored:n.stored, storedIn:n.storedIn, bagFrom:n.bagFrom, installed:n.installed, place:n.place }; }
   return JSON.stringify({
     nodes: nodes, edges: G.edges,
     explored:[...G.explored], captured:[...G.captured], tried:[...G.tried],
@@ -1269,6 +1285,10 @@ function revealScene(sid, silent){
     else focusOn([sn.key].concat(fresh, newKeys));
     renarrScene(sid);
   }
+  /* 时间节点：它同时是「回忆小剧场」的锚点（时间 × 地点 × 人物，见 05-combine.js）。
+     这里的两行提示都会出 —— 「TEC 档案解读」与「回忆组合」是两条互不替代的路。 */
+  if (firstTime && !silent && isTimeId(sid))
+    log("「" + esc(s.title || sid) + "」可以当一段回忆的锚点（把它拖到一个地点上，再拖一个人物上去）", "sys");
   if (firstTime && !silent && ((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[sid])
     log("「" + esc(s.title || sid) + "」似乎有可以解读的档案（把场景节点拖给 TEC 分析）", "sys");
   updateTecBadge();
@@ -1306,6 +1326,40 @@ function attemptCombo(toolKey, targetKey){
       (sceneLocs(tool.id).indexOf(target.id) >= 0 || sceneLocs(target.id).indexOf(tool.id) >= 0)){
     revealScene(target.id);
     log("前往场景 <b>" + esc(target.label) + "</b>", "act");
+    return;
+  }
+  /* 1.5) 回忆小剧场（A-001 的 6月2日 / 7月4日）：时间 × 地点 × 人物 三者凑齐才演出。
+         第一步 —— 时间 × 地点：把一个**时间节点**拖到某个**场景**上 ⇒ 就地绑定地点（n.place），
+         不新增节点（节点数不膨胀、撤销天然可用）。标签末尾挂上地点，看得见这一步生效了。
+         第二步 —— 再拖一个**人物**到绑好地点的时间节点上 ⇒ 按 when × who × where 查回忆表。
+         两条都插在「两个场景之间没有直接通路」之前：时间节点也是场景，不拦下来会被判成"走不过去"。 */
+  const tNode = tool.kind === "time" ? tool : (target.kind === "time" ? target : null);
+  const oNode = tNode === tool ? target : tool;          /* 时间节点对面的那一个 */
+  if (tNode && oNode && oNode.kind === "loc"){
+    if (tNode.place === oNode.id){
+      fail(tNode, oNode, "「" + plain(tNode.label) + "」已经记着这个地点了");
+    } else {
+      tNode.place = oNode.id;
+      log("「" + esc(tNode.label) + "」记下了地点：<b>" + esc(oNode.label) +
+          "</b>（再拖一个人物上去，看看那天发生了什么）", "sys");
+      render();              /* 只重绘（节点副行要跟着变）：这里不该再跑一遍自动布局，把玩家刚摆好的位置揉乱 */
+    }
+    return;
+  }
+  /* 第二步：人物 ×（时间 × 地点）—— 命中的是**时间节点**（它身上带着 when 与 place），人物给 who */
+  const mWhen = target.kind === "time" ? target : (tool.kind === "time" ? tool : null);
+  const mWho  = mWhen === target ? tool : target;
+  if (mWhen && mWho && mWho.kind === "char"){
+    const entry = lookupMemory(mWhen.id, mWho.id, mWhen.place);
+    if (entry){
+      G.tried.add(triedKey);
+      showMemoryPlay(entry, mWhen);
+      log("想起了一段回忆：<b>" + esc(entry.title || entry.id) + "</b>", "sys");
+    } else {
+      fail(mWhen, mWho, mWhen.place
+        ? "「" + plain((SCENES[mWhen.place] || {}).title || mWhen.place) + "」里没有「" + plain(mWho.label) + "」的回忆"
+        : "「" + plain(mWhen.label) + "」还不知道发生在哪里（先把它拖到一个地点上）");
+    }
     return;
   }
   /* 两个场景之间没有直接通路：这是"走不过去"，明确说清楚，不往下走反应表 */
@@ -1692,9 +1746,13 @@ function layout(){
   });
 }
 
-/* ============ 渲染 ============ */
-const NODE_W = { loc:152, item:130, char:130, clue:130 };
-const NODE_H = { loc:54, item:46, char:46, clue:46 };
+/* ============ 渲染 ============
+   节点尺寸表：**每个 kind 都必须在这里**（time 与 loc 同尺寸 —— 时间节点也挂 scene-node 类）。
+   漏一个的后果不是"尺寸不对"，而是**锚定浮窗直接算废**：anchorAboveOrBelow / showBubble /
+   右键菜单都用 `n.x + NODE_W[n.kind] / 2`，undefined 一路把 left 算成 NaN，浏览器丢弃非法值、
+   退回自动定位 —— 窗口跑到屏幕外，看着像"没弹出来"（DOM stub 里 style.left = "NaNpx" 是能断言的）。 */
+const NODE_W = { loc:152, item:130, char:130, clue:130, time:152 };
+const NODE_H = { loc:54, item:46, char:46, clue:46, time:54 };
 
 /* ============ 拖动收尾登记表 ============
    任何「拖到一半可能被 render() 打断」的手势都在这里登记一个 abort 回调。
@@ -1750,6 +1808,9 @@ function render(){
 
     let sub = isContainerNode(n) ? (G.collapsed.has(n.id) ? "已折叠 · 双击展开" : (G.explored.has(n.id) ? "已探索" : "未探索 · 双击展开")) : kindName(n.kind);
     if (n.kind === "clue" && G.captured.has(n.id)) sub = "线索 · 已捕获";
+    /* 时间节点记下了地点（「时间 × 地点」那一步，见 05-combine.js）：副行挂上「◈ 地点」，
+       一眼看得出这段回忆已经落到哪个场景上 —— 这是那一步唯一的即时反馈（不换符号、不加角标）。 */
+    if (n.kind === "time" && n.place && SCENES[n.place]) sub = "◈ " + SCENES[n.place].title;
     el.innerHTML = "<div class='n-title'>" + esc(n.label) + "</div><div class='n-sub'>" + esc(sub) + "</div>";
 
     /* 「条件进入」角标已撤（2026-10-14，用户要求）。它是一枚**实心**药丸，和「新 / 对话 N」
@@ -4096,8 +4157,19 @@ function closeEnding(){
   updateCrumbs();
 }
 
-/* ============ 记忆场景放映卡（A-001 日期闪回） ============ */
+/* ============ 记忆放映卡 / 回忆小剧场（A-001 日期闪回） ============
+   两种载体共用同一台状态机（memoryPlay + playMemoryLine + advanceMemory）：
+     · 放映卡 showMemoryCard —— 展开日期节点时放，正文 +「——角色：台词」逐行；
+     · 小剧场 showMemoryPlay —— 时间 × 地点 × 人物 凑齐时演，旁白 + 带头像的多人对话。
+   行的形状统一成对象 {t:"narr"|"talk"|"say", text, who}；旧的纯字符串行也兜得住
+   （memLineSpec 会在读的时候现归一到同一个形状）。 */
 let memoryPlay = null;
+function memLineSpec(raw){
+  if (raw && typeof raw === "object")
+    return { t: raw.t || "narr", text: String(raw.text == null ? "" : raw.text), who: raw.who || null };
+  const s = String(raw == null ? "" : raw);
+  return { t: s.startsWith("——") ? "talk" : "narr", text: s, who: null };
+}
 function showMemoryCard(n, s){
   closeNarr();
   const w = makeWindow("MEMORY // " + (s.title || n.id), closeNarr);
@@ -4107,30 +4179,95 @@ function showMemoryCard(n, s){
   makeFloatDraggable(c, true);                       /* 整卡可拖（与对话气泡一致），点/拖靠 _dragged 区分 */
   c.addEventListener("click", () => { if (!c._dragged) advanceMemory(); });
   world.appendChild(c);
-  anchorAboveOrBelow(c, n, 14);            /* 锚在节点上方，上方放不下则退到下方，不盖节点 */
   narrEl = c;
-  const lines = narrText(s.content || s.desc || "").split("\n").map(t => t.trim()).filter(Boolean);
+  const lines = narrText(s.content || s.desc || "").split("\n").map(t => t.trim()).filter(Boolean)
+    .map(t => ({ t: "narr", text: t }));
   sceneTags(n.id).forEach(t => {
     if (t.kind !== "char") return;
     const ch = CHARS[t.id];
     const st = ch && (ch.sceneTalks || {})[n.id];
-    (st || []).forEach(l => lines.push("——" + (ch.name || t.id) + "：" + plain(l.text || "")));
+    (st || []).forEach(l => lines.push({ t: "talk", text: "——" + (ch.name || t.id) + "：" + plain(l.text || "") }));
   });
   memoryPlay = { el: c, body: w.body, lines: lines, idx: 0, typing: false, cur: null, curText: "" };
   playMemoryLine();
+  /* 锚定必须放在第一行落下去之后：空窗口量到的高度只有标题栏那点，算出来的 top 偏下，
+     第一行一出现卡片就压住节点（`anchorAboveOrBelow` 承诺的是"不盖节点"）。 */
+  anchorAboveOrBelow(c, n, 14);
+}
+
+/* ---- 回忆小剧场：时间 × 地点 × 人物 三者凑齐后的演出（05-combine.js 里接线） ---- */
+/* 匹配器：when（时间节点 id）× who（人物 id）× where（绑在时间节点上的地点 id）三者全中才算命中 */
+function lookupMemory(when, who, where){
+  if (!when || !who || !where) return null;
+  return MEMORIES.find(m => m.when === when && m.who === who && m.where === where) || null;
+}
+/* 脚本 → 行对象。文本走 plain()：数据里若写了 [clue:…] / [char:…] 这类标签，这里就地换成可读名字。
+   注意**不在这里捕获线索** —— 回忆是"重看"，不该变成第二条拿线索的路（展开日期节点放的放映卡同样是只看不拿）。 */
+function memLinesOf(entry){
+  return (entry && entry.script || [])
+    .map(x => ({ t: x.t === "say" ? "say" : "narr", who: x.t === "say" ? x.who : null, text: plain(x.text || "") }))
+    .filter(x => x.text);
+}
+function showMemoryPlay(entry, n){
+  if (!entry || !n) return false;
+  closeNarr();                              /* 单例：开演前先收掉放映卡 / 上一场 */
+  const w = makeWindow("MEMORY // " + (entry.title || entry.id), closeNarr);
+  const c = w.el;
+  c.className = "narr-card memory mem-play syswin";   /* memory 血统 + mem-play 只加剧场的那几处排版 */
+  c.title = "单击任意位置推进下一行，按住可拖动";
+  makeFloatDraggable(c, true);              /* 整框可拖（与放映卡同一套），点/拖靠 _dragged 区分 */
+  c.addEventListener("click", () => { if (!c._dragged) advanceMemory(); });
+  world.appendChild(c);
+  narrEl = c;
+  memoryPlay = { el: c, body: w.body, lines: memLinesOf(entry), idx: 0, typing: false, cur: null, curText: "", entry: entry.id };
+  playMemoryLine();
+  anchorAboveOrBelow(c, n, 14);   /* 同放映卡：等第一行落下去再锚，空窗口的高度算不准 */
+  return true;
 }
 function playMemoryLine(){
   const mp = memoryPlay;
   if (!mp || !narrEl || mp.el !== narrEl){ memoryPlay = null; return; }
   if (mp.idx >= mp.lines.length){ memoryPlay = null; return; }
-  const txt = mp.lines[mp.idx];
-  const d = document.createElement("div");
-  d.className = txt.startsWith("——") ? "mem-line talk" : "mem-line";
-  mp.body.appendChild(d);
+  const spec = memLineSpec(mp.lines[mp.idx]);
+  let target;
+  if (spec.t === "say"){
+    /* 带头像的一行：左头像列（有美术稿用图，没有退首字方块 —— 与名册 / 对话窗同一退路）+ 右名字与台词。
+       **头像不加 .tec-avatar 类**：那个类在窗口拖动排除表里，挂上去这一行就没法拖着走了
+       （剧场整框该能拖，与放映卡一致）；带自己的点击处理器才需要进排除表，这里没有。 */
+    const ch = CHARS[spec.who] || {};
+    const nm = ch.name || spec.who || "";
+    const row = document.createElement("div");
+    row.className = "mem-say";
+    const av = document.createElement("div");
+    av.className = "mp-av";
+    const art = rosterAvatar(spec.who);
+    if (art){
+      const im = document.createElement("img");
+      im.src = art; im.alt = nm; im.draggable = false;
+      av.appendChild(im);
+    } else {
+      const ini = document.createElement("span");
+      ini.className = "mp-ini"; ini.textContent = nm.slice(0, 1);
+      av.appendChild(ini);
+    }
+    const main = document.createElement("div");
+    main.className = "mp-say-main";
+    const nmEl = document.createElement("div");
+    nmEl.className = "mp-name"; nmEl.textContent = nm;
+    target = document.createElement("div");
+    target.className = "mp-text";
+    main.appendChild(nmEl); main.appendChild(target);
+    row.appendChild(av); row.appendChild(main);
+    mp.body.appendChild(row);
+  } else {
+    target = document.createElement("div");
+    target.className = "mem-line" + (spec.t === "talk" ? " talk" : "");
+    mp.body.appendChild(target);
+  }
   mp.idx++;
   /* 每行也走打字机；打完就停在那儿等玩家点 —— 不再 700ms 自动换行（改成点击推进） */
-  mp.typing = true; mp.cur = d; mp.curText = txt;
-  typeInto(d, txt, { done: () => { mp.typing = false; } });
+  mp.typing = true; mp.cur = target; mp.curText = spec.text;
+  typeInto(target, spec.text, { done: () => { mp.typing = false; } });
 }
 /* 单次推进：本行还在打字 -> 先补全本句；已打完 -> 换下一行（视觉小说通行做法） */
 function advanceMemory(){
@@ -6177,6 +6314,16 @@ window.__avatarConfirm = () => confirmAvatarPick();
 window.__select = key => key ? selectNode(key) : clearSelection();
 window.__closeFloats = () => { closeBubble(); closeDlgWin(); closeNarr(); closePwPop(); };
 window.__renarr = sid => renarrScene(sid);
+/* 回忆小剧场（时间 × 地点 × 人物）：数据表 / 匹配器 / 当前演出进度 / 时间节点绑上的地点 */
+window.__memories = () => (MEMORIES || []).map(m => ({ id:m.id, when:m.when, where:m.where, who:m.who, title:m.title,
+  lines:(m.script || []).length,
+  kinds:(m.script || []).map(x => x.t),
+  cast:(m.script || []).filter(x => x.t === "say").map(x => x.who) }));
+window.__lookupMemory = (when, who, where) => { const e = lookupMemory(when, who, where); return e ? e.id : null; };
+window.__memoryState = () => memoryPlay
+  ? { open:true, idx:memoryPlay.idx, total:memoryPlay.lines.length, entry:memoryPlay.entry || null }
+  : { open:false, idx:0, total:0, entry:null };
+window.__placeOf = key => (G.nodes[key] || {}).place || null;
 window.__hit   = (cx, cy) => { const e = hitTest(cx, cy, null); return e ? e.dataset.key : null; };
 window.__switchCase = id => enterCase(id);
 window.__closeCase = () => closeCase();

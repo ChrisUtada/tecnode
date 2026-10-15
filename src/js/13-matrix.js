@@ -456,8 +456,19 @@ function closeEnding(){
   updateCrumbs();
 }
 
-/* ============ 记忆场景放映卡（A-001 日期闪回） ============ */
+/* ============ 记忆放映卡 / 回忆小剧场（A-001 日期闪回） ============
+   两种载体共用同一台状态机（memoryPlay + playMemoryLine + advanceMemory）：
+     · 放映卡 showMemoryCard —— 展开日期节点时放，正文 +「——角色：台词」逐行；
+     · 小剧场 showMemoryPlay —— 时间 × 地点 × 人物 凑齐时演，旁白 + 带头像的多人对话。
+   行的形状统一成对象 {t:"narr"|"talk"|"say", text, who}；旧的纯字符串行也兜得住
+   （memLineSpec 会在读的时候现归一到同一个形状）。 */
 let memoryPlay = null;
+function memLineSpec(raw){
+  if (raw && typeof raw === "object")
+    return { t: raw.t || "narr", text: String(raw.text == null ? "" : raw.text), who: raw.who || null };
+  const s = String(raw == null ? "" : raw);
+  return { t: s.startsWith("——") ? "talk" : "narr", text: s, who: null };
+}
 function showMemoryCard(n, s){
   closeNarr();
   const w = makeWindow("MEMORY // " + (s.title || n.id), closeNarr);
@@ -467,30 +478,95 @@ function showMemoryCard(n, s){
   makeFloatDraggable(c, true);                       /* 整卡可拖（与对话气泡一致），点/拖靠 _dragged 区分 */
   c.addEventListener("click", () => { if (!c._dragged) advanceMemory(); });
   world.appendChild(c);
-  anchorAboveOrBelow(c, n, 14);            /* 锚在节点上方，上方放不下则退到下方，不盖节点 */
   narrEl = c;
-  const lines = narrText(s.content || s.desc || "").split("\n").map(t => t.trim()).filter(Boolean);
+  const lines = narrText(s.content || s.desc || "").split("\n").map(t => t.trim()).filter(Boolean)
+    .map(t => ({ t: "narr", text: t }));
   sceneTags(n.id).forEach(t => {
     if (t.kind !== "char") return;
     const ch = CHARS[t.id];
     const st = ch && (ch.sceneTalks || {})[n.id];
-    (st || []).forEach(l => lines.push("——" + (ch.name || t.id) + "：" + plain(l.text || "")));
+    (st || []).forEach(l => lines.push({ t: "talk", text: "——" + (ch.name || t.id) + "：" + plain(l.text || "") }));
   });
   memoryPlay = { el: c, body: w.body, lines: lines, idx: 0, typing: false, cur: null, curText: "" };
   playMemoryLine();
+  /* 锚定必须放在第一行落下去之后：空窗口量到的高度只有标题栏那点，算出来的 top 偏下，
+     第一行一出现卡片就压住节点（`anchorAboveOrBelow` 承诺的是"不盖节点"）。 */
+  anchorAboveOrBelow(c, n, 14);
+}
+
+/* ---- 回忆小剧场：时间 × 地点 × 人物 三者凑齐后的演出（05-combine.js 里接线） ---- */
+/* 匹配器：when（时间节点 id）× who（人物 id）× where（绑在时间节点上的地点 id）三者全中才算命中 */
+function lookupMemory(when, who, where){
+  if (!when || !who || !where) return null;
+  return MEMORIES.find(m => m.when === when && m.who === who && m.where === where) || null;
+}
+/* 脚本 → 行对象。文本走 plain()：数据里若写了 [clue:…] / [char:…] 这类标签，这里就地换成可读名字。
+   注意**不在这里捕获线索** —— 回忆是"重看"，不该变成第二条拿线索的路（展开日期节点放的放映卡同样是只看不拿）。 */
+function memLinesOf(entry){
+  return (entry && entry.script || [])
+    .map(x => ({ t: x.t === "say" ? "say" : "narr", who: x.t === "say" ? x.who : null, text: plain(x.text || "") }))
+    .filter(x => x.text);
+}
+function showMemoryPlay(entry, n){
+  if (!entry || !n) return false;
+  closeNarr();                              /* 单例：开演前先收掉放映卡 / 上一场 */
+  const w = makeWindow("MEMORY // " + (entry.title || entry.id), closeNarr);
+  const c = w.el;
+  c.className = "narr-card memory mem-play syswin";   /* memory 血统 + mem-play 只加剧场的那几处排版 */
+  c.title = "单击任意位置推进下一行，按住可拖动";
+  makeFloatDraggable(c, true);              /* 整框可拖（与放映卡同一套），点/拖靠 _dragged 区分 */
+  c.addEventListener("click", () => { if (!c._dragged) advanceMemory(); });
+  world.appendChild(c);
+  narrEl = c;
+  memoryPlay = { el: c, body: w.body, lines: memLinesOf(entry), idx: 0, typing: false, cur: null, curText: "", entry: entry.id };
+  playMemoryLine();
+  anchorAboveOrBelow(c, n, 14);   /* 同放映卡：等第一行落下去再锚，空窗口的高度算不准 */
+  return true;
 }
 function playMemoryLine(){
   const mp = memoryPlay;
   if (!mp || !narrEl || mp.el !== narrEl){ memoryPlay = null; return; }
   if (mp.idx >= mp.lines.length){ memoryPlay = null; return; }
-  const txt = mp.lines[mp.idx];
-  const d = document.createElement("div");
-  d.className = txt.startsWith("——") ? "mem-line talk" : "mem-line";
-  mp.body.appendChild(d);
+  const spec = memLineSpec(mp.lines[mp.idx]);
+  let target;
+  if (spec.t === "say"){
+    /* 带头像的一行：左头像列（有美术稿用图，没有退首字方块 —— 与名册 / 对话窗同一退路）+ 右名字与台词。
+       **头像不加 .tec-avatar 类**：那个类在窗口拖动排除表里，挂上去这一行就没法拖着走了
+       （剧场整框该能拖，与放映卡一致）；带自己的点击处理器才需要进排除表，这里没有。 */
+    const ch = CHARS[spec.who] || {};
+    const nm = ch.name || spec.who || "";
+    const row = document.createElement("div");
+    row.className = "mem-say";
+    const av = document.createElement("div");
+    av.className = "mp-av";
+    const art = rosterAvatar(spec.who);
+    if (art){
+      const im = document.createElement("img");
+      im.src = art; im.alt = nm; im.draggable = false;
+      av.appendChild(im);
+    } else {
+      const ini = document.createElement("span");
+      ini.className = "mp-ini"; ini.textContent = nm.slice(0, 1);
+      av.appendChild(ini);
+    }
+    const main = document.createElement("div");
+    main.className = "mp-say-main";
+    const nmEl = document.createElement("div");
+    nmEl.className = "mp-name"; nmEl.textContent = nm;
+    target = document.createElement("div");
+    target.className = "mp-text";
+    main.appendChild(nmEl); main.appendChild(target);
+    row.appendChild(av); row.appendChild(main);
+    mp.body.appendChild(row);
+  } else {
+    target = document.createElement("div");
+    target.className = "mem-line" + (spec.t === "talk" ? " talk" : "");
+    mp.body.appendChild(target);
+  }
   mp.idx++;
   /* 每行也走打字机；打完就停在那儿等玩家点 —— 不再 700ms 自动换行（改成点击推进） */
-  mp.typing = true; mp.cur = d; mp.curText = txt;
-  typeInto(d, txt, { done: () => { mp.typing = false; } });
+  mp.typing = true; mp.cur = target; mp.curText = spec.text;
+  typeInto(target, spec.text, { done: () => { mp.typing = false; } });
 }
 /* 单次推进：本行还在打字 -> 先补全本句；已打完 -> 换下一行（视觉小说通行做法） */
 function advanceMemory(){

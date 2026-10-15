@@ -148,6 +148,16 @@ window.__avatarConfirm = () => confirmAvatarPick();
 window.__select = key => key ? selectNode(key) : clearSelection();
 window.__closeFloats = () => { closeBubble(); closeDlgWin(); closeNarr(); closePwPop(); };
 window.__renarr = sid => renarrScene(sid);
+/* 回忆小剧场（时间 × 地点 × 人物）：数据表 / 匹配器 / 当前演出进度 / 时间节点绑上的地点 */
+window.__memories = () => (MEMORIES || []).map(m => ({ id:m.id, when:m.when, where:m.where, who:m.who, title:m.title,
+  lines:(m.script || []).length,
+  kinds:(m.script || []).map(x => x.t),
+  cast:(m.script || []).filter(x => x.t === "say").map(x => x.who) }));
+window.__lookupMemory = (when, who, where) => { const e = lookupMemory(when, who, where); return e ? e.id : null; };
+window.__memoryState = () => memoryPlay
+  ? { open:true, idx:memoryPlay.idx, total:memoryPlay.lines.length, entry:memoryPlay.entry || null }
+  : { open:false, idx:0, total:0, entry:null };
+window.__placeOf = key => (G.nodes[key] || {}).place || null;
 window.__hit   = (cx, cy) => { const e = hitTest(cx, cy, null); return e ? e.dataset.key : null; };
 window.__switchCase = id => enterCase(id);
 window.__closeCase = () => closeCase();

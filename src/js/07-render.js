@@ -59,9 +59,13 @@ function layout(){
   });
 }
 
-/* ============ 渲染 ============ */
-const NODE_W = { loc:152, item:130, char:130, clue:130 };
-const NODE_H = { loc:54, item:46, char:46, clue:46 };
+/* ============ 渲染 ============
+   节点尺寸表：**每个 kind 都必须在这里**（time 与 loc 同尺寸 —— 时间节点也挂 scene-node 类）。
+   漏一个的后果不是"尺寸不对"，而是**锚定浮窗直接算废**：anchorAboveOrBelow / showBubble /
+   右键菜单都用 `n.x + NODE_W[n.kind] / 2`，undefined 一路把 left 算成 NaN，浏览器丢弃非法值、
+   退回自动定位 —— 窗口跑到屏幕外，看着像"没弹出来"（DOM stub 里 style.left = "NaNpx" 是能断言的）。 */
+const NODE_W = { loc:152, item:130, char:130, clue:130, time:152 };
+const NODE_H = { loc:54, item:46, char:46, clue:46, time:54 };
 
 /* ============ 拖动收尾登记表 ============
    任何「拖到一半可能被 render() 打断」的手势都在这里登记一个 abort 回调。
@@ -117,6 +121,9 @@ function render(){
 
     let sub = isContainerNode(n) ? (G.collapsed.has(n.id) ? "已折叠 · 双击展开" : (G.explored.has(n.id) ? "已探索" : "未探索 · 双击展开")) : kindName(n.kind);
     if (n.kind === "clue" && G.captured.has(n.id)) sub = "线索 · 已捕获";
+    /* 时间节点记下了地点（「时间 × 地点」那一步，见 05-combine.js）：副行挂上「◈ 地点」，
+       一眼看得出这段回忆已经落到哪个场景上 —— 这是那一步唯一的即时反馈（不换符号、不加角标）。 */
+    if (n.kind === "time" && n.place && SCENES[n.place]) sub = "◈ " + SCENES[n.place].title;
     el.innerHTML = "<div class='n-title'>" + esc(n.label) + "</div><div class='n-sub'>" + esc(sub) + "</div>";
 
     /* 「条件进入」角标已撤（2026-10-14，用户要求）。它是一枚**实心**药丸，和「新 / 对话 N」

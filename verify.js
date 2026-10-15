@@ -1128,6 +1128,10 @@ window.__reveal('SCENES_0602');
 assert('记忆场景弹放映卡', window.__dump().floats.narr === true);
 const memCard = ids['world'].children.find(c => c._classes.has('narr-card') && c._classes.has('memory'));
 assert('放映卡有 memory 样式', !!memCard);
+/* 时间节点也是"被锚定的宿主"：定位必须落在节点上方。left/top 一旦是 NaN（NODE_W 漏了 time 键
+   就会这样），stub 里照样看得见 —— 浏览器会丢弃非法值退回自动定位，真机上窗口直接跑出屏幕。 */
+assert('放映卡定位是实数（left / top 都不是 NaN）',
+  !!memCard && /^-?[\d.]+px$/.test(memCard.style.left || '') && /^-?[\d.]+px$/.test(memCard.style.top || ''));
 const memLines = () => memCard.querySelector('.syswin-body').children.length;
 if (memCard){
   const bodyBefore = memLines();
@@ -3124,6 +3128,11 @@ assert('从数据引用推画布键统一走 nodeKeyOfRef（源码检查）',
 assert('.node.time-node 的双线框与 ◆ 符号（源码检查）',
   /\.node\.time-node\{border:3px double #2b2b26\}/.test(html) &&
   /\.node\.time-node \.n-title::before\{content:"◆ "\}/.test(html));
+/* 尺寸表必须覆盖 time：锚定浮窗（放映卡 / 回忆小剧场 / 右键菜单）都按 n.x + NODE_W[n.kind] 算中心，
+   漏了这一键 ⇒ undefined ⇒ left 算成 NaN ⇒ 浏览器丢弃非法值 ⇒ 窗口自动定位、跑到屏幕外。 */
+assert('NODE_W / NODE_H 都带上 time 键（漏了会让锚定浮窗的 left 变 NaN）',
+  /const NODE_W = \{ loc:152, item:130, char:130, clue:130, time:152 \};/.test(html)
+  && /const NODE_H = \{ loc:54, item:46, char:46, clue:46, time:54 \};/.test(html));
 
 window.__ensure("time", "SCENES_0602");
 window.__ensure("time", "SCENES_0704");
@@ -3140,6 +3149,141 @@ const lg40 = logs.length;
 window.__combo("time:SCENES_0602", "time:SCENES_0704");
 assert('两个时间节点之间仍判「没有直接通路」，不落反应表噪音',
   logs.length === lg40 + 1 && logs[logs.length - 1].indexOf('没有直接通路') >= 0);
+
+/* ==================== 回忆小剧场：时间 × 地点 × 人物 ====================
+   三步：拖「时间」到「地点」（就地绑定 n.place，不新增节点）→ 拖「人物」到时间节点 →
+   按 when × who × where 查 DATA.memories。数据仍留在 SCENES 表、引用仍写 [loc:日期]；
+   lookupMemory 是唯一的匹配入口，三键全中才算数（缺一个都不演）。 */
+console.log('\n=== 回忆小剧场（时间 × 地点 × 人物） ===');
+
+const memsT = window.__memories();
+assert('memories 表随案件数据装载', memsT.length === 6);
+assert('lookupMemory 三键全中才命中',
+  window.__lookupMemory("SCENES_0602", "CHARS_luhengs", "SCENES_garden") === "MEM_0602_lhs"
+  && window.__lookupMemory("SCENES_0704", "CHARS_zs", "SCENES_garden") === "MEM_0704_zs");
+assert('缺 when / who / where 任一 = 未命中',
+  window.__lookupMemory("SCENES_0602", "CHARS_luhengs", null) === null
+  && window.__lookupMemory("SCENES_0602", null, "SCENES_garden") === null
+  && window.__lookupMemory(null, "CHARS_luhengs", "SCENES_garden") === null);
+assert('地点对不上 = 未命中（换场景不会误演别的回忆）',
+  window.__lookupMemory("SCENES_0602", "CHARS_luhengs", "SCENES_mdhm") === null);
+assert('每条回忆都有 when / where / who / title 与非空脚本',
+  memsT.every(m => m.when && m.where && m.who && m.title && m.lines > 0));
+assert('脚本行只认 narr / say 两种（别种写法一律不排进来）',
+  memsT.every(m => m.kinds.every(t => t === "narr" || t === "say")));
+assert('多数条目含对话行（叙事 + 带头像的多人对话 是混排的，不是清一色旁白）',
+  memsT.filter(m => m.kinds.indexOf("say") >= 0).length >= 4);
+assert('say 行都写了 who（否则那一行没有头像与名字）', memsT.every(m => m.cast.every(Boolean)));
+assert('when 只落在 SCENE_MEMORY 里的日期上（时间节点判据认它）',
+  [...new Set(memsT.map(m => m.when))].sort().join(',') === 'SCENES_0602,SCENES_0704');
+assert('where 是真实场景（副行取得到它的标题）',
+  [...new Set(memsT.map(m => m.where))].join(',') === 'SCENES_garden');
+assert('6 条回忆全部能被三键命中（数据自洽）',
+  memsT.every(m => window.__lookupMemory(m.when, m.who, m.where) === m.id));
+
+/* 静态：匹配与接线必须落在正确的位置 */
+assert('回忆分支插在「两个场景之间没有直接通路」之前（时间节点也是场景，不拦下来会被判成走不过去）',
+  html.indexOf('lookupMemory(mWhen.id, mWho.id, mWhen.place)') > 0
+  && html.indexOf('lookupMemory(mWhen.id, mWho.id, mWhen.place)') < html.indexOf('这两个场景之间没有直接通路'));
+assert('n.place 进快照 —— 撤销要把「绑定地点」这一步退回去',
+  /bagFrom:n\.bagFrom, installed:n\.installed, place:n\.place/.test(html));
+assert('时间节点副行挂出绑定的地点（源码检查）',
+  /n\.kind === "time" && n\.place && SCENES\[n\.place\]/.test(html));
+assert('剧场与放映卡共用一台状态机（memoryPlay / playMemoryLine / advanceMemory）',
+  /function showMemoryPlay\(entry, n\)\{/.test(html) && /function lookupMemory\(when, who, where\)\{/.test(html)
+  && html.indexOf('memoryPlay = { el: c, body: w.body, lines: memLinesOf(entry)') > 0);
+assert('剧场头像**不复用** .tec-avatar —— 那个类在窗口拖动排除表里，挂了整框就拖不动',
+  /av\.className = "mp-av";/.test(html) && html.indexOf(',.mp-av,') < 0);
+const memLinesFn = (() => { const s = html.slice(html.indexOf('function memLinesOf(entry){')); return s.slice(0, s.indexOf('\n}')); })();
+assert('回忆是「重看」：脚本行只做标签转名字，不当第二条拿线索的路',
+  memLinesFn.indexOf('gotClues') < 0 && memLinesFn.indexOf('plain(') > 0);
+
+/* 备好画布：花园（地点）+ 6月2日（时间节点，连带那天在场的人物一起上画布） */
+window.__reveal("SCENES_garden");
+window.__reveal("SCENES_0602");
+window.__closeFloats();
+const nodesBefore41 = window.__dump().nodes.length;
+
+/* ---- 第一步：时间 × 地点 ---- */
+window.__combo("time:SCENES_0602", "loc:SCENES_garden");
+assert('拖时间到地点 ⇒ 就地绑定 n.place（不新增节点）',
+  window.__placeOf("time:SCENES_0602") === "SCENES_garden"
+  && window.__dump().nodes.length === nodesBefore41);
+assert('绑定后副行挂上「◈ 地点」（这一步唯一的即时反馈）',
+  (findEl("time:SCENES_0602")._html || "").indexOf("◈ 植物学家的花园") >= 0);
+assert('只改这一个节点，别的不受影响',
+  window.__placeOf("time:SCENES_0704") === null && window.__placeOf("loc:SCENES_garden") === null);
+assert('绑定会留一条案卷（说得清这一步做了什么）',
+  logs.length > 0 && logs[logs.length - 1].indexOf('记下了地点') >= 0);
+
+/* 反向（地点拖到时间）同样成立，并且这一步进撤销栈 —— 撤销要把 place 退回 null */
+window.__combo("loc:SCENES_garden", "time:SCENES_0704");
+assert('反向（地点拖到时间）同样成立', window.__placeOf("time:SCENES_0704") === "SCENES_garden");
+ids['btn-undo']._ev.click[0]();
+assert('撤销把「绑定地点」退回去（place 进了快照），早先那一条不受影响',
+  window.__placeOf("time:SCENES_0704") === null && window.__placeOf("time:SCENES_0602") === "SCENES_garden");
+
+/* ---- 第二步：人物 ×（时间 × 地点） ---- */
+/* (a) 时间节点还没绑地点：只提示先给地点，不误演、不放任落进通用反应表 */
+window.__combo("char:CHARS_luhengs", "time:SCENES_0704");
+assert('时间节点没绑地点时拖人物上去 ⇒ 提示先给地点，不误演',
+  window.__memoryState().open === false
+  && logs.length > 0 && logs[logs.length - 1].indexOf('还不知道发生在哪里') >= 0);
+/* (b) 绑了地点、但这段回忆确实不在这里：说清「谁 / 在哪」没有，而不是"没有反应"那种噪音 */
+window.__combo("time:SCENES_0704", "loc:SCENES_garden");
+window.__combo("char:CHARS_JS", "time:SCENES_0704");
+assert('地点对得上、但没有这个人的回忆 ⇒ 明确说没有（且不误演）',
+  window.__memoryState().open === false
+  && logs.length > 0 && logs[logs.length - 1].indexOf('没有「槿杉」的回忆') >= 0);
+/* (c) 三键齐了（时间 × 地点 × 人物）⇒ 命中回忆表并演出小剧场 */
+window.__combo("char:CHARS_luhengs", "time:SCENES_0602");
+assert('三键齐了 ⇒ 命中并演出回忆小剧场',
+  window.__memoryState().open === true && window.__memoryState().entry === "MEM_0602_lhs");
+const mpEl = ids['world'].children.find(c => c._classes.has('mem-play'));
+assert('剧场是 .memory 血统（黑标题栏 / 暗纸身 / 3px 双线黑框都跟着来）',
+  !!mpEl && mpEl._classes.has('memory') && mpEl._classes.has('narr-card'));
+assert('剧场锚在时间节点上方，定位是实数（left / top 都不是 NaN）',
+  !!mpEl && /^-?[\d.]+px$/.test(mpEl.style.left || '') && /^-?[\d.]+px$/.test(mpEl.style.top || ''));
+assert('剧场标题 = MEMORY // 回忆名',
+  !!mpEl && (mpEl.querySelector('.syswin-title') || {})._text === 'MEMORY // 6月2日 · 陆珩松');
+assert('案卷留下「想起了一段回忆」', logs.length > 0 && logs[logs.length - 1].indexOf('想起了一段回忆') >= 0);
+
+const mpBody = () => mpEl.querySelector('.syswin-body');
+const mpLineCount = () => mpBody().children.length;
+let guard41 = 0;
+while (window.__memoryState().open && guard41++ < 40) window.__playStep();
+assert('逐行推进到脚本末尾（6 行全排出来）', mpLineCount() === 6);
+const sayRows = mpBody().children.filter(c => c._classes.has('mem-say'));
+assert('对话行带头像列（每行恰好一个头像位）',
+  sayRows.length === 4 && sayRows.every(r => {
+    const av = r.querySelector('.mp-av');
+    return !!av && av.children.length === 1;
+  }));
+assert('对话行的名字取自 CHARS（不是节点标签）',
+  sayRows.map(r => (r.querySelector('.mp-name') || {})._text).join('|') === '傅柏|陆珩松|陆珩松|槿杉');
+assert('没有美术稿的角色退首字方块（TEC / 执行者才有真图）',
+  sayRows.every(r => { const ini = (r.querySelector('.mp-av') || {}).querySelector && r.querySelector('.mp-av').querySelector('.mp-ini'); return !!ini && !!ini._text; }));
+assert('旁白行不带头像（头像只属于 say 行）',
+  mpBody().children.filter(c => c._classes.has('mem-line')).length === 2);
+assert('台词走打字机并落到行元素上（与放映卡同一套 typeInto）',
+  sayRows.every(r => ((r.querySelector('.mp-text') || {})._text || '').length > 0));
+
+/* 点击推进 + 拖过不算（与放映卡同一套口径） */
+window.__combo("char:CHARS_zs", "time:SCENES_0602");
+const mpEl2 = ids['world'].children.find(c => c._classes.has('mem-play'));
+const mp2Lines = () => mpEl2.querySelector('.syswin-body').children.length;
+const mp2Before = mp2Lines();
+mpEl2._ev.click[0]();
+assert('点剧场任意位置推进下一行', mp2Lines() > mp2Before);
+mpEl2._ev.pointerdown[0]({ button: 0, pointerId: 1, clientX: 500, clientY: 300, stopPropagation(){}, preventDefault(){} });
+mpEl2._ev.pointermove[0]({ clientX: 566, clientY: 334 });
+mpEl2._ev.pointerup[0]({});
+const mp2Drag = mp2Lines();
+mpEl2._ev.click[0]();
+assert('剧场拖过之后点击不推进（整框可拖）', mp2Lines() === mp2Drag);
+window.__closeFloats();
+assert('关浮层把剧场一并收掉（与放映卡同一个 closeNarr 出口）',
+  window.__memoryState().open === false && !ids['world'].children.some(c => c._classes.has('mem-play')));
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

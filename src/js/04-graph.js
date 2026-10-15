@@ -76,6 +76,10 @@ function revealScene(sid, silent){
     else focusOn([sn.key].concat(fresh, newKeys));
     renarrScene(sid);
   }
+  /* 时间节点：它同时是「回忆小剧场」的锚点（时间 × 地点 × 人物，见 05-combine.js）。
+     这里的两行提示都会出 —— 「TEC 档案解读」与「回忆组合」是两条互不替代的路。 */
+  if (firstTime && !silent && isTimeId(sid))
+    log("「" + esc(s.title || sid) + "」可以当一段回忆的锚点（把它拖到一个地点上，再拖一个人物上去）", "sys");
   if (firstTime && !silent && ((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[sid])
     log("「" + esc(s.title || sid) + "」似乎有可以解读的档案（把场景节点拖给 TEC 分析）", "sys");
   updateTecBadge();

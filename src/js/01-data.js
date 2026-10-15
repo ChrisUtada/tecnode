@@ -3,7 +3,7 @@
    每个案件一份与 <script id="gamedata"> 同构的数据对象。applyCaseData() 负责把数据
    装进下面这些模块级绑定，因此它们必须是 let（切换案件时整体替换）。 */
 let DATA, SCENES, ITEMS, CHARS, CLUES, START, ENDINGS;
-let REUSABLE_TOOLS, LIGHT_SOURCES, SCENE_MEMORY;
+let REUSABLE_TOOLS, LIGHT_SOURCES, SCENE_MEMORY, MEMORIES;
 
 function applyCaseData(data){
   DATA   = data || {};
@@ -24,6 +24,8 @@ function applyCaseData(data){
   LIGHT_SOURCES  = cfg.lightSources  || ["ITEM_taideng"];
   /* 日期闪回场景：首次展开时放 MEMORY 放映卡 */
   SCENE_MEMORY   = cfg.memoryScenes  || ["SCENES_0602", "SCENES_0704"];
+  /* 回忆小剧场：时间 × 地点 × 人物 三者凑齐后演出的脚本（见 13-matrix.js 的 lookupMemory） */
+  MEMORIES       = DATA.memories || [];
 }
 applyCaseData(JSON.parse(document.getElementById("gamedata").textContent));
 /* 五感槽位名 */
