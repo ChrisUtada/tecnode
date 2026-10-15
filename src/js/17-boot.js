@@ -68,6 +68,14 @@ window.__bag = key => bagStore(key);
 window.__bagTake = key => bagTake(key);
 window.__pin = key => { const n = G.nodes[key]; if (n) togglePin(n); };
 window.__bagToggle = () => toggleBagWin();
+/* 收纳窗「拖出」（2026-10-16）：带落点的取回 / 跨窗搬运 / 归位 —— 等价于把那一行拖到对应落点。
+   不带坐标的 __bagTake / __ledgerTake 仍是「单击一行」的旧口径（放回图标旁边）。 */
+window.__bagTakeAt = (key, cx, cy) => bagTake(key, cx, cy);
+window.__bagToLedger = key => bagToLedger(key);
+window.__bagToMatrix = key => bagToMatrix(key);
+window.__ledgerTakeAt = (key, cx, cy) => ledgerTake(key, cx, cy);
+window.__ledgerToBag = key => ledgerToBag(key);
+window.__overBagDrop = (cx, cy) => overBagDrop(cx, cy);
 window.__cap = key => attemptCapture(key);
 window.__noteSeen = t => noteSeen(t);
 window.__goto = sid => gotoScene(sid);

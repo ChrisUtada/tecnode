@@ -51,7 +51,9 @@
      （outline 画在本元素盒子外侧，不受自身 overflow:hidden 影响） */
   .bag-win.over{outline:2px dashed var(--text); outline-offset:3px}
   .bag-item{display:flex; justify-content:space-between; align-items:baseline; gap:8px;
-    padding:6px 8px; border-radius:var(--r-btn); cursor:pointer; font-size:12.5px; transition:background .12s, box-shadow .12s}
+    padding:6px 8px; border-radius:var(--r-btn); cursor:grab; font-size:12.5px; transition:background .12s, box-shadow .12s}
+  /* 行是「拖得进也拖得出」的：光标给出可拖的暗示（.node / .gd-plant 同一套 grab → grabbing） */
+  .bag-item:active{cursor:grabbing}
   .bag-item:hover{background:var(--bg); box-shadow:var(--press)}
   .bag-item .src{color:var(--faint); font-size:10.5px; white-space:nowrap}
   .bag-empty{color:var(--faint); font-size:12px; padding:4px 2px}
@@ -80,6 +82,9 @@
   /* 线索册 = 收纳盒：不分组、无状态列，感官直接标在行尾（整表已按五感排序，排序本身就是分组） */
   .goto-item .st.sense{color:var(--muted); letter-spacing:1px}
   .clue-win .syswin-body .goto-item, .people-win .syswin-body .goto-item{margin:2px 5px}
+  /* 只有线索册的行是可拖的（册里的行能拖去袋 / 桌布 / 画布）；档案与名册的行只可点，别一起带下水 */
+  .clue-win .syswin-body .goto-item{cursor:grab}
+  .clue-win .syswin-body .goto-item:active{cursor:grabbing}
   /* 人物名册：每行一个头像（48×48 —— 24×24 在真机上认不出是谁）。
      素材源图是 72×72，缩到 48 仍是一档下采样，细节还在；再往上放就该换更清晰的图了。
      只作用于人物窗 —— 档案与线索册同样复用 .goto-item，别把它们一起带下水。 */

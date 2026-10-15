@@ -105,7 +105,9 @@ function refreshGotoWin(){
    册子里只有已收纳的线索：一条一行，感官直接标在行尾，整表按五感顺序自动排序（同感自然相邻），
    不再分组、不再标归位状态，也不给未捕获 / 未收纳的线索留位——册子就是盒子，装什么显示什么。
    点一行 = 取回画布（回到线索册图标旁并选中，详情窗顺势展开全文）；
-   按住一行拖到推演桌布（或推演器图标）上松手 = 直接归位，不必先点回画布再拖一遍。 */
+   按住一行拖走 = 三个落点（2026-10-16 补齐）：另一个收纳窗（证物袋）/ 推演桌布（或推演器图标）/ 画布。
+   拖到画布松手 = 取回，**就落在松手那一点**（跟手，与推演桌布拖出同一口径）；
+   前两者不必先点回画布再拖一遍。 */
 let clueWinEl = null;
 function closeClueWin(){ if (clueWinEl){ clueWinEl.remove(); clueWinEl = null; } }
 function toggleClueWin(){
@@ -130,21 +132,30 @@ function ledgerStore(key){
   recomputeHidden(); layout(); render(); refreshClueWin();
   return true;
 }
-function ledgerTake(key){
+function ledgerTake(key, cx, cy){
   const n = G.nodes[key];
   if (!n || n.storedIn !== "LEDGER") return false;
   /* 案件窗关着时不能取：取出是放回画布的操作，不能对看不见的画布施展 */
   if (!requireCase()) return false;
   pushHistory();
   n.stored = false; n.storedIn = null; n.hidden = false; markFresh(n);
-  /* 取回到线索册图标附近的画布位置（屏幕坐标换算成世界坐标） */
-  const icon = document.getElementById("clue-icon");
-  if (icon){
-    const r = icon.getBoundingClientRect();
-    const wpt = toWorld(r.left + r.width / 2, r.top - 40);
-    n.x = wpt.x; n.y = wpt.y;
+  /* 带落点 = 从册里**拖出来**：落在松手那一点（与 bagTake / boardTake 同一口径 ——
+     先换算成世界坐标、**再**减去半张卡；这条路上不跑 layout()，跟手落下的位置不该被弹簧推走）。
+     不带落点 = 单击一行：仍旧放回线索册图标旁边的画布位置，并重整一次版（旧口径）。 */
+  const dropped = (cx != null && cy != null);
+  if (dropped){
+    const wpt = toWorld(cx, cy);
+    n.x = wpt.x - (NODE_W[n.kind] || 130) / 2; n.y = wpt.y - (NODE_H[n.kind] || 46) / 2;
+  } else {
+    const icon = document.getElementById("clue-icon");
+    if (icon){
+      const r = icon.getBoundingClientRect();
+      const wpt = toWorld(r.left + r.width / 2, r.top - 40);
+      n.x = wpt.x; n.y = wpt.y;
+    }
+    layout();
   }
-  layout(); render(); refreshClueWin();
+  render(); refreshClueWin();
   return true;
 }
 /* 排序键 = 五感顺序（SENSES 的键序）* 1000 + 线索在数据里的书写顺序，等价于「先按感官、再按原序」 */
@@ -255,17 +266,26 @@ function ledgerToMatrix(key){
   if (!requireCase()) return false;
   return assignClue(key, sense);
 }
+/* 册 → 袋：跨窗搬运（与 bagToLedger 对称的那一半）。袋什么都收，所以不设种类门；
+   内核走 restash（只改 storedIn、重画两个清单、不跑 layout()），与 boardToLedger 同款。 */
+function ledgerToBag(key){
+  return restash(key, "LEDGER", "BAG");
+}
 /* 行上的指针拖拽：镜像**不克隆行** —— 一旦拖离册子就以「节点块」现身
    （mx-chip.node，与桌布上的归位 chip 同款观感），居中跟手（#drag-layer）；
-   松手在落点外 = 弹回册中（无动作）。 */
+   松手落在三个落点之外 = 取回画布（跟手），不弹回册中。 */
 function makeLedgerRowDraggable(row, key){
   let dragging = false, moved = false, wasMoved = false, sx = 0, sy = 0,
       mirror = null, mw = 0, mh = 0, sr = null;
+  /* 三个落点的高亮都要能撤（袋窗 / 袋图标 / 桌布 / 推演器图标） */
   const clearOver = () => {
     const bd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
     if (bd) bd.classList.remove("over");
     const ic = document.getElementById("infer-icon");
     if (ic && ic.classList) ic.classList.remove("over");
+    if (bagWinEl && bagWinEl.classList) bagWinEl.classList.remove("over");
+    const bi = document.getElementById("bag-dock");
+    if (bi && bi.classList) bi.classList.remove("over");
   };
   /* 被 render() 打断时的收尾（见 07-render.js 的登记表）：摘镜像、把行放回来 */
   const abortRowDrag = () => {
@@ -301,6 +321,16 @@ function makeLedgerRowDraggable(row, key){
     }
     mirror.style.left = (e.clientX - sr.left - mw / 2) + "px";
     mirror.style.top  = (e.clientY - sr.top  - mh / 2) + "px";
+    /* 落点高亮：袋窗 / 袋图标（跨窗搬运）、桌布（归位）。桌布只在推演窗开着时存在。 */
+    if (bagWinEl && bagWinEl.classList){
+      const r = bagWinEl.getBoundingClientRect();
+      bagWinEl.classList.toggle("over", e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+    }
+    const bi = document.getElementById("bag-dock");
+    if (bi && bi.classList){
+      const r = bi.getBoundingClientRect();
+      bi.classList.toggle("over", e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+    }
     const bd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
     if (bd){
       const r = bd.getBoundingClientRect();
@@ -316,7 +346,10 @@ function makeLedgerRowDraggable(row, key){
     clearOver();
     if (moved) wasMoved = true;
     if (!moved || !e) return;
-    if (overMatrixDrop(e.clientX, e.clientY)) ledgerToMatrix(key);
+    /* 落点判定顺序即优先级：先判「另一个收纳窗」，再判桌布，其余一律算画布。 */
+    if (overBagDrop(e.clientX, e.clientY)){ ledgerToBag(key); return; }
+    if (overMatrixDrop(e.clientX, e.clientY)){ ledgerToMatrix(key); return; }
+    ledgerTake(key, e.clientX, e.clientY);   /* 落在画布上：取回，就落在松手那一点 */
   };
   row.addEventListener("pointerup", finish);
   row.addEventListener("pointercancel", () => { unregisterDrag(abortRowDrag); abortRowDrag(); });

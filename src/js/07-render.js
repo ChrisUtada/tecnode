@@ -162,6 +162,9 @@ function render(){
   updateBagBadge();
   updateLedgerBadge();
   updateInferBadge();
+  refreshBagWin();      /* 三扇清单窗一律跟着图刷新（关着时是空操作）：任何一个节点的 storedIn
+                           变了，对应的窗都得当场改。原先只刷册 / 推演 / 名册，漏了袋窗 ——
+                           「袋里的线索直接拖上桌布」（assignClue）就会留下一行幽灵条目。 */
   refreshClueWin();     /* 开着的索引窗跟着图刷新（关着时是空操作） */
   refreshPeopleWin();
   refreshInferWin();    /* 推演窗同理：阵列与执行者头顶的种子对话框都是状态驱动的，

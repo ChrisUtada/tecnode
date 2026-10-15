@@ -2772,11 +2772,15 @@ assert('花园窗与全桌浮窗同一族样式（card 底 / edge 描边 / 圆�
 assert('生长计时改用进度条：倒计时文字与 fmtGardenLeft 已删（源码检查）',
   html.indexOf('gd-prog') >= 0 && html.indexOf('GARDEN_STAGES[4] * 100') >= 0 &&
   html.indexOf('还差 ') < 0 && html.indexOf('fmtGardenLeft') < 0);
-assert('册中行拖着走：镜像 + 落点判定 + 归位接线（源码检查）',
+assert('册中行拖着走：镜像 + 三个落点 + 归位接线（源码检查）',
   html.indexOf('function overMatrixDrop(cx, cy){') >= 0 &&
+  html.indexOf('function overBagDrop(cx, cy){') >= 0 &&
   html.indexOf('function ledgerToMatrix(key){') >= 0 &&
   html.indexOf('function makeLedgerRowDraggable(row, key){') >= 0 &&
-  html.indexOf('if (overMatrixDrop(e.clientX, e.clientY)) ledgerToMatrix(key);') >= 0 &&
+  /* 落点判定顺序即优先级：袋在前、桌布在后，其余一律算画布（落在画布上 = 取回，跟手） */
+  html.indexOf('if (overBagDrop(e.clientX, e.clientY)){ ledgerToBag(key); return; }') >= 0 &&
+  html.indexOf('if (overMatrixDrop(e.clientX, e.clientY)){ ledgerToMatrix(key); return; }') >= 0 &&
+  html.indexOf('ledgerTake(key, e.clientX, e.clientY);') >= 0 &&
   html.indexOf('window.__ledgerToMatrix = key => ledgerToMatrix(key);') >= 0);
 assert('册行点击仍是取回、拖过的那一下不连发（源码检查）',
   html.indexOf('if (wasMoved){ wasMoved = false; return; }') >= 0);
@@ -2816,19 +2820,29 @@ assert('归位后册窗清单同步少一行、册里不再有它',
   clueWin39.querySelectorAll('.goto-item').length === rowsBefore39 - 1 &&
   window.__clueLedger().every(c => c.id !== 'CLUES_gcs'));
 assert('松手后桌布高亮已清', !board39._classes.has('over'));
-/* 拖到桌布与图标之外 = 弹回册中；刚拖完的那一下 click 不取回，再点一次才取回 */
+/* 拖过的那一下之后紧跟的 click 必须被吞掉 —— 否则归位的线索会被顺手取回画布（白归位一次） */
+row39._ev.click[0]();
+assert('刚拖完的那一下 click 不连发（归位的线索没被顺手取回画布）',
+  window.__dump().storedIn[K39] === 'MATRIX');
+/* 拖到三个落点之外 = **取回画布**，就落在松手那一点（跟手，与桌布拖出同一口径） */
 window.__boardTake('CLUES_gcs', 'vision');
 window.__ledgerStore(K39);
 const idx39 = window.__clueLedger().findIndex(c => c.id === 'CLUES_gcs');
 const rowB39 = clueWin39.querySelectorAll('.goto-item')[idx39];
+const V39 = window.__dump().view;
+const dx39 = 500, dy39 = 500;
+const expX39 = (dx39 - V39.x) / V39.k - 65;    /* 世界坐标 - NODE_W.clue/2 = 130/2 */
+const expY39 = (dy39 - V39.y) / V39.k - 23;    /* 世界坐标 - NODE_H.clue/2 = 46/2  */
 rowB39._ev.pointerdown[0]({ button:0, clientX:8, clientY:8, pointerId:1 });
-rowB39._ev.pointermove[0]({ clientX:500, clientY:500 });
-rowB39._ev.pointerup[0]({ clientX:500, clientY:500 });
-assert('拖到落点之外 = 弹回册中（仍是 LEDGER）', window.__dump().storedIn[K39] === 'LEDGER');
+rowB39._ev.pointermove[0]({ clientX:dx39, clientY:dy39 });
+rowB39._ev.pointerup[0]({ clientX:dx39, clientY:dy39 });
+assert('拖到落点之外 = 取回画布（不再是弹回册中）',
+  window.__dump().storedIn[K39] === undefined && !!findEl(K39));
+assert('取回后落在松手那一点（先换世界坐标、再减半张卡）',
+  Math.abs(window.__dump().pos[K39].x - expX39) <= 1 && Math.abs(window.__dump().pos[K39].y - expY39) <= 1);
+/* 取回后这一行已经不在册里了，再点它也只是「没有这一条」（幂等，不炸） */
 rowB39._ev.click[0]();
-assert('刚拖完的那一下 click 不取回（仍在册）', window.__dump().storedIn[K39] === 'LEDGER');
-rowB39._ev.click[0]();
-assert('再点一次 = 正常取回画布', window.__dump().storedIn[K39] === undefined);
+assert('已取回的线索再点那一行是空操作（幂等）', window.__dump().storedIn[K39] === undefined);
 assert('非册中线索走不了这条路（画布上的再调 = false）', window.__ledgerToMatrix(K39) === false);
 /* ---- 花园进度条：生长中的株按真实时钟出条；开花后不再出条（进度条站在那里已无意义） ---- */
 window.__garden.plantAt(45000);
@@ -3284,6 +3298,197 @@ assert('剧场拖过之后点击不推进（整框可拖）', mp2Lines() === mp2
 window.__closeFloats();
 assert('关浮层把剧场一并收掉（与放映卡同一个 closeNarr 出口）',
   window.__memoryState().open === false && !ids['world'].children.some(c => c._classes.has('mem-play')));
+
+/* ==================== 收纳窗：拖得进，也要拖得出（证物袋 / 线索册） ====================
+   「拖进」早已有（画布节点 → 袋图标 / 袋窗 / 册图标 / 册窗，08-interact.js 的 iconHit 分支）。
+   这里补的是另一半：袋与册里的**行**都能按住拖出来。三个落点，判定顺序即优先级：
+     ① 另一个收纳窗（袋 ↔ 册，跨窗搬运）  ② 推演桌布（线索归位）  ③ 画布（取回，跟手）。
+   单击一行仍是旧口径（取回并放回图标旁边），拖拽是它的加速版。
+   两条「不跑 layout()」：跟手落下的位置、以及跨窗搬运，都不该让弹簧把别的节点一起重排。 */
+console.log('\n=== 收纳窗拖出（证物袋 / 线索册） ===');
+
+/* ---- 静态：接线必须完整 ---- */
+assert('袋里一行挂上了指针拖拽（不再是裸 click）',
+  html.indexOf('makeBagRowDraggable(d, n.key)') >= 0 &&
+  html.indexOf('d.addEventListener("click", () => bagTake(n.key))') < 0);
+assert('袋 / 册两侧的取回都认「带落点」这一支（拖出来 = 落在松手那一点）',
+  /function bagTake\(key, cx, cy\)\{/.test(html) && /function ledgerTake\(key, cx, cy\)\{/.test(html) &&
+  (html.match(/const dropped = \(cx != null && cy != null\);/g) || []).length === 2);
+assert('跟手落点：先换世界坐标、再减半张卡（不能在屏幕坐标里先减，k≠1 时差一个 k 倍）',
+  (html.match(/n\.x = wpt\.x - \(NODE_W\[n\.kind\] \|\| 130\) \/ 2; n\.y = wpt\.y - \(NODE_H\[n\.kind\] \|\| 46\) \/ 2;/g) || []).length === 2);
+assert('袋行落点判定三个都在，且顺序 = 册 → 桌布 → 画布（缺一个就有一条路静默失效）',
+  html.indexOf('if (overLedgerDrop(e.clientX, e.clientY)){ bagToLedger(key); return; }') >= 0 &&
+  html.indexOf('if (overMatrixDrop(e.clientX, e.clientY)){ bagToMatrix(key); return; }') >= 0 &&
+  html.indexOf('bagTake(key, e.clientX, e.clientY);') >= 0);
+assert('跨窗搬运与 boardToLedger 同款：只改 storedIn、不跑 layout()（搬一条不该重排摆位）',
+  html.indexOf('function restash(key, from, to){') >= 0 &&
+  html.indexOf('if (!n || !n.stored || n.storedIn !== from || from === to) return false;') >= 0);
+assert('袋 → 册只放行线索（说法与 ledgerStore 逐字一致）',
+  html.indexOf('function bagToLedger(key){') >= 0 && html.indexOf('只有线索能收进线索册') >= 0);
+assert('袋 / 册里的行都换成可拖光标（档案与名册的行不动，它们只可点）',
+  html.indexOf('.bag-item:active{cursor:grabbing}') >= 0 &&
+  html.indexOf('.clue-win .syswin-body .goto-item{cursor:grab}') >= 0 &&
+  html.indexOf('.clue-win .syswin-body .goto-item:active{cursor:grabbing}') >= 0);
+assert('拖出三件套都有无头钩子（把「拖到某个落点」降成一次调用）',
+  html.indexOf('window.__bagTakeAt = (key, cx, cy) => bagTake(key, cx, cy);') >= 0 &&
+  html.indexOf('window.__bagToLedger = key => bagToLedger(key);') >= 0 &&
+  html.indexOf('window.__bagToMatrix = key => bagToMatrix(key);') >= 0 &&
+  html.indexOf('window.__ledgerToBag = key => ledgerToBag(key);') >= 0 &&
+  html.indexOf('window.__overBagDrop = (cx, cy) => overBagDrop(cx, cy);') >= 0);
+/* 三扇清单窗必须在 render() 里一起刷：漏掉谁，谁的清单就会留下「幽灵条目」
+   （实测：袋里的线索直接拖上桌布后，袋窗还挂着那一行） */
+const renderFn40 = (() => { const s = html.slice(html.indexOf('function render(){')); return s.slice(0, s.indexOf('\n}')); })();
+assert('袋窗与册窗都在 render() 里跟着图刷新（三扇清单窗同一套口径）',
+  renderFn40.indexOf('refreshBagWin()') > 0 && renderFn40.indexOf('refreshClueWin()') > 0);
+
+/* ---- 运行时 ---- */
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+window.__closeFloats();
+assert('准备：案件窗展开中（取回 / 搬运都走 requireCase 这道门）', window.__caseInfo().open === true);
+
+const K40 = 'item:ITEMS_zsq';                 /* 注射器：花园里的普通物品（非线索） */
+assert('准备：注射器在画布上', !!findEl(K40));
+
+/* (1) 两种入口给出不同落点：拖动 = 跟手；单击 = 回图标旁边（旧口径没改） */
+assert('先把注射器收进袋子', window.__bag(K40) === true && window.__dump().storedIn[K40] === 'BAG');
+const V40 = window.__dump().view;
+const dx40 = 520, dy40 = 430;
+assert('带落点取回：回到画布上', window.__bagTakeAt(K40, dx40, dy40) === true);
+assert('落点 = 松手那一点（世界坐标 - 半张卡；NODE_W.item 130 / NODE_H.item 46）',
+  Math.abs(window.__dump().pos[K40].x - ((dx40 - V40.x) / V40.k - 65)) <= 1 &&
+  Math.abs(window.__dump().pos[K40].y - ((dy40 - V40.y) / V40.k - 23)) <= 1);
+const dropX40 = (dx40 - V40.x) / V40.k - 65;
+window.__bag(K40);
+/* 先右键钉住再接单击取回：layout() 是带随机项的弹簧（07-render.js 里有 Math.random），
+   不钉住的话"回到袋子旁边"会被它随机推走几像素，量不出确定值。钉住 = 只看落点算法本身。 */
+window.__pin(K40);
+window.__bagTake(K40);                        /* 不带坐标 = 单击那一行 */
+const dk40 = ids['bag-dock'].getBoundingClientRect();
+const homeX40 = (dk40.left + dk40.width / 2 - V40.x) / V40.k;
+const homeY40 = (dk40.top - 40 - V40.y) / V40.k;
+assert('单击取回仍是旧口径：回到袋子旁边（锚点是袋图标，不是松手那一点）',
+  window.__dump().storedIn[K40] === undefined &&
+  Math.abs(window.__dump().pos[K40].x - homeX40) <= 1 && Math.abs(window.__dump().pos[K40].y - homeY40) <= 1);
+assert('两条入口的落点确实不同（没被合并成一条）', Math.abs(homeX40 - dropX40) > 20);
+window.__pin(K40);                            /* 取消钉住，别把这条状态留给后面的用例 */
+
+/* (2) 跨窗搬运：袋 ↔ 册 */
+const C40 = 'clue:CLUES_V_luheng';
+window.__ensure('clue', 'CLUES_V_luheng');
+/* 把一条线索拉回画布（三种收纳状态都兜住），后面几步都要一个干净的起点 */
+function toCanvas40(key){
+  const w = window.__dump().storedIn[key];
+  if (!w) return;
+  if (w === 'LEDGER'){ window.__ledgerTake(key); return; }
+  if (w === 'BAG'){ window.__bagTake(key); return; }
+  if (w === 'MATRIX'){
+    const raw = key.slice(5), mx = window.__dump().matrix;
+    Object.keys(mx).forEach(s => { if (mx[s].indexOf(raw) >= 0) window.__boardTake(raw, s); });
+  }
+}
+toCanvas40(C40);
+assert('准备：贯穿伤线索已在画布上', window.__dump().storedIn[C40] === undefined);
+window.__bag(C40);
+if (!window.__dump().floats.bag) ids['bag-dock']._ev.dblclick[0]();
+if (!window.__dump().floats.clue) window.__clueToggle();
+const bagWin40 = ids['desktop'].querySelector('.bag-win');
+const clueWin40 = ids['desktop'].querySelector('.clue-win');
+const ledgerN40 = window.__dump().ledger.length;
+assert('准备：线索在袋里、两扇收纳窗都开着、袋窗清单 1 条',
+  window.__dump().storedIn[C40] === 'BAG' && !!bagWin40 && !!clueWin40 &&
+  bagWin40.querySelectorAll('.bag-item').length === 1 &&
+  bagWin40.querySelectorAll('.bag-item')[0]._ev.pointerdown);
+assert('袋 → 册：改归册子（跨窗搬运）',
+  window.__bagToLedger(C40) === true && window.__dump().storedIn[C40] === 'LEDGER');
+assert('搬完袋窗当场清空、册窗多一行（两扇窗同步刷新）',
+  bagWin40.querySelectorAll('.bag-item').length === 0 &&
+  clueWin40.querySelectorAll('.goto-item').length === ledgerN40 + 1);
+assert('册 → 袋（反向搬运）', window.__ledgerToBag(C40) === true && window.__dump().storedIn[C40] === 'BAG');
+ids['btn-undo']._ev.click[0]();
+assert('撤销把跨窗搬运退回去（回到线索册）', window.__dump().storedIn[C40] === 'LEDGER');
+assert('非线索拖到册上被拦下', window.__bag(K40) === true && window.__bagToLedger(K40) === false);
+assert('被拦下时两边清单都不动',
+  window.__dump().storedIn[K40] === 'BAG' && window.__dump().ledger.indexOf(C40) >= 0);
+assert('拦下的说法与 ledgerStore 一致（同一句 toast）',
+  String(ids['toast']._html).indexOf('只有线索能收进线索册') >= 0);
+/* 把注射器取出：下面几步按「袋里恰好一条」来取行，袋里多一条就会拖错行 */
+assert('清场：注射器取出，袋里只留那条线索', window.__bagTake(K40) === true && window.__dump().bag.length === 0);
+
+/* (3) 真拖一遍（stub 里走完整事件流）：先把两扇窗挪到互不重叠的空地，免得落点互相盖住 */
+bagWin40.style.left = '640px'; bagWin40.style.top = '420px';    /* (640,420)-(780,468) */
+clueWin40.style.left = '300px'; clueWin40.style.top = '600px';  /* (300,600)-(440,648) */
+const onBag40    = { x: 700,  y: 440 };
+const onClue40   = { x: 370,  y: 624 };
+const onBoard40  = { x: 960,  y: 584 };
+const onCanvas40 = { x: 1100, y: 200 };   /* 干净的画布空地：躲开整列桌面图标（x 最大 158） */
+const ev40 = (o) => Object.assign({ button:0, pointerId:1, stopPropagation(){}, preventDefault(){} }, o);
+
+/* (3a) 册中一行 → 袋窗：跨窗搬运 */
+const rowL40 = clueWin40.querySelector('.goto-item');
+if (!rowL40){ errs++; console.log('  ✗ 册窗里没有可拖的行（线索不在册中？）'); }
+else {
+  rowL40._ev.pointerdown[0](ev40({ clientX: 320, clientY: 610 }));
+  rowL40._ev.pointermove[0](ev40({ clientX: 330, clientY: 620 }));
+  rowL40._ev.pointermove[0](ev40({ clientX: onBag40.x, clientY: onBag40.y }));
+  assert('拖动中袋窗挂 over 高亮（悬停与判决共用同一份落点）', bagWin40._classes.has('over'));
+  rowL40._ev.pointerup[0](ev40({ clientX: onBag40.x, clientY: onBag40.y }));
+  assert('册中一行拖到袋窗 = 跨窗搬运（LEDGER → BAG）', window.__dump().storedIn[C40] === 'BAG');
+  assert('松手后袋窗高亮已清', !bagWin40._classes.has('over'));
+}
+
+/* (3b) 袋中一行 → 册窗：反向跨窗（此时袋里恰好一条，取到的一定是它） */
+const rowB40 = bagWin40.querySelector('.bag-item');
+if (!rowB40){ errs++; console.log('  ✗ 袋窗里没有可拖的行'); }
+else {
+  rowB40._ev.pointerdown[0](ev40({ clientX: 660, clientY: 430 }));
+  rowB40._ev.pointermove[0](ev40({ clientX: 670, clientY: 440 }));
+  rowB40._ev.pointermove[0](ev40({ clientX: onClue40.x, clientY: onClue40.y }));
+  assert('拖动中册窗挂 over 高亮', clueWin40._classes.has('over'));
+  rowB40._ev.pointerup[0](ev40({ clientX: onClue40.x, clientY: onClue40.y }));
+  assert('袋中一行拖到册窗 = 跨窗搬运（BAG → LEDGER）', window.__dump().storedIn[C40] === 'LEDGER');
+  assert('松手后册窗高亮已清', !clueWin40._classes.has('over'));
+}
+
+/* (3c) 册中一行 → 画布：取回，跟手 */
+const V40c = window.__dump().view;
+const rowL40b = clueWin40.querySelector('.goto-item');
+if (!rowL40b){ errs++; console.log('  ✗ 册窗里没有可拖的行（跨窗那一步没落上？）'); }
+else {
+  rowL40b._ev.pointerdown[0](ev40({ clientX: 320, clientY: 610 }));
+  rowL40b._ev.pointermove[0](ev40({ clientX: 330, clientY: 620 }));
+  rowL40b._ev.pointermove[0](ev40({ clientX: onCanvas40.x, clientY: onCanvas40.y }));
+  rowL40b._ev.pointerup[0](ev40({ clientX: onCanvas40.x, clientY: onCanvas40.y }));
+  assert('册中一行拖到画布 = 取回，落在松手那一点',
+    window.__dump().storedIn[C40] === undefined && !!findEl(C40) &&
+    Math.abs(window.__dump().pos[C40].x - ((onCanvas40.x - V40c.x) / V40c.k - 65)) <= 1 &&
+    Math.abs(window.__dump().pos[C40].y - ((onCanvas40.y - V40c.y) / V40c.k - 23)) <= 1);
+  /* 拖过的那一下之后紧跟的 click 必须被吞掉：否则刚取回的线索又被「单击取回」挪回图标旁边 */
+  rowL40b._ev.click[0]();
+  assert('刚拖完的那一下 click 不连发（取回位置没被顺手改写）',
+    window.__dump().storedIn[C40] === undefined &&
+    Math.abs(window.__dump().pos[C40].x - ((onCanvas40.x - V40c.x) / V40c.k - 65)) <= 1);
+}
+
+/* (3d) 袋里的线索 → 桌布：归位（桌布元素在每次 render 后重建，挪位必须放在最后一步之前） */
+window.__bag(C40);
+if (!window.__dump().floats.matrix) window.__inferToggle();
+const board40 = ids['desktop'].querySelector('.mx-board');
+board40.style.left = '900px'; board40.style.top = '560px';   /* (900,560)-(1040,608) */
+const rowB40b = bagWin40.querySelector('.bag-item');
+if (!rowB40b || !board40){ errs++; console.log('  ✗ 袋窗行或桌布元素找不到'); }
+else {
+  rowB40b._ev.pointerdown[0](ev40({ clientX: 660, clientY: 430 }));
+  rowB40b._ev.pointermove[0](ev40({ clientX: 670, clientY: 440 }));
+  rowB40b._ev.pointermove[0](ev40({ clientX: onBoard40.x, clientY: onBoard40.y }));
+  assert('拖动中桌布挂 over 高亮', board40._classes.has('over'));
+  rowB40b._ev.pointerup[0](ev40({ clientX: onBoard40.x, clientY: onBoard40.y }));
+  assert('袋里的线索拖上桌布 = 直接归位（BAG → MATRIX）',
+    window.__dump().storedIn[C40] === 'MATRIX' && window.__dump().matrix.vision.indexOf('CLUES_V_luheng') >= 0);
+  assert('归位后袋窗清单清空、桌布高亮已清',
+    bagWin40.querySelectorAll('.bag-item').length === 0 && !board40._classes.has('over'));
+}
+window.__closeFloats();
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 
