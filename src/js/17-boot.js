@@ -89,6 +89,7 @@ window.__mxAssign = (k, s) => assignClue(k, s);
 window.__boardTake = (id, sense, cx, cy) => boardTake(id, sense, cx, cy);   /* 等价于把桌布上的 chip 拖出去 */
 window.__matrixItems = () => matrixItems().map(n => n.key);
 window.__infer = () => executeInference();
+window.__render = () => render();   /* 验证 / 调试：手动重绘整张画布（等价于任何一次 render 调用） */
 window.__inferToggle = () => toggleInferWin();
 window.__ensure = (kind, id) => {
   const d = kind === "clue" ? (CLUES[id] || {}) : (ITEMS[id] || {});
@@ -111,7 +112,8 @@ window.__garden = {
       x: 24 + (i % 4) * 18, y: 58 });
     refreshGardenWin(); refreshGardenIcon(); return true; },
   open: () => openGardenWin(),
-  close: () => closeGardenWin()
+  close: () => closeGardenWin(),
+  redraw: () => refreshGardenWin()      /* 模拟一次 tick 重绘（验证「叙事框不被重绘抹掉」） */
 };
 /* 真名结局的「真名形成说明」原文（开花后点花叙事框的内容来源；验证用） */
 window.__trueEndingMsg = () => {

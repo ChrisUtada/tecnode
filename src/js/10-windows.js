@@ -46,9 +46,11 @@ function makeFloatDraggable(el, inWorld, handle){
        会一直留着上一次拖窗口的 true，那些元素自己的"点击"就被误吞了（真机才有；DOM stub 的
        closest() 恒返回 null，排除表在 stub 里等于不存在，所以这条测不出来）。 */
     el._dragged = false;
-    /* 交互子元素（按钮/输入框/清单项/× 关窗键/阵列执行者与线索 chip）不启动拖动——否则 setPointerCapture
-       会把 click 重定向到窗口自身，行内可点的清单项永远收不到 click。新增可点清单项时记得往这里加。 */
-    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip,.music-row")) return;
+    /* 交互子元素（按钮/输入框/清单项/× 关窗键/阵列执行者与线索 chip/花园叙事框）不启动拖动——否则
+       setPointerCapture 会把 pointerup 与 click 一起重定向到窗口自身，行内可点的东西永远收不到 click。
+       新增可点清单项时记得往这里加。花园叙事框是「整框点一下 = 看下一段」，必须在此列（真机才暴露：
+       合成 click 直接投递给元素，绕过了这层重定向，探针会假通过）。 */
+    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip,.music-row,.gd-narr")) return;
     /* CSS 定位的浮窗（right/bottom/margin 居中），首次拖动时换算成 left/top，并清掉 margin 防止跳位 */
     if (el.style.left === "" || el.style.left == null){
       const r = el.getBoundingClientRect(), sr = desktopEl.getBoundingClientRect();

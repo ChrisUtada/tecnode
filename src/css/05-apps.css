@@ -187,11 +187,15 @@
      白卡 + 朝下小尖角（指向执行者），源图 16×16 → 32px。 */
   .mx-seedpop{position:absolute; left:50%; bottom:calc(100% + 12px); transform:translateX(-50%);
     padding:6px 8px; background:var(--card); border:1px solid var(--edge); border-radius:var(--r-sm);
-    box-shadow:var(--raise); cursor:grab; user-select:none;
+    box-shadow:var(--raise); user-select:none;
     animation:mx-seedpop-in .35s ease}
-  .mx-seedpop:active{cursor:grabbing}
+  /* 拖拽把手只有种子图本身：白卡空白处不是把手（cursor 也跟着走图） */
+  .mx-seedpop img{width:32px; height:32px; display:block; image-rendering:pixelated; cursor:grab}
+  .mx-seedpop img:active{cursor:grabbing}
   .mx-seedpop.dragging{opacity:.94}
-  .mx-seedpop img{width:32px; height:32px; display:block; image-rendering:pixelated}
+  /* 跟手拖动的是**种子图本身**（镜像只克隆那张图，不是整块气泡）：脱离 .mx-seedpop 后
+     选择器不再匹配，锐化与尺寸得自己带（尺寸也由内联 width/height 写入，这里兜底） */
+  .mx-seed-mirror{display:block; width:32px; height:32px; image-rendering:pixelated}
   .mx-seedpop::after{content:""; position:absolute; left:50%; bottom:-5px; width:8px; height:8px;
     transform:translateX(-50%) rotate(45deg); background:var(--card);
     border-right:1px solid var(--edge); border-bottom:1px solid var(--edge)}
@@ -199,38 +203,55 @@
     0%{opacity:0; transform:translateX(-50%) translateY(8px) scale(.6)}
     100%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
   }
-  /* 花园窗：一块自由花圃（不设固定坛位）。窗宽对齐 bag/detail 的 300px 档；
+  /* 花园窗：**一整片纸面**（与推演器桌布同一张「纸」）—— 不再有凹进去的花圃框（用户口径）。
+     .gd-field 只剩「可种植区域」的坐标基准（位置 / 落点百分比），本身不描边、不凹陷。
+     窗宽 520（300 → 380 → 520，两次都是「太小、字挤成一团、读着费劲」的用户反馈）；
      株 = 绝对定位（left/top 百分比），按住可以直接拖动摆放。
-     凹陷底面（press）当「土」，种子 / 花草浮在上面。
-     窗体本体与全桌浮窗同一族：card 底 + edge 描边 + 圆角 + win-shadow（z 也回到 25 档）。 */
-  .garden-win{position:absolute; left:50%; top:110px; margin-left:-150px; width:300px;
+     窗体本体与全桌浮窗同一族：card 底 + edge 描边 + 圆角 + win-shadow。
+     纸面只留一条 10px 下边距（原来那行底注已按用户口径去掉，底部留白由内边距兜住）。 */
+  .garden-win{position:absolute; left:50%; top:110px; margin-left:-260px; width:520px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
-  .garden-win .syswin-body{padding:10px}
-  .gd-field{position:relative; height:190px; border:1px solid var(--edge); border-radius:var(--r-btn);
-    background:var(--bg); box-shadow:var(--press); overflow:hidden}
+  .garden-win .syswin-body{padding:0 0 10px;
+    background-color:var(--bg);
+    background-image:var(--paper-grain), var(--paper-fleck);
+    background-size:200px 200px, 360px 360px; background-repeat:repeat, repeat;
+    background-blend-mode:soft-light, multiply}
+  .gd-field{position:relative; height:260px; overflow:hidden}
   .gd-plant{position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column;
     align-items:center; cursor:grab; user-select:none}
   .gd-plant:active{cursor:grabbing}
-  .gd-plant img{width:48px; height:48px; image-rendering:pixelated}
-  .gd-plant .gd-stage{margin-top:2px; padding:1px 5px; font-size:10px; color:var(--muted);
+  .gd-plant img{width:64px; height:64px; image-rendering:pixelated}
+  .gd-plant .gd-stage{margin-top:3px; padding:2px 7px; font-size:11px; color:var(--muted);
     border:1px solid var(--edge-soft); border-radius:var(--r-btn); background:var(--face); white-space:nowrap}
   .gd-plant.bloom .gd-stage{color:var(--text); border-color:var(--edge)}
   /* 生长计时 = 进度条（不用字）：与播放器 / TEC 分析条同一族（凹槽 + 墨色填充） */
-  .gd-plant .gd-prog{width:56px; height:6px; margin-top:3px; border-radius:4px;
+  .gd-plant .gd-prog{width:72px; height:7px; margin-top:4px; border-radius:4px;
     background:var(--face-lo); box-shadow:var(--press); overflow:hidden}
   .gd-plant .gd-prog i{display:block; height:100%; width:0; background:var(--line); border-radius:4px}
-  .gd-hint{margin-top:8px; font-size:10.5px; color:var(--faint); line-height:1.6}
-  /* 开花后点花浮现的叙事框：嵌在花园窗内、花朵上/下方，随窗移动；满宽、限高可滚，与浮窗同族 */
-  .gd-narr{position:absolute; left:8px; width:calc(100% - 16px); max-height:158px;
-    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-btn);
-    box-shadow:var(--win-shadow); z-index:6; display:flex; flex-direction:column; overflow:hidden}
-  .gd-narr-head{padding:3px 7px; border-bottom:1px solid var(--edge-soft);
-    display:flex; justify-content:space-between; align-items:center;
-    font-size:10px; letter-spacing:1px; color:var(--muted)}
-  .gd-narr-x{cursor:pointer; padding:0 3px; color:var(--muted)}
+  /* 开花后点花浮现的叙事框：**排在花圃下方独立一行**（不压在花圃上，也不挤花草），
+     随窗一起长高。呈现按用户定稿的 A+B：**逐段旁白**（点一下浮现下一段）——
+     正文不再塞进小框里滚，字号 / 行高 / 段距按中文长文重排，读的是几段话而不是一堵字墙；
+     标题升级为「花魄」大字 + 「真名 · 形成说明」副行。
+     字号 11.5 → 13.5、行高 2 → 1.9：用户反馈「字小、读着费劲」，对齐结局遮罩那档阅读字号。
+     整框可点（cursor:pointer），读完后 .done 收回成普通箭头。 */
+  .gd-narr{margin:10px 10px 0; background:var(--card); border:1px solid var(--edge);
+    border-radius:var(--r-btn); box-shadow:var(--win-shadow); display:flex; flex-direction:column;
+    overflow:hidden; cursor:pointer}
+  .gd-narr.done{cursor:default}
+  .gd-narr-head{padding:8px 14px 7px; border-bottom:1px solid var(--edge-soft);
+    display:flex; align-items:baseline; gap:9px}
+  .gd-narr-name{font-size:17px; font-weight:600; letter-spacing:4px; color:var(--line)}
+  .gd-narr-sub{font-size:11px; letter-spacing:1px; color:var(--muted)}
+  .gd-narr-x{margin-left:auto; align-self:center; cursor:pointer; padding:0 3px; color:var(--muted);
+    font-size:15px}
   .gd-narr-x:hover{color:var(--text)}
-  .gd-narr-body{padding:6px 8px; overflow:auto; font-size:10.5px; line-height:1.7; color:var(--text)}
+  .gd-narr-body{padding:13px 16px 4px; font-size:13.5px; line-height:1.9; color:var(--line)}
+  .gd-narr-p{margin:0 0 .75em}
+  .gd-narr-p:last-child{margin-bottom:0}
+  .gd-narr-p.in{animation:gd-narr-in .4s ease both}
+  .gd-narr-more{padding:7px 14px 10px; font-size:11.5px; letter-spacing:1px; color:var(--muted)}
+  @keyframes gd-narr-in{from{opacity:0; transform:translateY(5px)} to{opacity:1; transform:none}}
   /* 结局清单：弱化存在，收在桌布左下角 */
   .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
   .memory{background:#dcd8c2; border:3px double #2b2b26; border-radius:var(--r-win); box-shadow:var(--win-shadow)}

@@ -2,6 +2,34 @@
 function attachInteractions(el, n){
   let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0, ghost = null, overEl = null, mirror = null;
 
+  /* 摘掉本次拖动留下的一切痕迹（镜像 / 幽灵线 / 各类落点高亮） */
+  const teardownDrag = () => {
+    if (mirror){ mirror.remove(); mirror = null; }
+    el.classList.remove("dragging");
+    el.style.visibility = "";
+    if (ghost){ ghost.remove(); ghost = null; }
+    if (overEl){ if (overEl.classList) overEl.classList.remove("over"); overEl = null; }
+    nodeDropTargets().forEach(id => {
+      const ic = dropTargetEl(id);
+      if (ic && ic.classList) ic.classList.remove("over");
+    });
+    const mxBd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
+    if (mxBd && mxBd.classList) mxBd.classList.remove("over");
+  };
+  /* 被 render() 打断时的收尾：把当前位移写回 n.x/n.y（夹回界内），别让节点跳回拖动前的起点。
+     只写位置、**不做落点判定** —— 此刻落点（组合对象 / 收纳窗）可能已经被重建，
+     按旧引用判了也是错的；玩家的意图是「停在这里」，落点动作留给下一次拖动。 */
+  const abortDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
+    teardownDrag();
+    if (moved){
+      n.x = Math.max(60, Math.min(2000 - 220, isFinite(x) ? x : n.x));
+      n.y = Math.max(50, Math.min(1300 - 120, isFinite(y) ? y : n.y));
+    }
+  };
+
   el.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
     cancelViewAnim();   /* 抓住节点即接管镜头：正在跑的自动聚焦立刻停住（"拖动即可打断"） */
@@ -12,6 +40,7 @@ function attachInteractions(el, n){
     sx = e.clientX; sy = e.clientY;
     ox = parseFloat(el.style.left) || 0;
     oy = parseFloat(el.style.top)  || 0;
+    registerDrag(abortDrag);   /* 拖到一半若被 render() 打断，由它收尾（见 07-render.js 的登记表） */
     try { el.setPointerCapture(e.pointerId); } catch(_){}
     e.stopPropagation();
   });
@@ -74,23 +103,16 @@ function attachInteractions(el, n){
   el.addEventListener("pointercancel", () => {
     if (!dragging) return;
     dragging = false;
-    el.classList.remove("dragging");
-    if (mirror){ mirror.remove(); mirror = null; }
-    el.style.visibility = "";
-    if (ghost){ ghost.remove(); ghost = null; }
-    if (overEl){ overEl.classList.remove("over"); overEl = null; }
+    unregisterDrag(abortDrag);
+    teardownDrag();
   });
 
   el.addEventListener("pointerup", e => {
     if (!dragging) return;
     dragging = false;
-    el.classList.remove("dragging");
-    if (mirror){ mirror.remove(); mirror = null; }
-    el.style.visibility = "";
-    if (ghost){ ghost.remove(); ghost = null; }
-    const target = overEl;
-    if (overEl) overEl.classList.remove("over");
-    overEl = null;
+    unregisterDrag(abortDrag);
+    const target = overEl;      /* teardownDrag 会清掉 overEl，先留住松手命中的那一个 */
+    teardownDrag();
 
     /* 桌面图标命中判定（固定优先级 bag > clue > tec > infer > goto；任何路径清掉 over 高亮） */
     let iconHit = null;

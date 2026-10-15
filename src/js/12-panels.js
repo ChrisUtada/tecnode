@@ -215,6 +215,33 @@ function overMatrixDrop(cx, cy){
   }
   return false;
 }
+/* ---- 反向：桌布上的 chip 拖回线索册（与「册 → 桌布」对称的那一半）----
+   落点 = 线索册窗（开着时）或线索册图标；两个都没命中才退回「拖出桌布 = 取回画布」。 */
+function overLedgerDrop(cx, cy){
+  if (clueWinEl && clueWinEl.style.display !== "none"){
+    const r = clueWinEl.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  const ic = document.getElementById("clue-icon");
+  if (ic){
+    const r = ic.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  return false;
+}
+/* 桌布 → 册：把归位的线索**改写收纳位置**（storedIn MATRIX → LEDGER），并从阵列里摘掉。
+   不能复用 ledgerStore —— 它对 `n.stored` 的节点直接 return false，而归位的线索正是 stored 状态。
+   与 assignClue / boardTake 同款：只重画、**不跑 layout()**（归位一个线索不该顺手重排玩家的摆位）。 */
+function boardToLedger(cid, sense){
+  const n = nodeByKey("clue", cid);
+  if (!n) return false;
+  if (!requireCase()){ refreshInferWin(); return false; }
+  pushHistory();
+  G.matrix[sense] = (G.matrix[sense] || []).filter(x => x !== cid);
+  n.stored = true; n.storedIn = "LEDGER"; n.pinned = false;
+  render(); refreshInferWin(); refreshClueWin();
+  return true;
+}
 /* 归位 = 直接从册子搬上桌布（复用 assignClue：它认 G.nodes 里任何线索，不管现在收在哪儿；
    storedIn 从 LEDGER 改写成 MATRIX，撤销栈照记，render() 顺手把册窗清单刷成少一行）。 */
 function ledgerToMatrix(key){
@@ -237,10 +264,19 @@ function makeLedgerRowDraggable(row, key){
     const ic = document.getElementById("infer-icon");
     if (ic && ic.classList) ic.classList.remove("over");
   };
+  /* 被 render() 打断时的收尾（见 07-render.js 的登记表）：摘镜像、把行放回来 */
+  const abortRowDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (mirror){ mirror.remove(); mirror = null; }
+    row.style.visibility = "";
+    clearOver();
+  };
   row.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
     dragging = true; moved = false; wasMoved = false; sx = e.clientX; sy = e.clientY;
     sr = desktopEl.getBoundingClientRect();
+    registerDrag(abortRowDrag);
     try { row.setPointerCapture(e.pointerId); } catch(_){}
   });
   row.addEventListener("pointermove", e => {
@@ -271,6 +307,7 @@ function makeLedgerRowDraggable(row, key){
   const finish = e => {
     if (!dragging) return;
     dragging = false;
+    unregisterDrag(abortRowDrag);
     if (mirror){ mirror.remove(); mirror = null; }
     row.style.visibility = "";
     clearOver();
@@ -279,12 +316,7 @@ function makeLedgerRowDraggable(row, key){
     if (overMatrixDrop(e.clientX, e.clientY)) ledgerToMatrix(key);
   };
   row.addEventListener("pointerup", finish);
-  row.addEventListener("pointercancel", () => {
-    dragging = false;
-    if (mirror){ mirror.remove(); mirror = null; }
-    row.style.visibility = "";
-    clearOver();
-  });
+  row.addEventListener("pointercancel", () => { unregisterDrag(abortRowDrag); abortRowDrag(); });
   /* 点击 = 取回画布；刚拖完的那一下（wasMoved）不算点击 */
   row.addEventListener("click", () => {
     if (wasMoved){ wasMoved = false; return; }

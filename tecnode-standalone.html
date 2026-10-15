@@ -345,11 +345,15 @@
      白卡 + 朝下小尖角（指向执行者），源图 16×16 → 32px。 */
   .mx-seedpop{position:absolute; left:50%; bottom:calc(100% + 12px); transform:translateX(-50%);
     padding:6px 8px; background:var(--card); border:1px solid var(--edge); border-radius:var(--r-sm);
-    box-shadow:var(--raise); cursor:grab; user-select:none;
+    box-shadow:var(--raise); user-select:none;
     animation:mx-seedpop-in .35s ease}
-  .mx-seedpop:active{cursor:grabbing}
+  /* 拖拽把手只有种子图本身：白卡空白处不是把手（cursor 也跟着走图） */
+  .mx-seedpop img{width:32px; height:32px; display:block; image-rendering:pixelated; cursor:grab}
+  .mx-seedpop img:active{cursor:grabbing}
   .mx-seedpop.dragging{opacity:.94}
-  .mx-seedpop img{width:32px; height:32px; display:block; image-rendering:pixelated}
+  /* 跟手拖动的是**种子图本身**（镜像只克隆那张图，不是整块气泡）：脱离 .mx-seedpop 后
+     选择器不再匹配，锐化与尺寸得自己带（尺寸也由内联 width/height 写入，这里兜底） */
+  .mx-seed-mirror{display:block; width:32px; height:32px; image-rendering:pixelated}
   .mx-seedpop::after{content:""; position:absolute; left:50%; bottom:-5px; width:8px; height:8px;
     transform:translateX(-50%) rotate(45deg); background:var(--card);
     border-right:1px solid var(--edge); border-bottom:1px solid var(--edge)}
@@ -357,38 +361,55 @@
     0%{opacity:0; transform:translateX(-50%) translateY(8px) scale(.6)}
     100%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
   }
-  /* 花园窗：一块自由花圃（不设固定坛位）。窗宽对齐 bag/detail 的 300px 档；
+  /* 花园窗：**一整片纸面**（与推演器桌布同一张「纸」）—— 不再有凹进去的花圃框（用户口径）。
+     .gd-field 只剩「可种植区域」的坐标基准（位置 / 落点百分比），本身不描边、不凹陷。
+     窗宽 520（300 → 380 → 520，两次都是「太小、字挤成一团、读着费劲」的用户反馈）；
      株 = 绝对定位（left/top 百分比），按住可以直接拖动摆放。
-     凹陷底面（press）当「土」，种子 / 花草浮在上面。
-     窗体本体与全桌浮窗同一族：card 底 + edge 描边 + 圆角 + win-shadow（z 也回到 25 档）。 */
-  .garden-win{position:absolute; left:50%; top:110px; margin-left:-150px; width:300px;
+     窗体本体与全桌浮窗同一族：card 底 + edge 描边 + 圆角 + win-shadow。
+     纸面只留一条 10px 下边距（原来那行底注已按用户口径去掉，底部留白由内边距兜住）。 */
+  .garden-win{position:absolute; left:50%; top:110px; margin-left:-260px; width:520px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
-  .garden-win .syswin-body{padding:10px}
-  .gd-field{position:relative; height:190px; border:1px solid var(--edge); border-radius:var(--r-btn);
-    background:var(--bg); box-shadow:var(--press); overflow:hidden}
+  .garden-win .syswin-body{padding:0 0 10px;
+    background-color:var(--bg);
+    background-image:var(--paper-grain), var(--paper-fleck);
+    background-size:200px 200px, 360px 360px; background-repeat:repeat, repeat;
+    background-blend-mode:soft-light, multiply}
+  .gd-field{position:relative; height:260px; overflow:hidden}
   .gd-plant{position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column;
     align-items:center; cursor:grab; user-select:none}
   .gd-plant:active{cursor:grabbing}
-  .gd-plant img{width:48px; height:48px; image-rendering:pixelated}
-  .gd-plant .gd-stage{margin-top:2px; padding:1px 5px; font-size:10px; color:var(--muted);
+  .gd-plant img{width:64px; height:64px; image-rendering:pixelated}
+  .gd-plant .gd-stage{margin-top:3px; padding:2px 7px; font-size:11px; color:var(--muted);
     border:1px solid var(--edge-soft); border-radius:var(--r-btn); background:var(--face); white-space:nowrap}
   .gd-plant.bloom .gd-stage{color:var(--text); border-color:var(--edge)}
   /* 生长计时 = 进度条（不用字）：与播放器 / TEC 分析条同一族（凹槽 + 墨色填充） */
-  .gd-plant .gd-prog{width:56px; height:6px; margin-top:3px; border-radius:4px;
+  .gd-plant .gd-prog{width:72px; height:7px; margin-top:4px; border-radius:4px;
     background:var(--face-lo); box-shadow:var(--press); overflow:hidden}
   .gd-plant .gd-prog i{display:block; height:100%; width:0; background:var(--line); border-radius:4px}
-  .gd-hint{margin-top:8px; font-size:10.5px; color:var(--faint); line-height:1.6}
-  /* 开花后点花浮现的叙事框：嵌在花园窗内、花朵上/下方，随窗移动；满宽、限高可滚，与浮窗同族 */
-  .gd-narr{position:absolute; left:8px; width:calc(100% - 16px); max-height:158px;
-    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-btn);
-    box-shadow:var(--win-shadow); z-index:6; display:flex; flex-direction:column; overflow:hidden}
-  .gd-narr-head{padding:3px 7px; border-bottom:1px solid var(--edge-soft);
-    display:flex; justify-content:space-between; align-items:center;
-    font-size:10px; letter-spacing:1px; color:var(--muted)}
-  .gd-narr-x{cursor:pointer; padding:0 3px; color:var(--muted)}
+  /* 开花后点花浮现的叙事框：**排在花圃下方独立一行**（不压在花圃上，也不挤花草），
+     随窗一起长高。呈现按用户定稿的 A+B：**逐段旁白**（点一下浮现下一段）——
+     正文不再塞进小框里滚，字号 / 行高 / 段距按中文长文重排，读的是几段话而不是一堵字墙；
+     标题升级为「花魄」大字 + 「真名 · 形成说明」副行。
+     字号 11.5 → 13.5、行高 2 → 1.9：用户反馈「字小、读着费劲」，对齐结局遮罩那档阅读字号。
+     整框可点（cursor:pointer），读完后 .done 收回成普通箭头。 */
+  .gd-narr{margin:10px 10px 0; background:var(--card); border:1px solid var(--edge);
+    border-radius:var(--r-btn); box-shadow:var(--win-shadow); display:flex; flex-direction:column;
+    overflow:hidden; cursor:pointer}
+  .gd-narr.done{cursor:default}
+  .gd-narr-head{padding:8px 14px 7px; border-bottom:1px solid var(--edge-soft);
+    display:flex; align-items:baseline; gap:9px}
+  .gd-narr-name{font-size:17px; font-weight:600; letter-spacing:4px; color:var(--line)}
+  .gd-narr-sub{font-size:11px; letter-spacing:1px; color:var(--muted)}
+  .gd-narr-x{margin-left:auto; align-self:center; cursor:pointer; padding:0 3px; color:var(--muted);
+    font-size:15px}
   .gd-narr-x:hover{color:var(--text)}
-  .gd-narr-body{padding:6px 8px; overflow:auto; font-size:10.5px; line-height:1.7; color:var(--text)}
+  .gd-narr-body{padding:13px 16px 4px; font-size:13.5px; line-height:1.9; color:var(--line)}
+  .gd-narr-p{margin:0 0 .75em}
+  .gd-narr-p:last-child{margin-bottom:0}
+  .gd-narr-p.in{animation:gd-narr-in .4s ease both}
+  .gd-narr-more{padding:7px 14px 10px; font-size:11.5px; letter-spacing:1px; color:var(--muted)}
+  @keyframes gd-narr-in{from{opacity:0; transform:translateY(5px)} to{opacity:1; transform:none}}
   /* 结局清单：弱化存在，收在桌布左下角 */
   .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
   .memory{background:#dcd8c2; border:3px double #2b2b26; border-radius:var(--r-win); box-shadow:var(--win-shadow)}
@@ -1648,7 +1669,32 @@ function layout(){
 const NODE_W = { loc:152, item:130, char:130, clue:130 };
 const NODE_H = { loc:54, item:46, char:46, clue:46 };
 
+/* ============ 拖动收尾登记表 ============
+   任何「拖到一半可能被 render() 打断」的手势都在这里登记一个 abort 回调。
+   为什么必须收尾：render() 会 nodeLayer.innerHTML = "" 重建**全部**节点 DOM。被拖的那个元素
+   一旦离树，指针捕获被隐式释放，pointerup / pointercancel 就再也不会派发过来 —— 收尾逻辑跑不到，
+   镜像就永久留在 #drag-layer（画布上多出一个点不动也拖不动的节点），同时这次拖放的落点动作丢失。
+   真实触发路径：TEC 分析是 setTimeout（11-dialog.js），玩家一边拖节点一边等分析，
+   分析完成且**本次真产出新线索**时 settle() → render() —— 正是「拖着拖着线索掉下来」那一刻。
+   在重建之前统一收尾：把位移写回 n.x/n.y、摘掉镜像与幽灵线、清掉落点高亮。 */
+const dragAborters = new Set();
+function abortActiveDrags(){
+  if (!dragAborters.size) return;
+  Array.from(dragAborters).forEach(fn => { try { fn(); } catch(_){} });
+  dragAborters.clear();
+}
+function registerDrag(fn){ dragAborters.add(fn); return fn; }
+function unregisterDrag(fn){ dragAborters.delete(fn); }
+/* 兜底：重建时清空镜像层。走到这里时各手势自己的 abort 已经摘掉各自那一片，
+   这句只为「万一还有没登记的镜像」收尾，保证 #drag-layer 绝不带着旧镜像跨过一次重建。 */
+function clearDragLayer(){
+  const l = document.getElementById("drag-layer");
+  if (l) l.innerHTML = "";
+}
+
 function render(){
+  abortActiveDrags();     /* 先给拖动中的手势收尾，再动 DOM（见上） */
+  clearDragLayer();
   nodeLayer.innerHTML = "";
   svg.innerHTML = "";
 
@@ -1833,6 +1879,34 @@ function syncDragMirror(m, el){ if (m) positionDragMirror(m, el); }
 function attachInteractions(el, n){
   let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0, ghost = null, overEl = null, mirror = null;
 
+  /* 摘掉本次拖动留下的一切痕迹（镜像 / 幽灵线 / 各类落点高亮） */
+  const teardownDrag = () => {
+    if (mirror){ mirror.remove(); mirror = null; }
+    el.classList.remove("dragging");
+    el.style.visibility = "";
+    if (ghost){ ghost.remove(); ghost = null; }
+    if (overEl){ if (overEl.classList) overEl.classList.remove("over"); overEl = null; }
+    nodeDropTargets().forEach(id => {
+      const ic = dropTargetEl(id);
+      if (ic && ic.classList) ic.classList.remove("over");
+    });
+    const mxBd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
+    if (mxBd && mxBd.classList) mxBd.classList.remove("over");
+  };
+  /* 被 render() 打断时的收尾：把当前位移写回 n.x/n.y（夹回界内），别让节点跳回拖动前的起点。
+     只写位置、**不做落点判定** —— 此刻落点（组合对象 / 收纳窗）可能已经被重建，
+     按旧引用判了也是错的；玩家的意图是「停在这里」，落点动作留给下一次拖动。 */
+  const abortDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
+    teardownDrag();
+    if (moved){
+      n.x = Math.max(60, Math.min(2000 - 220, isFinite(x) ? x : n.x));
+      n.y = Math.max(50, Math.min(1300 - 120, isFinite(y) ? y : n.y));
+    }
+  };
+
   el.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
     cancelViewAnim();   /* 抓住节点即接管镜头：正在跑的自动聚焦立刻停住（"拖动即可打断"） */
@@ -1843,6 +1917,7 @@ function attachInteractions(el, n){
     sx = e.clientX; sy = e.clientY;
     ox = parseFloat(el.style.left) || 0;
     oy = parseFloat(el.style.top)  || 0;
+    registerDrag(abortDrag);   /* 拖到一半若被 render() 打断，由它收尾（见 07-render.js 的登记表） */
     try { el.setPointerCapture(e.pointerId); } catch(_){}
     e.stopPropagation();
   });
@@ -1905,23 +1980,16 @@ function attachInteractions(el, n){
   el.addEventListener("pointercancel", () => {
     if (!dragging) return;
     dragging = false;
-    el.classList.remove("dragging");
-    if (mirror){ mirror.remove(); mirror = null; }
-    el.style.visibility = "";
-    if (ghost){ ghost.remove(); ghost = null; }
-    if (overEl){ overEl.classList.remove("over"); overEl = null; }
+    unregisterDrag(abortDrag);
+    teardownDrag();
   });
 
   el.addEventListener("pointerup", e => {
     if (!dragging) return;
     dragging = false;
-    el.classList.remove("dragging");
-    if (mirror){ mirror.remove(); mirror = null; }
-    el.style.visibility = "";
-    if (ghost){ ghost.remove(); ghost = null; }
-    const target = overEl;
-    if (overEl) overEl.classList.remove("over");
-    overEl = null;
+    unregisterDrag(abortDrag);
+    const target = overEl;      /* teardownDrag 会清掉 overEl，先留住松手命中的那一个 */
+    teardownDrag();
 
     /* 桌面图标命中判定（固定优先级 bag > clue > tec > infer > goto；任何路径清掉 over 高亮） */
     let iconHit = null;
@@ -2412,9 +2480,11 @@ function makeFloatDraggable(el, inWorld, handle){
        会一直留着上一次拖窗口的 true，那些元素自己的"点击"就被误吞了（真机才有；DOM stub 的
        closest() 恒返回 null，排除表在 stub 里等于不存在，所以这条测不出来）。 */
     el._dragged = false;
-    /* 交互子元素（按钮/输入框/清单项/× 关窗键/阵列执行者与线索 chip）不启动拖动——否则 setPointerCapture
-       会把 click 重定向到窗口自身，行内可点的清单项永远收不到 click。新增可点清单项时记得往这里加。 */
-    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip,.music-row")) return;
+    /* 交互子元素（按钮/输入框/清单项/× 关窗键/阵列执行者与线索 chip/花园叙事框）不启动拖动——否则
+       setPointerCapture 会把 pointerup 与 click 一起重定向到窗口自身，行内可点的东西永远收不到 click。
+       新增可点清单项时记得往这里加。花园叙事框是「整框点一下 = 看下一段」，必须在此列（真机才暴露：
+       合成 click 直接投递给元素，绕过了这层重定向，探针会假通过）。 */
+    if (e.target && e.target.closest && e.target.closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip,.music-row,.gd-narr")) return;
     /* CSS 定位的浮窗（right/bottom/margin 居中），首次拖动时换算成 left/top，并清掉 margin 防止跳位 */
     if (el.style.left === "" || el.style.left == null){
       const r = el.getBoundingClientRect(), sr = desktopEl.getBoundingClientRect();
@@ -3303,6 +3373,33 @@ function overMatrixDrop(cx, cy){
   }
   return false;
 }
+/* ---- 反向：桌布上的 chip 拖回线索册（与「册 → 桌布」对称的那一半）----
+   落点 = 线索册窗（开着时）或线索册图标；两个都没命中才退回「拖出桌布 = 取回画布」。 */
+function overLedgerDrop(cx, cy){
+  if (clueWinEl && clueWinEl.style.display !== "none"){
+    const r = clueWinEl.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  const ic = document.getElementById("clue-icon");
+  if (ic){
+    const r = ic.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  return false;
+}
+/* 桌布 → 册：把归位的线索**改写收纳位置**（storedIn MATRIX → LEDGER），并从阵列里摘掉。
+   不能复用 ledgerStore —— 它对 `n.stored` 的节点直接 return false，而归位的线索正是 stored 状态。
+   与 assignClue / boardTake 同款：只重画、**不跑 layout()**（归位一个线索不该顺手重排玩家的摆位）。 */
+function boardToLedger(cid, sense){
+  const n = nodeByKey("clue", cid);
+  if (!n) return false;
+  if (!requireCase()){ refreshInferWin(); return false; }
+  pushHistory();
+  G.matrix[sense] = (G.matrix[sense] || []).filter(x => x !== cid);
+  n.stored = true; n.storedIn = "LEDGER"; n.pinned = false;
+  render(); refreshInferWin(); refreshClueWin();
+  return true;
+}
 /* 归位 = 直接从册子搬上桌布（复用 assignClue：它认 G.nodes 里任何线索，不管现在收在哪儿；
    storedIn 从 LEDGER 改写成 MATRIX，撤销栈照记，render() 顺手把册窗清单刷成少一行）。 */
 function ledgerToMatrix(key){
@@ -3325,10 +3422,19 @@ function makeLedgerRowDraggable(row, key){
     const ic = document.getElementById("infer-icon");
     if (ic && ic.classList) ic.classList.remove("over");
   };
+  /* 被 render() 打断时的收尾（见 07-render.js 的登记表）：摘镜像、把行放回来 */
+  const abortRowDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (mirror){ mirror.remove(); mirror = null; }
+    row.style.visibility = "";
+    clearOver();
+  };
   row.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
     dragging = true; moved = false; wasMoved = false; sx = e.clientX; sy = e.clientY;
     sr = desktopEl.getBoundingClientRect();
+    registerDrag(abortRowDrag);
     try { row.setPointerCapture(e.pointerId); } catch(_){}
   });
   row.addEventListener("pointermove", e => {
@@ -3359,6 +3465,7 @@ function makeLedgerRowDraggable(row, key){
   const finish = e => {
     if (!dragging) return;
     dragging = false;
+    unregisterDrag(abortRowDrag);
     if (mirror){ mirror.remove(); mirror = null; }
     row.style.visibility = "";
     clearOver();
@@ -3367,12 +3474,7 @@ function makeLedgerRowDraggable(row, key){
     if (overMatrixDrop(e.clientX, e.clientY)) ledgerToMatrix(key);
   };
   row.addEventListener("pointerup", finish);
-  row.addEventListener("pointercancel", () => {
-    dragging = false;
-    if (mirror){ mirror.remove(); mirror = null; }
-    row.style.visibility = "";
-    clearOver();
-  });
+  row.addEventListener("pointercancel", () => { unregisterDrag(abortRowDrag); abortRowDrag(); });
   /* 点击 = 取回画布；刚拖完的那一下（wasMoved）不算点击 */
   row.addEventListener("click", () => {
     if (wasMoved){ wasMoved = false; return; }
@@ -3539,10 +3641,26 @@ function toggleInferWin(){
    桌布 overflow:hidden，所以拖动时把卡片克隆到全局 #drag-layer 跟随指针，松手落在桌布外即取回。 */
 function makeMatrixNodeDraggable(card, cid, sense){
   let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
+  /* 拖出桌布的方向：**线索册（窗 / 图标）也是落点** —— 与「册 → 桌布」对称的那一半 */
+  const clearDropOver = () => {
+    if (clueWinEl && clueWinEl.classList) clueWinEl.classList.remove("over");
+    const ic = document.getElementById("clue-icon");
+    if (ic && ic.classList) ic.classList.remove("over");
+  };
+  /* 被 render() 打断时的收尾（见 07-render.js 的登记表）：摘镜像、把卡片放回来 */
+  const abortCardDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove("dragging");
+    if (mirror){ mirror.remove(); mirror = null; }
+    card.style.visibility = "";
+    clearDropOver();
+  };
   card.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
     dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
     sr = desktopEl.getBoundingClientRect();
+    registerDrag(abortCardDrag);
     try { card.setPointerCapture(e.pointerId); } catch(_){}
     e.stopPropagation();
   });
@@ -3572,14 +3690,29 @@ function makeMatrixNodeDraggable(card, cid, sense){
     }
     mirror.style.left = (e.clientX - offx - sr.left) + "px";
     mirror.style.top  = (e.clientY - offy - sr.top ) + "px";
+    /* 线索册落点高亮（窗开着 / 图标常驻，谁被压中就亮谁） */
+    const lw = clueWinEl;
+    if (lw && lw.classList){
+      const r = lw.getBoundingClientRect();
+      lw.classList.toggle("over", e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+    }
+    const lic = document.getElementById("clue-icon");
+    if (lic && lic.classList){
+      const r = lic.getBoundingClientRect();
+      lic.classList.toggle("over", e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+    }
   });
   const finish = e => {
     if (!dragging) return;
     dragging = false;
+    unregisterDrag(abortCardDrag);
     card.classList.remove("dragging");
     if (mirror){ mirror.remove(); mirror = null; }
     card.style.visibility = "";
+    clearDropOver();
     if (!moved) return;                    /* 纯点击，不移除 */
+    /* 落在线索册上 → 改归册子（回头路有两条：回画布 / 回册子） */
+    if (overLedgerDrop(e.clientX, e.clientY)){ boardToLedger(cid, sense); return; }
     const bd = inferWinEl && inferWinEl.querySelector(".mx-board");
     if (bd){
       const r = bd.getBoundingClientRect();
@@ -3592,11 +3725,7 @@ function makeMatrixNodeDraggable(card, cid, sense){
     refreshInferWin();                     /* 仍在桌布内：复位 */
   };
   card.addEventListener("pointerup", finish);
-  card.addEventListener("pointercancel", () => {
-    dragging = false; card.classList.remove("dragging");
-    if (mirror){ mirror.remove(); mirror = null; }
-    card.style.visibility = "";
-  });
+  card.addEventListener("pointercancel", () => { unregisterDrag(abortCardDrag); abortCardDrag(); });
 }
 function refreshInferWin(){
   if (!inferWinEl) return;
@@ -3633,7 +3762,7 @@ function refreshInferWin(){
         let cls = "mx-chip node ent-node ent-clue";
         if (G.captured.has(cid)) cls += " got";
         chip.className = cls;
-        chip.title = "拖出桌布 = 取回画布";   /* 归位后画布上不再留这份线索，取回只有这一条路 */
+        chip.title = "拖出桌布 = 取回画布；拖到线索册 = 收进册子";   /* 回头路两条：回画布 / 回册子 */
         /* 归位 = 线索搬到了桌布上（画布上那份已经收走），所以这里说「已归位」，
            与画布上那枚「线索 · 已捕获」分开说 —— 两者是两个地方的两个状态 */
         const sub = G.captured.has(cid) ? "线索 · 已归位" : "线索";
@@ -3697,29 +3826,42 @@ function refreshInferWin(){
 /* ============ 种子对话框（「确认捕获」落定 → 花园的前奏） ============
    位置与心碎表情同款（.mx-exec 上方），但不自动消失：种子拖进花园才收走。
    气泡里**只有一张种子图**，没有任何文字 —— 要说的都由画面说了。
-   种子可拖 —— board overflow:hidden，与桌布 chip 同一套镜像拖法（#drag-layer）；
-   落进花园窗 / 花园图标 = 下种（gardenPlant，16-cases.js），落在别处 = 弹回原位。 */
+   **拖拽把手 = 种子图本身**（用户口径）：按在图上才算搬运，气泡白卡的空白处拖不动。
+   指针捕获与监听必须下在**同一个元素**（下面 handle）—— 捕获会把 pointermove / up
+   重定向到捕获元素，挂在别人身上就收不到移动。落进花园窗 / 花园图标 = 下种
+   （gardenPlant，16-cases.js），落在别处 = 弹回原位。 */
 function buildSeedPop(){
   const pop = document.createElement("div");
   pop.className = "mx-seedpop";
-  pop.title = "拖到花园里种下";
+  pop.title = "拖动种子，种进花园";
   const im = document.createElement("img");
   im.src = GARDEN_IMG.seed;
   im.alt = "花魄的种子"; im.draggable = false;
+  im.title = "拖到花园里种下";
   pop.appendChild(im);
-  makeSeedDraggable(pop);
+  makeSeedDraggable(pop, im);
   return pop;
 }
-function makeSeedDraggable(pop){
+function makeSeedDraggable(pop, handle){
+  const h = handle || pop;                 /* 把手缺省退整块（老调用点兼容） */
   let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
-  pop.addEventListener("pointerdown", e => {
+  /* 被 render() 打断时的收尾（见 07-render.js 的登记表）：摘镜像、把原气泡放回来 */
+  const abortSeedDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    pop.classList.remove("dragging");
+    if (mirror){ mirror.remove(); mirror = null; }
+    pop.style.visibility = "";
+  };
+  h.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
     dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
     sr = desktopEl.getBoundingClientRect();
-    try { pop.setPointerCapture(e.pointerId); } catch(_){}
+    registerDrag(abortSeedDrag);
+    try { h.setPointerCapture(e.pointerId); } catch(_){}
     e.stopPropagation();
   });
-  pop.addEventListener("pointermove", e => {
+  h.addEventListener("pointermove", e => {
     if (!dragging) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
     if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
@@ -3727,18 +3869,21 @@ function makeSeedDraggable(pop){
     pop.classList.add("dragging");
     if (!mirror){
       const layer = document.getElementById("drag-layer");
-      const r = pop.getBoundingClientRect();
+      /* 跟手的是**种子图本身**（用户口径）——镜像只克隆那张图，不是整块白卡气泡 */
+      const r = h.getBoundingClientRect();
       offx = e.clientX - r.left; offy = e.clientY - r.top;
-      mirror = pop.cloneNode(true);
-      mirror.classList.add("drag-mirror");
-      mirror.classList.remove("dragging");
+      mirror = h.cloneNode(true);
+      mirror.className = "mx-seed-mirror drag-mirror";
       mirror.style.position = "absolute"; mirror.style.transform = "none";
-      mirror.style.width = r.width + "px"; mirror.style.height = r.height + "px";
+      /* 尺寸取**布局**尺寸（offsetWidth），不取 rect：种子气泡带着 pop 缩放动画（scale .6→1），
+         动画没走完就起拖时 rect 量到的是缩放后的值（实测 32 → 19）。 */
+      mirror.style.width = (h.offsetWidth || 32) + "px";
+      mirror.style.height = (h.offsetHeight || 32) + "px";
       mirror.style.left = (r.left - sr.left) + "px";
       mirror.style.top  = (r.top  - sr.top ) + "px";
       mirror.style.visibility = "hidden";
       layer.appendChild(mirror);
-      pop.style.visibility = "hidden";
+      pop.style.visibility = "hidden";     /* 原气泡（含白卡）整体隐去，画面上只剩跟手的种子 */
       void mirror.offsetWidth;             /* 强制布局，显示即正确位置 */
       mirror.style.visibility = "visible";
     }
@@ -3748,6 +3893,7 @@ function makeSeedDraggable(pop){
   const finish = e => {
     if (!dragging) return;
     dragging = false;
+    unregisterDrag(abortSeedDrag);
     pop.classList.remove("dragging");
     if (mirror){ mirror.remove(); mirror = null; }
     pop.style.visibility = "";
@@ -3755,13 +3901,10 @@ function makeSeedDraggable(pop){
     if (overGardenDrop(e.clientX, e.clientY)){ gardenPlant(e.clientX, e.clientY); return; }
     refreshInferWin();                     /* 没拖进花园：弹回原位（对话框照旧） */
   };
-  pop.addEventListener("pointerup", finish);
-  pop.addEventListener("pointercancel", () => {
-    dragging = false; pop.classList.remove("dragging");
-    if (mirror){ mirror.remove(); mirror = null; }
-    pop.style.visibility = "";
-  });
+  h.addEventListener("pointerup", finish);
+  h.addEventListener("pointercancel", () => { unregisterDrag(abortSeedDrag); abortSeedDrag(); });
 }
+
 /* 长按蓄力：pointerdown 起 2.5s 完成 → executeInference；pointerup / pointerleave 提前 = 中断复位。
    无头环境 setTimeout 返回 0 就立即完成（与 enterCase 换档的兜底同款）。 */
 let riteTimer = null;
@@ -3877,6 +4020,11 @@ function triggerEnding(ending){
   /* 真名结局：先让推演器整窗冲击震动一拍，再落下结局遮罩 */
   const shock = !!(ending.isTrueCapture && inferWinEl);
   if (shock){
+    /* 拖过推演窗的手势会在窗口上留下内联 `animation:none`（makeFloatDraggable 防「pop 动画
+       没走完就拖动会错位」那句），而内联样式优先于 .shock 的类动画 —— 只要玩家挪过窗口，
+       真名震动就永远不会出现。加震之前先把这条内联清掉，并强制一次 reflow 让动画从 0 起跑。 */
+    inferWinEl.style.animation = "";
+    void inferWinEl.offsetWidth;
     inferWinEl.classList.add("shock");
     setTimeout(() => { if (inferWinEl) inferWinEl.classList.remove("shock"); }, 1000);
   }
@@ -5482,6 +5630,11 @@ const GARDEN_STAGES = [0, 45000, 90000, 135000, 180000];
 /* 株的位置记成花圃地面的百分比（x/y ∈ 8..92 / 30..85），不跟窗体像素走 —— 换机器、缩放都不歪 */
 const GARDEN_X = [8, 92], GARDEN_Y = [30, 85];
 let gardenWinEl = null, gardenIconEl = null, gardenTimer = null, gardenDragLive = false, gardenNarrEl = null;
+/* 叙事框当前是对着哪一株开的（株对象本身，来自 G.garden.plots，身份稳定）。
+   单独记一份是因为每秒一次的 gardenTick 会重绘整窗 —— 只靠 DOM 引用会在重绘后失联。
+   gardenNarrShown = 已浮现到第几段（逐段旁白的进度）；重绘要连进度一起装回去，否则每秒钟被打回第一段。 */
+let gardenNarrPlot = null;
+let gardenNarrShown = 0;
 
 function gardenOK(){ return !!G.garden; }
 /* 真名结局的大段「真名形成说明」：从案件数据里取（用于开花后点花呈现）；旧档里已有株却缺
@@ -5616,8 +5769,11 @@ function refreshGardenWin(){
   if (!gardenWinEl) return;
   const body = gardenWinEl.querySelector(".syswin-body");
   if (!body) return;
+  /* 每秒一次的 tick 会走到这里重绘整窗：先把「叙事框正对着哪一株、读到第几段」记住，
+     重绘末尾按同一株 + 同一进度把框装回去 —— 否则玩家刚点开的花魄说明会在 1 秒内被打回第一段。 */
+  const keepNarr = gardenNarrPlot, keepShown = gardenNarrShown;
   body.innerHTML = "";
-  gardenNarrEl = null;            /* 重绘会换掉花株 DOM，叙事框一并清掉 */
+  gardenNarrEl = null; gardenNarrPlot = null;
   const field = document.createElement("div");
   field.className = "gd-field";
   gardenPlots().forEach(p => {
@@ -5635,23 +5791,22 @@ function refreshGardenWin(){
     stg.className = "gd-stage";
     stg.textContent = st >= 4 ? "开花" : GARDEN_STAGE_NAME[st];
     plant.appendChild(stg);
-    /* 生长计时 = 进度条：按真实时钟出条（窗关着也在长，重开即当前进度），开花填满 */
-    const prog = document.createElement("div");
-    prog.className = "gd-prog";
-    const fill = document.createElement("i");
-    fill.style.width = Math.min(100, Math.round(Math.max(0, Date.now() - p.at) / GARDEN_STAGES[4] * 100)) + "%";
-    prog.appendChild(fill);
-    plant.appendChild(prog);
+    /* 生长计时 = 进度条：按真实时钟出条（窗关着也在长，重开即当前进度）。
+       开花后不再出条 —— 花已开成，进度条站在那里已无意义，只留花与状态词（用户口径）。 */
+    if (st < 4){
+      const prog = document.createElement("div");
+      prog.className = "gd-prog";
+      const fill = document.createElement("i");
+      fill.style.width = Math.min(100, Math.round(Math.max(0, Date.now() - p.at) / GARDEN_STAGES[4] * 100)) + "%";
+      prog.appendChild(fill);
+      plant.appendChild(prog);
+    }
     plant.title = st >= 4 ? "花魄开的花 —— 拖着可以换位置" : "还在长 —— 关掉游戏也不会倒退，拖着可以换位置";
     makeGardenPlantDraggable(plant, p);
     field.appendChild(plant);
   });
   body.appendChild(field);
-  const hint = document.createElement("div");
-  hint.className = "gd-hint";
-  hint.textContent = G.garden.seed ? "执行者头上还挂着一枚种子 —— 拖进这里，落在哪儿就种在哪儿"
-                                   : "想挪就拖：花草可以在园子里随意摆放（关掉游戏也不会倒退）";
-  body.appendChild(hint);
+  if (keepNarr) openGardenNarr(keepNarr, keepShown || 1);     /* 重绘前开着 → 按同一株 + 同一进度装回去 */
   updateGardenBadge();
 }
 /* 花圃内自由拖拽：按住一株直接挪（不进撤销栈 —— 摆放是装修，不是破案进度）。
@@ -5693,46 +5848,127 @@ function makeGardenPlantDraggable(el, p){
   });
 }
 
-/* ---- 开花后点花：嵌在花园窗内的叙事框（承载真名结局的 message）----
-   作为 .gd-field 的绝对定位子元素：优先贴在花上方，上方放不下（贴顶）退到花下方；横向满宽、贴左。
-   同一时刻只开一个；点同一株关闭、点别株切换。 */
-function closeGardenNarr(){ if (gardenNarrEl){ gardenNarrEl.remove(); gardenNarrEl = null; } }
-function openGardenNarr(p, plant){
+/* ---- 开花后点花：排在花圃下方的叙事框（承载真名结局的 message）----
+   插在 .gd-field 之后、随窗一起长高 —— 不再绝对定位压在花圃上（那样会跟花草挤成一团）。
+   同一时刻只开一个；点同一株关闭、点别株切换。
+   呈现按用户定稿的 A+B：**逐段旁白** —— 点花先淡出一段，点框继续下一段，一段一口气，读完为止。 */
+
+/* 真名说明分段：把一大块说明切成「一段一口气」的旁白段。
+   1) 先按句末标点（。！？…）断句；2) 超长句（> 140 字）在逗号 / 顿号 / 分号处就近对半再切，
+   免得像原句那样一口气念不到头；3) 贪心并句，目标约 150 字一段 —— 读起来是几段话，不是一堵字墙。 */
+function narrSegments(text){
+  const t = String(text || "").trim();
+  if (!t) return [];
+  const sents = t.match(/[^。！？…]+[。！？…]*/g) || [t];
+  const clauses = [];
+  sents.forEach(s => splitLongClause(s.trim(), clauses));
+  const segs = [];
+  let cur = "";
+  clauses.filter(Boolean).forEach(c => {
+    if (cur && (cur + c).length > 150){ segs.push(cur); cur = ""; }
+    cur += c;
+  });
+  if (cur) segs.push(cur);
+  return segs;
+}
+function splitLongClause(s, out){
+  if (s.length <= 140){ out.push(s); return; }
+  const parts = s.match(/[^，、；]+[，、；]?/g) || [s];
+  let acc = 0, cut = 0, bestD = Infinity;
+  parts.forEach((p, i) => {
+    acc += p.length;
+    const d = Math.abs(acc - s.length / 2);
+    if (i < parts.length - 1 && d < bestD){ bestD = d; cut = i; }
+  });
+  splitLongClause(parts.slice(0, cut + 1).join(""), out);
+  splitLongClause(parts.slice(cut + 1).join(""), out);
+}
+/* 把「已浮现到第 shown 段」铺进正文；animate=1 时让最新一段淡入（只在用户推进时给），
+   未读完时留下「继续」提示。每秒重绘会重建整框 —— 那时 animate=0，免得最后一段每秒重播淡入。 */
+function renderNarrBody(box, segs, shown, animate){
+  const nb = box.querySelector(".gd-narr-body");
+  if (!nb) return;
+  nb.innerHTML = "";
+  segs.slice(0, shown).forEach((s, i) => {
+    const p = document.createElement("p");
+    p.className = "gd-narr-p";
+    if (animate && i === shown - 1) p.classList.add("in");   /* 只让最新一段淡入 */
+    p.textContent = s;
+    nb.appendChild(p);
+  });
+  const more = box.querySelector(".gd-narr-more");
+  if (more) more.style.display = (shown < segs.length) ? "" : "none";
+  /* 读完就把整框的「点一下」光标收回：再点也没下一段了，别继续给可点的暗示 */
+  box.classList.toggle("done", shown >= segs.length);
+}
+/* 点一下框 = 浮现下一段；已读完则不动。 */
+function advanceGardenNarr(){
+  if (!gardenNarrEl || !gardenNarrPlot) return;
+  const segs = narrSegments(G.garden && G.garden.narr);
+  if (gardenNarrShown >= segs.length) return;
+  gardenNarrShown++;
+  renderNarrBody(gardenNarrEl, segs, gardenNarrShown, 1);
+  fitGardenInView();                       /* 又长高一段 → 若顶到视口底，把窗整体上移 */
+}
+/* 逐段旁白会把窗撑高，整段读完时可能超出视口底边。用户口径「正文不内部滚动」——
+   于是改挪窗：读的时候把窗整体上移，直到整段都看得见（只上移，不动左右）。
+   只在「点花 / 点框推进」这两处用户动作时挪，每秒重绘不挪 —— 免得跟手动拖动打架。
+   坐标换算：窗挂在 desktopEl 内（absolute），要把视口坐标折回相对桌面层再写 style.top。 */
+function fitGardenInView(){
+  if (!gardenWinEl || gardenWinEl.isConnected === false) return;
+  const vh = (typeof window !== "undefined" && window.innerHeight) || 0;
+  if (!vh) return;                                  /* 无头 stub 里量不到视口 → 不动 */
+  const r = gardenWinEl.getBoundingClientRect();
+  if (!(r.height > 0)) return;
+  const over = r.bottom - (vh - 10);
+  if (over <= 0) return;
+  const pTop = desktopEl ? desktopEl.getBoundingClientRect().top : 0;
+  gardenWinEl.style.top = Math.round(Math.max(pTop + 8, r.top - over) - pTop) + "px";
+}
+function closeGardenNarr(){
+  if (gardenNarrEl){ gardenNarrEl.remove(); gardenNarrEl = null; }
+  gardenNarrPlot = null; gardenNarrShown = 0;
+}
+/* shown 给了就按它铺（重绘续档），没给就是新开 → 只亮第一段。
+   fit=1 时（点花 / 推进这类用户动作）读完整段若顶到视口底就上移窗；重绘不挪。 */
+function openGardenNarr(p, shown, fit){
   if (!G.garden || !G.garden.narr) return;
-  closeGardenNarr();
-  const field = gardenWinEl && gardenWinEl.querySelector(".gd-field");
-  if (!field) return;
+  const body = gardenWinEl && gardenWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  const segs = narrSegments(G.garden.narr);
+  if (!segs.length) return;
+  if (gardenNarrEl) gardenNarrEl.remove();      /* 换株 / 重绘：先摘掉旧的，但不动 shown */
+  const n = Math.min(Math.max(1, shown | 0), segs.length);
   const box = document.createElement("div");
   box.className = "gd-narr";
   box._p = p;
   const head = document.createElement("div");
   head.className = "gd-narr-head";
-  head.textContent = "花魄 · 真名";
+  const name = document.createElement("b");
+  name.className = "gd-narr-name"; name.textContent = "花魄";
+  const sub = document.createElement("span");
+  sub.className = "gd-narr-sub"; sub.textContent = "真名 · 形成说明";
   const x = document.createElement("span");
   x.className = "gd-narr-x"; x.textContent = "×"; x.title = "关闭";
   x.addEventListener("click", e => { e.stopPropagation(); closeGardenNarr(); });
-  head.appendChild(x);
-  const body = document.createElement("div");
-  body.className = "gd-narr-body";
-  body.textContent = G.garden.narr;
-  box.appendChild(head); box.appendChild(body);
-  field.appendChild(box);
-  /* 先按实际尺寸定位：优先花上方，上方不够（贴顶或花靠上）则退到花下方；都溢则夹回窗口内 */
-  const fr = field.getBoundingClientRect();
-  const fh = fr.height || 190, fw = fr.width || 278;
-  const py = p.y / 100 * fh;
-  const bh = box.offsetHeight || 120;
-  const gap = 8;
-  let top = py - gap - bh;
-  if (top < 4) top = py + gap;                          /* 上方放不下 → 下方 */
-  if (top + bh > fh - 4) top = Math.max(4, fh - bh - 4);/* 整体仍溢 → 夹进窗口 */
-  box.style.top = top + "px";
-  box.style.left = "8px";
+  head.appendChild(name); head.appendChild(sub); head.appendChild(x);
+  const nb = document.createElement("div");
+  nb.className = "gd-narr-body";
+  const more = document.createElement("div");
+  more.className = "gd-narr-more"; more.textContent = "▸ 点一下 · 继续";
+  box.appendChild(head); box.appendChild(nb); box.appendChild(more);
+  box.addEventListener("click", () => { if (gardenNarrEl === box) advanceGardenNarr(); });
+  /* 接在花圃之后（窗口随框一起变高），是正文的最后一块。 */
+  body.appendChild(box);
   gardenNarrEl = box;
+  gardenNarrPlot = p;
+  gardenNarrShown = n;
+  renderNarrBody(box, segs, n, fit ? 1 : 0);
+  if (fit) fitGardenInView();
 }
 function toggleGardenNarr(p, plant){
-  if (gardenNarrEl && gardenNarrEl._p === p){ closeGardenNarr(); return; }
-  openGardenNarr(p, plant);
+  if (gardenNarrPlot === p){ closeGardenNarr(); return; }   /* 点同一株 = 收起 */
+  openGardenNarr(p, 1, true);
 }
 /* 每秒看一眼：窗开着才动 DOM；跨过开花那一刻弹一枚 toast（每株一次，记在株上）。
    存档回来时花早已开过（超过 10 秒）就静默补记，不补弹。
@@ -5844,6 +6080,7 @@ window.__mxAssign = (k, s) => assignClue(k, s);
 window.__boardTake = (id, sense, cx, cy) => boardTake(id, sense, cx, cy);   /* 等价于把桌布上的 chip 拖出去 */
 window.__matrixItems = () => matrixItems().map(n => n.key);
 window.__infer = () => executeInference();
+window.__render = () => render();   /* 验证 / 调试：手动重绘整张画布（等价于任何一次 render 调用） */
 window.__inferToggle = () => toggleInferWin();
 window.__ensure = (kind, id) => {
   const d = kind === "clue" ? (CLUES[id] || {}) : (ITEMS[id] || {});
@@ -5866,7 +6103,8 @@ window.__garden = {
       x: 24 + (i % 4) * 18, y: 58 });
     refreshGardenWin(); refreshGardenIcon(); return true; },
   open: () => openGardenWin(),
-  close: () => closeGardenWin()
+  close: () => closeGardenWin(),
+  redraw: () => refreshGardenWin()      /* 模拟一次 tick 重绘（验证「叙事框不被重绘抹掉」） */
 };
 /* 真名结局的「真名形成说明」原文（开花后点花叙事框的内容来源；验证用） */
 window.__trueEndingMsg = () => {

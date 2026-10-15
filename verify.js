@@ -1290,7 +1290,8 @@ const chipX = iwEl20.querySelector('.mx-board').querySelector('.mx-chip');
 assert('桌布上的线索 chip 不再带 ×', !!chipX && !chipX.querySelector('.mx-x'));
 assert('chip 的副标题说它在桌布上（与画布上那枚「已捕获」分开说）',
   !!chipX && chipX._html.indexOf('已归位') >= 0);
-assert('chip 的 tooltip 写明「拖出桌布 = 取回画布」', !!chipX && chipX.title === '拖出桌布 = 取回画布');
+assert('chip 的 tooltip 写明两条回头路（拖出桌布 / 拖到线索册）',
+  !!chipX && chipX.title === '拖出桌布 = 取回画布；拖到线索册 = 收进册子');
 /* 拖出桌布 = 取回画布（归位时画布上那份已经没了，这是唯一的回头路）。
    stub 里桌布矩形由 style.left/top + 140×48 常量拼出（新桌布无内联位置 → 0,0,140,48），
    拖到 (900,700) 必在其外；mirror 走 #drag-layer（getElementById 按需创建） */
@@ -1616,8 +1617,8 @@ assert('收起态助手卡片也能接收节点（拖入 = TEC 分析，与图�
   /function nodeDropTargets\(\)/.test(html)
   && /if \(tecChipOn\) list\.push\("tec-chip"\)/.test(html)
   && /iconHit === "tec-chip"\) tecAnalyze\(n\.key\)/.test(html));
-assert('悬停高亮与松手判决共用同一份 nodeDropTargets()',
-  (html.match(/nodeDropTargets\(\)\.forEach\(id => \{/g) || []).length === 2);
+assert('悬停高亮、松手判决与拖动收尾共用同一份 nodeDropTargets()',
+  (html.match(/nodeDropTargets\(\)\.forEach\(id => \{/g) || []).length === 3);
 assert('拖节点悬停到收起卡片上有高亮（与窗内头像同一套虚线）',
   /#tec-chip\.over\{[^}]*outline:2px dashed var\(--text\)/.test(html));
 /* 证物袋窗口 / 线索册窗口都是落点：窗口开着时把节点拖到窗口上 = 收纳。
@@ -1636,11 +1637,11 @@ assert('线索册窗口 / ※ 图标走 ledgerStore 收纳',
   /iconHit === "clue-icon" \|\| iconHit === "clue-win"\) ledgerStore\(n\.key\);/.test(html));
 assert('证物袋窗口有悬停高亮样式（与卡片 / 助手头像同一套虚线）',
   /\.bag-win\.over\{[^}]*outline:2px dashed var\(--text\)/.test(html));
-assert('落点元素解析走 dropTargetEl()（两扇收纳窗取变量，其余按 id），两处调用都在',
+assert('落点元素解析走 dropTargetEl()（两扇收纳窗取变量，其余按 id），三处调用都在',
   /function dropTargetEl\(id\)\{/.test(html)
   && /if \(id === "bag-win"\) return bagWinEl;/.test(html)
   && /if \(id === "clue-win"\) return clueWinEl;/.test(html)
-  && (html.match(/const ic = dropTargetEl\(id\);/g) || []).length === 2);
+  && (html.match(/const ic = dropTargetEl\(id\);/g) || []).length === 3);
 assert('空袋提示把「窗口内」也说清楚', html.indexOf('或本窗口内）收纳') >= 0);
 /* 最小化的顺滑关键：先亮落点卡片、再让窗口缩过去（否则窗口缩没、卡片才淡入 = 闪一下） */
 const iMinTec = html.indexOf('function minTecWin(){');
@@ -1659,7 +1660,7 @@ assert('tecTalk 只轮换闲聊：不再读 sceneTalks、不进撤销栈',
   tecTalkFn.indexOf('sceneTalks') < 0 && tecTalkFn.indexOf('pushHistory') < 0);
 assert('_dragged 的复位在拖动排除表之前（真机里从被排除的子元素上起手也会复位）',
   html.indexOf('el._dragged = false;') > 0
-  && html.indexOf('el._dragged = false;') < html.indexOf('closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip,.music-row")'));
+  && html.indexOf('el._dragged = false;') < html.indexOf('closest("button,input,.bag-item,.map-card,.goto-item,.syswin-x,.syswin-min,.tec-avatar,.mx-exec,.mx-chip,.music-row,.gd-narr")'));
 assert('气泡与记忆放映卡都接线了"点击推进"，且用 _dragged 挡掉拖过的那次点击',
   /c\.addEventListener\("click", \(\) => \{ if \(!c\._dragged\) advanceMemory\(\); \}\)/.test(html)
   && /if \(b\._dragged\) return;/.test(html) && /advanceMemory/.test(html));
@@ -1682,8 +1683,8 @@ assert('标题栏同时有最小化 #case-min 与关闭 #case-x', /id="case-min"
 assert('两条路是分开的函数（parkCase / stowCase / closeCase）',
   /function parkCase\(p\)/.test(html) && /function stowCase\(\)\{ return parkCase\("dock"\); \}/.test(html)
   && /function closeCase\(\)\{ return parkCase\("icon"\); \}/.test(html));
-assert('拖动排除表覆盖了地图地址卡 / TEC 头像 / TEC 最小化键 / 阵列执行者与线索 chip / 播放器曲目行',
-  /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.syswin-min,\.tec-avatar,\.mx-exec,\.mx-chip,\.music-row"\)/.test(html));
+assert('拖动排除表覆盖了地图地址卡 / TEC 头像 / TEC 最小化键 / 阵列 chip / 播放器曲目行 / 花园叙事框（整框可点）',
+  /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.syswin-min,\.tec-avatar,\.mx-exec,\.mx-chip,\.music-row,\.gd-narr"\)/.test(html));
 /* 触发 stub 里注册的事件处理器 */
 const fire = (el, t, o) => (el._ev[t] || []).forEach(f => f(Object.assign(
   { button: 0, clientX: 0, clientY: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o)));
@@ -2600,7 +2601,18 @@ assert('执行者头顶的种子对话框按状态重建（源码检查）',
   html.indexOf('if (G.garden && G.garden.seed) exec.appendChild(buildSeedPop())') >= 0);
 assert('种子气泡里只有一张图、没有任何文字节点（源码检查）',
   html.indexOf('mx-seedpop-tx') < 0 &&
-  /function buildSeedPop\(\)\{[\s\S]*?pop\.appendChild\(im\);[\s\S]*?makeSeedDraggable\(pop\);/.test(html));
+  /function buildSeedPop\(\)\{[\s\S]*?pop\.appendChild\(im\);[\s\S]*?makeSeedDraggable\(pop, im\);/.test(html));
+assert('种子拖拽把手只有图本身（气泡白卡不是把手）（源码检查）',
+  (() => { const a = html.indexOf('function makeSeedDraggable(pop, handle){');
+    if (a < 0) return false;
+    const b = html.indexOf('function riteEnd(', a);   /* 下一个顶层函数 = 本函数结尾 */
+    const src = b > a ? html.slice(a, b) : html.slice(a);
+    return src.indexOf('const h = handle || pop;') >= 0 &&
+           src.indexOf('h.addEventListener("pointerdown"') >= 0 &&
+           src.indexOf('h.setPointerCapture(e.pointerId)') >= 0 &&
+           src.indexOf('h.addEventListener("pointerup", finish)') >= 0 &&
+           src.indexOf('h.addEventListener("pointercancel"') >= 0 &&
+           src.indexOf('pop.addEventListener("pointerdown"') < 0; })());
 assert('种子拖放落点 = overGardenDrop → gardenPlant（源码检查）',
   html.indexOf('if (overGardenDrop(e.clientX, e.clientY)){ gardenPlant(e.clientX, e.clientY); return; }') >= 0);
 assert('下种过 requireCase 门（源码检查）',
@@ -2618,8 +2630,8 @@ assert('旧槽位档迁移：null 占位过滤 + 补坐标（源码检查）',
 assert('快照携带 garden（撤销 / 续档跟手）', html.indexOf('garden: JSON.parse(JSON.stringify(G.garden') >= 0);
 assert('旧档迁移：捕获过真名但无 garden 的存档补发种子（源码检查）',
   html.indexOf('ENDINGS.find(e => e.isTrueCapture)') >= 0);
-assert('种子对话框与自由花圃样式已写（窗有定宽、坛位样式已清）',
-  html.indexOf('.mx-seedpop{') >= 0 && html.indexOf('.garden-win{position:absolute; left:50%; top:110px; margin-left:-150px; width:300px;') >= 0 &&
+assert('种子对话框与自由花圃样式已写（窗加宽到 520、坛位样式已清）',
+  html.indexOf('.mx-seedpop{') >= 0 && html.indexOf('.garden-win{position:absolute; left:50%; top:110px; margin-left:-260px; width:520px;') >= 0 &&
   html.indexOf('.gd-field{') >= 0 && html.indexOf('.gd-plot') < 0 && html.indexOf('.gd-grid') < 0);
 assert('openApp 分发 garden 应用（源码检查）', html.indexOf('app === "garden") toggleGardenWin()') >= 0);
 assert('boot 与重置后都刷新花园图标（源码检查）',
@@ -2665,6 +2677,15 @@ assert('气泡里只有一张种子图（无文字节点）',
   !!pop38 && pop38.children.length === 1 &&
   String(pop38.children[0].tagName).toLowerCase() === 'img' &&
   String(pop38.children[0].src || '').indexOf('assets/flower/plant_seed.png') >= 0);
+assert('拖拽把手只挂在种子图上（气泡白卡空白处拖不动）',
+  (() => { const im = pop38 && pop38.children.find(c => String(c.tagName).toLowerCase() === 'img');
+    return !!im && !!im._ev.pointerdown && !!im._ev.pointermove && !!im._ev.pointerup &&
+           !pop38._ev.pointerdown && !pop38._ev.pointermove; })());
+assert('花圃是一整片纸面（与推演器桌布同源）而不是凹框、株图 64px',
+  html.indexOf('.garden-win .syswin-body{padding:0 0 10px;\r\n    background-color:var(--bg);') >= 0 &&
+  html.indexOf('background-image:var(--paper-grain), var(--paper-fleck);') >= 0 &&
+  html.indexOf('.gd-field{position:relative; height:260px; overflow:hidden}') >= 0 &&
+  html.indexOf('.gd-plant img{width:64px; height:64px;') >= 0);
 /* 下种：等价于把种子拖进花园窗（stub 里窗体 rect = 140×48，落点 70,24 = 50%,50% 夹回 y）。
    无固定坛位：落在哪儿就记在哪儿的百分比坐标。 */
 assert('种子落进花圃：头顶对话框收走、株带坐标',
@@ -2742,8 +2763,8 @@ assert('开着的推理窗同步重绘：对话框随撤销重现',
 
 console.log('\n=== 39. 册中直拖推演器 / 花园进度条 / 花园窗风格统一 ===');
 /* ---- 源码检查 ---- */
-assert('花园窗与全桌浮窗同一族样式（card 底 / edge 描边 / 圆角 / win-shadow，z 回 25 档）',
-  /\.garden-win\{position:absolute; left:50%; top:110px; margin-left:-150px; width:300px;\r?\n\s*background:var\(--card\); border:1px solid var\(--edge\); border-radius:var\(--r-win\);\r?\n\s*box-shadow:var\(--win-shadow\); z-index:25; overflow:hidden\}/.test(html));
+assert('花园窗与全桌浮窗同一族样式（card 底 / edge 描边 / 圆角 / win-shadow，z 回 25 档）+ 520 宽',
+  /\.garden-win\{position:absolute; left:50%; top:110px; margin-left:-260px; width:520px;\r?\n\s*background:var\(--card\); border:1px solid var\(--edge\); border-radius:var\(--r-win\);\r?\n\s*box-shadow:var\(--win-shadow\); z-index:25; overflow:hidden\}/.test(html));
 assert('生长计时改用进度条：倒计时文字与 fmtGardenLeft 已删（源码检查）',
   html.indexOf('gd-prog') >= 0 && html.indexOf('GARDEN_STAGES[4] * 100') >= 0 &&
   html.indexOf('还差 ') < 0 && html.indexOf('fmtGardenLeft') < 0);
@@ -2805,16 +2826,22 @@ assert('刚拖完的那一下 click 不取回（仍在册）', window.__dump().s
 rowB39._ev.click[0]();
 assert('再点一次 = 正常取回画布', window.__dump().storedIn[K39] === undefined);
 assert('非册中线索走不了这条路（画布上的再调 = false）', window.__ledgerToMatrix(K39) === false);
-/* ---- 花园进度条：生长中的株按真实时钟出条，开花填满；倒计时文字退场 ---- */
+/* ---- 花园进度条：生长中的株按真实时钟出条；开花后不再出条（进度条站在那里已无意义） ---- */
 window.__garden.plantAt(45000);
 window.__garden.plantAt(180000);
 window.__garden.open();
 const gw39 = ids['desktop'].querySelector('.garden-win');
 const plants39 = gw39.querySelectorAll('.gd-plant');
-assert('每株都带进度条、按真实进度出条（45s ≈ 25%，开花 = 100%）',
-  plants39.length === 2 && plants39.every(pl => !!pl.querySelector('.gd-prog')) &&
-  (() => { const g = plants39.map(pl => pl.querySelector('.gd-prog').children[0].style.width);
-    return g.indexOf('25%') >= 0 && g.indexOf('100%') >= 0; })());
+assert('生长中的株带进度条、按真实进度出条（45s ≈ 25%）；开花株不再出条',
+  plants39.length === 2 &&
+  (() => {
+    const iBloom = plants39.findIndex(pl => pl._classes.has('bloom'));
+    const iGrow  = plants39.findIndex(pl => !pl._classes.has('bloom'));
+    if (iBloom < 0 || iGrow < 0) return false;
+    const bar = plants39[iGrow].querySelector('.gd-prog');
+    return !!bar && bar.children[0].style.width === '25%' &&
+           !plants39[iBloom].querySelector('.gd-prog');
+  })());
 assert('档位行只剩档位名（倒计时文字从 DOM 退场）',
   plants39.every(pl => ['种子','嫩芽','展叶','舒叶','开花'].indexOf(pl.querySelector('.gd-stage')._text) >= 0));
 window.__garden.close();
@@ -2838,16 +2865,45 @@ assert('grantGardenSeed 接收并存储 message 到 G.garden.narr（源码检查
 assert('旧档迁移：有株无 narr 时回填真名说明（源码检查）',
   html.indexOf('if (G.garden.plots.some(Boolean) && !G.garden.narr) G.garden.narr = trueEndingMessage();') >= 0 &&
   html.indexOf('function trueEndingMessage()') >= 0);
-assert('开花后点花浮现叙事框：openGardenNarr 把 .gd-narr 注入 .gd-field（源码检查）',
-  html.indexOf('function openGardenNarr(p, plant){') >= 0 &&
-  /field\.appendChild\(box\)/.test(html) &&
+assert('开花后点花浮现叙事框：openGardenNarr 把 .gd-narr 接在花圃之后（源码检查）',
+  html.indexOf('function openGardenNarr(p, shown, fit){') >= 0 &&
+  html.indexOf('body.appendChild(box)') >= 0 &&
   html.indexOf('box.className = "gd-narr";') >= 0);
+assert('真名说明分段器：按句末断句 + 超长句就近再切 + 贪心并段（源码检查）',
+  html.indexOf('function narrSegments(text){') >= 0 &&
+  html.indexOf('[^。！？…]+[。！？…]*') >= 0 &&
+  html.indexOf('function splitLongClause(s, out){') >= 0 &&
+  html.indexOf('(cur + c).length > 150') >= 0);
+assert('逐段旁白：点框浮现下一段、读完即止（源码检查）',
+  html.indexOf('function advanceGardenNarr(){') >= 0 &&
+  html.indexOf('if (gardenNarrShown >= segs.length) return;') >= 0 &&
+  html.indexOf('gardenNarrShown++;') >= 0 &&
+  html.indexOf('openGardenNarr(p, 1, true);') >= 0);
+assert('正文不内部滚动：读完顶到视口底就上移窗（仅用户动作时挪）（源码检查）',
+  html.indexOf('function fitGardenInView(){') >= 0 &&
+  html.indexOf('const over = r.bottom - (vh - 10);') >= 0 &&
+  html.indexOf('if (fit) fitGardenInView();') >= 0 &&
+  html.indexOf('const vh = (typeof window !== "undefined" && window.innerHeight) || 0;') >= 0 &&
+  html.indexOf('.gd-narr-body{padding:13px 16px 4px; font-size:13.5px; line-height:1.9; color:var(--line)}') >= 0);
+assert('花园窗不再有底注行（.gd-hint 已按用户口径移除）（源码检查）',
+  html.indexOf('gd-hint') < 0);
+assert('段落淡入只在用户推进时给（每秒重绘不重播）（源码检查）',
+  html.indexOf('function renderNarrBody(box, segs, shown, animate){') >= 0 &&
+  html.indexOf('if (animate && i === shown - 1) p.classList.add("in");') >= 0 &&
+  html.indexOf('renderNarrBody(box, segs, n, fit ? 1 : 0);') >= 0 &&
+  html.indexOf('renderNarrBody(gardenNarrEl, segs, gardenNarrShown, 1);') >= 0);
 assert('花株 click 接线：未拖动 + 已 bloom + 有 narr 才触发（源码检查）',
   html.indexOf('el.addEventListener("click", () => {') >= 0 &&
   html.indexOf('if (!el.classList.contains("bloom")) return;') >= 0 &&
   html.indexOf('toggleGardenNarr(p, el);') >= 0);
-assert('叙事框样式已写（嵌花园窗、满宽、限高可滚，与浮窗同族）',
-  html.indexOf('.gd-narr{position:absolute; left:8px; width:calc(100% - 16px); max-height:158px;') >= 0);
+assert('叙事框样式已写（逐段旁白 / 阅读字号 13.5 / 大白字标题 / 整框可点 / 读完收回光标）（源码检查）',
+  html.indexOf('.gd-narr{margin:10px 10px 0; background:var(--card);') >= 0 &&
+  html.indexOf('.gd-narr{position:absolute') < 0 &&
+  html.indexOf('.gd-narr-body{padding:13px 16px 4px; font-size:13.5px; line-height:1.9; color:var(--line)}') >= 0 &&
+  html.indexOf('.gd-narr-name{font-size:17px;') >= 0 &&
+  html.indexOf('.gd-narr{') >= 0 && html.indexOf('cursor:pointer}') >= 0 &&
+  html.indexOf('.gd-narr.done{cursor:default}') >= 0 &&
+  html.indexOf('.gd-narr-more{') >= 0);
 
 /* ---- 运行时：复现真名结局（与 §38 同一套五感配方） ---- */
 ids['btn-reset']._ev.click[0]();
@@ -2890,15 +2946,56 @@ window.__garden.plantAt(200000);   /* 这枚 ms>=190000 → 已 bloom */
 window.__garden.open();
 const gw40 = ids['desktop'].querySelector('.garden-win');
 assert('花园窗已开、存在开花株', !!gw40 && gw40.querySelectorAll('.gd-plant.bloom').length >= 1);
-/* 点开花株 → 花上方浮现叙事框，正文含真名说明 */
+/* 点开花株 → 花圃下方浮现叙事框；A+B：首段先亮，点框逐段浮现 */
 const bloom40 = gw40.querySelector('.gd-plant.bloom');
 bloom40._ev.click[0]();
 const narr40 = gw40.querySelector('.gd-narr');
+const narrBodyText = box => box ? box.querySelector('.gd-narr-body').children.map(c => c._text || '').join('') : '';
+const narrParas = box => box ? box.querySelector('.gd-narr-body').children.length : 0;
+const narrMoreOn = box => { const m = box.querySelector('.gd-narr-more'); return !!m && m.style.display !== 'none'; };
 assert('点开花株：花园窗内浮现叙事框 .gd-narr', !!narr40);
-assert('叙事框正文即真名说明（不进遮罩、改在花上承载）',
-  !!narr40 && String(narr40.querySelector('.gd-narr-body')._text || '').indexOf('呋喃香豆素') >= 0);
-assert('叙事框嵌在 .gd-field 内、跟随花园窗',
-  !!narr40 && !!narr40.parentNode && narr40.parentNode._classes.has('gd-field'));
+assert('逐段旁白：首段先亮、只此一段、留「继续」提示（不进遮罩、改在花上承载）',
+  !!narr40 && narrParas(narr40) === 1 && narrMoreOn(narr40) &&
+  narrBodyText(narr40).indexOf('呋喃香豆素') >= 0);
+/* 点框推进：段落数递增，读到全部后停（再点不加段、「继续」提示收起） */
+let prevP40 = narrParas(narr40), clicks40 = 0;
+while (clicks40 < 20){
+  narr40._ev.click[0](); clicks40++;
+  const now = narrParas(narr40);
+  if (now === prevP40) break;
+  prevP40 = now;
+}
+assert('点框逐段浮现：段落数递增后停在总段数、再点不再加段',
+  prevP40 > 1 && narrParas(narr40) === prevP40 && !narrMoreOn(narr40));
+assert('读完：叙事框收成 .done（不再给「可点」光标暗示）', !!narr40 && narr40._classes.has('done'));
+/* 真机坑：花园窗是整窗可拖的，叙事框**必须在拖动排除表里** —— 否则按住叙事框起手时花园窗会
+   setPointerCapture，把 pointerup 与 click 一起改派到窗根，叙事框自己的 click 永远收不到
+   （用户报的「点了不继续」）。这条只能源码级钉住：DOM stub 不实现指针捕获，合成 click 直接投递给
+   元素也会绕过重定向 —— 探针必须用 CDP 真鼠标事件才测得出来（见 .workbuddy/_t/narrprobe.cjs）。 */
+assert('叙事框在拖动排除表内（否则整框点击被窗的指针捕获改派掉）（源码检查）',
+  /closest\("button,input,\.bag-item,\.map-card,\.goto-item,\.syswin-x,\.syswin-min,\.tec-avatar,\.mx-exec,\.mx-chip,\.music-row,\.gd-narr"\)/.test(html));
+assert('全部读完 = 拼起来正是整段真名说明（分段无损）',
+  narrBodyText(narr40) === String(msg40).trim());
+assert('叙事框排在花圃之后（同属花园窗正文，不压在花圃上）',
+  (() => { if (!narr40 || !narr40.parentNode) return false;
+    const bodyN = narr40.parentNode;
+    if (!bodyN._classes.has('syswin-body')) return false;
+    const iNarr = bodyN.children.findIndex(c => c._classes.has('gd-narr'));
+    const iField = bodyN.children.findIndex(c => c._classes.has('gd-field'));
+    return iNarr > iField && iNarr >= 0; })());
+/* 每秒一次 gardenTick 会重绘整窗：叙事框必须按「正对着哪一株 + 读到第几段」装回去 */
+assert('重绘保住已展开的叙事框与进度（源码检查）',
+  html.indexOf('const keepNarr = gardenNarrPlot, keepShown = gardenNarrShown;') >= 0 &&
+  html.indexOf('if (keepNarr) openGardenNarr(keepNarr, keepShown || 1);') >= 0 &&
+  html.indexOf('gardenNarrPlot = p;') >= 0 &&
+  html.indexOf('if (gardenNarrPlot === p){ closeGardenNarr(); return; }') >= 0);
+assert('重绘后叙事框仍在且进度不退回（tick 不清框、不打回第一段）',
+  (() => { if (!narr40) return false;
+    const paras = narrParas(narr40);
+    window.__garden.redraw();                 /* 模拟一次 tick 重绘 */
+    const again = gw40.querySelector('.gd-narr');
+    return !!again && narrParas(again) === paras && !narrMoreOn(again) &&
+      narrBodyText(again).indexOf('呋喃香豆素') >= 0; })());
 /* 再点同一株 → 关闭 */
 bloom40._ev.click[0]();
 assert('再点同一株：叙事框关闭', !gw40.querySelector('.gd-narr'));
@@ -2907,6 +3004,107 @@ const nonBloom40 = Array.from(gw40.querySelectorAll('.gd-plant')).find(p => !p._
 if (nonBloom40) nonBloom40._ev.click[0]();
 assert('点未开花株：不弹出叙事框', !gw40.querySelector('.gd-narr'));
 window.__garden.close();
+
+console.log('\n=== 41. 拖动收尾 / 推演器 ↔ 线索册互拖 / 种子镜像 / 真名震动 ===');
+const ev41 = o => Object.assign({ button: 0, pointerId: 1, stopPropagation(){}, preventDefault(){} }, o);
+const dlEl41 = () => document.getElementById('drag-layer');
+
+/* ---- A. 拖着拖着 render()（TEC 分析完成掉线索那一刻）：镜像不许残留、位移要写回 ---- */
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+const dragEl41 = findEl('loc:SCENES_garden');
+const posBefore41 = Object.assign({}, window.__dump().pos['loc:SCENES_garden']);
+dragEl41._ev.pointerdown[0](ev41({ clientX: 10, clientY: 10 }));
+dragEl41._ev.pointermove[0](ev41({ clientX: 120, clientY: 80 }));
+assert('拖动中：镜像进 #drag-layer、原节点被隐藏',
+  dlEl41().children.length === 1 && dragEl41.style.visibility === 'hidden');
+window.__render();                          /* 模拟「分析完成、新线索落到画布」的那次重建 */
+assert('拖动中被 render() 打断：#drag-layer 清空，不留幽灵节点', dlEl41().children.length === 0);
+const posAfter41 = window.__dump().pos['loc:SCENES_garden'];
+assert('拖动中被 render() 打断：位移已写回（停在拖到的地方，不跳回起点）',
+  posAfter41.x !== posBefore41.x || posAfter41.y !== posBefore41.y);
+assert('拖动中被 render() 打断：新节点不带拖动残留（无 dragging、可见）',
+  (() => { const el = findEl('loc:SCENES_garden');
+    return !!el && !el._classes.has('dragging') && el.style.visibility !== 'hidden'; })());
+dragEl41._ev.pointerup[0](ev41({ clientX: 120, clientY: 80 }));
+assert('收尾之后再松手：幂等，不产生异常或新镜像', dlEl41().children.length === 0);
+assert('render() 重建前统一给拖动收尾（源码检查）',
+  html.indexOf('const dragAborters = new Set();') >= 0 &&
+  html.indexOf('abortActiveDrags();') >= 0 &&
+  html.indexOf('function clearDragLayer(){') >= 0);
+assert('四种拖动都登记了 abort（节点 / 种子 / 芯片 / 册行）（源码检查）',
+  html.indexOf('registerDrag(abortDrag);') >= 0 &&
+  html.indexOf('registerDrag(abortSeedDrag);') >= 0 &&
+  html.indexOf('registerDrag(abortCardDrag);') >= 0 &&
+  html.indexOf('registerDrag(abortRowDrag);') >= 0);
+
+/* ---- B. 推演器 → 线索册（与「册 → 桌布」对称的那一半） ---- */
+window.__ensure('clue', 'CLUES_V_luheng');
+window.__inferToggle();
+window.__mxAssign('clue:CLUES_V_luheng', 'vision');
+assert('线索已归位桌布（storedIn = MATRIX、画布上没有它）',
+  window.__dump().storedIn['clue:CLUES_V_luheng'] === 'MATRIX' && !findEl('clue:CLUES_V_luheng'));
+const iw41 = ids['desktop'].querySelector('.infer-win');
+const chip41 = iw41 && iw41.querySelector('.mx-chip');
+assert('桌布上有线索 chip', !!chip41);
+/* 落点用线索册图标的实际矩形中心（stub 里图标有布局位置，别写死坐标） */
+const lic41 = document.getElementById('clue-icon');
+const lr41 = lic41.getBoundingClientRect();
+const lcx41 = lr41.left + lr41.width / 2, lcy41 = lr41.top + lr41.height / 2;
+chip41._ev.pointerdown[0](ev41({ clientX: 0, clientY: 0 }));
+chip41._ev.pointermove[0](ev41({ clientX: lcx41, clientY: lcy41 + 40 }));
+chip41._ev.pointermove[0](ev41({ clientX: lcx41, clientY: lcy41 }));
+assert('拖到线索册上方：册图标亮起落点高亮', lic41._classes.has('over'));
+chip41._ev.pointerup[0](ev41({ clientX: lcx41, clientY: lcy41 }));
+assert('拖到线索册松手：归入册子（storedIn = LEDGER）',
+  window.__dump().storedIn['clue:CLUES_V_luheng'] === 'LEDGER');
+assert('拖到线索册松手：阵列里已摘掉这条',
+  (window.__dump().matrix.vision || []).indexOf('CLUES_V_luheng') < 0);
+assert('拖到线索册松手：画布上也不留它（归册 = 只留清单）', !findEl('clue:CLUES_V_luheng'));
+assert('拖到线索册后镜像不残留、落点高亮已收',
+  dlEl41().children.length === 0 && !document.getElementById('clue-icon')._classes.has('over'));
+assert('推演器 → 线索册的落点判定与归还路由（源码检查）',
+  html.indexOf('function overLedgerDrop(cx, cy){') >= 0 &&
+  html.indexOf('function boardToLedger(cid, sense){') >= 0 &&
+  html.indexOf('if (overLedgerDrop(e.clientX, e.clientY)){ boardToLedger(cid, sense); return; }') >= 0);
+
+/* ---- C. 种子跟手的是图本身，不是整块白卡气泡 ---- */
+window.__garden.grant(window.__trueEndingMsg());
+window.__render();                           /* 重刷推演窗：执行者头顶挂上种子对话框 */
+const pop41 = ids['desktop'].querySelector('.mx-seedpop');
+assert('种子对话框已挂在执行者头顶', !!pop41);
+const seedIm41 = pop41 && pop41.children.find(c => String(c.tagName).toLowerCase() === 'img');
+assert('对话框里只有一张种子图、且把手只挂在图上',
+  !!seedIm41 && !!seedIm41._ev.pointerdown && !pop41._ev.pointerdown);
+seedIm41._ev.pointerdown[0](ev41({ clientX: 0, clientY: 0 }));
+seedIm41._ev.pointermove[0](ev41({ clientX: 50, clientY: 40 }));
+const mir41 = dlEl41().children[0];
+assert('拖动种子：跟手的镜像是**种子图本身**（IMG + mx-seed-mirror），不是整块白卡气泡',
+  !!mir41 && String(mir41.tagName).toLowerCase() === 'img' && mir41._classes.has('mx-seed-mirror'));
+seedIm41._ev.pointerup[0](ev41({ clientX: 50, clientY: 40 }));
+assert('松手（没落进花园）：镜像收走、气泡放回来',
+  dlEl41().children.length === 0 && !pop41.style.visibility);
+
+/* ---- D. 真名震动：拖过窗口留下的内联 animation:none 不该把它盖掉 ---- */
+const iwD = ids['desktop'].querySelector('.infer-win');
+iwD._ev.pointerdown[0](ev41({ clientX: 0, clientY: 0 }));
+iwD._ev.pointermove[0](ev41({ clientX: 40, clientY: 30 }));   /* 玩家把推演窗挪到顺手位置 */
+iwD._ev.pointerup[0](ev41({ clientX: 40, clientY: 30 }));
+assert('拖过推演窗后窗口被写上内联 animation:none（真名震动失效的来源）',
+  iwD.style.animation === 'none');
+const mxD = window.__dump().matrix;
+Object.keys(mxD).forEach(s => mxD[s].forEach(cid => window.__boardTake(cid, s)));
+[["CLUES_V_luheng","vision"],["CLUES_nm","hearing"],["CLUES_mc","touch"],
+ ["CLUES_CBKW","taste"],["CLUES_xds","smell"]].forEach(([id, sense]) => {
+  window.__ensure("clue", id);
+  window.__mxAssign("clue:" + id, sense);
+});
+window.__infer();
+assert('真名结局：加震前清掉内联 animation，窗口真的在震（.shock 已加、内联已空）',
+  iwD._classes.has('shock') && iwD.style.animation === '');
+assert('震前清内联 animation（源码检查）',
+  html.indexOf('inferWinEl.style.animation = "";') >= 0 &&
+  html.indexOf('inferWinEl.style.animation = "";') < html.indexOf('inferWinEl.classList.add("shock")'));
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

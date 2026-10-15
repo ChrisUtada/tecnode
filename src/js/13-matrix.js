@@ -34,10 +34,26 @@ function toggleInferWin(){
    桌布 overflow:hidden，所以拖动时把卡片克隆到全局 #drag-layer 跟随指针，松手落在桌布外即取回。 */
 function makeMatrixNodeDraggable(card, cid, sense){
   let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
+  /* 拖出桌布的方向：**线索册（窗 / 图标）也是落点** —— 与「册 → 桌布」对称的那一半 */
+  const clearDropOver = () => {
+    if (clueWinEl && clueWinEl.classList) clueWinEl.classList.remove("over");
+    const ic = document.getElementById("clue-icon");
+    if (ic && ic.classList) ic.classList.remove("over");
+  };
+  /* 被 render() 打断时的收尾（见 07-render.js 的登记表）：摘镜像、把卡片放回来 */
+  const abortCardDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove("dragging");
+    if (mirror){ mirror.remove(); mirror = null; }
+    card.style.visibility = "";
+    clearDropOver();
+  };
   card.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
     dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
     sr = desktopEl.getBoundingClientRect();
+    registerDrag(abortCardDrag);
     try { card.setPointerCapture(e.pointerId); } catch(_){}
     e.stopPropagation();
   });
@@ -67,14 +83,29 @@ function makeMatrixNodeDraggable(card, cid, sense){
     }
     mirror.style.left = (e.clientX - offx - sr.left) + "px";
     mirror.style.top  = (e.clientY - offy - sr.top ) + "px";
+    /* 线索册落点高亮（窗开着 / 图标常驻，谁被压中就亮谁） */
+    const lw = clueWinEl;
+    if (lw && lw.classList){
+      const r = lw.getBoundingClientRect();
+      lw.classList.toggle("over", e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+    }
+    const lic = document.getElementById("clue-icon");
+    if (lic && lic.classList){
+      const r = lic.getBoundingClientRect();
+      lic.classList.toggle("over", e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+    }
   });
   const finish = e => {
     if (!dragging) return;
     dragging = false;
+    unregisterDrag(abortCardDrag);
     card.classList.remove("dragging");
     if (mirror){ mirror.remove(); mirror = null; }
     card.style.visibility = "";
+    clearDropOver();
     if (!moved) return;                    /* 纯点击，不移除 */
+    /* 落在线索册上 → 改归册子（回头路有两条：回画布 / 回册子） */
+    if (overLedgerDrop(e.clientX, e.clientY)){ boardToLedger(cid, sense); return; }
     const bd = inferWinEl && inferWinEl.querySelector(".mx-board");
     if (bd){
       const r = bd.getBoundingClientRect();
@@ -87,11 +118,7 @@ function makeMatrixNodeDraggable(card, cid, sense){
     refreshInferWin();                     /* 仍在桌布内：复位 */
   };
   card.addEventListener("pointerup", finish);
-  card.addEventListener("pointercancel", () => {
-    dragging = false; card.classList.remove("dragging");
-    if (mirror){ mirror.remove(); mirror = null; }
-    card.style.visibility = "";
-  });
+  card.addEventListener("pointercancel", () => { unregisterDrag(abortCardDrag); abortCardDrag(); });
 }
 function refreshInferWin(){
   if (!inferWinEl) return;
@@ -128,7 +155,7 @@ function refreshInferWin(){
         let cls = "mx-chip node ent-node ent-clue";
         if (G.captured.has(cid)) cls += " got";
         chip.className = cls;
-        chip.title = "拖出桌布 = 取回画布";   /* 归位后画布上不再留这份线索，取回只有这一条路 */
+        chip.title = "拖出桌布 = 取回画布；拖到线索册 = 收进册子";   /* 回头路两条：回画布 / 回册子 */
         /* 归位 = 线索搬到了桌布上（画布上那份已经收走），所以这里说「已归位」，
            与画布上那枚「线索 · 已捕获」分开说 —— 两者是两个地方的两个状态 */
         const sub = G.captured.has(cid) ? "线索 · 已归位" : "线索";
@@ -192,29 +219,42 @@ function refreshInferWin(){
 /* ============ 种子对话框（「确认捕获」落定 → 花园的前奏） ============
    位置与心碎表情同款（.mx-exec 上方），但不自动消失：种子拖进花园才收走。
    气泡里**只有一张种子图**，没有任何文字 —— 要说的都由画面说了。
-   种子可拖 —— board overflow:hidden，与桌布 chip 同一套镜像拖法（#drag-layer）；
-   落进花园窗 / 花园图标 = 下种（gardenPlant，16-cases.js），落在别处 = 弹回原位。 */
+   **拖拽把手 = 种子图本身**（用户口径）：按在图上才算搬运，气泡白卡的空白处拖不动。
+   指针捕获与监听必须下在**同一个元素**（下面 handle）—— 捕获会把 pointermove / up
+   重定向到捕获元素，挂在别人身上就收不到移动。落进花园窗 / 花园图标 = 下种
+   （gardenPlant，16-cases.js），落在别处 = 弹回原位。 */
 function buildSeedPop(){
   const pop = document.createElement("div");
   pop.className = "mx-seedpop";
-  pop.title = "拖到花园里种下";
+  pop.title = "拖动种子，种进花园";
   const im = document.createElement("img");
   im.src = GARDEN_IMG.seed;
   im.alt = "花魄的种子"; im.draggable = false;
+  im.title = "拖到花园里种下";
   pop.appendChild(im);
-  makeSeedDraggable(pop);
+  makeSeedDraggable(pop, im);
   return pop;
 }
-function makeSeedDraggable(pop){
+function makeSeedDraggable(pop, handle){
+  const h = handle || pop;                 /* 把手缺省退整块（老调用点兼容） */
   let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
-  pop.addEventListener("pointerdown", e => {
+  /* 被 render() 打断时的收尾（见 07-render.js 的登记表）：摘镜像、把原气泡放回来 */
+  const abortSeedDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    pop.classList.remove("dragging");
+    if (mirror){ mirror.remove(); mirror = null; }
+    pop.style.visibility = "";
+  };
+  h.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
     dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
     sr = desktopEl.getBoundingClientRect();
-    try { pop.setPointerCapture(e.pointerId); } catch(_){}
+    registerDrag(abortSeedDrag);
+    try { h.setPointerCapture(e.pointerId); } catch(_){}
     e.stopPropagation();
   });
-  pop.addEventListener("pointermove", e => {
+  h.addEventListener("pointermove", e => {
     if (!dragging) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
     if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
@@ -222,18 +262,21 @@ function makeSeedDraggable(pop){
     pop.classList.add("dragging");
     if (!mirror){
       const layer = document.getElementById("drag-layer");
-      const r = pop.getBoundingClientRect();
+      /* 跟手的是**种子图本身**（用户口径）——镜像只克隆那张图，不是整块白卡气泡 */
+      const r = h.getBoundingClientRect();
       offx = e.clientX - r.left; offy = e.clientY - r.top;
-      mirror = pop.cloneNode(true);
-      mirror.classList.add("drag-mirror");
-      mirror.classList.remove("dragging");
+      mirror = h.cloneNode(true);
+      mirror.className = "mx-seed-mirror drag-mirror";
       mirror.style.position = "absolute"; mirror.style.transform = "none";
-      mirror.style.width = r.width + "px"; mirror.style.height = r.height + "px";
+      /* 尺寸取**布局**尺寸（offsetWidth），不取 rect：种子气泡带着 pop 缩放动画（scale .6→1），
+         动画没走完就起拖时 rect 量到的是缩放后的值（实测 32 → 19）。 */
+      mirror.style.width = (h.offsetWidth || 32) + "px";
+      mirror.style.height = (h.offsetHeight || 32) + "px";
       mirror.style.left = (r.left - sr.left) + "px";
       mirror.style.top  = (r.top  - sr.top ) + "px";
       mirror.style.visibility = "hidden";
       layer.appendChild(mirror);
-      pop.style.visibility = "hidden";
+      pop.style.visibility = "hidden";     /* 原气泡（含白卡）整体隐去，画面上只剩跟手的种子 */
       void mirror.offsetWidth;             /* 强制布局，显示即正确位置 */
       mirror.style.visibility = "visible";
     }
@@ -243,6 +286,7 @@ function makeSeedDraggable(pop){
   const finish = e => {
     if (!dragging) return;
     dragging = false;
+    unregisterDrag(abortSeedDrag);
     pop.classList.remove("dragging");
     if (mirror){ mirror.remove(); mirror = null; }
     pop.style.visibility = "";
@@ -250,13 +294,10 @@ function makeSeedDraggable(pop){
     if (overGardenDrop(e.clientX, e.clientY)){ gardenPlant(e.clientX, e.clientY); return; }
     refreshInferWin();                     /* 没拖进花园：弹回原位（对话框照旧） */
   };
-  pop.addEventListener("pointerup", finish);
-  pop.addEventListener("pointercancel", () => {
-    dragging = false; pop.classList.remove("dragging");
-    if (mirror){ mirror.remove(); mirror = null; }
-    pop.style.visibility = "";
-  });
+  h.addEventListener("pointerup", finish);
+  h.addEventListener("pointercancel", () => { unregisterDrag(abortSeedDrag); abortSeedDrag(); });
 }
+
 /* 长按蓄力：pointerdown 起 2.5s 完成 → executeInference；pointerup / pointerleave 提前 = 中断复位。
    无头环境 setTimeout 返回 0 就立即完成（与 enterCase 换档的兜底同款）。 */
 let riteTimer = null;
@@ -372,6 +413,11 @@ function triggerEnding(ending){
   /* 真名结局：先让推演器整窗冲击震动一拍，再落下结局遮罩 */
   const shock = !!(ending.isTrueCapture && inferWinEl);
   if (shock){
+    /* 拖过推演窗的手势会在窗口上留下内联 `animation:none`（makeFloatDraggable 防「pop 动画
+       没走完就拖动会错位」那句），而内联样式优先于 .shock 的类动画 —— 只要玩家挪过窗口，
+       真名震动就永远不会出现。加震之前先把这条内联清掉，并强制一次 reflow 让动画从 0 起跑。 */
+    inferWinEl.style.animation = "";
+    void inferWinEl.offsetWidth;
     inferWinEl.classList.add("shock");
     setTimeout(() => { if (inferWinEl) inferWinEl.classList.remove("shock"); }, 1000);
   }

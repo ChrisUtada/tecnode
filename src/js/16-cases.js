@@ -1088,6 +1088,11 @@ const GARDEN_STAGES = [0, 45000, 90000, 135000, 180000];
 /* 株的位置记成花圃地面的百分比（x/y ∈ 8..92 / 30..85），不跟窗体像素走 —— 换机器、缩放都不歪 */
 const GARDEN_X = [8, 92], GARDEN_Y = [30, 85];
 let gardenWinEl = null, gardenIconEl = null, gardenTimer = null, gardenDragLive = false, gardenNarrEl = null;
+/* 叙事框当前是对着哪一株开的（株对象本身，来自 G.garden.plots，身份稳定）。
+   单独记一份是因为每秒一次的 gardenTick 会重绘整窗 —— 只靠 DOM 引用会在重绘后失联。
+   gardenNarrShown = 已浮现到第几段（逐段旁白的进度）；重绘要连进度一起装回去，否则每秒钟被打回第一段。 */
+let gardenNarrPlot = null;
+let gardenNarrShown = 0;
 
 function gardenOK(){ return !!G.garden; }
 /* 真名结局的大段「真名形成说明」：从案件数据里取（用于开花后点花呈现）；旧档里已有株却缺
@@ -1222,8 +1227,11 @@ function refreshGardenWin(){
   if (!gardenWinEl) return;
   const body = gardenWinEl.querySelector(".syswin-body");
   if (!body) return;
+  /* 每秒一次的 tick 会走到这里重绘整窗：先把「叙事框正对着哪一株、读到第几段」记住，
+     重绘末尾按同一株 + 同一进度把框装回去 —— 否则玩家刚点开的花魄说明会在 1 秒内被打回第一段。 */
+  const keepNarr = gardenNarrPlot, keepShown = gardenNarrShown;
   body.innerHTML = "";
-  gardenNarrEl = null;            /* 重绘会换掉花株 DOM，叙事框一并清掉 */
+  gardenNarrEl = null; gardenNarrPlot = null;
   const field = document.createElement("div");
   field.className = "gd-field";
   gardenPlots().forEach(p => {
@@ -1241,23 +1249,22 @@ function refreshGardenWin(){
     stg.className = "gd-stage";
     stg.textContent = st >= 4 ? "开花" : GARDEN_STAGE_NAME[st];
     plant.appendChild(stg);
-    /* 生长计时 = 进度条：按真实时钟出条（窗关着也在长，重开即当前进度），开花填满 */
-    const prog = document.createElement("div");
-    prog.className = "gd-prog";
-    const fill = document.createElement("i");
-    fill.style.width = Math.min(100, Math.round(Math.max(0, Date.now() - p.at) / GARDEN_STAGES[4] * 100)) + "%";
-    prog.appendChild(fill);
-    plant.appendChild(prog);
+    /* 生长计时 = 进度条：按真实时钟出条（窗关着也在长，重开即当前进度）。
+       开花后不再出条 —— 花已开成，进度条站在那里已无意义，只留花与状态词（用户口径）。 */
+    if (st < 4){
+      const prog = document.createElement("div");
+      prog.className = "gd-prog";
+      const fill = document.createElement("i");
+      fill.style.width = Math.min(100, Math.round(Math.max(0, Date.now() - p.at) / GARDEN_STAGES[4] * 100)) + "%";
+      prog.appendChild(fill);
+      plant.appendChild(prog);
+    }
     plant.title = st >= 4 ? "花魄开的花 —— 拖着可以换位置" : "还在长 —— 关掉游戏也不会倒退，拖着可以换位置";
     makeGardenPlantDraggable(plant, p);
     field.appendChild(plant);
   });
   body.appendChild(field);
-  const hint = document.createElement("div");
-  hint.className = "gd-hint";
-  hint.textContent = G.garden.seed ? "执行者头上还挂着一枚种子 —— 拖进这里，落在哪儿就种在哪儿"
-                                   : "想挪就拖：花草可以在园子里随意摆放（关掉游戏也不会倒退）";
-  body.appendChild(hint);
+  if (keepNarr) openGardenNarr(keepNarr, keepShown || 1);     /* 重绘前开着 → 按同一株 + 同一进度装回去 */
   updateGardenBadge();
 }
 /* 花圃内自由拖拽：按住一株直接挪（不进撤销栈 —— 摆放是装修，不是破案进度）。
@@ -1299,46 +1306,127 @@ function makeGardenPlantDraggable(el, p){
   });
 }
 
-/* ---- 开花后点花：嵌在花园窗内的叙事框（承载真名结局的 message）----
-   作为 .gd-field 的绝对定位子元素：优先贴在花上方，上方放不下（贴顶）退到花下方；横向满宽、贴左。
-   同一时刻只开一个；点同一株关闭、点别株切换。 */
-function closeGardenNarr(){ if (gardenNarrEl){ gardenNarrEl.remove(); gardenNarrEl = null; } }
-function openGardenNarr(p, plant){
+/* ---- 开花后点花：排在花圃下方的叙事框（承载真名结局的 message）----
+   插在 .gd-field 之后、随窗一起长高 —— 不再绝对定位压在花圃上（那样会跟花草挤成一团）。
+   同一时刻只开一个；点同一株关闭、点别株切换。
+   呈现按用户定稿的 A+B：**逐段旁白** —— 点花先淡出一段，点框继续下一段，一段一口气，读完为止。 */
+
+/* 真名说明分段：把一大块说明切成「一段一口气」的旁白段。
+   1) 先按句末标点（。！？…）断句；2) 超长句（> 140 字）在逗号 / 顿号 / 分号处就近对半再切，
+   免得像原句那样一口气念不到头；3) 贪心并句，目标约 150 字一段 —— 读起来是几段话，不是一堵字墙。 */
+function narrSegments(text){
+  const t = String(text || "").trim();
+  if (!t) return [];
+  const sents = t.match(/[^。！？…]+[。！？…]*/g) || [t];
+  const clauses = [];
+  sents.forEach(s => splitLongClause(s.trim(), clauses));
+  const segs = [];
+  let cur = "";
+  clauses.filter(Boolean).forEach(c => {
+    if (cur && (cur + c).length > 150){ segs.push(cur); cur = ""; }
+    cur += c;
+  });
+  if (cur) segs.push(cur);
+  return segs;
+}
+function splitLongClause(s, out){
+  if (s.length <= 140){ out.push(s); return; }
+  const parts = s.match(/[^，、；]+[，、；]?/g) || [s];
+  let acc = 0, cut = 0, bestD = Infinity;
+  parts.forEach((p, i) => {
+    acc += p.length;
+    const d = Math.abs(acc - s.length / 2);
+    if (i < parts.length - 1 && d < bestD){ bestD = d; cut = i; }
+  });
+  splitLongClause(parts.slice(0, cut + 1).join(""), out);
+  splitLongClause(parts.slice(cut + 1).join(""), out);
+}
+/* 把「已浮现到第 shown 段」铺进正文；animate=1 时让最新一段淡入（只在用户推进时给），
+   未读完时留下「继续」提示。每秒重绘会重建整框 —— 那时 animate=0，免得最后一段每秒重播淡入。 */
+function renderNarrBody(box, segs, shown, animate){
+  const nb = box.querySelector(".gd-narr-body");
+  if (!nb) return;
+  nb.innerHTML = "";
+  segs.slice(0, shown).forEach((s, i) => {
+    const p = document.createElement("p");
+    p.className = "gd-narr-p";
+    if (animate && i === shown - 1) p.classList.add("in");   /* 只让最新一段淡入 */
+    p.textContent = s;
+    nb.appendChild(p);
+  });
+  const more = box.querySelector(".gd-narr-more");
+  if (more) more.style.display = (shown < segs.length) ? "" : "none";
+  /* 读完就把整框的「点一下」光标收回：再点也没下一段了，别继续给可点的暗示 */
+  box.classList.toggle("done", shown >= segs.length);
+}
+/* 点一下框 = 浮现下一段；已读完则不动。 */
+function advanceGardenNarr(){
+  if (!gardenNarrEl || !gardenNarrPlot) return;
+  const segs = narrSegments(G.garden && G.garden.narr);
+  if (gardenNarrShown >= segs.length) return;
+  gardenNarrShown++;
+  renderNarrBody(gardenNarrEl, segs, gardenNarrShown, 1);
+  fitGardenInView();                       /* 又长高一段 → 若顶到视口底，把窗整体上移 */
+}
+/* 逐段旁白会把窗撑高，整段读完时可能超出视口底边。用户口径「正文不内部滚动」——
+   于是改挪窗：读的时候把窗整体上移，直到整段都看得见（只上移，不动左右）。
+   只在「点花 / 点框推进」这两处用户动作时挪，每秒重绘不挪 —— 免得跟手动拖动打架。
+   坐标换算：窗挂在 desktopEl 内（absolute），要把视口坐标折回相对桌面层再写 style.top。 */
+function fitGardenInView(){
+  if (!gardenWinEl || gardenWinEl.isConnected === false) return;
+  const vh = (typeof window !== "undefined" && window.innerHeight) || 0;
+  if (!vh) return;                                  /* 无头 stub 里量不到视口 → 不动 */
+  const r = gardenWinEl.getBoundingClientRect();
+  if (!(r.height > 0)) return;
+  const over = r.bottom - (vh - 10);
+  if (over <= 0) return;
+  const pTop = desktopEl ? desktopEl.getBoundingClientRect().top : 0;
+  gardenWinEl.style.top = Math.round(Math.max(pTop + 8, r.top - over) - pTop) + "px";
+}
+function closeGardenNarr(){
+  if (gardenNarrEl){ gardenNarrEl.remove(); gardenNarrEl = null; }
+  gardenNarrPlot = null; gardenNarrShown = 0;
+}
+/* shown 给了就按它铺（重绘续档），没给就是新开 → 只亮第一段。
+   fit=1 时（点花 / 推进这类用户动作）读完整段若顶到视口底就上移窗；重绘不挪。 */
+function openGardenNarr(p, shown, fit){
   if (!G.garden || !G.garden.narr) return;
-  closeGardenNarr();
-  const field = gardenWinEl && gardenWinEl.querySelector(".gd-field");
-  if (!field) return;
+  const body = gardenWinEl && gardenWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  const segs = narrSegments(G.garden.narr);
+  if (!segs.length) return;
+  if (gardenNarrEl) gardenNarrEl.remove();      /* 换株 / 重绘：先摘掉旧的，但不动 shown */
+  const n = Math.min(Math.max(1, shown | 0), segs.length);
   const box = document.createElement("div");
   box.className = "gd-narr";
   box._p = p;
   const head = document.createElement("div");
   head.className = "gd-narr-head";
-  head.textContent = "花魄 · 真名";
+  const name = document.createElement("b");
+  name.className = "gd-narr-name"; name.textContent = "花魄";
+  const sub = document.createElement("span");
+  sub.className = "gd-narr-sub"; sub.textContent = "真名 · 形成说明";
   const x = document.createElement("span");
   x.className = "gd-narr-x"; x.textContent = "×"; x.title = "关闭";
   x.addEventListener("click", e => { e.stopPropagation(); closeGardenNarr(); });
-  head.appendChild(x);
-  const body = document.createElement("div");
-  body.className = "gd-narr-body";
-  body.textContent = G.garden.narr;
-  box.appendChild(head); box.appendChild(body);
-  field.appendChild(box);
-  /* 先按实际尺寸定位：优先花上方，上方不够（贴顶或花靠上）则退到花下方；都溢则夹回窗口内 */
-  const fr = field.getBoundingClientRect();
-  const fh = fr.height || 190, fw = fr.width || 278;
-  const py = p.y / 100 * fh;
-  const bh = box.offsetHeight || 120;
-  const gap = 8;
-  let top = py - gap - bh;
-  if (top < 4) top = py + gap;                          /* 上方放不下 → 下方 */
-  if (top + bh > fh - 4) top = Math.max(4, fh - bh - 4);/* 整体仍溢 → 夹进窗口 */
-  box.style.top = top + "px";
-  box.style.left = "8px";
+  head.appendChild(name); head.appendChild(sub); head.appendChild(x);
+  const nb = document.createElement("div");
+  nb.className = "gd-narr-body";
+  const more = document.createElement("div");
+  more.className = "gd-narr-more"; more.textContent = "▸ 点一下 · 继续";
+  box.appendChild(head); box.appendChild(nb); box.appendChild(more);
+  box.addEventListener("click", () => { if (gardenNarrEl === box) advanceGardenNarr(); });
+  /* 接在花圃之后（窗口随框一起变高），是正文的最后一块。 */
+  body.appendChild(box);
   gardenNarrEl = box;
+  gardenNarrPlot = p;
+  gardenNarrShown = n;
+  renderNarrBody(box, segs, n, fit ? 1 : 0);
+  if (fit) fitGardenInView();
 }
 function toggleGardenNarr(p, plant){
-  if (gardenNarrEl && gardenNarrEl._p === p){ closeGardenNarr(); return; }
-  openGardenNarr(p, plant);
+  if (gardenNarrPlot === p){ closeGardenNarr(); return; }   /* 点同一株 = 收起 */
+  openGardenNarr(p, 1, true);
 }
 /* 每秒看一眼：窗开着才动 DOM；跨过开花那一刻弹一枚 toast（每株一次，记在株上）。
    存档回来时花早已开过（超过 10 秒）就静默补记，不补弹。

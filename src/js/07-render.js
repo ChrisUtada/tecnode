@@ -63,7 +63,32 @@ function layout(){
 const NODE_W = { loc:152, item:130, char:130, clue:130 };
 const NODE_H = { loc:54, item:46, char:46, clue:46 };
 
+/* ============ 拖动收尾登记表 ============
+   任何「拖到一半可能被 render() 打断」的手势都在这里登记一个 abort 回调。
+   为什么必须收尾：render() 会 nodeLayer.innerHTML = "" 重建**全部**节点 DOM。被拖的那个元素
+   一旦离树，指针捕获被隐式释放，pointerup / pointercancel 就再也不会派发过来 —— 收尾逻辑跑不到，
+   镜像就永久留在 #drag-layer（画布上多出一个点不动也拖不动的节点），同时这次拖放的落点动作丢失。
+   真实触发路径：TEC 分析是 setTimeout（11-dialog.js），玩家一边拖节点一边等分析，
+   分析完成且**本次真产出新线索**时 settle() → render() —— 正是「拖着拖着线索掉下来」那一刻。
+   在重建之前统一收尾：把位移写回 n.x/n.y、摘掉镜像与幽灵线、清掉落点高亮。 */
+const dragAborters = new Set();
+function abortActiveDrags(){
+  if (!dragAborters.size) return;
+  Array.from(dragAborters).forEach(fn => { try { fn(); } catch(_){} });
+  dragAborters.clear();
+}
+function registerDrag(fn){ dragAborters.add(fn); return fn; }
+function unregisterDrag(fn){ dragAborters.delete(fn); }
+/* 兜底：重建时清空镜像层。走到这里时各手势自己的 abort 已经摘掉各自那一片，
+   这句只为「万一还有没登记的镜像」收尾，保证 #drag-layer 绝不带着旧镜像跨过一次重建。 */
+function clearDragLayer(){
+  const l = document.getElementById("drag-layer");
+  if (l) l.innerHTML = "";
+}
+
 function render(){
+  abortActiveDrags();     /* 先给拖动中的手势收尾，再动 DOM（见上） */
+  clearDragLayer();
   nodeLayer.innerHTML = "";
   svg.innerHTML = "";
 
