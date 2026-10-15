@@ -2594,7 +2594,12 @@ console.log('\n=== 38. 花园：确认捕获掉种子 → 拖进花圃自由落�
 assert('花卉素材五档全部入库并被成品引用（external 外链 flower/ 子目录）',
   ['seed', 'sprout', 'leaf_stage_1', 'leaf_stage_2', 'flower'].every(n =>
     html.indexOf('assets/flower/plant_' + n + '.png') >= 0));
-assert('桌面图标库注册了 flower 字形（自绘像素花）', html.indexOf('flower: "M10 3h4v4h-4z') >= 0);
+assert('桌面图标库注册了 leaf 字形（花园，Pixelarticons 原生）', html.indexOf('leaf: "M1 18h2v4H1z') >= 0);
+assert('桌面图标库注册了 robot-face 字形（TEC）', html.indexOf('"robot-face": "M4 6h16v2H4z') >= 0);
+assert('TEC 桌面图标改用 robot-face（不再是 message）', html.indexOf('data-icon="robot-face"') >= 0);
+assert('花园桌面图标改用 leaf（不再是自绘花）', html.indexOf('iconSvg("leaf", 24)') >= 0);
+assert('自绘 flower 字形已退役（表里不再有，全表回到 pixelarticons 同一网格）',
+  html.indexOf('flower: "M10 3h4') < 0 && html.indexOf('iconSvg("flower"') < 0);
 assert('真结局触发只解锁下一案，种子不在 triggerEnding 里发（源码检查）',
   html.indexOf('if (ending.isTrueCapture){ unlockNextCase(CASE_ID); }') >= 0);
 assert('种子改在结局遮罩末帧「确认捕获」点击后才发，并带上真名说明（源码检查）',

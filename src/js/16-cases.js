@@ -1185,7 +1185,7 @@ function refreshGardenIcon(){
     el.className = "desk-icon";
     el.id = "garden-icon";
     el.dataset.app = "garden";
-    el.innerHTML = '<div class="icon-glyph">' + iconSvg("flower", 24) + '</div><div class="icon-label">花园</div>';
+    el.innerHTML = '<div class="icon-glyph">' + iconSvg("leaf", 24) + '</div><div class="icon-label">花园</div>';
     document.getElementById("icons").appendChild(el);
     attachIcon(el, "garden");                 /* 与全桌一致：双击开（单击选中） */
     gardenIconEl = el;
