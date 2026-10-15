@@ -105,7 +105,7 @@ function applyPayload(payload, nearKey){
   if (!payload) return;
   if (payload.items) spawnItems(payload.items, nearKey);
   if (payload.scene && SCENES[payload.scene]){
-    const sn = ensureNode("loc", payload.scene, { label: SCENES[payload.scene].title });
+    const sn = ensureSceneNode(payload.scene, { label: SCENES[payload.scene].title });
     markFresh(sn);
   }
   gotClues(payload.message || payload.text || "");
@@ -180,8 +180,8 @@ function spawnChoiceNodes(n, cmd){
     if (o.message){ log(esc(plain(o.message)), "sys"); noteSeen(o.message); }
     const r = o.results || {};
     if (r.scene && SCENES[r.scene]){
-      const existed = !!nodeByKey("loc", r.scene);
-      const sn = ensureNode("loc", r.scene, { label: SCENES[r.scene].title });
+      const existed = !!nodeByKey(containerKind(r.scene), r.scene);
+      const sn = ensureSceneNode(r.scene, { label: SCENES[r.scene].title });
       if (!existed){
         sn.x = n.x + (i - (opts.length - 1) / 2) * 190;
         sn.y = n.y + 110;

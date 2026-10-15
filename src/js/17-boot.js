@@ -37,7 +37,7 @@ function boot(opts){
   }
   /* 开局只放一个「未探索」的起始场景节点：里面的东西和叙事卡都要等玩家双击展开时才出现，
      开场画面保持干净，第一次交互就是「双击这个节点」。 */
-  ensureNode("loc", START, { label: SCENES[START].title || START, x: 1000, y: 620 });
+  ensureSceneNode(START, { label: SCENES[START].title || START, x: 1000, y: 620 });
   G.lastScene = START;   /* 交谈 / TEC 的上下文仍认起始场景，只是画面还没展开 */
   layout();
   render();

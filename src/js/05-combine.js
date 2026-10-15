@@ -10,16 +10,16 @@ function attemptCombo(toolKey, targetKey){
   const triedKey = toolKey + ">" + targetKey;
   pushHistory();
 
-  /* 1) 目标是个场景，且拖过来的容器（场景 / 书桌这类容器物品）文本里正好列着它 → 视为"前往"。
+  /* 1) 目标是个场景，且拖过来的容器（场景 / 时间 / 书桌这类容器物品）文本里正好列着它 → 视为"前往"。
         书桌、垃圾桶是物品，但它们 content 里的 [loc:…]（如书桌的「返回花园」）照样是一条通路。 */
-  if (target.kind === "loc" && (tool.kind === "loc" || isContainerNode(tool)) &&
+  if (isSceneKind(target.kind) && (isSceneKind(tool.kind) || isContainerNode(tool)) &&
       (sceneLocs(tool.id).indexOf(target.id) >= 0 || sceneLocs(target.id).indexOf(tool.id) >= 0)){
     revealScene(target.id);
     log("前往场景 <b>" + esc(target.label) + "</b>", "act");
     return;
   }
   /* 两个场景之间没有直接通路：这是"走不过去"，明确说清楚，不往下走反应表 */
-  if (tool.kind === "loc" && target.kind === "loc"){
+  if (isSceneKind(tool.kind) && isSceneKind(target.kind)){
     fail(tool, target, "这两个场景之间没有直接通路");
     return;
   }
@@ -86,8 +86,8 @@ function attemptCombo(toolKey, targetKey){
   /* 应用结果 */
   const gained = [];
   if (results.scene && SCENES[results.scene]){
-    const isNew = !nodeByKey("loc", results.scene);
-    const sn = ensureNode("loc", results.scene, { label: SCENES[results.scene].title });
+    const isNew = !nodeByKey(containerKind(results.scene), results.scene);
+    const sn = ensureSceneNode(results.scene, { label: SCENES[results.scene].title });
     markFresh(sn);
     if (isNew) link(owner ? owner.key : targetKey, sn.key, "cond");
     gained.push("新场景「" + sn.label + "」");

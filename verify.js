@@ -1398,9 +1398,9 @@ assert('整个引擎里不再出现「已展开 / 未展开」（源码检查：
 window.__select('item:ITEM_sxbj');
 assert('来源照旧：手写笔记的详情窗写「来源：书桌」',
   (ids['detail-body']._html || '').indexOf('来源：书桌') >= 0);
-/* 「来源」显式排除场景：场景之间的 homeScene 会被**最后一次**展开它的宿主覆盖
+/* 「来源」显式排除场景类节点（场景与时间）：它们的 homeScene 会被**最后一次**展开它的宿主覆盖
    （实测「植物学家的花园」的来源一度变成「尸体」），写出来是随机的、只会误导。 */
-assert('「来源」行显式排除场景（源码检查）', /n\.kind !== "loc" && n\.homeScene/.test(html));
+assert('「来源」行显式排除场景（源码检查）', /!isSceneKind\(n\.kind\) && n\.homeScene/.test(html));
 
 /* 回看入口能真的把卡叫回来 */
 window.__closeFloats();
@@ -2381,13 +2381,13 @@ assert('正文其余部分照常转义（没有多出裸标签）',
   dHtml34().indexOf('纸上用潦草的笔记写着：姓名：') >= 0);
 
 const before34 = window.__dump();
-assert('摘录前画布上没有「7月4日」闪回场景', !before34.nodes.includes('loc:SCENES_0704'));
+assert('摘录前画布上没有「7月4日」闪回节点', !before34.nodes.includes('time:SCENES_0704'));
 const l34 = logs.length;
 window.__excerpt('loc:SCENES_0704', 'item:ITEMS_wbfs');
 const after34 = window.__dump();
-assert('摘录后长出目标节点', after34.nodes.includes('loc:SCENES_0704'));
+assert('摘录后长出目标节点（日期是第五类节点，画布键为 time:）', after34.nodes.includes('time:SCENES_0704'));
 assert('*并*长出一条连回纸片的边（这才是解孤岛的那一步）',
-  after34.edges.indexOf('cond:item:ITEMS_wbfs>loc:SCENES_0704') >= 0);
+  after34.edges.indexOf('cond:item:ITEMS_wbfs>time:SCENES_0704') >= 0);
 assert('摘录是「结果」，记一条日志', logs.length === l34 + 1 && logs[logs.length - 1].indexOf('摘录') >= 0);
 assert('摘录进撤销栈（可撤销）', after34.history > before34.history);
 assert('镜头判断认这次的新节点', !!after34.focus);
@@ -3105,6 +3105,41 @@ assert('真名结局：加震前清掉内联 animation，窗口真的在震（.s
 assert('震前清内联 animation（源码检查）',
   html.indexOf('inferWinEl.style.animation = "";') >= 0 &&
   html.indexOf('inferWinEl.style.animation = "";') < html.indexOf('inferWinEl.classList.add("shock")'));
+
+/* ==================== 时间节点：kind:"time"（第五类节点） ====================
+   6月2日 / 7月4日 这类日期闪回不再是普通场景节点。**数据仍留在 SCENES 表**、数据侧的引用
+   仍写 [loc:日期]，但画布上的键是 time:SCENES_0602。整套设计靠两条防线立住：
+   ① 判据只有一个地方 —— isTimeId / containerKind；② 建节点只走一个入口 —— ensureSceneNode。
+   本项目 statically 检查这两条，防止后来人再手写一个 loc。 */
+console.log('\n=== 时间节点：kind:"time"（第五类） ===');
+
+assert('isTimeId 由 config.memoryScenes 裁决（源码检查）',
+  /function isTimeId\(id\)\{ return SCENE_MEMORY\.indexOf\(id\) >= 0; \}/.test(html));
+assert('containerKind 先判时间、再判场景（源码检查）',
+  /isTimeId\(id\) \? "time" : \(SCENES\[id\] \? "loc" : "item"\)/.test(html));
+assert('引擎里不再有写死的 build-loc 调用（建场景节点统一走 ensureSceneNode）',
+  html.indexOf('ensureNode("loc"') < 0);
+assert('从数据引用推画布键统一走 nodeKeyOfRef（源码检查）',
+  /function nodeKeyOfRef\(kind, id\)\{ return isSceneKind\(kind\) \? containerKey\(id\)/.test(html));
+assert('.node.time-node 的双线框与 ◆ 符号（源码检查）',
+  /\.node\.time-node\{border:3px double #2b2b26\}/.test(html) &&
+  /\.node\.time-node \.n-title::before\{content:"◆ "\}/.test(html));
+
+window.__ensure("time", "SCENES_0602");
+window.__ensure("time", "SCENES_0704");
+window.__render();
+assert('时间节点在画布上的键是 time:（不是 loc:）', !!findEl("time:SCENES_0602"));
+assert('同一日期 id 不会并存一个 loc: 节点',
+  !window.__dump().nodes.includes("loc:SCENES_0602"));
+const tEl40 = findEl("time:SCENES_0602");
+assert('时间节点同时挂 scene-node（尺寸）与 time-node（符号 / 双线框）两个类',
+  !!tEl40 && tEl40._classes.has("scene-node") && tEl40._classes.has("time-node"));
+
+/* 两个时间节点之间照旧「没有直接通路」：kind 换了，loc-loc 那条判定必须同时认 time */
+const lg40 = logs.length;
+window.__combo("time:SCENES_0602", "time:SCENES_0704");
+assert('两个时间节点之间仍判「没有直接通路」，不落反应表噪音',
+  logs.length === lg40 + 1 && logs[logs.length - 1].indexOf('没有直接通路') >= 0);
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

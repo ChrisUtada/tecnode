@@ -20,8 +20,22 @@ function parseTags(text){
   }
   return out;
 }
+/* ============ 时间节点（第五类） ============
+   6月2日 / 7月4日 这类「日期闪回」在画布上是独立的一类节点（kind:"time"），
+   可展开、可组合，但它**仍从 SCENES 表读数据** —— 身份由 config.memoryScenes 裁决。
+   之所以不把数据迁去独立的 times 表：那样要连带改 7 处 sceneTalks 的 key、
+   content 里的 [loc:] 标签、摘录的 to 字段与 config.memoryScenes 自身，收益不值。
+   于是「是不是时间节点」只在这一个函数里判一次，全项目共用。 */
+function isTimeId(id){ return SCENE_MEMORY.indexOf(id) >= 0; }
+/* 场景类节点（场景 / 时间）：凡是「双击展开、有 content、算通路」的判定都要同时认这两类 */
+function isSceneKind(k){ return k === "loc" || k === "time"; }
+/* 从「数据里的引用」推「画布上的节点键」。
+   数据侧的标签与摘录 to 仍写 [loc:SCENES_0602]（时间节点没有迁表），但画布上它的键是 time:SCENES_0602。
+   凡是要拿引用去查 / 建画布节点的地方，都必须过这一道 —— 否则会凭空造出一个 loc: 节点，
+   与 containerKey() 算出的 time: 分裂成同一 id 的两个节点。 */
+function nodeKeyOfRef(kind, id){ return isSceneKind(kind) ? containerKey(id) : kind + ":" + id; }
 function labelOf(kind, id){
-  if (kind === "loc")  return SCENES[id] ? SCENES[id].title : null;
+  if (isSceneKind(kind)) return SCENES[id] ? SCENES[id].title : null;
   if (kind === "item") return ITEMS[id]  ? ITEMS[id].label  : (id.startsWith("DATA_") ? id.replace(/^DATA_/, "") : null);
   if (kind === "char") return CHARS[id]  ? CHARS[id].name   : null;
   if (kind === "clue") return CLUES[id]  ? CLUES[id].label  : null;
@@ -33,7 +47,7 @@ function findReactable(kind, id){
   if (kind === "clue") return CLUES[id];
   return null;
 }
-function kindName(k){ return { item:"物品", char:"角色", clue:"线索", loc:"场景" }[k] || k; }
+function kindName(k){ return { item:"物品", char:"角色", clue:"线索", loc:"场景", time:"时间" }[k] || k; }
 function nodeByKey(kind, id){ return G.nodes[kind + ":" + id]; }
 /* 光照判定（点灯 = 双击执行它的文本命令）：
    lightOn()           → config.lightSources 里任意一盏「环境光源」（台灯）点亮即可
@@ -139,7 +153,8 @@ function lookupReaction(ownerKind, ownerId, toolId){
    下面这套一律按 id 查表（先场景后物品）：节点键用 containerKey(id)，标题用 containerTitle(id)。 */
 function containerData(id){ return SCENES[id] || ((ITEMS[id] && ITEMS[id].content) ? ITEMS[id] : null); }
 function isContainerId(id){ return !!containerData(id); }
-function containerKind(id){ return SCENES[id] ? "loc" : "item"; }
+/* 容器节点的 kind：时间节点优先判（它的数据也在 SCENES 表里，不先判就会落回 "loc"） */
+function containerKind(id){ return isTimeId(id) ? "time" : (SCENES[id] ? "loc" : "item"); }
 function containerKey(id){ return containerKind(id) + ":" + id; }
 function containerTitle(id){ const c = containerData(id); return c ? (c.title || c.label || id) : id; }
 /* 节点是不是容器：kind 与数据表对得上、且它的数据是容器（带 content）。画布上它是唯一可展开的一类节点。 */
@@ -148,7 +163,7 @@ function isContainerNode(n){ return !!n && n.kind === containerKind(n.id) && isC
    旧写法靠「是不是场景」这一个 flag 分流到 SCENES，书桌这类容器物品一改判身份就会查空表。 */
 function nodeData(n){
   if (!n) return null;
-  if (n.kind === "loc")  return SCENES[n.id];
+  if (isSceneKind(n.kind)) return SCENES[n.id];   /* 场景与时间节点同表：SCENES */
   if (n.kind === "item") return ITEMS[n.id];
   if (n.kind === "char") return CHARS[n.id];
   if (n.kind === "clue") return CLUES[n.id];

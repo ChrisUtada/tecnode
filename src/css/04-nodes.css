@@ -23,6 +23,11 @@
 
   .node.scene-node{width:152px; height:54px}
   .node.scene-node .n-title::before{content:"■ "}
+  /* 时间节点（6月2日 / 7月4日 这类日期闪回）：尺寸沿用场景节点（它同时挂着 scene-node 类），
+     只换符号与边框 —— 双线框与 .memory 记忆卡同一个语汇，一眼认得出「这是一段日期」。
+     规则写在 .node.unexplored 之前，未探索时仍按虚线框呈现（同一特异性、后者胜）。 */
+  .node.time-node{border:3px double #2b2b26}
+  .node.time-node .n-title::before{content:"◆ "}
   .node.ent-item .n-title::before{content:"□ "}
   .node.ent-char .n-title::before{content:"● "}
   .node.ent-clue .n-title::before{content:"▲ "}

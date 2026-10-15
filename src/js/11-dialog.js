@@ -227,7 +227,7 @@ function showNarrCard(n, s){
   const text = narrText(s.content || s.desc || "");
   if (!text) return;
   /* 卡头按 kind 取名：书桌 / 垃圾桶是物品，别把它们的叙事卡标成「 SCENE_FEED 」 */
-  const w = makeWindow((n.kind === "loc" ? "SCENE_FEED" : "OBJECT_FEED") + " // " + (s.title || s.label || n.id), closeNarr);
+  const w = makeWindow((isSceneKind(n.kind) ? "SCENE_FEED" : "OBJECT_FEED") + " // " + (s.title || s.label || n.id), closeNarr);
   const c = w.el;
   c.className = "narr-card syswin";
   w.body.textContent = text;                 /* 先放全文 → 按整卡实测高度定位 */
@@ -541,9 +541,9 @@ function tecAnalyzeFinish(key){
   tecTask = null;              /* 进度条的收尾交给 updateTecChip（key 变 null 时会把动画停掉） */
   tecClearAnalyzing();
   if (!n) return false;
-  /* 场景节点：评述由「档案解读」承担（见下），不走通用反应表（场景在表里没有条目，只会落兜底噪音） */
-  if (n.kind !== "loc") tecReaction(key);      /* TEC 对该节点的评述（沿用原有反应表） */
-  const talks = n.kind === "loc" ? (((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[n.id] || []) : null;
+  /* 场景 / 时间节点：评述由「档案解读」承担（见下），不走通用反应表（它们在表里没有条目，只会落兜底噪音） */
+  if (!isSceneKind(n.kind)) tecReaction(key);      /* TEC 对该节点的评述（沿用原有反应表） */
+  const talks = isSceneKind(n.kind) ? (((CHARS["CHARS_TEC"] || {}).sceneTalks || {})[n.id] || []) : null;
   const unread = talks ? talks.length - (G.tecProg[n.id] || 0) : 0;
   {
     const fresh = capturableClues(n).filter(id => !G.captured.has(id));

@@ -12,6 +12,13 @@ function ensureNode(kind, id, opts){
   };
   return G.nodes[key];
 }
+/* 建「场景类」节点（场景 / 时间）的唯一入口：kind 由 containerKind() 现算。
+   原先 7 处各自写死要建 loc 节点 —— 一旦某个 id 被划成时间节点（config.memoryScenes），
+   那些入口会造出 loc 键的节点，而 containerKey() 按 containerKind() 算的是 time 键，
+   同一个 id 就分裂成两个节点、状态各记一半。凡是要建场景节点，一律走这里。 */
+function ensureSceneNode(id, opts){
+  return ensureNode(containerKind(id), id, opts);
+}
 /* 「刚上画布 / 刚被取回」的节点有两件事要记，别混成一个 flag：
      fresh  —— 只给这一轮的镜头聚焦用，render() 末尾就擦（一次性）；
      unread —— 节点上那枚「新」角标，一直挂着，**只由玩家点这个节点**摘（clearFresh）。
@@ -50,8 +57,8 @@ function revealScene(sid, silent){
   });
 
   sceneLocs(sid).forEach(tid => {
-    const existed = !!nodeByKey("loc", tid);
-    const tn = ensureNode("loc", tid, { label: SCENES[tid].title || tid });
+    const existed = !!nodeByKey(containerKind(tid), tid);
+    const tn = ensureSceneNode(tid, { label: SCENES[tid].title || tid });
     if (!tn.homeScene) tn.homeScene = sid;
     if (!existed){ added++; newKeys.push(tn.key); }
     link(sn.key, tn.key, "move");

@@ -137,7 +137,7 @@ function attachInteractions(el, n){
         if (n.kind === "clue") assignClue(n.key, (CLUES[n.id] || {}).type);
         else toast("只有线索能进推演器", true);
       } else if (iconHit === "goto-icon"){
-        if (n.kind === "loc") gotoScene(n.id);   /* 档案里列的是场景；容器物品（书桌）不在此列 */
+        if (isSceneKind(n.kind)) gotoScene(n.id);   /* 档案里列的是场景与时间；容器物品（书桌）不在此列 */
         else toast("只有场景能进档案", true);
       }
       return;
@@ -164,7 +164,7 @@ function attachInteractions(el, n){
          「放回现场」（storeNode），但那与证物袋 / 线索册重叠（还没有清单、只能整场展开才能取回），
          入口已移除。组合也不放行：折叠后里面的东西看不见，隔空命中的结果没有着力点。 */
       if (tn && isContainerNode(tn) && G.collapsed.has(tn.id)){
-        toast("<b>" + esc(tn.label) + "</b><br>" + (tn.kind === "loc" ? "场景已折叠" : "已折叠") +
+        toast("<b>" + esc(tn.label) + "</b><br>" + (isSceneKind(tn.kind) ? "场景已折叠" : "已折叠") +
               "：先双击展开，或把节点拖到证物袋", true);
         return;
       }

@@ -27,7 +27,7 @@ function paintDetail(){
     html += "<div class='drow'>状态：" + (G.explored.has(n.id) ? "已探索" : "未探索") + "</div>";
     /* 正文只在叙事卡里出现一次；详情窗只给回看入口（去重） */
     if (G.explored.has(n.id))
-      html += "<div class='drow'><button id='dt-renarr'>[ " + (n.kind === "loc" ? "重看场景叙事" : "重看叙事") + " ]</button></div>";
+      html += "<div class='drow'><button id='dt-renarr'>[ " + (isSceneKind(n.kind) ? "重看场景叙事" : "重看叙事") + " ]</button></div>";
   } else if (n.kind === "clue"){
     const c = CLUES[n.id] || {};
     html += "<div class='ddesc'>" + esc(plain(c.desc || "（无描述）")) + "</div>";
@@ -72,7 +72,7 @@ function paintDetail(){
      **场景不给**：场景之间是叙事链接，不是「谁装下了谁」——而且 homeScene 会被
      最后一次展开的宿主覆盖（实测「植物学家的花园」的来源变成过「尸体」），
      写出来是随机的、纯误导。详情窗自此只剩「简介 / 状态 / 来源」三种内容。 */
-  if (n.kind !== "loc" && n.homeScene && containerData(n.homeScene))
+  if (!isSceneKind(n.kind) && n.homeScene && containerData(n.homeScene))
     html += "<div class='drow'>来源：" + esc(containerTitle(n.homeScene)) + "</div>";
 
   if (detailBody.__sig === html) return;     /* 状态没变：原样留着，不动 DOM */
@@ -106,9 +106,11 @@ function excerptHtml(text, list){
   let out = "", cur = 0;
   hits.forEach(h => {
     if (h.at < cur) return;                                  /* 与已输出的片段重叠：跳过 */
-    const key = String(list[h.i].to);
+    const ref = String(list[h.i].to);                  /* 数据里的引用原样写进 data-ex，点它时才解析 */
+    const ri = ref.indexOf(":");
+    const nkey = ri < 0 ? ref : nodeKeyOfRef(ref.slice(0, ri), ref.slice(ri + 1));
     out += esc(t.slice(cur, h.at));
-    out += "<button class='ex" + (G.nodes[key] ? " got" : "") + "' data-ex=\"" + esc(key) + "\">" +
+    out += "<button class='ex" + (G.nodes[nkey] ? " got" : "") + "' data-ex=\"" + esc(ref) + "\">" +
            esc(t.slice(h.at, h.at + h.len)) + "</button>";
     cur = h.at + h.len;
   });
@@ -123,7 +125,10 @@ function takeExcerpt(target, srcKey){
   const src = G.nodes[srcKey];
   const i = String(target || "").indexOf(":");
   if (!src || i < 0) return;
-  const kind = target.slice(0, i), id = target.slice(i + 1);
+  const refKind = target.slice(0, i), id = target.slice(i + 1);
+  /* 数据里写的是 [loc:SCENES_0704]，但画布上那是时间节点 —— kind 要按 containerKind 规整，
+     否则这里会长出一个 loc:SCENES_0704，与 containerKey() 算出的 time: 分裂成两个节点 */
+  const kind = isSceneKind(refKind) ? containerKind(id) : refKind;
   const nm = labelOf(kind, id);
   if (!nm) return;
   const key = kind + ":" + id;
@@ -184,8 +189,8 @@ window.__choice = function(id, ci, oi){
   if (opt.message){ log(esc(plain(opt.message)), "sys"); noteSeen(opt.message); }
   const r = opt.results || {};
   if (r.scene && SCENES[r.scene]){
-    const isNew = !nodeByKey("loc", r.scene);
-    const sn = ensureNode("loc", r.scene, { label: SCENES[r.scene].title });
+    const isNew = !nodeByKey(containerKind(r.scene), r.scene);
+    const sn = ensureSceneNode(r.scene, { label: SCENES[r.scene].title });
     markFresh(sn);
     link(n.key, sn.key, "cond");
     revealScene(r.scene);

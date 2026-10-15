@@ -95,9 +95,12 @@ function render(){
   Object.values(G.nodes).forEach(n => {
     if (n.hidden || n.stored){ n.el = null; return; }
     const el = document.createElement("div");
-    /* 画布上的长相只看 kind：场景是宽节点（■），书桌 / 垃圾桶是普通物品节点（□）。
+    /* 画布上的长相只看 kind：场景与时间都是宽节点（■ / ◆），书桌 / 垃圾桶是普通物品节点（□）。
+       时间节点多挂一个 time-node 类，只为换掉符号与边框，尺寸仍与场景一致。
        「能不能展开」是容器的事 —— 由 unexplored / collapsed 两个类表达，与 kind 无关。 */
-    const kindCls = n.kind === "loc" ? "scene-node" : "ent-node ent-" + n.kind;
+    const kindCls = n.kind === "time" ? "scene-node time-node"
+                  : n.kind === "loc"  ? "scene-node"
+                  : "ent-node ent-" + n.kind;
     let cls = "node " + kindCls;
     if (isContainerNode(n) && !G.explored.has(n.id)) cls += " unexplored";
     if (isContainerNode(n) && G.collapsed.has(n.id)) cls += " collapsed";

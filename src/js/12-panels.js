@@ -36,7 +36,10 @@ function noteSeen(text){
 }
 function heardScenes(){
   const known = new Set(G.explored);
-  Object.keys(G.nodes).forEach(k => { if (k.startsWith("loc:")) known.add(k.slice(4)); });
+  Object.keys(G.nodes).forEach(k => {
+    const m = /^(?:loc|time):(.+)$/.exec(k);   /* 时间节点也是「听说的场景」，一并进档案 */
+    if (m) known.add(m[1]);
+  });
   G.explored.forEach(sid => sceneLocs(sid).forEach(t => known.add(t)));
   G.seenTexts.forEach(txt => {
     parseTags(txt).forEach(t => { if (t.kind === "loc" && SCENES[t.id]) known.add(t.id); });
@@ -49,9 +52,9 @@ function heardScenes(){
 }
 function gotoScene(sid){
   if (!SCENES[sid]) return;                 /* 档案里只有场景；容器物品（书桌 / 垃圾桶）不在此列 */
-  const isNew = !nodeByKey("loc", sid);
+  const isNew = !nodeByKey(containerKind(sid), sid);
   if (isNew) pushHistory();
-  const sn = ensureNode("loc", sid, { label: SCENES[sid].title });
+  const sn = ensureSceneNode(sid, { label: SCENES[sid].title });
   if (isNew){ markFresh(sn); layout(); }
   render();
   const r = stage.getBoundingClientRect();
@@ -90,7 +93,7 @@ function refreshGotoWin(){
     d.className = "goto-item";
     const label = document.createElement("span"); label.textContent = SCENES[sid].title || sid;
     const st = document.createElement("span"); st.className = "st";
-    st.textContent = (G.explored.has(sid) ? "已探索" : "未探索") + " · " + (nodeByKey("loc", sid) ? "在画布" : "未在画布");
+    st.textContent = (G.explored.has(sid) ? "已探索" : "未探索") + " · " + (nodeByKey(containerKind(sid), sid) ? "在画布" : "未在画布");
     d.appendChild(label); d.appendChild(st);
     d.addEventListener("click", () => { gotoScene(sid); closeGotoWin(); });
     body.appendChild(d);
