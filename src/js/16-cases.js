@@ -1067,3 +1067,234 @@ function openCardReview(){
   makeFloatDraggable(w.el, false);
   invReviewEl = w.el;
 }
+
+/* ============ 花园：真名结局的后续温柔 ============
+   「确认捕获」点下后，执行者头顶会挂一枚种子（13-matrix.js 的 .mx-seedpop 对话框）；
+   把它拖进花园（本窗或本图标）落在哪儿就种在哪儿 —— **没有固定坛位**，
+   种下之后花草还能在园子里随意拖动摆放。真实时间约三分钟长成白花。
+   生长走真实时钟（株上只记 at = 下种时刻），存档随行 —— 关游戏再回来，花不会倒退；
+   株下的计时用进度条表示（不用倒计时文字），窗关着期间照常生长，重开按真实进度出条。 */
+const GARDEN_IMG = {
+  seed:   "@@ASSET:flower/plant_seed.png@@",
+  sprout: "@@ASSET:flower/plant_sprout.png@@",
+  leaf1:  "@@ASSET:flower/plant_leaf_stage_1.png@@",
+  leaf2:  "@@ASSET:flower/plant_leaf_stage_2.png@@",
+  bloom:  "@@ASSET:flower/plant_flower.png@@"
+};
+const GARDEN_STAGE_IMG = ["seed", "sprout", "leaf1", "leaf2", "bloom"];
+const GARDEN_STAGE_NAME = ["种子", "嫩芽", "展叶", "舒叶", "开花"];
+/* 生长档位（毫秒）：45s 嫩芽 → 90s 展叶 → 135s 舒叶 → 180s 开花（约三分钟） */
+const GARDEN_STAGES = [0, 45000, 90000, 135000, 180000];
+/* 株的位置记成花圃地面的百分比（x/y ∈ 8..92 / 30..85），不跟窗体像素走 —— 换机器、缩放都不歪 */
+const GARDEN_X = [8, 92], GARDEN_Y = [30, 85];
+let gardenWinEl = null, gardenIconEl = null, gardenTimer = null, gardenDragLive = false;
+
+function gardenOK(){ return !!G.garden; }
+/* 花圃清单：老档归一化 —— 旧「槽位时代」的存档里数组带 null 占位、株上没有坐标，
+   在这里过滤 + 补一个散开的默认位置；正常路径只是原样返回。 */
+function gardenPlots(){
+  if (!G.garden) G.garden = { seed:false, plots:[] };
+  if (!Array.isArray(G.garden.plots)) G.garden.plots = [];
+  G.garden.plots = G.garden.plots.filter(Boolean);
+  G.garden.plots.forEach((p, i) => {
+    if (typeof p.x !== "number") p.x = 24 + (i % 4) * 18;
+    if (typeof p.y !== "number") p.y = 58;
+  });
+  return G.garden.plots;
+}
+/* 真结局发种子（确认捕获那一刻调，15-desktop.js）：只发一枚，种下之后（或旧档已有株）不再发 */
+function grantGardenSeed(){
+  if (!gardenOK()) G.garden = { seed:false, plots:[] };
+  if (G.garden.seed || G.garden.plots.some(Boolean)) return;
+  G.garden.seed = true;
+  refreshInferWin();          /* 执行者头顶的对话框（窗开着立刻可见；重开会按状态重建） */
+  refreshGardenIcon();
+}
+/* 生长档位 0..4：种子 → 嫩芽 → 展叶 → 舒叶 → 开花。
+   判定按**整秒**量化：档位不会因为毫秒级抖动在边界上闪跳（180000 整 = 开花，179999 = 舒叶，
+   且这格判定在整整一秒内都是稳定的），倒计时行仍然显示精确到秒的余量。 */
+function gardenStageOf(p){
+  const el = Math.floor((Date.now() - p.at) / 1000) * 1000;
+  let st = 0;
+  for (let i = 1; i < GARDEN_STAGES.length; i++) if (el >= GARDEN_STAGES[i]) st = i;
+  return st;
+}
+/* 种子的合法落点：花园窗（开着且没被最小化藏起）或花园图标 */
+function overGardenDrop(cx, cy){
+  if (gardenWinEl && gardenWinEl.style.display !== "none"){
+    const r = gardenWinEl.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  const ic = document.getElementById("garden-icon");
+  if (ic){
+    const r = ic.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  return false;
+}
+/* 落点 → 花圃地面百分比（越界夹回）；窗没开 / 图标上松手 = 中间偏下 */
+function gardenSpotOf(cx, cy){
+  let x = 50, y = 58;
+  const field = gardenWinEl && gardenWinEl.querySelector(".gd-field");
+  if (cx != null && field){
+    const r = field.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0){
+      x = (cx - r.left) / r.width * 100;
+      y = (cy - r.top) / r.height * 100;
+    }
+  }
+  return { x: Math.round(Math.max(GARDEN_X[0], Math.min(GARDEN_X[1], x))),
+           y: Math.round(Math.max(GARDEN_Y[0], Math.min(GARDEN_Y[1], y))) };
+}
+/* 下种：落在哪儿就种在哪儿（没有坛位）。与收纳同一道门：案卷得开着（下种是写进度的动作）；
+   种子离身，头顶对话框收走。 */
+function gardenPlant(cx, cy){
+  if (!gardenOK() || !G.garden.seed) return false;
+  if (!requireCase()){ refreshInferWin(); return false; }
+  const spot = gardenSpotOf(cx, cy);
+  pushHistory();
+  G.garden.seed = false;
+  gardenPlots().push({ at: Date.now(), hit: false, x: spot.x, y: spot.y });
+  refreshInferWin();
+  refreshGardenWin();
+  refreshGardenIcon();
+  toast("种子落土了。给花魄一点时间。");
+  return true;
+}
+
+/* ---- 桌面图标：捕获真名（有种子或有株）才出现，照播放器图标的先例动态挂进 ICON_LAYOUT ---- */
+function refreshGardenIcon(){
+  const on = gardenOK() && (G.garden.seed || G.garden.plots.some(Boolean));
+  if (on && !gardenIconEl){
+    const el = document.createElement("div");
+    el.className = "desk-icon";
+    el.id = "garden-icon";
+    el.dataset.app = "garden";
+    el.innerHTML = '<div class="icon-glyph">' + iconSvg("flower", 24) + '</div><div class="icon-label">花园</div>';
+    document.getElementById("icons").appendChild(el);
+    attachIcon(el, "garden");                 /* 与全桌一致：双击开（单击选中） */
+    gardenIconEl = el;
+    if (!ICON_LAYOUT.some(r => r[0] === "garden-icon")) ICON_LAYOUT.push(["garden-icon", "garden"]);
+    resetIconPositions();
+  } else if (!on && gardenIconEl){
+    if (gardenWinEl) closeGardenWin();        /* 重置 / 换案：窗与图标一并收 */
+    gardenIconEl.remove();
+    gardenIconEl = null;
+    const i = ICON_LAYOUT.findIndex(r => r[0] === "garden-icon");
+    if (i >= 0){ ICON_LAYOUT.splice(i, 1); resetIconPositions(); }
+  }
+  updateGardenBadge();
+}
+function updateGardenBadge(){
+  if (!gardenIconEl) return;
+  const cnt = gardenPlots().filter(Boolean).length;
+  let b = gardenIconEl.querySelector(".badge");
+  if (cnt > 0){
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; gardenIconEl.appendChild(b); }
+    b.textContent = cnt + " 株";
+  } else if (b) b.remove();
+}
+
+/* ---- 花园窗：一块自由花圃。株 = 绝对定位（left/top 百分比 = 下种落点），可拖动摆放 ---- */
+function toggleGardenWin(){ if (gardenWinEl){ closeGardenWin(); return; } openGardenWin(); }
+function openGardenWin(){
+  if (gardenWinEl){ gardenWinEl.style.display = ""; return; }
+  const w = makeWindow("GARDEN // 花园", closeGardenWin);
+  w.el.classList.add("garden-win");
+  desktopEl.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  gardenWinEl = w.el;
+  refreshGardenWin();
+  startGardenTicker();
+}
+function closeGardenWin(){ if (gardenWinEl){ gardenWinEl.remove(); gardenWinEl = null; } }
+function refreshGardenWin(){
+  if (!gardenWinEl) return;
+  const body = gardenWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  const field = document.createElement("div");
+  field.className = "gd-field";
+  gardenPlots().forEach(p => {
+    const st = gardenStageOf(p);
+    const plant = document.createElement("div");
+    plant.className = "gd-plant";
+    if (st >= 4) plant.classList.add("bloom");
+    plant.style.left = p.x + "%";
+    plant.style.top = p.y + "%";
+    const im = document.createElement("img");
+    im.src = GARDEN_IMG[GARDEN_STAGE_IMG[st]];
+    im.alt = GARDEN_STAGE_NAME[st]; im.draggable = false;
+    plant.appendChild(im);
+    const stg = document.createElement("span");
+    stg.className = "gd-stage";
+    stg.textContent = st >= 4 ? "开花" : GARDEN_STAGE_NAME[st];
+    plant.appendChild(stg);
+    /* 生长计时 = 进度条：按真实时钟出条（窗关着也在长，重开即当前进度），开花填满 */
+    const prog = document.createElement("div");
+    prog.className = "gd-prog";
+    const fill = document.createElement("i");
+    fill.style.width = Math.min(100, Math.round(Math.max(0, Date.now() - p.at) / GARDEN_STAGES[4] * 100)) + "%";
+    prog.appendChild(fill);
+    plant.appendChild(prog);
+    plant.title = st >= 4 ? "花魄开的花 —— 拖着可以换位置" : "还在长 —— 关掉游戏也不会倒退，拖着可以换位置";
+    makeGardenPlantDraggable(plant, p);
+    field.appendChild(plant);
+  });
+  body.appendChild(field);
+  const hint = document.createElement("div");
+  hint.className = "gd-hint";
+  hint.textContent = G.garden.seed ? "执行者头上还挂着一枚种子 —— 拖进这里，落在哪儿就种在哪儿"
+                                   : "想挪就拖：花草可以在园子里随意摆放（关掉游戏也不会倒退）";
+  body.appendChild(hint);
+  updateGardenBadge();
+}
+/* 花圃内自由拖拽：按住一株直接挪（不进撤销栈 —— 摆放是装修，不是破案进度）。
+   拖动中只更新 left/top 与株上的 x/y，不重建 DOM；松手才重绘一次把档位行带上。 */
+function makeGardenPlantDraggable(el, p){
+  let dragging = false, moved = false, sx = 0, sy = 0;
+  el.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
+    try { el.setPointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+  el.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    if (!moved && Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) < 5) return;
+    moved = true; gardenDragLive = true;
+    const field = gardenWinEl && gardenWinEl.querySelector(".gd-field");
+    if (!field) return;
+    const r = field.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return;
+    const spot = gardenSpotOf(e.clientX, e.clientY);
+    p.x = spot.x; p.y = spot.y;
+    el.style.left = p.x + "%";
+    el.style.top = p.y + "%";
+  });
+  const finish = () => {
+    if (!dragging) return;
+    dragging = false; gardenDragLive = false;
+    if (moved) refreshGardenWin();          /* 拖完了重绘一遍（标题行等跟随新位置） */
+  };
+  el.addEventListener("pointerup", finish);
+  el.addEventListener("pointercancel", finish);
+}
+/* 每秒看一眼：窗开着才动 DOM；跨过开花那一刻弹一枚 toast（每株一次，记在株上）。
+   存档回来时花早已开过（超过 10 秒）就静默补记，不补弹。
+   拖拽进行中不动 DOM（重建会把正被抓住的那株换掉，指针就脱手了）。 */
+function gardenTick(){
+  if (!gardenWinEl || !gardenOK()) return;
+  gardenPlots().forEach(p => {
+    if (!p || p.hit) return;
+    if (gardenStageOf(p) >= 4){
+      p.hit = true;
+      if (Date.now() - p.at <= GARDEN_STAGES[4] + 10000) toast("「花魄」开花了。");
+    }
+  });
+  if (!gardenDragLive) refreshGardenWin();
+}
+function startGardenTicker(){
+  if (gardenTimer) return;
+  try { gardenTimer = setInterval(gardenTick, 1000); } catch(_){ gardenTimer = null; }   /* 无头 stub 可能没有 interval */
+}

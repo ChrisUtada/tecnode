@@ -4,7 +4,10 @@ let sel = null;
 
 function blankGraph(){
   return { nodes:{}, edges:[], explored:new Set(), captured:new Set(), tried:new Set(), talkProg:{}, tecProg:{}, lastScene:null, collapsed:new Set(), seenTexts:[],
-    matrix:{vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings:new Set() };
+    matrix:{vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings:new Set(),
+    /* 花园（真名结局的后续温柔）：seed = 执行者头顶还挂着一枚没种下的种子；
+       plots = 花坛（{at:下种时刻, hit:开花提示已弹}），长成看真实时间，见 16-cases.js 的花园模块 */
+    garden:{ seed:false, plots:[] } };
 }
 function snapshot(){
   const nodes = {};
@@ -19,7 +22,8 @@ function snapshot(){
     talkProg: Object.assign({}, G.talkProg),
     tecProg: Object.assign({}, G.tecProg), lastScene: G.lastScene,
     collapsed: [...G.collapsed],
-    matrix: JSON.parse(JSON.stringify(G.matrix)), endings: [...G.endings]
+    matrix: JSON.parse(JSON.stringify(G.matrix)), endings: [...G.endings],
+    garden: JSON.parse(JSON.stringify(G.garden || { seed:false, plots:[] }))
   });
 }
 function pushHistory(){ history.push(snapshot()); if (history.length > 60) history.shift(); }
@@ -30,7 +34,14 @@ function restore(str){
   const unread = {};
   Object.keys(G.nodes).forEach(k => { if (G.nodes[k].unread) unread[k] = true; });
   G = { nodes:s.nodes, edges:s.edges, explored:new Set(s.explored), captured:new Set(s.captured), tried:new Set(s.tried), talkProg: s.talkProg || {}, tecProg: s.tecProg || {}, lastScene: s.lastScene || null, collapsed: new Set(s.collapsed || []), seenTexts: G.seenTexts || [],
-    matrix: s.matrix || {vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings: new Set(s.endings || []) };
+    matrix: s.matrix || {vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings: new Set(s.endings || []),
+    garden: s.garden || { seed:false, plots:[] } };
+  /* 旧档迁移：花园字段是「真名结局掉种子」之后才有的。捕获过真名的旧档没有 garden ——
+     按结局语义补发那枚种子（种没种下看 plots，不会重复发）；没到过真结局的照默认空。 */
+  if (!s.garden){
+    const t = (typeof ENDINGS !== "undefined") && ENDINGS.find(e => e.isTrueCapture);
+    if (t && G.endings.has(t.id)) G.garden = { seed:true, plots:[] };
+  }
   Object.keys(G.nodes).forEach(k => { if (unread[k]) G.nodes[k].unread = true; });
   Object.values(G.nodes).forEach(n => { n.el = null; });
   recomputeHidden();

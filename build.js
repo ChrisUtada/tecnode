@@ -56,12 +56,16 @@ const MIME = {
 };
 
 /* 把 @@ASSET:<filename>@@ 换成完整可用的 src：
- *   external → assets/<filename>        inline → data:<mime>;base64,<正文> */
+ *   external → assets/<filename>        inline → data:<mime>;base64,<正文>
+ * filename 允许子目录（如 flower/plant_seed.png，素材按类归档）；
+ * 但严禁 .. 上跳 —— 素材必须待在 src/assets/ 里。 */
 function resolveAssets(text, where, mode) {
   let hits = 0;
   const out = text.replace(/@@ASSET:([^@]+)@@/g, (m, name) => {
-    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) {
-      throw new Error(where + " 里的素材名不合法：@@ASSET:" + name + "@@（只允许字母数字与 . _ -）");
+    const segs = name.split("/");
+    const ok = segs.every(s => /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(s));
+    if (!ok || name.indexOf("..") >= 0) {
+      throw new Error(where + " 里的素材名不合法：@@ASSET:" + name + "@@（只允许字母数字与 . _ -，可带子目录，但不得 .. 上跳）");
     }
     const p = path.join(ROOT, ASSET_DIR, name);
     if (!fs.existsSync(p)) throw new Error(where + " 引用了不存在的素材：" + ASSET_DIR + "/" + name);
@@ -173,20 +177,35 @@ function assemble() {
 }
 
 /* 外链产物引用 assets/<name>：构建时把 src/assets/* 复制到根目录 assets/
-   （.gitignore 里只忽略根目录的 /assets/，源素材 src/assets/ 照常入库） */
+   （.gitignore 里只忽略根目录的 /assets/，源素材 src/assets/ 照常入库）。
+   递归镜像子目录（flower/ 等），并**先清掉目标里源目录已不存在的文件**——
+   只复制不清理会让 assets/ 带着历史残留跨机器漂移（旧 tec.b64.txt 就是这么留下的）。 */
 function copyAssets() {
   const src = path.join(ROOT, "src", "assets");
   if (!fs.existsSync(src)) return;
   const dst = path.join(ROOT, ASSET_OUT_DIR);
   fs.mkdirSync(dst, { recursive: true });
   let n = 0;
-  for (const f of fs.readdirSync(src).sort()) {
-    const p = path.join(src, f);
-    if (!fs.statSync(p).isFile()) continue;
-    fs.copyFileSync(p, path.join(dst, f));
-    n++;
-  }
-  console.log("  外链素材目录 " + ASSET_OUT_DIR + "/ 同步 " + n + " 个文件 ← " + ASSET_DIR + "/");
+  const walk = (from, to, rel) => {
+    for (const f of fs.readdirSync(from).sort()) {
+      const p = path.join(from, f);
+      const q = path.join(to, f);
+      if (fs.statSync(p).isDirectory()) { fs.mkdirSync(q, { recursive: true }); walk(p, q, rel + f + "/"); continue; }
+      fs.copyFileSync(p, q);
+      n++;
+    }
+  };
+  walk(src, dst, "");
+  const prune = (dir) => {
+    for (const f of fs.readdirSync(dir)) {
+      const p = path.join(dir, f);
+      if (fs.statSync(p).isDirectory()) { prune(p); continue; }
+      const rel = path.relative(path.join(ROOT, ASSET_OUT_DIR), p).replace(/\\/g, "/");
+      if (!fs.existsSync(path.join(src, rel))) { fs.unlinkSync(p); n--; console.log("  清掉历史残留 " + ASSET_OUT_DIR + "/" + rel); }
+    }
+  };
+  prune(dst);
+  console.log("  外链素材目录 " + ASSET_OUT_DIR + "/ 同步 " + n + " 个文件 ← " + ASSET_DIR + "/（含子目录）");
 }
 
 function write(file, text) {

@@ -12,6 +12,7 @@ function boot(opts){
   closeInferWin();
   closePeopleWin();
   closeMapWin();
+  closeGardenWin();    /* 花园窗同理：开局 / 换案 / 重置都收（图标由 refreshGardenIcon 按状态重挂） */
   view = { x: 40, y: 20, k: 1 };
   applyView();
   logBox.innerHTML = "";
@@ -75,6 +76,7 @@ window.__clueToggle = () => toggleClueWin();
 window.__clueLedger = () => ledgerList().map(n => ({ key:n.key, id:n.id, label:n.label, sense:(CLUES[n.id] || {}).type }));
 window.__ledgerStore = key => ledgerStore(key);
 window.__ledgerTake  = key => ledgerTake(key);
+window.__ledgerToMatrix = key => ledgerToMatrix(key);   /* 等价于把册中一行拖上推演桌布 */
 window.__dropTargets = () => nodeDropTargets();
 window.__peopleToggle = () => togglePeopleWin();
 window.__roster = () => metChars().map(id => {
@@ -87,6 +89,29 @@ window.__mxAssign = (k, s) => assignClue(k, s);
 window.__boardTake = (id, sense, cx, cy) => boardTake(id, sense, cx, cy);   /* 等价于把桌布上的 chip 拖出去 */
 window.__matrixItems = () => matrixItems().map(n => n.key);
 window.__infer = () => executeInference();
+window.__inferToggle = () => toggleInferWin();
+window.__ensure = (kind, id) => {
+  const d = kind === "clue" ? (CLUES[id] || {}) : (ITEMS[id] || {});
+  return ensureNode(kind, id, { label: d.label || id });
+};
+/* 花园（无头验证 / 调试）：plant(cx,cy) 等价于把种子拖进花园（无坐标 = 中部）；plantAt(ms)
+   直接种一枚「ms 毫秒前」下种的种子 —— 生长走真实时钟，钩子靠倒拨 at 来测各档位，不用真等三分钟 */
+window.__garden = {
+  state: () => ({
+    seed: gardenOK() ? G.garden.seed : null,
+    plots: gardenOK() ? gardenPlots().map(p => ({ stage: gardenStageOf(p), at: p.at, hit: !!p.hit, x: p.x, y: p.y })) : null,
+    icon: !!gardenIconEl, win: !!gardenWinEl
+  }),
+  grant: () => grantGardenSeed(),
+  plant: (cx, cy) => gardenPlant(cx, cy),
+  plantAt: ms => { if (!gardenOK()) return false;
+    const i = gardenPlots().length;
+    gardenPlots().push({ at: Date.now() - (ms || 0), hit: ms >= GARDEN_STAGES[4] + 10000,
+      x: 24 + (i % 4) * 18, y: 58 });
+    refreshGardenWin(); refreshGardenIcon(); return true; },
+  open: () => openGardenWin(),
+  close: () => closeGardenWin()
+};
 window.__playStep = () => { if (memoryPlay) advanceMemory(); else if (endingState) playEndingStage(); };
 window.__intro = {
   step: () => introState && introState.step,
@@ -152,6 +177,8 @@ window.__dump  = () => ({
   floats: { bubble: !!bubbleEl, dlg: !!dlgWinEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
   matrix: JSON.parse(JSON.stringify(G.matrix)),
   endings: [...G.endings],
+  garden: G.garden ? { seed: !!G.garden.seed, plots: gardenPlots().filter(Boolean).length } : null,
+  gardenIcon: !!gardenIconEl,
   endingOverlay: !!endingState,
   investigator: investigator ? { name: investigator.name, id: investigator.id, sense: investigator.sense,
                                  avatarId: investigator.avatarId || null } : null,
@@ -171,6 +198,7 @@ window.__dump  = () => ({
 
 boot();
 refreshMusicIcon();          /* 还原存档时若唱机已装针，桌面播放器图标要补回来 */
+refreshGardenIcon();         /* 还原存档时若捕获过真名（种子未种 / 坛里有花），桌面花园图标要补回来 */
 
 /* 无头验证 / 调试用的音乐钩子（不依赖真实音频设备：只查 DOM 与库状态） */
 window.__music = {

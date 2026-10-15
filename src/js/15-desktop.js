@@ -61,6 +61,7 @@ function openApp(app){
   else if (app === "log") toggleLogWin();
   else if (app === "map") toggleMapWin();
   else if (app === "music") toggleMusicWin();
+  else if (app === "garden") toggleGardenWin();
 }
 function selectIcon(el){
   document.querySelectorAll(".desk-icon.sel").forEach(x => x.classList.remove("sel"));
@@ -141,7 +142,14 @@ document.getElementById("btn-fit").addEventListener("click", () => { if (require
 document.getElementById("ending-overlay").addEventListener("click", () => {
   if (!endingState) return;
   const cur = endingState.stages[endingState.step - 1];
-  if (cur && cur.final){ closeEnding(); return; }
+  if (cur && cur.final){
+    /* 末帧 = 「确认捕获 / 收下这份记录」。种子在这一刻才发（不是 triggerEnding）：
+       玩家亲手点了确认，执行者头顶的对话框才挂出来 —— 谢幕与奖励一起落定。 */
+    const wasTrue = !!(endingState.ending && endingState.ending.isTrueCapture);
+    closeEnding();
+    if (wasTrue) grantGardenSeed();
+    return;
+  }
   clearTimeout(endingState.timer);
   playEndingStage();
 });
@@ -167,6 +175,7 @@ document.getElementById("btn-reset").addEventListener("click", () => {
   closeClueWin();            /* 线索册窗与证物袋同级：同样只在此处与换案时清 */
   boot();
   refreshMusicIcon();        /* 重置后重新评估唱针状态：若针已不在，图标/窗口/最小化卡片一并收 */
+  refreshGardenIcon();       /* 重置后花园同理：种子 / 花坛随 G 清空，图标与窗一并收 */
   log("已重置为初始状态", "sys");
 });
 document.getElementById("btn-reach").addEventListener("click", () => {

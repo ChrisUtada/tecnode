@@ -101,7 +101,8 @@ function refreshGotoWin(){
    线索捕获后先落在画布上，要做的是「把它拖进线索册」（拖到窗口里或左侧图标上）——收进来即离开画布。
    册子里只有已收纳的线索：一条一行，感官直接标在行尾，整表按五感顺序自动排序（同感自然相邻），
    不再分组、不再标归位状态，也不给未捕获 / 未收纳的线索留位——册子就是盒子，装什么显示什么。
-   点一行 = 取回画布（回到线索册图标旁并选中，详情窗顺势展开全文）。 */
+   点一行 = 取回画布（回到线索册图标旁并选中，详情窗顺势展开全文）；
+   按住一行拖到推演桌布（或推演器图标）上松手 = 直接归位，不必先点回画布再拖一遍。 */
 let clueWinEl = null;
 function closeClueWin(){ if (clueWinEl){ clueWinEl.remove(); clueWinEl = null; } }
 function toggleClueWin(){
@@ -185,7 +186,7 @@ function refreshClueWin(){
     const st = document.createElement("span"); st.className = "st sense";
     st.textContent = SENSES[c.type] || "";
     d.appendChild(box); d.appendChild(st);
-    d.addEventListener("click", () => takeFromLedger(n.key));
+    makeLedgerRowDraggable(d, n.key);
     body.appendChild(d);
   });
 }
@@ -196,6 +197,99 @@ function takeFromLedger(key){
   if (!n || !ledgerTake(key)) return false;
   centerOnNode(n); selectNode(n.key);
   return true;
+}
+
+/* ---- 册中一行直拖推演器：按住行拖到桌布（或推演器图标）上松手 = 归位 ----
+   落点判定与画布拖拽同源（桌布 + infer-icon）；拖动中给落点打 over 高亮。
+   纯点击仍是取回画布 —— 拖过的那一下吞掉紧跟的 click，两个动作不连发。 */
+function overMatrixDrop(cx, cy){
+  const bd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
+  if (bd){
+    const r = bd.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  const ic = document.getElementById("infer-icon");
+  if (ic){
+    const r = ic.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  return false;
+}
+/* 归位 = 直接从册子搬上桌布（复用 assignClue：它认 G.nodes 里任何线索，不管现在收在哪儿；
+   storedIn 从 LEDGER 改写成 MATRIX，撤销栈照记，render() 顺手把册窗清单刷成少一行）。 */
+function ledgerToMatrix(key){
+  const n = G.nodes[key];
+  if (!n || n.storedIn !== "LEDGER") return false;
+  const sense = (CLUES[n.id] || {}).type;
+  if (!sense){ toast("这条线索没有感官类型，上不了桌布", true); return false; }
+  if (!requireCase()) return false;
+  return assignClue(key, sense);
+}
+/* 行上的指针拖拽：镜像**不克隆行** —— 一旦拖离册子就以「节点块」现身
+   （mx-chip.node，与桌布上的归位 chip 同款观感），居中跟手（#drag-layer）；
+   松手在落点外 = 弹回册中（无动作）。 */
+function makeLedgerRowDraggable(row, key){
+  let dragging = false, moved = false, wasMoved = false, sx = 0, sy = 0,
+      mirror = null, mw = 0, mh = 0, sr = null;
+  const clearOver = () => {
+    const bd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
+    if (bd) bd.classList.remove("over");
+    const ic = document.getElementById("infer-icon");
+    if (ic && ic.classList) ic.classList.remove("over");
+  };
+  row.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    dragging = true; moved = false; wasMoved = false; sx = e.clientX; sy = e.clientY;
+    sr = desktopEl.getBoundingClientRect();
+    try { row.setPointerCapture(e.pointerId); } catch(_){}
+  });
+  row.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+    moved = true;
+    if (!mirror){
+      const layer = document.getElementById("drag-layer");
+      const n = G.nodes[key], c = CLUES[n.id] || {};
+      mirror = document.createElement("div");
+      mirror.className = "mx-chip node ent-node ent-clue drag-mirror";
+      mirror.innerHTML = "<div class='n-title'>" + esc(c.label || n.label) + "</div><div class='n-sub'>线索</div>";
+      mirror.style.position = "absolute";
+      mirror.style.width = "140px";
+      layer.appendChild(mirror);
+      mw = mirror.offsetWidth || 140; mh = mirror.offsetHeight || 40;
+      row.style.visibility = "hidden";
+    }
+    mirror.style.left = (e.clientX - sr.left - mw / 2) + "px";
+    mirror.style.top  = (e.clientY - sr.top  - mh / 2) + "px";
+    const bd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
+    if (bd){
+      const r = bd.getBoundingClientRect();
+      bd.classList.toggle("over", e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+    }
+  });
+  const finish = e => {
+    if (!dragging) return;
+    dragging = false;
+    if (mirror){ mirror.remove(); mirror = null; }
+    row.style.visibility = "";
+    clearOver();
+    if (moved) wasMoved = true;
+    if (!moved || !e) return;
+    if (overMatrixDrop(e.clientX, e.clientY)) ledgerToMatrix(key);
+  };
+  row.addEventListener("pointerup", finish);
+  row.addEventListener("pointercancel", () => {
+    dragging = false;
+    if (mirror){ mirror.remove(); mirror = null; }
+    row.style.visibility = "";
+    clearOver();
+  });
+  /* 点击 = 取回画布；刚拖完的那一下（wasMoved）不算点击 */
+  row.addEventListener("click", () => {
+    if (wasMoved){ wasMoved = false; return; }
+    takeFromLedger(key);
+  });
 }
 
 /* ============ ROSTER // 人物：名册 ============

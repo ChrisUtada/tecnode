@@ -340,6 +340,45 @@
     78%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
     100%{opacity:0; transform:translateX(-50%) translateY(-10px) scale(.9)}
   }
+  /* 「确认捕获」后的种子对话框：与心碎同位（.mx-exec 上方），但**常驻**、可拖 ——
+     气泡里只有一张种子图，没有文字（提示都在 title / 花园窗的底注里）。
+     白卡 + 朝下小尖角（指向执行者），源图 16×16 → 32px。 */
+  .mx-seedpop{position:absolute; left:50%; bottom:calc(100% + 12px); transform:translateX(-50%);
+    padding:6px 8px; background:var(--card); border:1px solid var(--edge); border-radius:var(--r-sm);
+    box-shadow:var(--raise); cursor:grab; user-select:none;
+    animation:mx-seedpop-in .35s ease}
+  .mx-seedpop:active{cursor:grabbing}
+  .mx-seedpop.dragging{opacity:.94}
+  .mx-seedpop img{width:32px; height:32px; display:block; image-rendering:pixelated}
+  .mx-seedpop::after{content:""; position:absolute; left:50%; bottom:-5px; width:8px; height:8px;
+    transform:translateX(-50%) rotate(45deg); background:var(--card);
+    border-right:1px solid var(--edge); border-bottom:1px solid var(--edge)}
+  @keyframes mx-seedpop-in{
+    0%{opacity:0; transform:translateX(-50%) translateY(8px) scale(.6)}
+    100%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
+  }
+  /* 花园窗：一块自由花圃（不设固定坛位）。窗宽对齐 bag/detail 的 300px 档；
+     株 = 绝对定位（left/top 百分比），按住可以直接拖动摆放。
+     凹陷底面（press）当「土」，种子 / 花草浮在上面。
+     窗体本体与全桌浮窗同一族：card 底 + edge 描边 + 圆角 + win-shadow（z 也回到 25 档）。 */
+  .garden-win{position:absolute; left:50%; top:110px; margin-left:-150px; width:300px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+  .garden-win .syswin-body{padding:10px}
+  .gd-field{position:relative; height:190px; border:1px solid var(--edge); border-radius:var(--r-btn);
+    background:var(--bg); box-shadow:var(--press); overflow:hidden}
+  .gd-plant{position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column;
+    align-items:center; cursor:grab; user-select:none}
+  .gd-plant:active{cursor:grabbing}
+  .gd-plant img{width:48px; height:48px; image-rendering:pixelated}
+  .gd-plant .gd-stage{margin-top:2px; padding:1px 5px; font-size:10px; color:var(--muted);
+    border:1px solid var(--edge-soft); border-radius:var(--r-btn); background:var(--face); white-space:nowrap}
+  .gd-plant.bloom .gd-stage{color:var(--text); border-color:var(--edge)}
+  /* 生长计时 = 进度条（不用字）：与播放器 / TEC 分析条同一族（凹槽 + 墨色填充） */
+  .gd-plant .gd-prog{width:56px; height:6px; margin-top:3px; border-radius:4px;
+    background:var(--face-lo); box-shadow:var(--press); overflow:hidden}
+  .gd-plant .gd-prog i{display:block; height:100%; width:0; background:var(--line); border-radius:4px}
+  .gd-hint{margin-top:8px; font-size:10.5px; color:var(--faint); line-height:1.6}
   /* 结局清单：弱化存在，收在桌布左下角 */
   .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
   .memory{background:#dcd8c2; border:3px double #2b2b26; border-radius:var(--r-win); box-shadow:var(--win-shadow)}
@@ -787,7 +826,10 @@ const ICON_PATHS = {
   briefcase: "M2 8h2v12H2zm18 0h2v12h-2zM4 6h16v2H4zm0 14h16v2H4zM8 4h2v2H8zm2-2h4v2h-4zm4 2h2v2h-2z",
   message: "M20 2H4v2h16zm0 14H6v2h14zm2-12h-2v12h2zM4 4H2v18h2zm2 14H4v2h2z",
   "clipboard-list": "M20 12h2v8h-2zm-8-2h8v2h-8zm0 10h8v2h-8zm-2-8h2v8h-2zM6 2h8v2H6zm0 4h8v2H6zm0-2h2v2H6zm6 0h2v2h-2zm2 0h2v2h-2zM16 6h2v5h-2zM4 4h2v2H4zM2 6h2v12H2zm2 12h6v2H4zm2-8h4v2H6zm0 4h2v2H6zm11 2h5v2h-5zM16 16h2v6h-2z",
-  map: "M4 20h2v2H2V6h2v14Zm12 0h2v2h-4v-2h-2v-2h2V8h-2V6h4v14Zm-8 0H6v-2h2v2Zm12 0h-2v-2h2v2ZM10 4h2v2h-2v10h2v2H8V4H6V2h4v2Zm12 14h-2V4h-2V2h4v16ZM6 6H4V4h2v2Zm12 0h-2V4h2v2Z"
+  map: "M4 20h2v2H2V6h2v14Zm12 0h2v2h-4v-2h-2v-2h2V8h-2V6h4v14Zm-8 0H6v-2h2v2Zm12 0h-2v-2h2v2ZM10 4h2v2h-2v10h2v2H8V4H6V2h4v2Zm12 14h-2V4h-2V2h4v16ZM6 6H4V4h2v2Zm12 0h-2V4h2v2Z",
+  /* 花园：自绘（Pixelarticons 没有花）：四瓣 + 花芯 + 茎 + 双叶，全部 2~4px 条带。
+     上瓣 y3-6 贴花芯 y7-10，下瓣 y11-14 接茎 y15-18，叶 x8-10 / x13-15 贴茎两侧。 */
+  flower: "M10 3h4v4h-4zM6 7h4v4H6zM14 7h4v4h-4zM10 11h4v4h-4zM10 7h4v4h-4zM11 15h2v4h-2zM8 16h3v2H8zM13 16h3v2h-3z"
 };
 function iconSvg(name, size){
   const paths = ICON_PATHS[name];
@@ -859,7 +901,10 @@ let sel = null;
 
 function blankGraph(){
   return { nodes:{}, edges:[], explored:new Set(), captured:new Set(), tried:new Set(), talkProg:{}, tecProg:{}, lastScene:null, collapsed:new Set(), seenTexts:[],
-    matrix:{vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings:new Set() };
+    matrix:{vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings:new Set(),
+    /* 花园（真名结局的后续温柔）：seed = 执行者头顶还挂着一枚没种下的种子；
+       plots = 花坛（{at:下种时刻, hit:开花提示已弹}），长成看真实时间，见 16-cases.js 的花园模块 */
+    garden:{ seed:false, plots:[] } };
 }
 function snapshot(){
   const nodes = {};
@@ -874,7 +919,8 @@ function snapshot(){
     talkProg: Object.assign({}, G.talkProg),
     tecProg: Object.assign({}, G.tecProg), lastScene: G.lastScene,
     collapsed: [...G.collapsed],
-    matrix: JSON.parse(JSON.stringify(G.matrix)), endings: [...G.endings]
+    matrix: JSON.parse(JSON.stringify(G.matrix)), endings: [...G.endings],
+    garden: JSON.parse(JSON.stringify(G.garden || { seed:false, plots:[] }))
   });
 }
 function pushHistory(){ history.push(snapshot()); if (history.length > 60) history.shift(); }
@@ -885,7 +931,14 @@ function restore(str){
   const unread = {};
   Object.keys(G.nodes).forEach(k => { if (G.nodes[k].unread) unread[k] = true; });
   G = { nodes:s.nodes, edges:s.edges, explored:new Set(s.explored), captured:new Set(s.captured), tried:new Set(s.tried), talkProg: s.talkProg || {}, tecProg: s.tecProg || {}, lastScene: s.lastScene || null, collapsed: new Set(s.collapsed || []), seenTexts: G.seenTexts || [],
-    matrix: s.matrix || {vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings: new Set(s.endings || []) };
+    matrix: s.matrix || {vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings: new Set(s.endings || []),
+    garden: s.garden || { seed:false, plots:[] } };
+  /* 旧档迁移：花园字段是「真名结局掉种子」之后才有的。捕获过真名的旧档没有 garden ——
+     按结局语义补发那枚种子（种没种下看 plots，不会重复发）；没到过真结局的照默认空。 */
+  if (!s.garden){
+    const t = (typeof ENDINGS !== "undefined") && ENDINGS.find(e => e.isTrueCapture);
+    if (t && G.endings.has(t.id)) G.garden = { seed:true, plots:[] };
+  }
   Object.keys(G.nodes).forEach(k => { if (unread[k]) G.nodes[k].unread = true; });
   Object.values(G.nodes).forEach(n => { n.el = null; });
   recomputeHidden();
@@ -1651,6 +1704,8 @@ function render(){
   updateInferBadge();
   refreshClueWin();     /* 开着的索引窗跟着图刷新（关着时是空操作） */
   refreshPeopleWin();
+  refreshInferWin();    /* 推演窗同理：阵列与执行者头顶的种子对话框都是状态驱动的，
+                           撤销 / 续档把 G 滚回去之后，开着的窗不能留着旧 DOM */
   /* 重建 DOM 后恢复选中态并重挂聚焦淡化 */
   if (sel && G.nodes[sel] && G.nodes[sel].el) G.nodes[sel].el.classList.add("sel"); else sel = null;
   applyFocus();
@@ -3123,7 +3178,8 @@ function refreshGotoWin(){
    线索捕获后先落在画布上，要做的是「把它拖进线索册」（拖到窗口里或左侧图标上）——收进来即离开画布。
    册子里只有已收纳的线索：一条一行，感官直接标在行尾，整表按五感顺序自动排序（同感自然相邻），
    不再分组、不再标归位状态，也不给未捕获 / 未收纳的线索留位——册子就是盒子，装什么显示什么。
-   点一行 = 取回画布（回到线索册图标旁并选中，详情窗顺势展开全文）。 */
+   点一行 = 取回画布（回到线索册图标旁并选中，详情窗顺势展开全文）；
+   按住一行拖到推演桌布（或推演器图标）上松手 = 直接归位，不必先点回画布再拖一遍。 */
 let clueWinEl = null;
 function closeClueWin(){ if (clueWinEl){ clueWinEl.remove(); clueWinEl = null; } }
 function toggleClueWin(){
@@ -3207,7 +3263,7 @@ function refreshClueWin(){
     const st = document.createElement("span"); st.className = "st sense";
     st.textContent = SENSES[c.type] || "";
     d.appendChild(box); d.appendChild(st);
-    d.addEventListener("click", () => takeFromLedger(n.key));
+    makeLedgerRowDraggable(d, n.key);
     body.appendChild(d);
   });
 }
@@ -3218,6 +3274,99 @@ function takeFromLedger(key){
   if (!n || !ledgerTake(key)) return false;
   centerOnNode(n); selectNode(n.key);
   return true;
+}
+
+/* ---- 册中一行直拖推演器：按住行拖到桌布（或推演器图标）上松手 = 归位 ----
+   落点判定与画布拖拽同源（桌布 + infer-icon）；拖动中给落点打 over 高亮。
+   纯点击仍是取回画布 —— 拖过的那一下吞掉紧跟的 click，两个动作不连发。 */
+function overMatrixDrop(cx, cy){
+  const bd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
+  if (bd){
+    const r = bd.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  const ic = document.getElementById("infer-icon");
+  if (ic){
+    const r = ic.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  return false;
+}
+/* 归位 = 直接从册子搬上桌布（复用 assignClue：它认 G.nodes 里任何线索，不管现在收在哪儿；
+   storedIn 从 LEDGER 改写成 MATRIX，撤销栈照记，render() 顺手把册窗清单刷成少一行）。 */
+function ledgerToMatrix(key){
+  const n = G.nodes[key];
+  if (!n || n.storedIn !== "LEDGER") return false;
+  const sense = (CLUES[n.id] || {}).type;
+  if (!sense){ toast("这条线索没有感官类型，上不了桌布", true); return false; }
+  if (!requireCase()) return false;
+  return assignClue(key, sense);
+}
+/* 行上的指针拖拽：镜像**不克隆行** —— 一旦拖离册子就以「节点块」现身
+   （mx-chip.node，与桌布上的归位 chip 同款观感），居中跟手（#drag-layer）；
+   松手在落点外 = 弹回册中（无动作）。 */
+function makeLedgerRowDraggable(row, key){
+  let dragging = false, moved = false, wasMoved = false, sx = 0, sy = 0,
+      mirror = null, mw = 0, mh = 0, sr = null;
+  const clearOver = () => {
+    const bd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
+    if (bd) bd.classList.remove("over");
+    const ic = document.getElementById("infer-icon");
+    if (ic && ic.classList) ic.classList.remove("over");
+  };
+  row.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    dragging = true; moved = false; wasMoved = false; sx = e.clientX; sy = e.clientY;
+    sr = desktopEl.getBoundingClientRect();
+    try { row.setPointerCapture(e.pointerId); } catch(_){}
+  });
+  row.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+    moved = true;
+    if (!mirror){
+      const layer = document.getElementById("drag-layer");
+      const n = G.nodes[key], c = CLUES[n.id] || {};
+      mirror = document.createElement("div");
+      mirror.className = "mx-chip node ent-node ent-clue drag-mirror";
+      mirror.innerHTML = "<div class='n-title'>" + esc(c.label || n.label) + "</div><div class='n-sub'>线索</div>";
+      mirror.style.position = "absolute";
+      mirror.style.width = "140px";
+      layer.appendChild(mirror);
+      mw = mirror.offsetWidth || 140; mh = mirror.offsetHeight || 40;
+      row.style.visibility = "hidden";
+    }
+    mirror.style.left = (e.clientX - sr.left - mw / 2) + "px";
+    mirror.style.top  = (e.clientY - sr.top  - mh / 2) + "px";
+    const bd = inferWinEl ? inferWinEl.querySelector(".mx-board") : null;
+    if (bd){
+      const r = bd.getBoundingClientRect();
+      bd.classList.toggle("over", e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+    }
+  });
+  const finish = e => {
+    if (!dragging) return;
+    dragging = false;
+    if (mirror){ mirror.remove(); mirror = null; }
+    row.style.visibility = "";
+    clearOver();
+    if (moved) wasMoved = true;
+    if (!moved || !e) return;
+    if (overMatrixDrop(e.clientX, e.clientY)) ledgerToMatrix(key);
+  };
+  row.addEventListener("pointerup", finish);
+  row.addEventListener("pointercancel", () => {
+    dragging = false;
+    if (mirror){ mirror.remove(); mirror = null; }
+    row.style.visibility = "";
+    clearOver();
+  });
+  /* 点击 = 取回画布；刚拖完的那一下（wasMoved）不算点击 */
+  row.addEventListener("click", () => {
+    if (wasMoved){ wasMoved = false; return; }
+    takeFromLedger(key);
+  });
 }
 
 /* ============ ROSTER // 人物：名册 ============
@@ -3527,6 +3676,80 @@ function refreshInferWin(){
   exec.appendChild(av);   /* 执行者只留头像：头像即五芒星中枢，标签/提示已移除 */
   exec.addEventListener("pointerdown", riteStart);
   board.appendChild(exec);
+
+  /* 「确认捕获」之后的余韵：执行者头顶挂一枚没种下的种子（对话框）。
+     显隐只看 G.garden.seed —— 窗重开 / 每次重绘都从这里重建，不是一次性 DOM：
+     种子没被拖进花园之前，关掉推理窗再打开，对话框还在。 */
+  if (G.garden && G.garden.seed) exec.appendChild(buildSeedPop());
+}
+
+/* ============ 种子对话框（「确认捕获」落定 → 花园的前奏） ============
+   位置与心碎表情同款（.mx-exec 上方），但不自动消失：种子拖进花园才收走。
+   气泡里**只有一张种子图**，没有任何文字 —— 要说的都由画面说了。
+   种子可拖 —— board overflow:hidden，与桌布 chip 同一套镜像拖法（#drag-layer）；
+   落进花园窗 / 花园图标 = 下种（gardenPlant，16-cases.js），落在别处 = 弹回原位。 */
+function buildSeedPop(){
+  const pop = document.createElement("div");
+  pop.className = "mx-seedpop";
+  pop.title = "拖到花园里种下";
+  const im = document.createElement("img");
+  im.src = GARDEN_IMG.seed;
+  im.alt = "花魄的种子"; im.draggable = false;
+  pop.appendChild(im);
+  makeSeedDraggable(pop);
+  return pop;
+}
+function makeSeedDraggable(pop){
+  let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
+  pop.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
+    sr = desktopEl.getBoundingClientRect();
+    try { pop.setPointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+  pop.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+    moved = true;
+    pop.classList.add("dragging");
+    if (!mirror){
+      const layer = document.getElementById("drag-layer");
+      const r = pop.getBoundingClientRect();
+      offx = e.clientX - r.left; offy = e.clientY - r.top;
+      mirror = pop.cloneNode(true);
+      mirror.classList.add("drag-mirror");
+      mirror.classList.remove("dragging");
+      mirror.style.position = "absolute"; mirror.style.transform = "none";
+      mirror.style.width = r.width + "px"; mirror.style.height = r.height + "px";
+      mirror.style.left = (r.left - sr.left) + "px";
+      mirror.style.top  = (r.top  - sr.top ) + "px";
+      mirror.style.visibility = "hidden";
+      layer.appendChild(mirror);
+      pop.style.visibility = "hidden";
+      void mirror.offsetWidth;             /* 强制布局，显示即正确位置 */
+      mirror.style.visibility = "visible";
+    }
+    mirror.style.left = (e.clientX - offx - sr.left) + "px";
+    mirror.style.top  = (e.clientY - offy - sr.top ) + "px";
+  });
+  const finish = e => {
+    if (!dragging) return;
+    dragging = false;
+    pop.classList.remove("dragging");
+    if (mirror){ mirror.remove(); mirror = null; }
+    pop.style.visibility = "";
+    if (!moved) return;                    /* 纯点击：不动 */
+    if (overGardenDrop(e.clientX, e.clientY)){ gardenPlant(e.clientX, e.clientY); return; }
+    refreshInferWin();                     /* 没拖进花园：弹回原位（对话框照旧） */
+  };
+  pop.addEventListener("pointerup", finish);
+  pop.addEventListener("pointercancel", () => {
+    dragging = false; pop.classList.remove("dragging");
+    if (mirror){ mirror.remove(); mirror = null; }
+    pop.style.visibility = "";
+  });
 }
 /* 长按蓄力：pointerdown 起 2.5s 完成 → executeInference；pointerup / pointerleave 提前 = 中断复位。
    无头环境 setTimeout 返回 0 就立即完成（与 enterCase 换档的兜底同款）。 */
@@ -3635,8 +3858,10 @@ function executeInference(){
 let endingState = null;
 function triggerEnding(ending){
   G.endings.add(ending.id);
-  /* 只有捕获「真名」（真结局）才点亮下一案的地址 */
-  if (ending.isTrueCapture) unlockNextCase(CASE_ID);
+  /* 只有捕获「真名」（真结局）才点亮下一案的地址。
+     种子**不在这里发**：它要等玩家在结局遮罩上亲手点下「确认捕获」才发（15-desktop.js 的
+     遮罩点击分支）—— 演出还没谢幕就先掉奖励，等于把结局的余韵抢在观众离场前倒掉了。 */
+  if (ending.isTrueCapture){ unlockNextCase(CASE_ID); }
   log("<b>结局达成：" + esc(ending.name) + "</b>", "cap");
   /* 真名结局：先让推演器整窗冲击震动一拍，再落下结局遮罩 */
   const shock = !!(ending.isTrueCapture && inferWinEl);
@@ -4012,6 +4237,7 @@ function openApp(app){
   else if (app === "log") toggleLogWin();
   else if (app === "map") toggleMapWin();
   else if (app === "music") toggleMusicWin();
+  else if (app === "garden") toggleGardenWin();
 }
 function selectIcon(el){
   document.querySelectorAll(".desk-icon.sel").forEach(x => x.classList.remove("sel"));
@@ -4092,7 +4318,14 @@ document.getElementById("btn-fit").addEventListener("click", () => { if (require
 document.getElementById("ending-overlay").addEventListener("click", () => {
   if (!endingState) return;
   const cur = endingState.stages[endingState.step - 1];
-  if (cur && cur.final){ closeEnding(); return; }
+  if (cur && cur.final){
+    /* 末帧 = 「确认捕获 / 收下这份记录」。种子在这一刻才发（不是 triggerEnding）：
+       玩家亲手点了确认，执行者头顶的对话框才挂出来 —— 谢幕与奖励一起落定。 */
+    const wasTrue = !!(endingState.ending && endingState.ending.isTrueCapture);
+    closeEnding();
+    if (wasTrue) grantGardenSeed();
+    return;
+  }
   clearTimeout(endingState.timer);
   playEndingStage();
 });
@@ -4118,6 +4351,7 @@ document.getElementById("btn-reset").addEventListener("click", () => {
   closeClueWin();            /* 线索册窗与证物袋同级：同样只在此处与换案时清 */
   boot();
   refreshMusicIcon();        /* 重置后重新评估唱针状态：若针已不在，图标/窗口/最小化卡片一并收 */
+  refreshGardenIcon();       /* 重置后花园同理：种子 / 花坛随 G 清空，图标与窗一并收 */
   log("已重置为初始状态", "sys");
 });
 document.getElementById("btn-reach").addEventListener("click", () => {
@@ -5214,6 +5448,237 @@ function openCardReview(){
   invReviewEl = w.el;
 }
 
+/* ============ 花园：真名结局的后续温柔 ============
+   「确认捕获」点下后，执行者头顶会挂一枚种子（13-matrix.js 的 .mx-seedpop 对话框）；
+   把它拖进花园（本窗或本图标）落在哪儿就种在哪儿 —— **没有固定坛位**，
+   种下之后花草还能在园子里随意拖动摆放。真实时间约三分钟长成白花。
+   生长走真实时钟（株上只记 at = 下种时刻），存档随行 —— 关游戏再回来，花不会倒退；
+   株下的计时用进度条表示（不用倒计时文字），窗关着期间照常生长，重开按真实进度出条。 */
+const GARDEN_IMG = {
+  seed:   "assets/flower/plant_seed.png",
+  sprout: "assets/flower/plant_sprout.png",
+  leaf1:  "assets/flower/plant_leaf_stage_1.png",
+  leaf2:  "assets/flower/plant_leaf_stage_2.png",
+  bloom:  "assets/flower/plant_flower.png"
+};
+const GARDEN_STAGE_IMG = ["seed", "sprout", "leaf1", "leaf2", "bloom"];
+const GARDEN_STAGE_NAME = ["种子", "嫩芽", "展叶", "舒叶", "开花"];
+/* 生长档位（毫秒）：45s 嫩芽 → 90s 展叶 → 135s 舒叶 → 180s 开花（约三分钟） */
+const GARDEN_STAGES = [0, 45000, 90000, 135000, 180000];
+/* 株的位置记成花圃地面的百分比（x/y ∈ 8..92 / 30..85），不跟窗体像素走 —— 换机器、缩放都不歪 */
+const GARDEN_X = [8, 92], GARDEN_Y = [30, 85];
+let gardenWinEl = null, gardenIconEl = null, gardenTimer = null, gardenDragLive = false;
+
+function gardenOK(){ return !!G.garden; }
+/* 花圃清单：老档归一化 —— 旧「槽位时代」的存档里数组带 null 占位、株上没有坐标，
+   在这里过滤 + 补一个散开的默认位置；正常路径只是原样返回。 */
+function gardenPlots(){
+  if (!G.garden) G.garden = { seed:false, plots:[] };
+  if (!Array.isArray(G.garden.plots)) G.garden.plots = [];
+  G.garden.plots = G.garden.plots.filter(Boolean);
+  G.garden.plots.forEach((p, i) => {
+    if (typeof p.x !== "number") p.x = 24 + (i % 4) * 18;
+    if (typeof p.y !== "number") p.y = 58;
+  });
+  return G.garden.plots;
+}
+/* 真结局发种子（确认捕获那一刻调，15-desktop.js）：只发一枚，种下之后（或旧档已有株）不再发 */
+function grantGardenSeed(){
+  if (!gardenOK()) G.garden = { seed:false, plots:[] };
+  if (G.garden.seed || G.garden.plots.some(Boolean)) return;
+  G.garden.seed = true;
+  refreshInferWin();          /* 执行者头顶的对话框（窗开着立刻可见；重开会按状态重建） */
+  refreshGardenIcon();
+}
+/* 生长档位 0..4：种子 → 嫩芽 → 展叶 → 舒叶 → 开花。
+   判定按**整秒**量化：档位不会因为毫秒级抖动在边界上闪跳（180000 整 = 开花，179999 = 舒叶，
+   且这格判定在整整一秒内都是稳定的），倒计时行仍然显示精确到秒的余量。 */
+function gardenStageOf(p){
+  const el = Math.floor((Date.now() - p.at) / 1000) * 1000;
+  let st = 0;
+  for (let i = 1; i < GARDEN_STAGES.length; i++) if (el >= GARDEN_STAGES[i]) st = i;
+  return st;
+}
+/* 种子的合法落点：花园窗（开着且没被最小化藏起）或花园图标 */
+function overGardenDrop(cx, cy){
+  if (gardenWinEl && gardenWinEl.style.display !== "none"){
+    const r = gardenWinEl.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  const ic = document.getElementById("garden-icon");
+  if (ic){
+    const r = ic.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+  }
+  return false;
+}
+/* 落点 → 花圃地面百分比（越界夹回）；窗没开 / 图标上松手 = 中间偏下 */
+function gardenSpotOf(cx, cy){
+  let x = 50, y = 58;
+  const field = gardenWinEl && gardenWinEl.querySelector(".gd-field");
+  if (cx != null && field){
+    const r = field.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0){
+      x = (cx - r.left) / r.width * 100;
+      y = (cy - r.top) / r.height * 100;
+    }
+  }
+  return { x: Math.round(Math.max(GARDEN_X[0], Math.min(GARDEN_X[1], x))),
+           y: Math.round(Math.max(GARDEN_Y[0], Math.min(GARDEN_Y[1], y))) };
+}
+/* 下种：落在哪儿就种在哪儿（没有坛位）。与收纳同一道门：案卷得开着（下种是写进度的动作）；
+   种子离身，头顶对话框收走。 */
+function gardenPlant(cx, cy){
+  if (!gardenOK() || !G.garden.seed) return false;
+  if (!requireCase()){ refreshInferWin(); return false; }
+  const spot = gardenSpotOf(cx, cy);
+  pushHistory();
+  G.garden.seed = false;
+  gardenPlots().push({ at: Date.now(), hit: false, x: spot.x, y: spot.y });
+  refreshInferWin();
+  refreshGardenWin();
+  refreshGardenIcon();
+  toast("种子落土了。给花魄一点时间。");
+  return true;
+}
+
+/* ---- 桌面图标：捕获真名（有种子或有株）才出现，照播放器图标的先例动态挂进 ICON_LAYOUT ---- */
+function refreshGardenIcon(){
+  const on = gardenOK() && (G.garden.seed || G.garden.plots.some(Boolean));
+  if (on && !gardenIconEl){
+    const el = document.createElement("div");
+    el.className = "desk-icon";
+    el.id = "garden-icon";
+    el.dataset.app = "garden";
+    el.innerHTML = '<div class="icon-glyph">' + iconSvg("flower", 24) + '</div><div class="icon-label">花园</div>';
+    document.getElementById("icons").appendChild(el);
+    attachIcon(el, "garden");                 /* 与全桌一致：双击开（单击选中） */
+    gardenIconEl = el;
+    if (!ICON_LAYOUT.some(r => r[0] === "garden-icon")) ICON_LAYOUT.push(["garden-icon", "garden"]);
+    resetIconPositions();
+  } else if (!on && gardenIconEl){
+    if (gardenWinEl) closeGardenWin();        /* 重置 / 换案：窗与图标一并收 */
+    gardenIconEl.remove();
+    gardenIconEl = null;
+    const i = ICON_LAYOUT.findIndex(r => r[0] === "garden-icon");
+    if (i >= 0){ ICON_LAYOUT.splice(i, 1); resetIconPositions(); }
+  }
+  updateGardenBadge();
+}
+function updateGardenBadge(){
+  if (!gardenIconEl) return;
+  const cnt = gardenPlots().filter(Boolean).length;
+  let b = gardenIconEl.querySelector(".badge");
+  if (cnt > 0){
+    if (!b){ b = document.createElement("span"); b.className = "badge cnt"; gardenIconEl.appendChild(b); }
+    b.textContent = cnt + " 株";
+  } else if (b) b.remove();
+}
+
+/* ---- 花园窗：一块自由花圃。株 = 绝对定位（left/top 百分比 = 下种落点），可拖动摆放 ---- */
+function toggleGardenWin(){ if (gardenWinEl){ closeGardenWin(); return; } openGardenWin(); }
+function openGardenWin(){
+  if (gardenWinEl){ gardenWinEl.style.display = ""; return; }
+  const w = makeWindow("GARDEN // 花园", closeGardenWin);
+  w.el.classList.add("garden-win");
+  desktopEl.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  gardenWinEl = w.el;
+  refreshGardenWin();
+  startGardenTicker();
+}
+function closeGardenWin(){ if (gardenWinEl){ gardenWinEl.remove(); gardenWinEl = null; } }
+function refreshGardenWin(){
+  if (!gardenWinEl) return;
+  const body = gardenWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  const field = document.createElement("div");
+  field.className = "gd-field";
+  gardenPlots().forEach(p => {
+    const st = gardenStageOf(p);
+    const plant = document.createElement("div");
+    plant.className = "gd-plant";
+    if (st >= 4) plant.classList.add("bloom");
+    plant.style.left = p.x + "%";
+    plant.style.top = p.y + "%";
+    const im = document.createElement("img");
+    im.src = GARDEN_IMG[GARDEN_STAGE_IMG[st]];
+    im.alt = GARDEN_STAGE_NAME[st]; im.draggable = false;
+    plant.appendChild(im);
+    const stg = document.createElement("span");
+    stg.className = "gd-stage";
+    stg.textContent = st >= 4 ? "开花" : GARDEN_STAGE_NAME[st];
+    plant.appendChild(stg);
+    /* 生长计时 = 进度条：按真实时钟出条（窗关着也在长，重开即当前进度），开花填满 */
+    const prog = document.createElement("div");
+    prog.className = "gd-prog";
+    const fill = document.createElement("i");
+    fill.style.width = Math.min(100, Math.round(Math.max(0, Date.now() - p.at) / GARDEN_STAGES[4] * 100)) + "%";
+    prog.appendChild(fill);
+    plant.appendChild(prog);
+    plant.title = st >= 4 ? "花魄开的花 —— 拖着可以换位置" : "还在长 —— 关掉游戏也不会倒退，拖着可以换位置";
+    makeGardenPlantDraggable(plant, p);
+    field.appendChild(plant);
+  });
+  body.appendChild(field);
+  const hint = document.createElement("div");
+  hint.className = "gd-hint";
+  hint.textContent = G.garden.seed ? "执行者头上还挂着一枚种子 —— 拖进这里，落在哪儿就种在哪儿"
+                                   : "想挪就拖：花草可以在园子里随意摆放（关掉游戏也不会倒退）";
+  body.appendChild(hint);
+  updateGardenBadge();
+}
+/* 花圃内自由拖拽：按住一株直接挪（不进撤销栈 —— 摆放是装修，不是破案进度）。
+   拖动中只更新 left/top 与株上的 x/y，不重建 DOM；松手才重绘一次把档位行带上。 */
+function makeGardenPlantDraggable(el, p){
+  let dragging = false, moved = false, sx = 0, sy = 0;
+  el.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
+    try { el.setPointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+  el.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    if (!moved && Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) < 5) return;
+    moved = true; gardenDragLive = true;
+    const field = gardenWinEl && gardenWinEl.querySelector(".gd-field");
+    if (!field) return;
+    const r = field.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return;
+    const spot = gardenSpotOf(e.clientX, e.clientY);
+    p.x = spot.x; p.y = spot.y;
+    el.style.left = p.x + "%";
+    el.style.top = p.y + "%";
+  });
+  const finish = () => {
+    if (!dragging) return;
+    dragging = false; gardenDragLive = false;
+    if (moved) refreshGardenWin();          /* 拖完了重绘一遍（标题行等跟随新位置） */
+  };
+  el.addEventListener("pointerup", finish);
+  el.addEventListener("pointercancel", finish);
+}
+/* 每秒看一眼：窗开着才动 DOM；跨过开花那一刻弹一枚 toast（每株一次，记在株上）。
+   存档回来时花早已开过（超过 10 秒）就静默补记，不补弹。
+   拖拽进行中不动 DOM（重建会把正被抓住的那株换掉，指针就脱手了）。 */
+function gardenTick(){
+  if (!gardenWinEl || !gardenOK()) return;
+  gardenPlots().forEach(p => {
+    if (!p || p.hit) return;
+    if (gardenStageOf(p) >= 4){
+      p.hit = true;
+      if (Date.now() - p.at <= GARDEN_STAGES[4] + 10000) toast("「花魄」开花了。");
+    }
+  });
+  if (!gardenDragLive) refreshGardenWin();
+}
+function startGardenTicker(){
+  if (gardenTimer) return;
+  try { gardenTimer = setInterval(gardenTick, 1000); } catch(_){ gardenTimer = null; }   /* 无头 stub 可能没有 interval */
+}
+
 /* ============ 启动 ============ */
 function boot(opts){
   opts = opts || {};
@@ -5228,6 +5693,7 @@ function boot(opts){
   closeInferWin();
   closePeopleWin();
   closeMapWin();
+  closeGardenWin();    /* 花园窗同理：开局 / 换案 / 重置都收（图标由 refreshGardenIcon 按状态重挂） */
   view = { x: 40, y: 20, k: 1 };
   applyView();
   logBox.innerHTML = "";
@@ -5291,6 +5757,7 @@ window.__clueToggle = () => toggleClueWin();
 window.__clueLedger = () => ledgerList().map(n => ({ key:n.key, id:n.id, label:n.label, sense:(CLUES[n.id] || {}).type }));
 window.__ledgerStore = key => ledgerStore(key);
 window.__ledgerTake  = key => ledgerTake(key);
+window.__ledgerToMatrix = key => ledgerToMatrix(key);   /* 等价于把册中一行拖上推演桌布 */
 window.__dropTargets = () => nodeDropTargets();
 window.__peopleToggle = () => togglePeopleWin();
 window.__roster = () => metChars().map(id => {
@@ -5303,6 +5770,29 @@ window.__mxAssign = (k, s) => assignClue(k, s);
 window.__boardTake = (id, sense, cx, cy) => boardTake(id, sense, cx, cy);   /* 等价于把桌布上的 chip 拖出去 */
 window.__matrixItems = () => matrixItems().map(n => n.key);
 window.__infer = () => executeInference();
+window.__inferToggle = () => toggleInferWin();
+window.__ensure = (kind, id) => {
+  const d = kind === "clue" ? (CLUES[id] || {}) : (ITEMS[id] || {});
+  return ensureNode(kind, id, { label: d.label || id });
+};
+/* 花园（无头验证 / 调试）：plant(cx,cy) 等价于把种子拖进花园（无坐标 = 中部）；plantAt(ms)
+   直接种一枚「ms 毫秒前」下种的种子 —— 生长走真实时钟，钩子靠倒拨 at 来测各档位，不用真等三分钟 */
+window.__garden = {
+  state: () => ({
+    seed: gardenOK() ? G.garden.seed : null,
+    plots: gardenOK() ? gardenPlots().map(p => ({ stage: gardenStageOf(p), at: p.at, hit: !!p.hit, x: p.x, y: p.y })) : null,
+    icon: !!gardenIconEl, win: !!gardenWinEl
+  }),
+  grant: () => grantGardenSeed(),
+  plant: (cx, cy) => gardenPlant(cx, cy),
+  plantAt: ms => { if (!gardenOK()) return false;
+    const i = gardenPlots().length;
+    gardenPlots().push({ at: Date.now() - (ms || 0), hit: ms >= GARDEN_STAGES[4] + 10000,
+      x: 24 + (i % 4) * 18, y: 58 });
+    refreshGardenWin(); refreshGardenIcon(); return true; },
+  open: () => openGardenWin(),
+  close: () => closeGardenWin()
+};
 window.__playStep = () => { if (memoryPlay) advanceMemory(); else if (endingState) playEndingStage(); };
 window.__intro = {
   step: () => introState && introState.step,
@@ -5368,6 +5858,8 @@ window.__dump  = () => ({
   floats: { bubble: !!bubbleEl, dlg: !!dlgWinEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
   matrix: JSON.parse(JSON.stringify(G.matrix)),
   endings: [...G.endings],
+  garden: G.garden ? { seed: !!G.garden.seed, plots: gardenPlots().filter(Boolean).length } : null,
+  gardenIcon: !!gardenIconEl,
   endingOverlay: !!endingState,
   investigator: investigator ? { name: investigator.name, id: investigator.id, sense: investigator.sense,
                                  avatarId: investigator.avatarId || null } : null,
@@ -5387,6 +5879,7 @@ window.__dump  = () => ({
 
 boot();
 refreshMusicIcon();          /* 还原存档时若唱机已装针，桌面播放器图标要补回来 */
+refreshGardenIcon();         /* 还原存档时若捕获过真名（种子未种 / 坛里有花），桌面花园图标要补回来 */
 
 /* 无头验证 / 调试用的音乐钩子（不依赖真实音频设备：只查 DOM 与库状态） */
 window.__music = {

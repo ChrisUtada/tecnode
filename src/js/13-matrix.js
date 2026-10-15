@@ -182,6 +182,80 @@ function refreshInferWin(){
   exec.appendChild(av);   /* 执行者只留头像：头像即五芒星中枢，标签/提示已移除 */
   exec.addEventListener("pointerdown", riteStart);
   board.appendChild(exec);
+
+  /* 「确认捕获」之后的余韵：执行者头顶挂一枚没种下的种子（对话框）。
+     显隐只看 G.garden.seed —— 窗重开 / 每次重绘都从这里重建，不是一次性 DOM：
+     种子没被拖进花园之前，关掉推理窗再打开，对话框还在。 */
+  if (G.garden && G.garden.seed) exec.appendChild(buildSeedPop());
+}
+
+/* ============ 种子对话框（「确认捕获」落定 → 花园的前奏） ============
+   位置与心碎表情同款（.mx-exec 上方），但不自动消失：种子拖进花园才收走。
+   气泡里**只有一张种子图**，没有任何文字 —— 要说的都由画面说了。
+   种子可拖 —— board overflow:hidden，与桌布 chip 同一套镜像拖法（#drag-layer）；
+   落进花园窗 / 花园图标 = 下种（gardenPlant，16-cases.js），落在别处 = 弹回原位。 */
+function buildSeedPop(){
+  const pop = document.createElement("div");
+  pop.className = "mx-seedpop";
+  pop.title = "拖到花园里种下";
+  const im = document.createElement("img");
+  im.src = GARDEN_IMG.seed;
+  im.alt = "花魄的种子"; im.draggable = false;
+  pop.appendChild(im);
+  makeSeedDraggable(pop);
+  return pop;
+}
+function makeSeedDraggable(pop){
+  let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
+  pop.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
+    sr = desktopEl.getBoundingClientRect();
+    try { pop.setPointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+  pop.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+    moved = true;
+    pop.classList.add("dragging");
+    if (!mirror){
+      const layer = document.getElementById("drag-layer");
+      const r = pop.getBoundingClientRect();
+      offx = e.clientX - r.left; offy = e.clientY - r.top;
+      mirror = pop.cloneNode(true);
+      mirror.classList.add("drag-mirror");
+      mirror.classList.remove("dragging");
+      mirror.style.position = "absolute"; mirror.style.transform = "none";
+      mirror.style.width = r.width + "px"; mirror.style.height = r.height + "px";
+      mirror.style.left = (r.left - sr.left) + "px";
+      mirror.style.top  = (r.top  - sr.top ) + "px";
+      mirror.style.visibility = "hidden";
+      layer.appendChild(mirror);
+      pop.style.visibility = "hidden";
+      void mirror.offsetWidth;             /* 强制布局，显示即正确位置 */
+      mirror.style.visibility = "visible";
+    }
+    mirror.style.left = (e.clientX - offx - sr.left) + "px";
+    mirror.style.top  = (e.clientY - offy - sr.top ) + "px";
+  });
+  const finish = e => {
+    if (!dragging) return;
+    dragging = false;
+    pop.classList.remove("dragging");
+    if (mirror){ mirror.remove(); mirror = null; }
+    pop.style.visibility = "";
+    if (!moved) return;                    /* 纯点击：不动 */
+    if (overGardenDrop(e.clientX, e.clientY)){ gardenPlant(e.clientX, e.clientY); return; }
+    refreshInferWin();                     /* 没拖进花园：弹回原位（对话框照旧） */
+  };
+  pop.addEventListener("pointerup", finish);
+  pop.addEventListener("pointercancel", () => {
+    dragging = false; pop.classList.remove("dragging");
+    if (mirror){ mirror.remove(); mirror = null; }
+    pop.style.visibility = "";
+  });
 }
 /* 长按蓄力：pointerdown 起 2.5s 完成 → executeInference；pointerup / pointerleave 提前 = 中断复位。
    无头环境 setTimeout 返回 0 就立即完成（与 enterCase 换档的兜底同款）。 */
@@ -290,8 +364,10 @@ function executeInference(){
 let endingState = null;
 function triggerEnding(ending){
   G.endings.add(ending.id);
-  /* 只有捕获「真名」（真结局）才点亮下一案的地址 */
-  if (ending.isTrueCapture) unlockNextCase(CASE_ID);
+  /* 只有捕获「真名」（真结局）才点亮下一案的地址。
+     种子**不在这里发**：它要等玩家在结局遮罩上亲手点下「确认捕获」才发（15-desktop.js 的
+     遮罩点击分支）—— 演出还没谢幕就先掉奖励，等于把结局的余韵抢在观众离场前倒掉了。 */
+  if (ending.isTrueCapture){ unlockNextCase(CASE_ID); }
   log("<b>结局达成：" + esc(ending.name) + "</b>", "cap");
   /* 真名结局：先让推演器整窗冲击震动一拍，再落下结局遮罩 */
   const shock = !!(ending.isTrueCapture && inferWinEl);

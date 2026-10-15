@@ -129,6 +129,8 @@ function render(){
   updateInferBadge();
   refreshClueWin();     /* 开着的索引窗跟着图刷新（关着时是空操作） */
   refreshPeopleWin();
+  refreshInferWin();    /* 推演窗同理：阵列与执行者头顶的种子对话框都是状态驱动的，
+                           撤销 / 续档把 G 滚回去之后，开着的窗不能留着旧 DOM */
   /* 重建 DOM 后恢复选中态并重挂聚焦淡化 */
   if (sel && G.nodes[sel] && G.nodes[sel].el) G.nodes[sel].el.classList.add("sel"); else sel = null;
   applyFocus();

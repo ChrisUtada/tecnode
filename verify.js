@@ -2537,8 +2537,10 @@ assert('render() 不再产出「条件进入」角标（源码检查）', html.i
 assert('节点角标不再用 `badge cond` 这个类名（源码检查）', html.indexOf('badge cond') < 0);
 assert('「无文本入口」的分支仍带 `!condRoutes[n.id]` 守卫（源码检查）',
   /inbound\[n\.id\] === 0 &&\s+!condRoutes\[n\.id\]/.test(html));
+/* 实心药丸的 6 处合法使用：日志未读（03-utils）、袋 / 册 / 推演三枚角标（06-storage）、
+   案件「已关闭」（16-cases）、花园「N 株」（16-cases 花园模块） */
 assert('计数与通知类实心药丸统一叫 `.badge.cnt`（源码检查）',
-  (html.match(/className = "badge cnt"/g) || []).length === 5 && html.indexOf('.badge.cnt{') >= 0);
+  (html.match(/className = "badge cnt"/g) || []).length === 6 && html.indexOf('.badge.cnt{') >= 0);
 assert('condRoutes 保留（可达性检查还在用）（源码检查）', html.indexOf('const condRoutes = {}') >= 0);
 
 console.log('\n=== 37. 内置音乐库 + 桌面播放器（唱机装唱针后解锁） ===');
@@ -2581,6 +2583,240 @@ assert('openApp 分发 music 应用（源码检查）', html.indexOf('app === "m
 assert('最小化卡片样式与唤回接线已写（源码检查）',
   html.indexOf('#music-dock{position:absolute') >= 0 &&
   html.indexOf('attachDock(document.getElementById("music-dock"), restoreMusicWin)') >= 0);
+
+console.log('\n=== 38. 花园：确认捕获掉种子 → 拖进花圃自由落点 → 三分钟长成 ===');
+/* 源码检查：素材、图标字形、真结局发种、气泡重建、拖放落点、持久化与迁移 */
+assert('花卉素材五档全部入库并被成品引用（external 外链 flower/ 子目录）',
+  ['seed', 'sprout', 'leaf_stage_1', 'leaf_stage_2', 'flower'].every(n =>
+    html.indexOf('assets/flower/plant_' + n + '.png') >= 0));
+assert('桌面图标库注册了 flower 字形（自绘像素花）', html.indexOf('flower: "M10 3h4v4h-4z') >= 0);
+assert('真结局触发只解锁下一案，种子不在 triggerEnding 里发（源码检查）',
+  html.indexOf('if (ending.isTrueCapture){ unlockNextCase(CASE_ID); }') >= 0);
+assert('种子改在结局遮罩末帧「确认捕获」点击后才发（源码检查）',
+  html.indexOf('const wasTrue = !!(endingState.ending && endingState.ending.isTrueCapture);') >= 0 &&
+  html.indexOf('if (wasTrue) grantGardenSeed();') >= 0);
+assert('执行者头顶的种子对话框按状态重建（源码检查）',
+  html.indexOf('if (G.garden && G.garden.seed) exec.appendChild(buildSeedPop())') >= 0);
+assert('种子气泡里只有一张图、没有任何文字节点（源码检查）',
+  html.indexOf('mx-seedpop-tx') < 0 &&
+  /function buildSeedPop\(\)\{[\s\S]*?pop\.appendChild\(im\);[\s\S]*?makeSeedDraggable\(pop\);/.test(html));
+assert('种子拖放落点 = overGardenDrop → gardenPlant（源码检查）',
+  html.indexOf('if (overGardenDrop(e.clientX, e.clientY)){ gardenPlant(e.clientX, e.clientY); return; }') >= 0);
+assert('下种过 requireCase 门（源码检查）',
+  /function gardenPlant\(cx, cy\)\{\r?\n\s*if \(!gardenOK\(\) \|\| !G\.garden\.seed\) return false;\r?\n\s*if \(!requireCase\(\)\)/.test(html));
+assert('没有固定坛位：株记百分比坐标、越界夹回（源码检查）',
+  html.indexOf('const GARDEN_X = [8, 92], GARDEN_Y = [30, 85];') >= 0 &&
+  html.indexOf('gardenSpotOf(cx, cy)') >= 0 &&
+  html.indexOf('gardenPlots().push({ at: Date.now(), hit: false, x: spot.x, y: spot.y });') >= 0);
+assert('花草可在花圃内自由拖动（源码检查）',
+  html.indexOf('function makeGardenPlantDraggable(el, p){') >= 0 &&
+  html.indexOf('gardenDragLive = true;') >= 0 &&
+  html.indexOf('if (!gardenDragLive) refreshGardenWin();') >= 0);
+assert('旧槽位档迁移：null 占位过滤 + 补坐标（源码检查）',
+  html.indexOf('G.garden.plots = G.garden.plots.filter(Boolean);') >= 0);
+assert('快照携带 garden（撤销 / 续档跟手）', html.indexOf('garden: JSON.parse(JSON.stringify(G.garden') >= 0);
+assert('旧档迁移：捕获过真名但无 garden 的存档补发种子（源码检查）',
+  html.indexOf('ENDINGS.find(e => e.isTrueCapture)') >= 0);
+assert('种子对话框与自由花圃样式已写（窗有定宽、坛位样式已清）',
+  html.indexOf('.mx-seedpop{') >= 0 && html.indexOf('.garden-win{position:absolute; left:50%; top:110px; margin-left:-150px; width:300px;') >= 0 &&
+  html.indexOf('.gd-field{') >= 0 && html.indexOf('.gd-plot') < 0 && html.indexOf('.gd-grid') < 0);
+assert('openApp 分发 garden 应用（源码检查）', html.indexOf('app === "garden") toggleGardenWin()') >= 0);
+assert('boot 与重置后都刷新花园图标（源码检查）',
+  (html.match(/refreshMusicIcon\(\);[^\n]*\r?\n\s*refreshGardenIcon\(\);/g) || []).length === 2);
+assert('boot 收掉花园窗（源码检查）', html.indexOf('closeGardenWin();') >= 0);
+
+/* 运行时：初始无种子无株无图标 */
+assert('花园初始态：无种子、圃空、无图标',
+  (() => { const s = window.__garden.state();
+    return s.seed === false && s.icon === false && s.win === false && s.plots.length === 0; })());
+/* 真结局走真实路径：先清空推演阵列（此前小节可能残留），再按配方摆满五感 → __infer()
+   （配方：V_luheng 视 / nm 听 / mc 触 / CBKW 味 / xds 嗅，见 data/case-a001.json 的 TRUE_E） */
+const mx0 = window.__dump().matrix;
+Object.keys(mx0).forEach(sense => mx0[sense].forEach(cid => window.__boardTake(cid, sense)));
+[["CLUES_V_luheng","vision"],["CLUES_nm","hearing"],["CLUES_mc","touch"],
+ ["CLUES_CBKW","taste"],["CLUES_xds","smell"]].forEach(([id, sense]) => {
+  window.__ensure("clue", id);
+  window.__mxAssign("clue:" + id, sense);
+});
+const mx38 = window.__dump().matrix;
+const mxIds38 = Object.keys(mx38).reduce((a, s) => a.concat(mx38[s]), []).sort();
+assert('五感配方摆满（阵列里正好五条真结局线索）',
+  JSON.stringify(mxIds38) === JSON.stringify(["CLUES_CBKW","CLUES_V_luheng","CLUES_mc","CLUES_nm","CLUES_xds"]));
+window.__infer();
+/* 结局遮罩落下，但种子还没发 —— 要等玩家点「确认捕获」 */
+assert('推演命中真结局：遮罩落下，但此刻种子还没发',
+  window.__dump().endingOverlay === true && window.__dump().garden.seed === false &&
+  window.__garden.state().icon === false);
+/* 点穿结局遮罩：一次点击推一帧，末帧 = 「确认捕获」，再点一下 = 谢幕 + 发种子 */
+const ov38 = ids['ending-overlay'];
+let clicks38 = 0;
+while (window.__dump().endingOverlay && clicks38 < 40 && ov38._ev.click && ov38._ev.click.length){
+  ov38._ev.click[0](); clicks38++;
+}
+assert('第 ' + clicks38 + ' 次点击点穿遮罩：谢幕后种子到手、花园图标出现',
+  clicks38 > 0 && window.__dump().endingOverlay === false &&
+  window.__dump().garden.seed === true && window.__garden.state().icon === true);
+/* 打开推理窗：执行者头顶应挂着种子对话框 —— 气泡里只有一张种子图，没有文字 */
+window.__inferToggle();
+const pop38 = ids['desktop'].querySelector('.mx-seedpop');
+assert('「确认捕获」后执行者头顶出现种子对话框', !!pop38);
+assert('气泡里只有一张种子图（无文字节点）',
+  !!pop38 && pop38.children.length === 1 &&
+  String(pop38.children[0].tagName).toLowerCase() === 'img' &&
+  String(pop38.children[0].src || '').indexOf('assets/flower/plant_seed.png') >= 0);
+/* 下种：等价于把种子拖进花园窗（stub 里窗体 rect = 140×48，落点 70,24 = 50%,50% 夹回 y）。
+   无固定坛位：落在哪儿就记在哪儿的百分比坐标。 */
+assert('种子落进花圃：头顶对话框收走、株带坐标',
+  (() => { const ok = window.__garden.plant(70, 24);
+    const s = window.__garden.state();
+    return ok === true && s.seed === false && s.plots.length === 1 &&
+           s.plots[0].stage === 0 && s.plots[0].x >= 8 && s.plots[0].x <= 92 &&
+           s.plots[0].y >= 30 && s.plots[0].y <= 85 &&
+           !ids['desktop'].querySelector('.mx-seedpop'); })());
+window.__garden.plantAt(45000);
+window.__garden.plantAt(180000);
+/* 舒叶那枚取档位中部（135000..180000 的正中 150000）：距边界有 30 秒余量，
+   verify 跑得再慢也不会跨档。「180000 整 = 开花、179999 = 舒叶」的边界语义不在这里测 ——
+   179999 距开花只差 1ms，真实时间里下一次重绘就会翻档，属正确行为而非可测稳态；
+   边界由下一条源码检查锁定（判定用 >=，整秒量化）。 */
+window.__garden.plantAt(150000);
+assert('倒拨 at 的三枚分别落在嫩芽 / 开花 / 舒叶（180000 整 = 开花，150000 = 舒叶）',
+  (() => { const sts = window.__garden.state().plots.map(p => p.stage).sort();
+    return JSON.stringify(sts) === JSON.stringify([0, 1, 3, 4]); })());
+assert('生长档位表 = 0 / 45s / 90s / 135s / 180s、边界判定用 >=、按整秒量化（源码检查）',
+  html.indexOf('[0, 45000, 90000, 135000, 180000]') >= 0 &&
+  html.indexOf('if (el >= GARDEN_STAGES[i]) st = i;') >= 0 &&
+  html.indexOf('Math.floor((Date.now() - p.at) / 1000) * 1000') >= 0);
+assert('图标角标随株数走（4 株）',
+  (() => { const ic = ids['icons'].children.find(c => c.id === 'garden-icon');
+    const b = ic && ic.querySelector('.badge');
+    return !!b && b.textContent === '4 株'; })());
+/* 花园窗：四株全在圃里，影像按档位出图；开花株读出「开花」；每株都挂着可拖拽的事件 */
+window.__garden.open();
+const gw38 = ids['desktop'].querySelector('.garden-win');
+const plants38 = gw38 ? gw38.querySelectorAll('.gd-plant') : [];
+assert('花园窗开出来了、四株全在圃里（自由摆放，无坛位格子）',
+  !!gw38 && plants38.length === 4 && gw38.querySelectorAll('.gd-plot').length === 0);
+assert('株影像按档位出图（种子 / 嫩芽 / 舒叶 / 开花）',
+  (() => { if (plants38.length !== 4) return false;
+    const srcs = plants38.map(cell => {
+      const im = cell.children.find(c => String(c.tagName).toLowerCase() === 'img');
+      return im ? String(im.src || '') : '';
+    });
+    return srcs.some(s => s.indexOf('plant_seed.png') >= 0) &&
+           srcs.some(s => s.indexOf('plant_sprout.png') >= 0) &&
+           srcs.some(s => s.indexOf('plant_leaf_stage_2.png') >= 0) &&
+           srcs.some(s => s.indexOf('plant_flower.png') >= 0); })());
+assert('开花株的档位行写「开花」、株按百分比定位、事件已挂',
+  (() => { const bloom = gw38.querySelectorAll('.gd-plant.bloom');
+    if (bloom.length !== 1 || !bloom[0].children.some(c => c._text === '开花')) return false;
+    return plants38.every(pl => /%$/.test(String(pl.style.left)) && /%$/.test(String(pl.style.top)) &&
+      pl._ev.pointerdown && pl._ev.pointermove && pl._ev.pointerup); })());
+/* 圃内自由拖动：按住一株挪 —— stub 里花圃 rect = 140×48，挪到 (100,10) → x=71、y 夹回 30 */
+(function dragPlant38(){
+  const pl = plants38[0];
+  const before = window.__garden.state().plots[0];
+  pl._ev.pointerdown[0]({ button:0, clientX:before.x * 1.4, clientY:before.y * 0.48, pointerId:1, stopPropagation(){} });
+  pl._ev.pointermove[0]({ clientX:100, clientY:10, stopPropagation(){} });
+  pl._ev.pointerup[0]({});
+})();
+assert('圃内自由拖动：株挪到松手点（越界夹回）',
+  (() => { const s = window.__garden.state().plots[0];
+    return s.x === 71 && s.y === 30; })());
+window.__garden.close();
+assert('× 关闭后窗体收、图标与株仍在',
+  !ids['desktop'].querySelector('.garden-win') && window.__garden.state().icon === true &&
+  window.__garden.state().plots.length === 4);
+/* 下种进了快照：撤销一次应滚回「最后一次下种」之前 —— 种子回到执行者头顶，圃清空。
+   推理窗此刻还开着：render() 末尾的 refreshInferWin 应把气泡按恢复后的状态重挂。 */
+(function undoOnce38(){
+  const ub = ids['btn-undo'];
+  if (ub && ub._ev && ub._ev.click) ub._ev.click[0]();
+})();
+assert('撤销滚回下种前：圃清空、种子回到头顶（seed = true）',
+  (() => { const s = window.__garden.state();
+    return s.seed === true && s.plots.length === 0; })());
+assert('开着的推理窗同步重绘：对话框随撤销重现',
+  !!ids['desktop'].querySelector('.mx-seedpop'));
+
+console.log('\n=== 39. 册中直拖推演器 / 花园进度条 / 花园窗风格统一 ===');
+/* ---- 源码检查 ---- */
+assert('花园窗与全桌浮窗同一族样式（card 底 / edge 描边 / 圆角 / win-shadow，z 回 25 档）',
+  /\.garden-win\{position:absolute; left:50%; top:110px; margin-left:-150px; width:300px;\r?\n\s*background:var\(--card\); border:1px solid var\(--edge\); border-radius:var\(--r-win\);\r?\n\s*box-shadow:var\(--win-shadow\); z-index:25; overflow:hidden\}/.test(html));
+assert('生长计时改用进度条：倒计时文字与 fmtGardenLeft 已删（源码检查）',
+  html.indexOf('gd-prog') >= 0 && html.indexOf('GARDEN_STAGES[4] * 100') >= 0 &&
+  html.indexOf('还差 ') < 0 && html.indexOf('fmtGardenLeft') < 0);
+assert('册中行拖着走：镜像 + 落点判定 + 归位接线（源码检查）',
+  html.indexOf('function overMatrixDrop(cx, cy){') >= 0 &&
+  html.indexOf('function ledgerToMatrix(key){') >= 0 &&
+  html.indexOf('function makeLedgerRowDraggable(row, key){') >= 0 &&
+  html.indexOf('if (overMatrixDrop(e.clientX, e.clientY)) ledgerToMatrix(key);') >= 0 &&
+  html.indexOf('window.__ledgerToMatrix = key => ledgerToMatrix(key);') >= 0);
+assert('册行点击仍是取回、拖过的那一下不连发（源码检查）',
+  html.indexOf('if (wasMoved){ wasMoved = false; return; }') >= 0);
+assert('拖离册子的镜像以节点块现身（mx-chip 同款，不再克隆行）（源码检查）',
+  html.indexOf('mx-chip node ent-node ent-clue drag-mirror') >= 0 &&
+  html.indexOf('mirror = row.cloneNode(true);') < 0);
+/* ---- 运行时：真拖一遍 —— 册中一行拖上推理窗桌布 = 归位 ----
+   stub 里桌布 rect = 140×48（原点起）：按住行挪 5px 以上，松手在 (70,24) = 桌布内。 */
+const K39 = 'clue:CLUES_gcs';
+window.__ensure('clue', 'CLUES_gcs');
+(function toLedger39(){
+  const where = window.__dump().storedIn[K39];
+  if (where === 'LEDGER') return;
+  if (where === 'MATRIX'){
+    const mx = window.__dump().matrix;
+    Object.keys(mx).forEach(s => { if (mx[s].indexOf('CLUES_gcs') >= 0) window.__boardTake('CLUES_gcs', s); });
+  } else if (where === 'BAG'){ window.__bagTake(K39); }
+  window.__ledgerStore(K39);
+})();
+assert('准备：贯穿伤线索已收进线索册', window.__dump().storedIn[K39] === 'LEDGER');
+if (!window.__dump().floats.clue) window.__clueToggle();
+if (!window.__dump().floats.matrix) window.__inferToggle();
+const clueWin39 = ids['desktop'].querySelector('.clue-win');
+const board39 = ids['desktop'].querySelector('.mx-board');
+const row39 = clueWin39.querySelector('.goto-item');
+assert('册窗开着、行上挂着拖拽与点击事件',
+  !!row39 && row39._ev.pointerdown && row39._ev.pointermove && row39._ev.pointerup && row39._ev.click);
+const rowsBefore39 = clueWin39.querySelectorAll('.goto-item').length;
+row39._ev.pointerdown[0]({ button:0, clientX:8, clientY:8, pointerId:1 });
+row39._ev.pointermove[0]({ clientX:70, clientY:24 });
+assert('拖动中桌布挂 over 高亮', board39._classes.has('over'));
+row39._ev.pointerup[0]({ clientX:70, clientY:24 });
+assert('册中一行拖上桌布 = 直接归位（LEDGER → MATRIX）',
+  window.__dump().storedIn[K39] === 'MATRIX' &&
+  window.__dump().matrix.vision.indexOf('CLUES_gcs') >= 0);
+assert('归位后册窗清单同步少一行、册里不再有它',
+  clueWin39.querySelectorAll('.goto-item').length === rowsBefore39 - 1 &&
+  window.__clueLedger().every(c => c.id !== 'CLUES_gcs'));
+assert('松手后桌布高亮已清', !board39._classes.has('over'));
+/* 拖到桌布与图标之外 = 弹回册中；刚拖完的那一下 click 不取回，再点一次才取回 */
+window.__boardTake('CLUES_gcs', 'vision');
+window.__ledgerStore(K39);
+const idx39 = window.__clueLedger().findIndex(c => c.id === 'CLUES_gcs');
+const rowB39 = clueWin39.querySelectorAll('.goto-item')[idx39];
+rowB39._ev.pointerdown[0]({ button:0, clientX:8, clientY:8, pointerId:1 });
+rowB39._ev.pointermove[0]({ clientX:500, clientY:500 });
+rowB39._ev.pointerup[0]({ clientX:500, clientY:500 });
+assert('拖到落点之外 = 弹回册中（仍是 LEDGER）', window.__dump().storedIn[K39] === 'LEDGER');
+rowB39._ev.click[0]();
+assert('刚拖完的那一下 click 不取回（仍在册）', window.__dump().storedIn[K39] === 'LEDGER');
+rowB39._ev.click[0]();
+assert('再点一次 = 正常取回画布', window.__dump().storedIn[K39] === undefined);
+assert('非册中线索走不了这条路（画布上的再调 = false）', window.__ledgerToMatrix(K39) === false);
+/* ---- 花园进度条：生长中的株按真实时钟出条，开花填满；倒计时文字退场 ---- */
+window.__garden.plantAt(45000);
+window.__garden.plantAt(180000);
+window.__garden.open();
+const gw39 = ids['desktop'].querySelector('.garden-win');
+const plants39 = gw39.querySelectorAll('.gd-plant');
+assert('每株都带进度条、按真实进度出条（45s ≈ 25%，开花 = 100%）',
+  plants39.length === 2 && plants39.every(pl => !!pl.querySelector('.gd-prog')) &&
+  (() => { const g = plants39.map(pl => pl.querySelector('.gd-prog').children[0].style.width);
+    return g.indexOf('25%') >= 0 && g.indexOf('100%') >= 0; })());
+assert('档位行只剩档位名（倒计时文字从 DOM 退场）',
+  plants39.every(pl => ['种子','嫩芽','展叶','舒叶','开花'].indexOf(pl.querySelector('.gd-stage')._text) >= 0));
+window.__garden.close();
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

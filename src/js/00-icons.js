@@ -17,7 +17,10 @@ const ICON_PATHS = {
   briefcase: "M2 8h2v12H2zm18 0h2v12h-2zM4 6h16v2H4zm0 14h16v2H4zM8 4h2v2H8zm2-2h4v2h-4zm4 2h2v2h-2z",
   message: "M20 2H4v2h16zm0 14H6v2h14zm2-12h-2v12h2zM4 4H2v18h2zm2 14H4v2h2z",
   "clipboard-list": "M20 12h2v8h-2zm-8-2h8v2h-8zm0 10h8v2h-8zm-2-8h2v8h-2zM6 2h8v2H6zm0 4h8v2H6zm0-2h2v2H6zm6 0h2v2h-2zm2 0h2v2h-2zM16 6h2v5h-2zM4 4h2v2H4zM2 6h2v12H2zm2 12h6v2H4zm2-8h4v2H6zm0 4h2v2H6zm11 2h5v2h-5zM16 16h2v6h-2z",
-  map: "M4 20h2v2H2V6h2v14Zm12 0h2v2h-4v-2h-2v-2h2V8h-2V6h4v14Zm-8 0H6v-2h2v2Zm12 0h-2v-2h2v2ZM10 4h2v2h-2v10h2v2H8V4H6V2h4v2Zm12 14h-2V4h-2V2h4v16ZM6 6H4V4h2v2Zm12 0h-2V4h2v2Z"
+  map: "M4 20h2v2H2V6h2v14Zm12 0h2v2h-4v-2h-2v-2h2V8h-2V6h4v14Zm-8 0H6v-2h2v2Zm12 0h-2v-2h2v2ZM10 4h2v2h-2v10h2v2H8V4H6V2h4v2Zm12 14h-2V4h-2V2h4v16ZM6 6H4V4h2v2Zm12 0h-2V4h2v2Z",
+  /* 花园：自绘（Pixelarticons 没有花）：四瓣 + 花芯 + 茎 + 双叶，全部 2~4px 条带。
+     上瓣 y3-6 贴花芯 y7-10，下瓣 y11-14 接茎 y15-18，叶 x8-10 / x13-15 贴茎两侧。 */
+  flower: "M10 3h4v4h-4zM6 7h4v4H6zM14 7h4v4h-4zM10 11h4v4h-4zM10 7h4v4h-4zM11 15h2v4h-2zM8 16h3v2H8zM13 16h3v2h-3z"
 };
 function iconSvg(name, size){
   const paths = ICON_PATHS[name];

@@ -182,6 +182,45 @@
     78%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
     100%{opacity:0; transform:translateX(-50%) translateY(-10px) scale(.9)}
   }
+  /* 「确认捕获」后的种子对话框：与心碎同位（.mx-exec 上方），但**常驻**、可拖 ——
+     气泡里只有一张种子图，没有文字（提示都在 title / 花园窗的底注里）。
+     白卡 + 朝下小尖角（指向执行者），源图 16×16 → 32px。 */
+  .mx-seedpop{position:absolute; left:50%; bottom:calc(100% + 12px); transform:translateX(-50%);
+    padding:6px 8px; background:var(--card); border:1px solid var(--edge); border-radius:var(--r-sm);
+    box-shadow:var(--raise); cursor:grab; user-select:none;
+    animation:mx-seedpop-in .35s ease}
+  .mx-seedpop:active{cursor:grabbing}
+  .mx-seedpop.dragging{opacity:.94}
+  .mx-seedpop img{width:32px; height:32px; display:block; image-rendering:pixelated}
+  .mx-seedpop::after{content:""; position:absolute; left:50%; bottom:-5px; width:8px; height:8px;
+    transform:translateX(-50%) rotate(45deg); background:var(--card);
+    border-right:1px solid var(--edge); border-bottom:1px solid var(--edge)}
+  @keyframes mx-seedpop-in{
+    0%{opacity:0; transform:translateX(-50%) translateY(8px) scale(.6)}
+    100%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
+  }
+  /* 花园窗：一块自由花圃（不设固定坛位）。窗宽对齐 bag/detail 的 300px 档；
+     株 = 绝对定位（left/top 百分比），按住可以直接拖动摆放。
+     凹陷底面（press）当「土」，种子 / 花草浮在上面。
+     窗体本体与全桌浮窗同一族：card 底 + edge 描边 + 圆角 + win-shadow（z 也回到 25 档）。 */
+  .garden-win{position:absolute; left:50%; top:110px; margin-left:-150px; width:300px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:25; overflow:hidden}
+  .garden-win .syswin-body{padding:10px}
+  .gd-field{position:relative; height:190px; border:1px solid var(--edge); border-radius:var(--r-btn);
+    background:var(--bg); box-shadow:var(--press); overflow:hidden}
+  .gd-plant{position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column;
+    align-items:center; cursor:grab; user-select:none}
+  .gd-plant:active{cursor:grabbing}
+  .gd-plant img{width:48px; height:48px; image-rendering:pixelated}
+  .gd-plant .gd-stage{margin-top:2px; padding:1px 5px; font-size:10px; color:var(--muted);
+    border:1px solid var(--edge-soft); border-radius:var(--r-btn); background:var(--face); white-space:nowrap}
+  .gd-plant.bloom .gd-stage{color:var(--text); border-color:var(--edge)}
+  /* 生长计时 = 进度条（不用字）：与播放器 / TEC 分析条同一族（凹槽 + 墨色填充） */
+  .gd-plant .gd-prog{width:56px; height:6px; margin-top:3px; border-radius:4px;
+    background:var(--face-lo); box-shadow:var(--press); overflow:hidden}
+  .gd-plant .gd-prog i{display:block; height:100%; width:0; background:var(--line); border-radius:4px}
+  .gd-hint{margin-top:8px; font-size:10.5px; color:var(--faint); line-height:1.6}
   /* 结局清单：弱化存在，收在桌布左下角 */
   .mx-sync{width:100%; margin-top:10px; letter-spacing:2px}
   .memory{background:#dcd8c2; border:3px double #2b2b26; border-radius:var(--r-win); box-shadow:var(--win-shadow)}
