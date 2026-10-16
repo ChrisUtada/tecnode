@@ -103,6 +103,15 @@ window.__render = () => render();   /* 验证 / 调试：手动重绘整张画�
 /* 时间轴 / 时刻图层（方案 B，P1）：切当前时刻（"present" 或 config.memoryScenes 里的 id）。
    只重绘不重排 ⇒ 「该时刻的节点留在同一位置」。 */
 window.__time = t => setTime(t);
+/* 人物登场门控的对账口：debut 配置 / 是否已登场 / 现在档登场点是否达成 */
+window.__charGate = id => ({ debut: charDebut(id), met: charDebuted(id), now: charNowMet(id) });
+/* 测试用：把节点从画布状态里拿掉（含相关边），模拟「还没遇到这个人」——
+   供「回忆时刻带出在场人物」等从无到有的路径测试用；仅测试钩子，玩家流程不触碰。 */
+window.__dropNode = k => {
+  delete G.nodes[k];
+  G.edges = G.edges.filter(e => e.a !== k && e.b !== k);
+  render();
+};
 window.__timeStage = () => (G && G.time) || "present";
 window.__stages = () => timelineStages().map(s => ({ id:s.id, label:s.label, size:s.keys ? s.keys.size : null }));
 window.__visibleNow = () => Object.keys(G.nodes).filter(k => visibleNow(G.nodes[k]));

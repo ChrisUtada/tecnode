@@ -36,6 +36,33 @@ function link(aKey, bKey, kind){
   G.edges.push({ a:aKey, b:bKey, kind });
 }
 
+/* 进入回忆时刻：把那天文本里在场的**已到登场点**的人物带出画布（[char:x] 标签，TEC 已由 sceneTags 滤掉）。
+   人物按 CHARS.debut 门控（见 03-utils.js）：debut 不是这一刻的（陆珩松要等 lhsdst）不上画布
+   —— 文本提及 ≠ 遇到；debut 正是这一刻的（朱穗=7/4）才 spawn，并置位登场（meetCharAt）。
+   新建的人物围在地点节点旁（**不 layout** —— 保原位不变量，靠偏移手工散开），
+   连一条 entity 边、挂「新」角标。已存在的节点不动（不重复提示、不挪坐标）。 */
+function spawnMemCast(t){
+  if (t === PRESENT_TIME || !SCENES[t]) return 0;
+  const place = memPlaceOf(t);
+  const pn = place ? G.nodes[containerKey(place)] : null;
+  const hx = pn ? pn.x : null, hy = pn ? pn.y : null;
+  let added = 0;
+  sceneTags(t).forEach((tag, i) => {
+    if (tag.kind === "char" && charDebut(tag.id) !== t) return;   /* 登场点不在这一刻：跳过 */
+    const existed = !!nodeByKey(tag.kind, tag.id);
+    const en = ensureNode(tag.kind, tag.id, {});
+    if (!en.homeScene) en.homeScene = t;
+    if (tag.kind === "char") meetCharAt(tag.id, t);
+    if (!existed){
+      added++;
+      if (hx !== null){ en.x = hx + 60 + (i % 3) * 96; en.y = hy + 150 + Math.floor(i / 3) * 96; }
+      markFresh(en);
+      if (pn) link(pn.key, en.key, "entity");
+    }
+  });
+  return added;
+}
+
 /* 揭示一个容器（场景 / 书桌这类会装东西的物品）的内容。可重复调用，幂等。
    sid 既可以是场景 id，也可以是容器物品的 id —— 键由 containerKind() 决定。 */
 function revealScene(sid, silent){
@@ -59,6 +86,7 @@ function revealScene(sid, silent){
     const en = ensureNode(t.kind, t.id, { x: home.x, y: home.y });
     if (!en.homeScene) en.homeScene = sid;
     if (!existed){ added++; newKeys.push(en.key); }
+    if (t.kind === "char") meetCharAt(t.id, sid);   /* 场景正是 debut 的：此刻登场（其他提及不置位） */
     link(sn.key, en.key, "entity");
   });
 

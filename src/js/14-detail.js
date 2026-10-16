@@ -142,6 +142,9 @@ function takeExcerpt(target, srcKey){
   const i = String(target || "").indexOf(":");
   if (!src || i < 0) return;
   const refKind = target.slice(0, i), id = target.slice(i + 1);
+  /* 人物按登场门控（03-utils.js）：还没到 debut 的名字只是纸面提及——摘录不出节点，
+     免得「槿杉」在玩家进过 6/2 之前就提前上画布（提及 ≠ 遇到）。 */
+  if (refKind === "char" && CHARS[id] && !charDebuted(id)) return;
   /* 数据里写的是 [loc:SCENES_0704]，但画布上那是时间节点 —— kind 要按 containerKind 规整，
      否则这里会长出一个 loc:SCENES_0704，与 containerKey() 算出的 time: 分裂成两个节点 */
   const kind = isSceneKind(refKind) ? containerKind(id) : refKind;

@@ -151,7 +151,7 @@
 node verify.js
 ```
 
-用最小 DOM stub 真实执行 `index.html` 里的脚本（不是读代码看），**1038 项断言全绿**：
+用最小 DOM stub 真实执行 `index.html` 里的脚本（不是读代码看），**1056 项断言全绿**：
 
 ```
 ✅ 左抽屉拿到手电筒          ✅ 手电筒 → 黑影：解锁「尸体」场景
@@ -392,7 +392,7 @@ node _cdp_excerpt.cjs       # 文本物摘录：真鼠标点详情窗正文里�
 ```bash
 node build.js          # 从 src/ + data/ 拼出 index.html / _template.html / tecnode-standalone.html（+ editor.html，若 src/editor/ 在盘上），并同步 assets/
 node build.js --check  # 不改盘：比对「源码构建结果」与盘上产物（editor 缺席时只比三个），不一致就非零退出（提示该重新构建了）
-node verify.js         # 1038 项断言
+node verify.js         # 1056 项断言
 ```
 
 改完任何源码都要跑一遍 `node build.js`，否则盘上的 `index.html` 还是旧的。
@@ -495,7 +495,7 @@ src:url(@@ASSET:font.ttf@@) format("truetype");
   - **行拖拽与窗口拖动互不干扰**：`.bag-item` 与 `.goto-item` 都在 `makeFloatDraggable` 的排除表里，按住行不会变成拖整扇窗；两扇窗的行都换成 `grab` / `grabbing` 光标（档案与名册的行只可点，别一起带下水 —— 所以 `cursor` 那条规则按 `.clue-win` 收窄）。
 - **「听说过」= 已探索 ∪ 在画布 ∪ 已见文本中的 `[loc:]` 标签或场景标题点名**：玩家见过的文本（合成/命令/密码/TEC 分析的成功与失败消息）都进 `seenTexts`（上限 200 条），**不随撤销丢失**（知识一旦获得不回退）；GOTO 窗口据此给出场景索引。捕获对无 hiddenClue 的节点记 `cap:` tried，防止无脑穷举。
 - **线索册是收纳盒、不是索引清单**：收纳走 `ledgerStore()`（与证物袋共用同一套 `stored` 机制，`storedIn === "LEDGER"`），节点**离开画布但保留连边**，可撤销、重置回退；`ledgerTake()` 取回（`requireCase()` 守卫；放回 ※ 图标旁、`markFresh(n)` 点亮「新」角标）。窗口只列 `ledgerItems()`——**没收纳进去的不显示**，因此「五感分组 / 空组写无 / 待归位·已归位」这一层整体取消；感官由 `ledgerRank()` 决定排序（五感键序 × 1000 + 线索在数据里的书写序），并标在行尾 `.st.sense`。窗口在 `render()` 末尾统一刷新（关着时是空操作），图标角标在 `updateLedgerBadge()` 里跟着刷。
-- **人物名册 = 常驻两人 + 「已结识」的人**。`ROSTER_PINNED` 里钉着 **TEC**（点行 = 开助手窗）与**执行者**（点行 = 开逻辑阵列）—— 他们不是「遇到的人」，没有画布节点，所以既不算进 `metChars()` 的三来源、也绝不在画布上造节点（`char:CHARS_TEC` 仍被 `sceneTags()` 过滤）。其余角色的「已结识」三来源：画布上有 `char:` 节点 ∪ `seenTexts` 里的 `[char:]` 标签 ∪ 在已探索场景里说过话（`sceneTalks` 命中）。点一行走 `gotoChar()`：没有节点就补一个（`homeScene` 记 `G.lastScene`），再 `centerOnNode` + `selectNode` + `showCharLine`——与双击节点**同一条对话路径**，因此节点可能"无词"（角色对白挂在来源场景上：换个场景遇到的同一个人，`sceneTalks` 自然可能为空，名册照实标「无对话文本」）。
+- **人物名册 = 常驻两人 + 「已结识」的人**。`ROSTER_PINNED` 里钉着 **TEC**（点行 = 开助手窗）与**执行者**（点行 = 开逻辑阵列）—— 他们不是「遇到的人」，没有画布节点，所以既不算进 `metChars()`、也绝不在画布上造节点（`char:CHARS_TEC` 仍被 `sceneTags()` 过滤）。其余角色的「已结识」按**登场门控**（2026-10-16，见时间图层段的「人物登场门控」）：画布上有**已登场**的 `char:` 节点 ∪ 到过某个时刻（放过放映卡，那天 `sceneTalks` 里的人算认识了）∪ 在已探索场景里说过话（`sceneTalks` 命中）。**纸面提及不算**——访客记录里读到名字、摘录点名，名册都不列。点一行走 `gotoChar()`：没有节点就补一个（`homeScene` 记 `G.lastScene`），再 `centerOnNode` + `selectNode` + `showCharLine`——与双击节点**同一条对话路径**，因此节点可能"无词"（角色对白挂在来源场景上：换个场景遇到的同一个人，`sceneTalks` 自然可能为空，名册照实标「无对话文本」）。
 - **头像库（`AVATAR`，2026-10-14）——「测试末尾选头像 + 领证后换头像」**：可选池 = **常驻两人（执行者 / TEC）+ 已结识的人**，判据直接沿用名册的 `metChars()`。三条约定：① **池子是现算的**（`avatarUnlocked()` 每次都重数）⇒「每遇到一个新人物就解锁一张」不需要任何写盘逻辑，`investigator.avatarId` 是唯一落盘字段；② 初始 `AVATAR_INITIAL = ["CHARS_EXEC", "CHARS_TEC"]`、默认选中 `AVATAR_DEFAULT_ID = "CHARS_EXEC"`；③ **未解锁只画虚线「?」+「未解锁」，不显示名字** —— 免得剧透还没出场的人。选角界面是 3 列格子（`buildAvatarPicker()`，测试流程与换头像窗共用；`button` 在 `makeFloatDraggable` 的排除表里，所以窗内的格子点得动）。**没美术稿的角色（目前 4 位剧情角色）走首字方块**，`fillCertPhoto()` 按 `avatarId` 画证件照、`avatarId` 缺失（本轮之前的老存档）时退回固定的 `cert-avatar.png`。测试流程：登记姓名 → 三道题 → **`AVATAR // 选择头像`** → `INVESTIGATOR // 调查员证`（领证页有「[ 换一张头像 ]」退回来改）；领证后从证件窗的「[ 更换头像 ]」开 `AVATAR // 选择头像` 独立窗，确认后写盘 + 重开证件窗把照片换过来。调试钩子：`__intro.pick()/confirmPick()/avatar()/pool()`、`__avatars()`、`__avatarOpen()/__avatarPick()/__avatarConfirm()`。
 - **名册每行一个头像（48×48，窗宽 324 = 300 + 这 24px）**：`rosterAvatar(id)` 返回 null 就用「首字方块」占位（`.ini` 22px）。2026-10-14 用户反馈 24×24 真机认不出，翻倍；素材源图 72×72，缩到 48 仍是一档下采样。目前只有 TEC（`tec-avatar.png`）与执行者（`executor-avatar.png`）有美术稿，四位剧情角色走占位、等图 —— 拿到图后放进 `src/assets/`，在 `rosterAvatar()` 里按 id 补一行素材占位符即可（写法与 `11-dialog.js` 的 `TEC_AVATAR` 完全一样）。⚠ 该函数必须**惰性**读取常量：所有切片拼进同一个 `<script>`，`EXECUTOR_AVATAR` 定义在 `13-matrix.js`（`12-panels.js` 之后），顶层引用会踩 TDZ。
 - **两扇桌面层清单窗都落在桌面层**（z-index 25），和档案 / 推演器一样**离屏（– 收起 / × 关闭）时仍然开着**，但行点击都先过 `requireCase()` 闸门（动作上加门，不是开窗上加）；换案 / 重置走 `boot()` 统一收掉。版面上线索册在**左侧**（`left:96px`，避开桌面图标栏），人物窗在**详情窗左侧**（`right:328px; top:60px`，与 `#detail-win` 并排成「列表 + 详情」一对，实测两者留 14px 缝不叠窗）。两扇窗都进了 `nodeDropTargets()`（线索册窗口 + ※ 图标是线索落点，`dropTargetEl` 按变量解析），顺序排在静态图标之前。
@@ -514,6 +514,11 @@ src:url(@@ASSET:font.ttf@@) format("truetype");
   - **回忆态风格层（P3，2026-10-16）**：只要不在「现在」（`G.time !== "present"`），`applyMemMode()`（15-desktop.js）就给 `#desktop` 挂 `.mem-mode` —— **窗体与节点整体切 memory 做旧风格**，回到「现在」摘掉类即完全还原、不残留。覆盖规则写在 **`06-shell.css` 末段**（CSS 最后一片，同特异性后者胜，才压得住散在 04 / 05 里的窗口与节点基样式）：`.syswin` 底→暗纸身 `#dcd8c2` + `border:3px double #2b2b26`、`.syswin-bar`→`#2b2b26`、标题字 `#e6e3d2`、`.syswin-x/-min` 反色、`.node` 纸面渐变→暗纸渐变 + 深色边框/文字、`.node.time-node`/`.hub` 双线框、未探索/折叠保持虚线但换色、`.node.sel` 外框改亮色；`#timeline` 一并换肤。**全部字面色值、不碰 `:root`**（与 `.memory` 放映卡同一种「另一种纸」）。render() 末尾 `applyMemMode()`。调试钩子 `__memMode()`。verify.js 有「**回忆态风格层（P3）**」分节（6 条：接线 + 样式就位 + 字面色值 + 运行时三态切换）。
   - **回忆小剧场改由轴驱动（P4，2026-10-16）**：时间不再占节点，`when` 取 `G.time`；**拖人物到地点节点**即 `lookupMemory(G.time, who, where)`（见上文「回忆小剧场」的「触发（P4）」）。旧的「拖时间到地点绑 `n.place`」及其副行/提示一并撤。
   - **时间节点下画布（P5，2026-10-16）**：`render()` 跳过 `kind === "time"` —— 日期被发现时节点仍进 `G.nodes`（发现 / 存档 / 时刻派生都靠它），只是不画。**读回忆改由档案窗承担**：`setTime(t)` 里 `changed && t !== "present"` 时调 `showMemoryCard(t, 地点节点)`（`showMemoryCard` 已改为「按日期 id + 锚点」）。发现路径不变（`revealScene` 见 `[loc:日期]` 就建 `time:` 节点 → 档案窗多一行）。verify.js 的「时间节点」与「回忆小剧场」两节已按新设计重写。
+  - **进入回忆时刻带出在场人物 + 人物登场门控（2026-10-16）**：7/4 这类时刻常由「摘录点名 / 展开访客记录」获得 —— 只建 `time:` 节点、不 reveal 内容，文本里 `[char:x]` 在场的人物（朱穗们）没有口子上画布。`applyTimeNow` 在 render 前 `spawnMemCast(t)`（04-graph.js）：把该时刻场景正文的实体标签建出来（`sceneTags` 同源，TEC 已滤），**新建的人物围在地点节点旁手工散点（不 layout，保原位不变量）**、连一条 `entity` 边、挂「新」角标；**已存在的节点不动**（不重复提示、不挪坐标）；切回「现在」节点仍在画布（认识过的不会消失）。
+  - **人物登场门控（debut，2026-10-16）**：「文本里提到」≠「遇到了」——人物的出现时机关系整个调查进度，不能「进过回忆就全局存在」。数据给每个人物显式配置 `CHARS[id].debut`（最早可交互的时刻 / 场景 id；朱穗=`SCENES_0704`、陆珩松=`SCENES_lhsdst`、槿杉/傅柏=`SCENES_0602`、TEC 没配=常驻不门控），两道门（03-utils.js）：
+    · **`charDebuted`** —— 玩家到达过 debut（进过那个时刻 / 探索过那个场景，`meetCharAt` 置位在 `G.debuted`，进快照、撤销/续档不回滚）。**回忆档可见 = 时刻派生含她 且 已登场**——陆珩松没在 lhsdst 出现过之前，7/4 的回忆里他也不出现（哪怕文本里有他）；
+    · **`charNowMet`** —— 「现在」档的登场点 = `sceneTalks` 里最早的非回忆场景被探索（朱穗=mdhm、陆=lhsdst）。**现在档可见 = 该点已达成**——朱穗回到 7月5日 要等「门的后面」探索后才出现，不会因为进过回忆就提前。`visibleNode()` 的 char 分支统一收口。
+    配套：`spawnMemCast` 只 spawn `debut === 当前时刻` 的人物；`revealScene` 遇到 debut 场景时置位（访客记录纸面提及不置位）；**摘录点名未登场人物不建节点**；名册 `metChars` 弃用 seenTexts 来源（提及≠认识）。boot 钩子 `__dropNode(k)`（删节点含边）、`__charGate(id)`（debut/met/now 对账）。
   - **叙事文本随时刻变化（2026-10-16）**：进入回忆时刻后，叙事跟着 `G.time` 走，不再全是「现在」的静态文本 ——
     ① **详情窗**：`memNarrOf(G.time, n)`（03-utils.js，旁边配 `timeLabelOf`）给出时刻专属叙述：**地点节点** = 那个日期场景的正文（与放映卡同源）；**人物节点** = 他/她那天的回忆脚本（`say` 行合成「——名字：台词」）。`paintDetail` 用它替换静态简介并注明「时刻：6月2日」；present 档返回 null、一切照旧。`paintDetail` 由 `render()` 末尾统一调用，**切档即自动换文案**（`__sig` 变了就重绘）。
     ② **重看叙事**：`renarrScene` 里身处回忆时刻且该地点就是 `memPlaceOf(G.time)` 时，放**那一时刻**的放映卡（`showMemoryCard(G.time, node)`），不把现在的正文放给过去的花园。

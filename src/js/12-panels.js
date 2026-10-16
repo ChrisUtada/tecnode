@@ -417,13 +417,20 @@ function rosterAvatar(id){
   if (id === "CHARS_EXEC") return EXECUTOR_AVATAR;
   return null;
 }
-/* 常驻在前、遇到的在后；CHARS_TEC 已在常驻里，从「遇到的人」里排除，免得排两遍 */
+/* 常驻在前、遇到的在后；CHARS_TEC 已在常驻里，从「遇到的人」里排除，免得排两遍。
+   「遇到」= 到达过登场点（03-utils.js 的 debut 门控）：
+   画布上有已登场的人物节点 / 到过某个时刻（放过放映卡，那天 sceneTalks 里的人算认识了）/
+   探索过某个 sceneTalks 覆盖的场景。**纸面提及不算**——访客记录里读到名字、摘录点名，
+   名册都不列（节点也还没登场）。 */
 function metChars(){
   const ids = new Set();
-  Object.keys(G.nodes).forEach(k => { if (k.indexOf("char:") === 0) ids.add(k.slice(5)); });
-  G.seenTexts.forEach(txt => parseTags(txt).forEach(t => { if (t.kind === "char" && CHARS[t.id]) ids.add(t.id); }));
-  G.explored.forEach(sid => Object.keys(CHARS).forEach(id => {
-    if ((CHARS[id].sceneTalks || {})[sid]) ids.add(id);
+  Object.keys(G.nodes).forEach(k => {
+    if (k.indexOf("char:") === 0){ const id = k.slice(5); if (charDebuted(id)) ids.add(id); }
+  });
+  const talkScenes = Object.assign({}, G.cardSeen || {});
+  G.explored.forEach(sid => { talkScenes[sid] = true; });
+  Object.keys(talkScenes).forEach(sid => Object.keys(CHARS).forEach(id => {
+    if (id !== "CHARS_TEC" && (CHARS[id].sceneTalks || {})[sid]) ids.add(id);
   }));
   return ROSTER_PINNED.map(p => p.id)
     .concat(Object.keys(CHARS).filter(id => id !== "CHARS_TEC" && ids.has(id)));

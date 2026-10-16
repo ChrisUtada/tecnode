@@ -548,7 +548,7 @@
     }
   },
   "chars": {
-    "CHARS_JS": {
+    "CHARS_JS": {"debut": "SCENES_0602",
       "name": "槿杉",
       "desc": "在植物领域颇有造诣的年轻植物学家。",
       "talkQueue": [],
@@ -594,7 +594,7 @@
       },
       "avatar": "images/avatar_CHARS_JS.png"
     },
-    "CHARS_luhengs": {
+    "CHARS_luhengs": {"debut": "SCENES_lhsdst",
       "name": "陆珩松",
       "desc": "年轻有为的植物学家。",
       "talkQueue": [
@@ -796,7 +796,7 @@
       },
       "avatar": "images/avatar_CHARS_luhengs.png"
     },
-    "NPC_FB": {
+    "NPC_FB": {"debut": "SCENES_0602",
       "name": "傅柏",
       "desc": "植物研究所所长",
       "talkQueue": [],
@@ -829,7 +829,7 @@
       },
       "avatar": "images/avatar_NPC_FB.png"
     },
-    "CHARS_zs": {
+    "CHARS_zs": {"debut": "SCENES_0704",
       "name": "朱穗",
       "desc": "陆珩松和槿杉的助手。",
       "talkQueue": [

@@ -72,8 +72,50 @@ function currentStage(){
 }
 /* 时间可见性：当前时刻的节点集里没有它 ⇒ 不可见；present 档全通过。 */
 function visibleNow(n){ if (!n) return false; const st = currentStage(); return !st.keys || st.keys.has(n.key); }
-/* 综合可见（时间 × 空间）：渲染 / 交互 / 聚焦一律认这一个。 */
-function visibleNode(n){ return !!n && !n.hidden && !n.stored && visibleNow(n); }
+/* ============ 人物登场门控（2026-10-16）============
+   「文本里提到」≠「遇到了」：访客记录纸面提到朱穗、摘录点名槿杉，都不该让她上画布。
+   人物的**最早登场点**由数据显式配置（CHARS[id].debut = 时刻 id 或现在档场景 id）：
+     · 朱穗 debut=7/4 回忆（只能在那被找到）；陆珩松 debut=lhsdst（现在档房间）；
+     · 槿杉/傅柏 debut=6/2（只在回忆）；TEC 没配 = 常驻不门控。
+   两道门：
+     · charDebuted —— 玩家到达过 debut（进过那个时刻 / 探索过那个场景），置位在 G.debuted；
+     · charNowMet —— 「现在」档的登场（sceneTalks 里最早的非回忆场景被探索）。
+   回忆档可见 = 时刻派生含她 且 charDebuted（陆没在 lhsdst 出现前，7/4 里也不出现）；
+   现在档可见 = charNowMet（朱穗回到 7/5 要等「门的后面」，不会因为进过回忆就提前）。 */
+function charDebut(id){ const c = CHARS[id]; return (c && c.debut) || null; }
+function charDebuted(id){
+  const d = charDebut(id);
+  if (!d) return true;
+  return !!(G.debuted && G.debuted[id]);
+}
+/* 到达 debut（幂等）：spawnMemCast 进入时刻 / revealScene 探索场景时调用 */
+function meetCharAt(id, sid){
+  if (charDebut(id) !== sid) return;
+  if (!G.debuted) G.debuted = {};
+  G.debuted[id] = true;
+}
+/* 人物在「现在」档的登场点：sceneTalks 里第一个非回忆场景；没有 = 现在档不登场。 */
+function charNowScene(id){
+  const st = (CHARS[id] || {}).sceneTalks || {};
+  return Object.keys(st).find(sid => (SCENE_MEMORY || []).indexOf(sid) < 0) || null;
+}
+function charNowMet(id){
+  if (id === "CHARS_TEC") return true;
+  const s = charNowScene(id);
+  return !!s && G.explored.has(s);
+}
+/* 综合可见（时间 × 空间 × 登场）：渲染 / 交互 / 聚焦一律认这一个。 */
+function visibleNode(n){
+  if (!n || n.hidden || n.stored) return false;
+  if (n.kind === "char"){
+    if (!charDebuted(n.id)) return false;      /* 没到 debut：任何档都不出现 */
+    if (!visibleNow(n)) return false;          /* 时刻派生：这一档没她的戏份 */
+    const st = currentStage();
+    if (!st.keys && !charNowMet(n.id)) return false;   /* 现在档：登场点未达成 */
+    return true;
+  }
+  return visibleNow(n);
+}
 /* 切换时刻。只重绘、**不重排**（layout）：节点 x/y 跨时刻共享，
    重排会把玩家摆好的位置推走 —— 「该时刻的节点留在同一位置」靠的就是这一点。 */
 /* 某时刻回忆发生在哪个地点（数据侧 memories 的 where）；没有就 null。放映卡按它定锚点。 */
@@ -115,6 +157,7 @@ function openTimeCard(t){
 function applyTimeNow(t){
   G.time = t;
   closeBubble(); closeNarr(); closePwPop(); closeDlgWin();  /* 锚在画布上的浮层收掉，别指向已隐藏的节点 */
+  if (t !== PRESENT_TIME) spawnMemCast(t);   /* 那天文本里在场的人物跟到画布上（朱穗们）——须赶在 render 前 */
   render();
   /* 进入回忆时刻：镜头聚焦在该时刻的发生地点上（memories 的 where；不在画布就跳过）。
      必须在开放映卡**之前**对焦 —— 卡片按当前视图做「不裁出屏幕」钳制（与 revealScene 同一口径）。 */

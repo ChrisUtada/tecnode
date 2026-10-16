@@ -987,6 +987,8 @@ function blankGraph(){
   return { nodes:{}, edges:[], explored:new Set(), captured:new Set(), tried:new Set(), talkProg:{}, tecProg:{}, lastScene:null, collapsed:new Set(), seenTexts:[], time:"present",
     /* cardSeen：每个时刻的放映卡是否**自动**放过（记在该时刻名下，切档不重放；见 03-utils.js 的 openTimeCardOnce） */
     cardSeen:{},
+    /* debuted：人物登场门控的置位（到达 CHARS.debut 后为 true，见 03-utils.js 的 meetCharAt） */
+    debuted:{},
     matrix:{vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings:new Set(),
     /* 花园（真名结局的后续温柔）：seed = 执行者头顶还挂着一枚没种下的种子；
        plots = 花坛（{at:下种时刻, hit:开花提示已弹}），长成看真实时间，见 16-cases.js 的花园模块 */
@@ -1007,6 +1009,8 @@ function snapshot(){
     tecProg: Object.assign({}, G.tecProg), lastScene: G.lastScene,
     collapsed: [...G.collapsed], time: G.time || "present",
     cardSeen: Object.assign({}, G.cardSeen || {}),
+    /* 登场置位同 cardSeen 性质：认识了就是认识了，不随撤销回滚 */
+    debuted: Object.assign({}, G.debuted || {}),
     matrix: JSON.parse(JSON.stringify(G.matrix)), endings: [...G.endings],
     garden: JSON.parse(JSON.stringify(G.garden || { seed:false, plots:[] }))
   });
@@ -1021,6 +1025,7 @@ function restore(str){
   G = { nodes:s.nodes, edges:s.edges, explored:new Set(s.explored), captured:new Set(s.captured), tried:new Set(s.tried), talkProg: s.talkProg || {}, tecProg: s.tecProg || {}, lastScene: s.lastScene || null, collapsed: new Set(s.collapsed || []), seenTexts: G.seenTexts || [], time: s.time || "present",
     /* cardSeen 是玩家知识：撤销 / 续档不回滚（当前 G 的优先），重开游戏则从存档里接回来 */
     cardSeen: Object.assign({}, s.cardSeen || {}, G.cardSeen || {}),
+    debuted: Object.assign({}, s.debuted || {}, G.debuted || {}),
     matrix: s.matrix || {vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings: new Set(s.endings || []),
     garden: s.garden || { seed:false, plots:[] } };
   /* 旧档迁移：花园字段是「真名结局掉种子」之后才有的。捕获过真名的旧档没有 garden ——
@@ -1108,8 +1113,50 @@ function currentStage(){
 }
 /* 时间可见性：当前时刻的节点集里没有它 ⇒ 不可见；present 档全通过。 */
 function visibleNow(n){ if (!n) return false; const st = currentStage(); return !st.keys || st.keys.has(n.key); }
-/* 综合可见（时间 × 空间）：渲染 / 交互 / 聚焦一律认这一个。 */
-function visibleNode(n){ return !!n && !n.hidden && !n.stored && visibleNow(n); }
+/* ============ 人物登场门控（2026-10-16）============
+   「文本里提到」≠「遇到了」：访客记录纸面提到朱穗、摘录点名槿杉，都不该让她上画布。
+   人物的**最早登场点**由数据显式配置（CHARS[id].debut = 时刻 id 或现在档场景 id）：
+     · 朱穗 debut=7/4 回忆（只能在那被找到）；陆珩松 debut=lhsdst（现在档房间）；
+     · 槿杉/傅柏 debut=6/2（只在回忆）；TEC 没配 = 常驻不门控。
+   两道门：
+     · charDebuted —— 玩家到达过 debut（进过那个时刻 / 探索过那个场景），置位在 G.debuted；
+     · charNowMet —— 「现在」档的登场（sceneTalks 里最早的非回忆场景被探索）。
+   回忆档可见 = 时刻派生含她 且 charDebuted（陆没在 lhsdst 出现前，7/4 里也不出现）；
+   现在档可见 = charNowMet（朱穗回到 7/5 要等「门的后面」，不会因为进过回忆就提前）。 */
+function charDebut(id){ const c = CHARS[id]; return (c && c.debut) || null; }
+function charDebuted(id){
+  const d = charDebut(id);
+  if (!d) return true;
+  return !!(G.debuted && G.debuted[id]);
+}
+/* 到达 debut（幂等）：spawnMemCast 进入时刻 / revealScene 探索场景时调用 */
+function meetCharAt(id, sid){
+  if (charDebut(id) !== sid) return;
+  if (!G.debuted) G.debuted = {};
+  G.debuted[id] = true;
+}
+/* 人物在「现在」档的登场点：sceneTalks 里第一个非回忆场景；没有 = 现在档不登场。 */
+function charNowScene(id){
+  const st = (CHARS[id] || {}).sceneTalks || {};
+  return Object.keys(st).find(sid => (SCENE_MEMORY || []).indexOf(sid) < 0) || null;
+}
+function charNowMet(id){
+  if (id === "CHARS_TEC") return true;
+  const s = charNowScene(id);
+  return !!s && G.explored.has(s);
+}
+/* 综合可见（时间 × 空间 × 登场）：渲染 / 交互 / 聚焦一律认这一个。 */
+function visibleNode(n){
+  if (!n || n.hidden || n.stored) return false;
+  if (n.kind === "char"){
+    if (!charDebuted(n.id)) return false;      /* 没到 debut：任何档都不出现 */
+    if (!visibleNow(n)) return false;          /* 时刻派生：这一档没她的戏份 */
+    const st = currentStage();
+    if (!st.keys && !charNowMet(n.id)) return false;   /* 现在档：登场点未达成 */
+    return true;
+  }
+  return visibleNow(n);
+}
 /* 切换时刻。只重绘、**不重排**（layout）：节点 x/y 跨时刻共享，
    重排会把玩家摆好的位置推走 —— 「该时刻的节点留在同一位置」靠的就是这一点。 */
 /* 某时刻回忆发生在哪个地点（数据侧 memories 的 where）；没有就 null。放映卡按它定锚点。 */
@@ -1151,6 +1198,7 @@ function openTimeCard(t){
 function applyTimeNow(t){
   G.time = t;
   closeBubble(); closeNarr(); closePwPop(); closeDlgWin();  /* 锚在画布上的浮层收掉，别指向已隐藏的节点 */
+  if (t !== PRESENT_TIME) spawnMemCast(t);   /* 那天文本里在场的人物跟到画布上（朱穗们）——须赶在 render 前 */
   render();
   /* 进入回忆时刻：镜头聚焦在该时刻的发生地点上（memories 的 where；不在画布就跳过）。
      必须在开放映卡**之前**对焦 —— 卡片按当前视图做「不裁出屏幕」钳制（与 revealScene 同一口径）。 */
@@ -1426,6 +1474,33 @@ function link(aKey, bKey, kind){
   G.edges.push({ a:aKey, b:bKey, kind });
 }
 
+/* 进入回忆时刻：把那天文本里在场的**已到登场点**的人物带出画布（[char:x] 标签，TEC 已由 sceneTags 滤掉）。
+   人物按 CHARS.debut 门控（见 03-utils.js）：debut 不是这一刻的（陆珩松要等 lhsdst）不上画布
+   —— 文本提及 ≠ 遇到；debut 正是这一刻的（朱穗=7/4）才 spawn，并置位登场（meetCharAt）。
+   新建的人物围在地点节点旁（**不 layout** —— 保原位不变量，靠偏移手工散开），
+   连一条 entity 边、挂「新」角标。已存在的节点不动（不重复提示、不挪坐标）。 */
+function spawnMemCast(t){
+  if (t === PRESENT_TIME || !SCENES[t]) return 0;
+  const place = memPlaceOf(t);
+  const pn = place ? G.nodes[containerKey(place)] : null;
+  const hx = pn ? pn.x : null, hy = pn ? pn.y : null;
+  let added = 0;
+  sceneTags(t).forEach((tag, i) => {
+    if (tag.kind === "char" && charDebut(tag.id) !== t) return;   /* 登场点不在这一刻：跳过 */
+    const existed = !!nodeByKey(tag.kind, tag.id);
+    const en = ensureNode(tag.kind, tag.id, {});
+    if (!en.homeScene) en.homeScene = t;
+    if (tag.kind === "char") meetCharAt(tag.id, t);
+    if (!existed){
+      added++;
+      if (hx !== null){ en.x = hx + 60 + (i % 3) * 96; en.y = hy + 150 + Math.floor(i / 3) * 96; }
+      markFresh(en);
+      if (pn) link(pn.key, en.key, "entity");
+    }
+  });
+  return added;
+}
+
 /* 揭示一个容器（场景 / 书桌这类会装东西的物品）的内容。可重复调用，幂等。
    sid 既可以是场景 id，也可以是容器物品的 id —— 键由 containerKind() 决定。 */
 function revealScene(sid, silent){
@@ -1449,6 +1524,7 @@ function revealScene(sid, silent){
     const en = ensureNode(t.kind, t.id, { x: home.x, y: home.y });
     if (!en.homeScene) en.homeScene = sid;
     if (!existed){ added++; newKeys.push(en.key); }
+    if (t.kind === "char") meetCharAt(t.id, sid);   /* 场景正是 debut 的：此刻登场（其他提及不置位） */
     link(sn.key, en.key, "entity");
   });
 
@@ -4016,13 +4092,20 @@ function rosterAvatar(id){
   if (id === "CHARS_EXEC") return EXECUTOR_AVATAR;
   return null;
 }
-/* 常驻在前、遇到的在后；CHARS_TEC 已在常驻里，从「遇到的人」里排除，免得排两遍 */
+/* 常驻在前、遇到的在后；CHARS_TEC 已在常驻里，从「遇到的人」里排除，免得排两遍。
+   「遇到」= 到达过登场点（03-utils.js 的 debut 门控）：
+   画布上有已登场的人物节点 / 到过某个时刻（放过放映卡，那天 sceneTalks 里的人算认识了）/
+   探索过某个 sceneTalks 覆盖的场景。**纸面提及不算**——访客记录里读到名字、摘录点名，
+   名册都不列（节点也还没登场）。 */
 function metChars(){
   const ids = new Set();
-  Object.keys(G.nodes).forEach(k => { if (k.indexOf("char:") === 0) ids.add(k.slice(5)); });
-  G.seenTexts.forEach(txt => parseTags(txt).forEach(t => { if (t.kind === "char" && CHARS[t.id]) ids.add(t.id); }));
-  G.explored.forEach(sid => Object.keys(CHARS).forEach(id => {
-    if ((CHARS[id].sceneTalks || {})[sid]) ids.add(id);
+  Object.keys(G.nodes).forEach(k => {
+    if (k.indexOf("char:") === 0){ const id = k.slice(5); if (charDebuted(id)) ids.add(id); }
+  });
+  const talkScenes = Object.assign({}, G.cardSeen || {});
+  G.explored.forEach(sid => { talkScenes[sid] = true; });
+  Object.keys(talkScenes).forEach(sid => Object.keys(CHARS).forEach(id => {
+    if (id !== "CHARS_TEC" && (CHARS[id].sceneTalks || {})[sid]) ids.add(id);
   }));
   return ROSTER_PINNED.map(p => p.id)
     .concat(Object.keys(CHARS).filter(id => id !== "CHARS_TEC" && ids.has(id)));
@@ -4829,6 +4912,9 @@ function takeExcerpt(target, srcKey){
   const i = String(target || "").indexOf(":");
   if (!src || i < 0) return;
   const refKind = target.slice(0, i), id = target.slice(i + 1);
+  /* 人物按登场门控（03-utils.js）：还没到 debut 的名字只是纸面提及——摘录不出节点，
+     免得「槿杉」在玩家进过 6/2 之前就提前上画布（提及 ≠ 遇到）。 */
+  if (refKind === "char" && CHARS[id] && !charDebuted(id)) return;
   /* 数据里写的是 [loc:SCENES_0704]，但画布上那是时间节点 —— kind 要按 containerKind 规整，
      否则这里会长出一个 loc:SCENES_0704，与 containerKey() 算出的 time: 分裂成两个节点 */
   const kind = isSceneKind(refKind) ? containerKind(id) : refKind;
@@ -6705,6 +6791,15 @@ window.__render = () => render();   /* 验证 / 调试：手动重绘整张画�
 /* 时间轴 / 时刻图层（方案 B，P1）：切当前时刻（"present" 或 config.memoryScenes 里的 id）。
    只重绘不重排 ⇒ 「该时刻的节点留在同一位置」。 */
 window.__time = t => setTime(t);
+/* 人物登场门控的对账口：debut 配置 / 是否已登场 / 现在档登场点是否达成 */
+window.__charGate = id => ({ debut: charDebut(id), met: charDebuted(id), now: charNowMet(id) });
+/* 测试用：把节点从画布状态里拿掉（含相关边），模拟「还没遇到这个人」——
+   供「回忆时刻带出在场人物」等从无到有的路径测试用；仅测试钩子，玩家流程不触碰。 */
+window.__dropNode = k => {
+  delete G.nodes[k];
+  G.edges = G.edges.filter(e => e.a !== k && e.b !== k);
+  render();
+};
 window.__timeStage = () => (G && G.time) || "present";
 window.__stages = () => timelineStages().map(s => ({ id:s.id, label:s.label, size:s.keys ? s.keys.size : null }));
 window.__visibleNow = () => Object.keys(G.nodes).filter(k => visibleNow(G.nodes[k]));

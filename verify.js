@@ -1897,64 +1897,69 @@ assert('常驻两人用真头像（src 指向外链素材）',
   /^assets\//.test(avImgOf(rrows[1]) || ''));
 assert('TEC 与执行者不是同一张头像（执行者早有自己的素材）',
   avImgOf(rrows[0]) !== avImgOf(rrows[1]));
-window.__reveal('SCENES_fkjl');                        /* 这场景点名了朱穗 / 傅柏 */
+window.__reveal('SCENES_fkjl');                        /* 这场景纸面点名了朱穗 / 傅柏 */
+assert('访客记录纸面提及不进名册（提及 ≠ 遇到，debut 门控）',
+  window.__roster().map(r => r.id).sort().join(',') === 'CHARS_EXEC,CHARS_TEC');
+window.__reveal('SCENES_lhsdst');                      /* 陆珩松的登场点（debut=lhsdst）：此刻才算遇到 */
 const roster = window.__roster();
-assert('展开场景后名册接着记下遇到的人',
-  roster.map(r => r.id).sort().join(',') === 'CHARS_EXEC,CHARS_TEC,CHARS_zs,NPC_FB');
+assert('到达 debut 才记下：房间里见到陆珩松（常驻 + 1）',
+  roster.map(r => r.id).sort().join(',') === 'CHARS_EXEC,CHARS_TEC,CHARS_luhengs');
 assert('常驻两人固定排在最前（不按遇到顺序插进来）',
   roster[0].id === 'CHARS_TEC' && roster[1].id === 'CHARS_EXEC');
 assert('名册把 TEC 也算进来', roster.some(r => r.id === 'CHARS_TEC') && roster.some(r => r.id === 'CHARS_EXEC'));
 /* 剧情角色还没有美术稿 ⇒ 退回首字方块占位（拿到图后换成 img 即可，一行一块） */
 const iniRows = peopleRows().filter(r => !!avIniOf(r));
-assert('没有美术稿的剧情角色用「首字方块」占位', iniRows.length === 2 &&
-  iniRows.map(r => avIniOf(r)).sort().join('') === '傅朱' &&
+assert('没有美术稿的剧情角色用「首字方块」占位', iniRows.length === 1 &&
+  iniRows.map(r => avIniOf(r)).join('') === '陆' &&
   iniRows.every(r => !avImgOf(r)));
 /* 遇到新人 ⇒ 头像库当场解锁（池子现算，没有任何「解锁」写盘逻辑） */
 console.log('  —— 头像解锁 ——');
-assert('结识两人后可选头像 = 常驻 2 + 新解锁 2',
-  window.__avatars().pool.join(',') === 'CHARS_EXEC,CHARS_TEC,NPC_FB,CHARS_zs');
-assert('未解锁数从 4 掉到 2', window.__avatars().locked === 2);
+assert('结识陆珩松后可选头像 = 常驻 2 + 新解锁 1',
+  window.__avatars().pool.join(',') === 'CHARS_EXEC,CHARS_TEC,CHARS_luhengs');
+assert('未解锁数从 4 掉到 3', window.__avatars().locked === 3);
 window.__avatarOpen();
 {
   const avTiles = ids['desktop'].querySelector('.avatar-win').querySelectorAll('.avatar-pick');
   const avOpen = avTiles.filter(t => !t.classList.contains('locked'));
   const iniOf = t => { const s = t.querySelector('.av').children.find(c => String(c.tagName).toLowerCase() === 'span'); return s ? s.textContent : null; };
-  assert('换头像窗列出 4 张可选 + 2 张未解锁', avTiles.length === 6 && avOpen.length === 4);
-  assert('新解锁两位没有美术稿 ⇒ 首字方块占位',
-    avOpen.map(iniOf).filter(Boolean).sort().join('') === '傅朱');
-  assert('解锁计数行跟着涨到「已解锁 4 / 6」',
-    ids['desktop'].querySelector('.avatar-count').textContent === '已解锁 4 / 6');
+  assert('换头像窗列出 3 张可选 + 3 张未解锁', avTiles.length === 6 && avOpen.length === 3);
+  assert('新解锁一位没有美术稿 ⇒ 首字方块占位',
+    avOpen.map(iniOf).filter(Boolean).sort().join('') === '陆');
+  assert('解锁计数行跟着涨到「已解锁 3 / 6」',
+    ids['desktop'].querySelector('.avatar-count').textContent === '已解锁 3 / 6');
 }
-window.__avatarPick('CHARS_zs'); window.__avatarConfirm();
-assert('换成没美术稿的人也能落章（avatarId = 朱穗）',
-  window.__dump().investigator.avatarId === 'CHARS_zs' && window.__avatars().win === false);
+window.__avatarPick('CHARS_luhengs'); window.__avatarConfirm();
+assert('换成没美术稿的人也能落章（avatarId = 陆珩松）',
+  window.__dump().investigator.avatarId === 'CHARS_luhengs' && window.__avatars().win === false);
 {
   invChipNode._ev.click[0]();
   const cw = ids['desktop'].querySelectorAll('.cert-win');
   const p = cw[cw.length - 1].querySelector('.cert-photo');
   const ini = p.children.find(c => String(c.tagName).toLowerCase() === 'span');
-  assert('证件照退回首字方块（朱）', !!ini && ini.textContent === '朱' && !p.children.some(c => String(c.tagName).toLowerCase() === 'img'));
+  assert('证件照退回首字方块（陆）', !!ini && ini.textContent === '陆' && !p.children.some(c => String(c.tagName).toLowerCase() === 'img'));
 }
 window.__avatarOpen(); window.__avatarPick('CHARS_EXEC'); window.__avatarConfirm();
 assert('换回执行者（留给后续用）', window.__dump().investigator.avatarId === 'CHARS_EXEC');
-assert('名册行带对话进度（未交谈 0/1）',
-  roster.find(r => r.id === 'CHARS_zs').prog === 0 && roster.find(r => r.id === 'CHARS_zs').total === 1);
-/* 点「朱穗」那一行（傅柏在这个场景里没有对白，走的是「无对话文本」分支） */
-const zsRow = rowByLabel('朱穗');
-assert('名册里找得到「朱穗」这一行', !!zsRow);
-assert('傅柏那行标「无对话文本」（该场景里他确实没词）',
-  rowByLabel('傅柏').querySelector('.st').textContent === '无对话文本');
-fire(zsRow, 'click', {});
-assert('点人物一行 = 选中该角色节点', window.__dump().sel === 'char:CHARS_zs');
-assert('点人物一行 = 说出第一句（对话进度 +1）', window.__dump().talk['char:CHARS_zs'] === 1);
+assert('名册行带对话进度（未交谈 0/12）',
+  roster.find(r => r.id === 'CHARS_luhengs').prog === 0 && roster.find(r => r.id === 'CHARS_luhengs').total === 12);
+/* 点「陆珩松」那一行（debut 已达成的人物：gotoChar 把节点叫上画布） */
+const luRow = rowByLabel('陆珩松');
+assert('名册里找得到「陆珩松」这一行', !!luRow);
+fire(luRow, 'click', {});
+assert('点人物一行 = 选中该角色节点', window.__dump().sel === 'char:CHARS_luhengs');
+assert('点人物一行 = 说出第一句（对话进度 +1）', window.__dump().talk['char:CHARS_luhengs'] === 1);
 assert('点完人物窗仍开着（可以接着点下一个人）', window.__dump().floats.people === true);
-assert('名册行随之刷新出对话状态词（不再显示条数）', rowByLabel('朱穗').querySelector('.st').textContent === '已聊完');
-assert('说完的角色行标上 done', rowByLabel('朱穗')._classes.has('done'));
+assert('名册行随之刷新出对话状态词（不再显示条数）', rowByLabel('陆珩松').querySelector('.st').textContent === '可继续');
+assert('没聊完的角色行不标 done', !rowByLabel('陆珩松')._classes.has('done'));
+/* 聊满 12 句（base 11 + 场景对白 1）：行标「已聊完」+ done（done 分支的运行期断言） */
+for (let i = 0; i < 11; i++) window.__talk('char:CHARS_luhengs');
+assert('聊满后行标「已聊完」', rowByLabel('陆珩松').querySelector('.st').textContent === '已聊完');
+assert('聊满后行标 done', rowByLabel('陆珩松')._classes.has('done'));
 /* 点常驻两行 = 打开各自的窗（他们都没有画布节点，绝不该「叫到画布上」） */
 fire(rowByLabel('TEC'), 'click', {});
 assert('点 TEC 一行 = 开 TEC 助手窗', window.__dump().floats.tec === true);
 assert('点 TEC 一行不会给他造画布节点',
-  !window.__dump().nodes.includes('char:CHARS_TEC') && window.__dump().sel === 'char:CHARS_zs');
+  !window.__dump().nodes.includes('char:CHARS_TEC') && window.__dump().sel === 'char:CHARS_luhengs');
 fire(rowByLabel('TEC'), 'click', {});                  /* 再点一下 = 关掉，别影响后面的用例 */
 assert('再点一下 TEC 一行 = 收掉助手窗', window.__dump().floats.tec === false);
 fire(rowByLabel('执行者'), 'click', {});
@@ -2407,17 +2412,20 @@ assert('重复摘录不重复长节点、不写日志、不刷撤销步',
   window.__dump().nodes.length === n34b && window.__dump().history === h34b && logs.length === l34b);
 
 window.__select('item:ITEMS_wbfs');
+const l34c = logs.length, h34c = window.__dump().history, n34c = window.__dump().nodes.length, e34c = window.__dump().edges.length;
 window.__excerpt('char:CHARS_JS', 'item:ITEMS_wbfs');
-assert('摘录「槿杉」长出角色节点', window.__dump().nodes.includes('char:CHARS_JS'));
-assert('角色节点也连回了纸片',
-  window.__dump().edges.indexOf('cond:item:ITEMS_wbfs>char:CHARS_JS') >= 0);
+assert('摘录点名「槿杉」：她还没到登场点（debut=6/2）——不建节点（提及 ≠ 遇到）',
+  !window.__dump().nodes.includes('char:CHARS_JS'));
+assert('未登场的摘录点名：边 / 日志 / 撤销步全部纹丝不动',
+  window.__dump().edges.length === e34c && window.__dump().nodes.length === n34c &&
+  window.__dump().history === h34c && logs.length === l34c);
 assert('摘录把读到的词记进「听说过」（源码检查：noteSeen(nm)）',
   /noteSeen\(nm\);/.test(html));
 
 /* 撤销能把这步收回去 */
 const h34 = window.__dump().history;
 ids['btn-undo']._ev.click[0]();
-assert('撤销一次收回「槿杉」那一步', window.__dump().history < h34);
+assert('撤销一次收回上一步摘录', window.__dump().history < h34);
 
 /* 源码检查：委托 + 按钮天然在拖动排除表里（浮窗 setPointerCapture 不会吞掉这次 click） */
 assert('摘录点击委托在 #detail-body 上（源码检查）',
@@ -3531,11 +3539,13 @@ assert('G.time 进快照 / 出档 / 默认（源码检查）',
     sw.indexOf('layout') < 0 && sw.indexOf('time-fade') > 0);
 }
 
-/* 备齐节点：地点 + 在场人物 + 两个分属不同时刻的人物 + 一条「现在」的线索 */
+/* 备齐节点：地点 + 在场人物 + 两个分属不同时刻的人物 + 一条「现在」的线索。
+   陆珩松走真实路径：reveal 他的登场点 lhsdst（debut 置位 + layout 给坐标）；
+   朱穗 / 傅柏用 __ensure 备好（debut 未到 / 坐标不参断言）。 */
 const T_GARDEN = 'loc:SCENES_garden', T_LU = 'char:CHARS_luhengs', T_ZS = 'char:CHARS_zs',
       T_FB = 'char:NPC_FB',      T_CLUE = 'clue:CLUES_V_luheng';
 window.__ensure('loc', 'SCENES_garden');
-window.__ensure('char', 'CHARS_luhengs');
+window.__reveal('SCENES_lhsdst');           /* 陆珩松 debut：节点带坐标上画布 + 置位登场 */
 window.__ensure('char', 'CHARS_zs');
 window.__ensure('char', 'NPC_FB');
 window.__ensure('clue', 'CLUES_V_luheng');
@@ -3667,6 +3677,63 @@ assert('获得 7/4 后：档案三行（现在 / 7月4日 / 6月2日），开着
 gotoRows()[0]._ev.click[0]();
 assert('点「现在」行：档不变', window.__timeStage() === 'present');
 window.__time('present');
+
+/* ==================== 回忆时刻带出在场人物 ====================
+   7/4 这类时刻常由摘录 / 档案获得 —— 只建 time: 节点、不 reveal 内容，文本里
+   在场的人物（朱穗们）没有口子上画布。进入回忆时刻时 spawnMemCast 把 [char:x]
+   带出（TEC 已滤），围在地点旁、连 entity 边、挂「新」角标；已存在的节点不动。 */
+console.log('\n=== 回忆时刻带出在场人物：spawnMemCast ===');
+
+assert('带出在场人物：spawnMemCast 定义 + applyTimeNow 在 render 前调用（源码检查）',
+  /function spawnMemCast\(t\)\{/.test(html) &&
+  html.indexOf('if (t !== PRESENT_TIME) spawnMemCast(t);') >= 0);
+assert('带出在场人物：新建节点手工散点、不 layout，连 entity 边（源码检查）',
+  html.indexOf('en.x = hx + 60 + (i % 3) * 96;') >= 0 &&
+  html.indexOf('link(pn.key, en.key, "entity");') >= 0 &&
+  html.indexOf('if (t !== PRESENT_TIME) spawnMemCast(t);') < html.indexOf('render();'));
+
+/* 运行期：槿杉（CHARS_JS，6/2 文本里在场）经摘录章节已建 —— 先拿掉她模拟「还没遇到」，
+   切到 6/2 应从无到有自动补回（真实玩家路径里这些人物正是这样首次上画布的） */
+window.__dropNode('char:CHARS_JS');
+const zsPosBefore = JSON.stringify(window.__dump().pos['char:CHARS_zs']);
+window.__time('SCENES_0602');
+assert('进入 6/2：文本里在场的槿杉自动上画布（拿掉后重进补回）',
+  window.__dump().nodes.indexOf('char:CHARS_JS') >= 0);
+const jsPos = window.__dump().pos['char:CHARS_JS'];
+assert('新建人物有坐标（不 layout，围在地点节点旁）',
+  jsPos && typeof jsPos.x === 'number' && typeof jsPos.y === 'number');
+assert('人物与发生地点连 entity 边',
+  window.__dump().edges.indexOf('entity:loc:SCENES_garden>char:CHARS_JS') >= 0);
+assert('已存在的朱穗不被挪动（重进时刻不动既有节点）',
+  JSON.stringify(window.__dump().pos['char:CHARS_zs']) === zsPosBefore);
+window.__time('present');
+assert('切回现在：带出的人物节点仍在画布（认识过的不会消失）',
+  window.__dump().nodes.indexOf('char:CHARS_JS') >= 0);
+
+/* 登场门控（debut）的对账：visibleNode 里 char 分支 + 现在档可见性 */
+assert('人物登场门控：visibleNode 的 char 分支 + debut 谓词（源码检查）',
+  html.indexOf('if (!charDebuted(n.id)) return false;') >= 0 &&
+  html.indexOf('if (!st.keys && !charNowMet(n.id)) return false;') >= 0);
+assert('朱穗门控对账：debut=7/4，还没进过那个时刻 → 未登场、现在档登场点（mdhm）未探索',
+  (() => { const g = window.__charGate('CHARS_zs'); return g.debut === 'SCENES_0704' && g.met === false && g.now === false; })());
+assert('此刻朱穗在现在档不可见（回到 7/5 要等「门的后面」，不会因为建过节点就出现）',
+  !window.__visibleKeys().includes('char:CHARS_zs'));
+window.__reveal('SCENES_lhsdst');
+assert('探索 lhsdst：陆珩松到达 debut（置位登场）',
+  (() => { const g = window.__charGate('CHARS_luhengs'); return g.debut === 'SCENES_lhsdst' && g.met === true && g.now === true; })());
+window.__time('SCENES_0704');
+assert('进入 7/4：朱穗到达 debut（她只能在这一刻被找到）',
+  window.__charGate('CHARS_zs').met === true);
+assert('7/4 档：朱穗与陆珩松（debut 已达成）都可见',
+  window.__visibleKeys().includes('char:CHARS_zs') && window.__visibleKeys().includes('char:CHARS_luhengs'));
+window.__time('present');
+assert('回到现在：朱穗仍不可见（mdhm 未探索）——进过回忆 ≠ 现在登场',
+  !window.__visibleKeys().includes('char:CHARS_zs'));
+window.__reveal('SCENES_mdhm');
+assert('探索「门的后面」：朱穗现在档登场（可见）',
+  window.__charGate('CHARS_zs').now === true && window.__visibleKeys().includes('char:CHARS_zs'));
+assert('槿杉现在档永不登场（sceneTalks 只覆盖回忆时刻）',
+  window.__charGate('CHARS_JS').now === false && !window.__visibleKeys().includes('char:CHARS_JS'));
 
 /* ==================== 叙事文本随时刻变化 ====================
    进入回忆时刻后，叙事跟着时刻走（2026-10-16）：
