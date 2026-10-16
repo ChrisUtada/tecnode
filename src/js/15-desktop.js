@@ -19,6 +19,7 @@
     /* 光标在窗口/浮层上时滚轮交给窗口自己的滚动条，不触发画布缩放 */
     const t = e.target;
     if (t && t.closest && t.closest(".syswin, #toast, #verdict")) return;
+    /* 画布滚轮**始终是缩放** —— 切时刻只在时间轴窗体上滚（那扇窗自己接管自己的 wheel）。 */
     cancelViewAnim();   /* 玩家缩放 → 接管镜头 */
     e.preventDefault();
     const r = stage.getBoundingClientRect();
@@ -31,7 +32,7 @@
 })();
 
 function fit(){
-  const keys = Object.keys(G.nodes).filter(k => !G.nodes[k].hidden && !G.nodes[k].stored);
+  const keys = Object.keys(G.nodes).filter(k => visibleNode(G.nodes[k]));
   if (!keys.length) return;
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   keys.forEach(k => {
@@ -115,6 +116,21 @@ function resetIconPositions(){
 }
 ICON_LAYOUT.forEach(([id, app]) => attachIcon(document.getElementById(id), app));
 resetIconPositions();
+
+/* ============ 时刻图层（方案 B）：时刻的「已知集合」 ============
+   独立时间轴窗体已删（2026-10-16 与档案合并）：切时刻的入口改在**档案窗**（12-panels.js 的
+   refreshGotoWin，按时间记录、带简介）。这里只留「哪些时刻已经被玩家获得」的判据，供档案与
+   timeStageKeys 使用：该时刻已有画布节点，或已探索过它的场景。 */
+function timelineKnown(){
+  return (SCENE_MEMORY || []).filter(id => !!G.nodes["time:" + id] || G.explored.has(id));
+}
+/* 回忆态：只要不在「现在」，就给桌面根挂 .mem-mode —— 窗体与节点整体切 memory 做旧风格
+   （纯字面色值、不碰 :root，规则见 06-shell.css 末段）。回到「现在」摘掉类即完全还原、不残留。 */
+function applyMemMode(){
+  if (!desktopEl || !desktopEl.classList) return;
+  desktopEl.classList.toggle("mem-mode", ((G && G.time) || PRESENT_TIME) !== PRESENT_TIME);
+}
+
 /* 详情 / 日志静态窗口：× 与拖动 */
 document.getElementById("detail-x").addEventListener("click", () => clearSelection());
 document.getElementById("log-x").addEventListener("click", () => setLogWin(false));

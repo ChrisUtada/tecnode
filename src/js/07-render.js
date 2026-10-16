@@ -97,7 +97,9 @@ function render(){
   svg.innerHTML = "";
 
   Object.values(G.nodes).forEach(n => {
-    if (n.hidden || n.stored){ n.el = null; return; }
+    /* 时间节点（P5）：不再上画布 —— 时刻改由右上角时间轴承担（15-desktop.js）。
+       它仍留在 G.nodes 里（发现 / 存档 / 时刻派生都靠它），只是不画出来。 */
+    if (n.kind === "time" || !visibleNode(n)){ n.el = null; return; }
     const el = document.createElement("div");
     /* 画布上的长相只看 kind：场景与时间都是宽节点（■ / ◆），书桌 / 垃圾桶是普通物品节点（□）。
        时间节点多挂一个 time-node 类，只为换掉符号与边框，尺寸仍与场景一致。
@@ -121,9 +123,6 @@ function render(){
 
     let sub = isContainerNode(n) ? (G.collapsed.has(n.id) ? "已折叠 · 双击展开" : (G.explored.has(n.id) ? "已探索" : "未探索 · 双击展开")) : kindName(n.kind);
     if (n.kind === "clue" && G.captured.has(n.id)) sub = "线索 · 已捕获";
-    /* 时间节点记下了地点（「时间 × 地点」那一步，见 05-combine.js）：副行挂上「◈ 地点」，
-       一眼看得出这段回忆已经落到哪个场景上 —— 这是那一步唯一的即时反馈（不换符号、不加角标）。 */
-    if (n.kind === "time" && n.place && SCENES[n.place]) sub = "◈ " + SCENES[n.place].title;
     el.innerHTML = "<div class='n-title'>" + esc(n.label) + "</div><div class='n-sub'>" + esc(sub) + "</div>";
 
     /* 「条件进入」角标已撤（2026-10-14，用户要求）。它是一枚**实心**药丸，和「新 / 对话 N」
@@ -169,6 +168,9 @@ function render(){
   refreshPeopleWin();
   refreshInferWin();    /* 推演窗同理：阵列与执行者头顶的种子对话框都是状态驱动的，
                            撤销 / 续档把 G 滚回去之后，开着的窗不能留着旧 DOM */
+  refreshGotoWin();     /* 档案窗（按时间记录）跟着图刷新：已知时刻变了 / 当前档变了都要重排，
+                           「当前」高亮与「已回顾」状态才会跟着走（关着时是空操作） */
+  applyMemMode();       /* 回忆态（非「现在」）给桌面挂 .mem-mode：窗体 + 节点切 memory 做旧风格 */
   /* 重建 DOM 后恢复选中态并重挂聚焦淡化 */
   if (sel && G.nodes[sel] && G.nodes[sel].el) G.nodes[sel].el.classList.add("sel"); else sel = null;
   applyFocus();
@@ -246,7 +248,7 @@ function center(el){
 }
 function updateCrumbs(){
   const total = Object.keys(G.nodes).length;
-  const visible = Object.values(G.nodes).filter(n => !n.hidden && !n.stored).length;
+  const visible = Object.values(G.nodes).filter(visibleNode).length;
   crumbs.innerHTML = "节点 <b>" + visible + "/" + total + "</b> · 已探索场景 <b>" +
     G.explored.size + "/" + Object.keys(SCENES).length + "</b> · 已试组合 <b>" + G.tried.size +
     "</b> · 捕获线索 <b>" + G.captured.size + "</b> · 结局 <b>" + G.endings.size + "/" + ENDINGS.length + "</b>";

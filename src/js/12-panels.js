@@ -27,28 +27,79 @@ function clearSelection(){
   applyFocus();
 }
 
-/* ============ GOTO // 前往：听说过的场景索引 ============ */
 /* seenTexts 不进 snapshot：已经"听说过"的知识不随撤销丢失 */
 function noteSeen(text){
   if (!text) return;
   G.seenTexts.push(String(text));
   if (G.seenTexts.length > 200) G.seenTexts.shift();
 }
-function heardScenes(){
-  const known = new Set(G.explored);
-  Object.keys(G.nodes).forEach(k => {
-    const m = /^(?:loc|time):(.+)$/.exec(k);   /* 时间节点也是「听说的场景」，一并进档案 */
-    if (m) known.add(m[1]);
-  });
-  G.explored.forEach(sid => sceneLocs(sid).forEach(t => known.add(t)));
-  G.seenTexts.forEach(txt => {
-    parseTags(txt).forEach(t => { if (t.kind === "loc" && SCENES[t.id]) known.add(t.id); });
-    for (const id in SCENES){
-      const t = SCENES[id].title;
-      if (t && t.length >= 2 && txt.indexOf(t) >= 0) known.add(id);
+
+/* ============ ARCHIVE // 档案：按时间记录 ============
+   档案不再列地点，而是按**时刻**记录（2026-10-16 与独立时间轴合并）：顶部「现在」，
+   往下是已经获得的时刻，越往下越早。每档一行：日期 + 简介（发生地点 · 在场人物 + 一句开场摘要，
+   从 memories 自动拼，见 timeBriefOf）。点一行 = 切到那刻（整块世界慢淡入淡出；该时刻的放映卡
+   只**自动**放一遍，见 03-utils.js 的 openTimeCardOnce）；点的**就是当前档** = 重放那段回忆。
+   地点的「前往场景」走画布命令入口（08-interact.js 的 gotoScene），不再占档案。 */
+let gotoWinEl = null;
+function closeGotoWin(){ if (gotoWinEl){ gotoWinEl.remove(); gotoWinEl = null; } }
+function toggleGotoWin(){
+  if (gotoWinEl){ closeGotoWin(); return; }
+  const w = makeWindow("ARCHIVE // 档案", closeGotoWin);
+  w.el.classList.add("goto-win");
+  desktopEl.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  gotoWinEl = w.el;
+  clearArchiveNew();     /* 打开档案 = 「新」角标已读 */
+  refreshGotoWin();
+}
+/* 某时刻的简介：取 memories 里 when 相同的条目，拼「发生地点 · 在场人物」与一句开场旁白。 */
+function timeBriefOf(t){
+  const mems = (MEMORIES || []).filter(m => m.when === t);
+  const where = (mems[0] && mems[0].where && SCENES[mems[0].where]) ? SCENES[mems[0].where].title : "";
+  const who = [];
+  mems.forEach(m => { if (m.who && who.indexOf(m.who) < 0) who.push(m.who); });
+  const whoTxt = who.map(id => (CHARS[id] && CHARS[id].name) || id).join(" · ");
+  let sum = "";
+  for (let i = 0; i < mems.length && !sum; i++){
+    const line = (mems[i].script || []).find(l => l && l.t === "narr" && l.text);
+    if (line) sum = plain(line.text);
+  }
+  return { where: where, who: whoTxt, sum: sum };
+}
+function refreshGotoWin(){
+  if (!gotoWinEl) return;
+  const body = gotoWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  /* 档上的档：现在在顶，之后把已知时刻倒序（越往下越早）—— 沿用旧时间轴的顺序 */
+  const list = [{ id: PRESENT_TIME, label: nowLabel() }].concat(
+    timelineKnown().slice().reverse().map(id => ({ id: id, label: (SCENES[id] && SCENES[id].title) || id })));
+  const cur = (G && G.time) || PRESENT_TIME;
+  list.forEach(s => {
+    const d = document.createElement("div");
+    d.className = "goto-item" + (s.id === cur ? " cur" : "");
+    /* 行结构与人册 / 清单同族：.nm（可收缩列）里 .lb 日期 + .ds 简介——.ds 自带**单行省略**，简介永不折行 */
+    const nm = document.createElement("div"); nm.className = "nm";
+    const label = document.createElement("span"); label.className = "lb"; label.textContent = s.label;
+    nm.appendChild(label);
+    const sub = document.createElement("div"); sub.className = "ds";
+    if (s.id === PRESENT_TIME){
+      sub.textContent = "侦查进行中";
+    } else {
+      const b = timeBriefOf(s.id);
+      sub.textContent = ([b.where, b.who].filter(Boolean).join(" —— ") + (b.sum ? "　" + b.sum : "")) || "（还没有关于这一天的记录）";
     }
+    nm.appendChild(sub);
+    const st = document.createElement("span"); st.className = "st";
+    st.textContent = (s.id === cur) ? "当前" : (s.id !== PRESENT_TIME && G.cardSeen && G.cardSeen[s.id] ? "已回顾" : "");
+    d.appendChild(nm); d.appendChild(st);
+    d.addEventListener("click", () => {
+      if (s.id !== cur) setTime(s.id);
+      else if (s.id !== PRESENT_TIME) openTimeCard(s.id);   /* 点当前档 = 重放这段回忆 */
+      closeGotoWin();
+    });
+    body.appendChild(d);
   });
-  return [...known].filter(id => SCENES[id]);
 }
 function gotoScene(sid){
   if (!SCENES[sid]) return;                 /* 档案里只有场景；容器物品（书桌 / 垃圾桶）不在此列 */
@@ -63,41 +114,6 @@ function gotoScene(sid){
   applyView();
   selectNode(sn.key);
   log("前往「" + esc(SCENES[sid].title || sid) + "」", "act");
-}
-let gotoWinEl = null;
-function closeGotoWin(){ if (gotoWinEl){ gotoWinEl.remove(); gotoWinEl = null; } }
-function toggleGotoWin(){
-  if (gotoWinEl){ closeGotoWin(); return; }
-  const w = makeWindow("ARCHIVE // 档案", closeGotoWin);
-  w.el.classList.add("goto-win");
-  desktopEl.appendChild(w.el);
-  makeFloatDraggable(w.el, false);
-  gotoWinEl = w.el;
-  refreshGotoWin();
-}
-function refreshGotoWin(){
-  if (!gotoWinEl) return;
-  const body = gotoWinEl.querySelector(".syswin-body");
-  if (!body) return;
-  body.innerHTML = "";
-  const list = heardScenes();
-  if (!list.length){
-    const d = document.createElement("div");
-    d.className = "bag-empty";
-    d.textContent = "（还没有听说任何场景）";
-    body.appendChild(d);
-    return;
-  }
-  list.forEach(sid => {
-    const d = document.createElement("div");
-    d.className = "goto-item";
-    const label = document.createElement("span"); label.textContent = SCENES[sid].title || sid;
-    const st = document.createElement("span"); st.className = "st";
-    st.textContent = (G.explored.has(sid) ? "已探索" : "未探索") + " · " + (nodeByKey(containerKind(sid), sid) ? "在画布" : "未在画布");
-    d.appendChild(label); d.appendChild(st);
-    d.addEventListener("click", () => { gotoScene(sid); closeGotoWin(); });
-    body.appendChild(d);
-  });
 }
 
 /* ============ CLUE LEDGER // 线索册：收纳盒 ============

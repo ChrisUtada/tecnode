@@ -18,37 +18,20 @@ function attemptCombo(toolKey, targetKey){
     log("前往场景 <b>" + esc(target.label) + "</b>", "act");
     return;
   }
-  /* 1.5) 回忆小剧场（A-001 的 6月2日 / 7月4日）：时间 × 地点 × 人物 三者凑齐才演出。
-         第一步 —— 时间 × 地点：把一个**时间节点**拖到某个**场景**上 ⇒ 就地绑定地点（n.place），
-         不新增节点（节点数不膨胀、撤销天然可用）。标签末尾挂上地点，看得见这一步生效了。
-         第二步 —— 再拖一个**人物**到绑好地点的时间节点上 ⇒ 按 when × who × where 查回忆表。
-         两条都插在「两个场景之间没有直接通路」之前：时间节点也是场景，不拦下来会被判成"走不过去"。 */
-  const tNode = tool.kind === "time" ? tool : (target.kind === "time" ? target : null);
-  const oNode = tNode === tool ? target : tool;          /* 时间节点对面的那一个 */
-  if (tNode && oNode && oNode.kind === "loc"){
-    if (tNode.place === oNode.id){
-      fail(tNode, oNode, "「" + plain(tNode.label) + "」已经记着这个地点了");
-    } else {
-      tNode.place = oNode.id;
-      log("「" + esc(tNode.label) + "」记下了地点：<b>" + esc(oNode.label) +
-          "</b>（再拖一个人物上去，看看那天发生了什么）", "sys");
-      render();              /* 只重绘（节点副行要跟着变）：这里不该再跑一遍自动布局，把玩家刚摆好的位置揉乱 */
-    }
-    return;
-  }
-  /* 第二步：人物 ×（时间 × 地点）—— 命中的是**时间节点**（它身上带着 when 与 place），人物给 who */
-  const mWhen = target.kind === "time" ? target : (tool.kind === "time" ? tool : null);
-  const mWho  = mWhen === target ? tool : target;
-  if (mWhen && mWho && mWho.kind === "char"){
-    const entry = lookupMemory(mWhen.id, mWho.id, mWhen.place);
+  /* 1.5) 回忆小剧场（方案 B P4）：时间不再占节点，when 由**时间轴当前档**（G.time）承担 ——
+         时间节点已不再上画布（P5），所以「拖时间到地点绑 place」那一步取消。
+         身处某个回忆时刻时，把一个人物拖到某个**地点**节点上 ⇒ 按 when × who × where 查回忆表。
+         插在「两个场景之间没有直接通路」之前：地点是场景，不先拦下来会被判成"走不过去"。 */
+  const mWho   = tool.kind === "char" ? tool : (target.kind === "char" ? target : null);
+  const mWhere = tool.kind === "loc"  ? tool : (target.kind === "loc"  ? target : null);
+  if (mWho && mWhere && G.time && G.time !== PRESENT_TIME){
+    const entry = lookupMemory(G.time, mWho.id, mWhere.id);
     if (entry){
       G.tried.add(triedKey);
-      showMemoryPlay(entry, mWhen);
+      showMemoryPlay(entry, mWhere);   /* 锚在地点节点上方 */
       log("想起了一段回忆：<b>" + esc(entry.title || entry.id) + "</b>", "sys");
     } else {
-      fail(mWhen, mWho, mWhen.place
-        ? "「" + plain((SCENES[mWhen.place] || {}).title || mWhen.place) + "」里没有「" + plain(mWho.label) + "」的回忆"
-        : "「" + plain(mWhen.label) + "」还不知道发生在哪里（先把它拖到一个地点上）");
+      fail(mWho, mWhere, "「" + plain(mWhere.label) + "」里没有「" + plain(mWho.label) + "」的回忆");
     }
     return;
   }

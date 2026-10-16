@@ -100,3 +100,24 @@
   #log div.cap{color:var(--text); text-decoration:underline}
   #log div.act{background:var(--bg)}
   #log div.act b{color:var(--text)}
+
+  /* ============ 回忆态：窗体 + 节点切 memory 做旧风格（P3） ============
+     进入任一回忆时刻（G.time !== "present"）时 applyMemMode() 给 #desktop 挂 .mem-mode；
+     离开回忆摘掉类即完全还原、不残留。全部用字面色值、不碰 :root —— 与 .memory 放映卡同一种
+     「另一种纸」（05-apps.css 的 .memory 段）：暗纸身 #dcd8c2 + 近黑标题栏 #2b2b26 + 3px 双线黑框。
+     放在本片（CSS 最后一片）以压过零散在 04 / 05 里的窗口与节点基样式（同特异性后者胜）。 */
+  .mem-mode .syswin{background:#dcd8c2; border:3px double #2b2b26}
+  .mem-mode .syswin-bar{background:#2b2b26; border-bottom-color:#8a8672}
+  .mem-mode .syswin-title{color:#e6e3d2}
+  .mem-mode .syswin-rule{border-color:#8a8672}
+  .mem-mode .syswin-x,.mem-mode .syswin-min{background:#2b2b26; border-color:#8a8672; color:#e6e3d2; box-shadow:none}
+  .mem-mode .syswin-x:hover,.mem-mode .syswin-min:hover{background:#e6e3d2; color:#2b2b26}
+  .mem-mode .syswin-body{color:#3a362c}
+  .mem-mode .node{background:linear-gradient(150deg,#e4dfcb 0%,#dcd8c2 55%,#cdc7ad 100%);
+    border-color:#2b2b26; color:#2b2b26; box-shadow:2px 3px 9px rgba(43,43,38,.32)}
+  .mem-mode .node .n-title{color:#2b2b26}
+  .mem-mode .node .n-sub{color:#6d6858}
+  .mem-mode .node.sel{outline-color:#e6e3d2}
+  .mem-mode .node.time-node,.mem-mode .node.scene-node.hub{border:3px double #2b2b26}
+  .mem-mode .node.unexplored,.mem-mode .node.collapsed{background:#cfc9b0; border-color:#2b2b26; color:#6d6858}
+  .mem-mode .node.unexplored .n-title{color:#6d6858}

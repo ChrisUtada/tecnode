@@ -137,7 +137,7 @@ function attachInteractions(el, n){
         if (n.kind === "clue") assignClue(n.key, (CLUES[n.id] || {}).type);
         else toast("只有线索能进推演器", true);
       } else if (iconHit === "goto-icon"){
-        if (isSceneKind(n.kind)) gotoScene(n.id);   /* 档案里列的是场景与时间；容器物品（书桌）不在此列 */
+        if (isSceneKind(n.kind)) gotoScene(n.id);   /* 场景拖到档案图标 = 前往（居中并选中）；档案窗本身按时间记录（12-panels.js），容器物品（书桌）不在此列 */
         else toast("只有场景能进档案", true);
       }
       return;
@@ -264,7 +264,7 @@ function nodeBox(n){
 }
 /* 把一组节点整体平移到视野中央（只平移，不改 view.k）。 */
 function focusOn(keys, ms){
-  const list = (keys || []).map(k => G.nodes[k]).filter(n => n && !n.hidden && !n.stored);
+  const list = (keys || []).map(k => G.nodes[k]).filter(n => visibleNode(n));
   if (tgReveal && !tgReveal.checked){ lastFocus = { on:false, why:"toggle-off", keys:[] }; return false; }
   if (!list.length){ lastFocus = { on:false, why:"nothing-visible", keys:[] }; return false; }
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -302,7 +302,7 @@ function focusOn(keys, ms){
 function freshKeys(){
   return Object.keys(G.nodes).filter(k => {
     const n = G.nodes[k];
-    return n && n.fresh && !n.hidden && !n.stored;
+    return n && n.fresh && visibleNode(n);
   });
 }
 /* 聚焦到「本次新长出来的节点」，把它们整体带到视野中央。
@@ -311,7 +311,7 @@ function freshKeys(){
    舞台角落（实测最坏偏离中心 285px）——看着就是"没聚焦"。锚点本身就在玩家眼皮底下，
    不需要镜头带过去；新节点才是要找的那个。 */
 function focusFresh(news){
-  const live = (news || []).filter(k => { const n = G.nodes[k]; return n && !n.hidden && !n.stored; });
+  const live = (news || []).filter(k => visibleNode(G.nodes[k]));
   if (!live.length){ lastFocus = { on:false, why:"no-new-node", keys:[] }; return false; }
   return focusOn(live);
 }

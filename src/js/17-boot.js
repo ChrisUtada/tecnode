@@ -9,6 +9,7 @@ function boot(opts){
      只有换案 / 重置才清（resetTec / closeBagWin / closeClueWin 在各自调用点），
      否则「– 收起 → 展开」回访同一案件时会被顺带收掉。 */
   closeGotoWin();
+  clearArchiveNew();    /* 开局 / 换案 / 重置：档案「新」角标一并清（档都重建了，没有未读可言） */
   closeInferWin();
   closePeopleWin();
   closeMapWin();
@@ -79,7 +80,8 @@ window.__overBagDrop = (cx, cy) => overBagDrop(cx, cy);
 window.__cap = key => attemptCapture(key);
 window.__noteSeen = t => noteSeen(t);
 window.__goto = sid => gotoScene(sid);
-window.__gotoList = () => heardScenes();
+window.__gotoList = () => ["present"].concat(timelineKnown().slice().reverse());   /* 档案按时间记录：档 id 清单（现在在顶） */
+window.__view = () => ({ x: view.x, y: view.y, k: view.k });   /* 验证 / 调试：当前镜头（聚焦断言用） */
 window.__clueToggle = () => toggleClueWin();
 window.__clueLedger = () => ledgerList().map(n => ({ key:n.key, id:n.id, label:n.label, sense:(CLUES[n.id] || {}).type }));
 window.__ledgerStore = key => ledgerStore(key);
@@ -98,6 +100,15 @@ window.__boardTake = (id, sense, cx, cy) => boardTake(id, sense, cx, cy);   /* �
 window.__matrixItems = () => matrixItems().map(n => n.key);
 window.__infer = () => executeInference();
 window.__render = () => render();   /* 验证 / 调试：手动重绘整张画布（等价于任何一次 render 调用） */
+/* 时间轴 / 时刻图层（方案 B，P1）：切当前时刻（"present" 或 config.memoryScenes 里的 id）。
+   只重绘不重排 ⇒ 「该时刻的节点留在同一位置」。 */
+window.__time = t => setTime(t);
+window.__timeStage = () => (G && G.time) || "present";
+window.__stages = () => timelineStages().map(s => ({ id:s.id, label:s.label, size:s.keys ? s.keys.size : null }));
+window.__visibleNow = () => Object.keys(G.nodes).filter(k => visibleNow(G.nodes[k]));
+window.__visibleKeys = () => Object.keys(G.nodes).filter(k => visibleNode(G.nodes[k]));
+/* 回忆态风格层（P3）：#desktop 上是否挂着 .mem-mode（窗体 + 节点切 memory 做旧风格） */
+window.__memMode = () => !!(desktopEl && desktopEl.classList && desktopEl.classList.contains("mem-mode"));
 window.__inferToggle = () => toggleInferWin();
 window.__ensure = (kind, id) => {
   const d = kind === "clue" ? (CLUES[id] || {}) : (ITEMS[id] || {});
@@ -156,6 +167,7 @@ window.__avatarConfirm = () => confirmAvatarPick();
 window.__select = key => key ? selectNode(key) : clearSelection();
 window.__closeFloats = () => { closeBubble(); closeDlgWin(); closeNarr(); closePwPop(); };
 window.__renarr = sid => renarrScene(sid);
+window.__renarrTalk = key => { const n = G.nodes[key]; return n ? renarrTalk(n) : false; };
 /* 回忆小剧场（时间 × 地点 × 人物）：数据表 / 匹配器 / 当前演出进度 / 时间节点绑上的地点 */
 window.__memories = () => (MEMORIES || []).map(m => ({ id:m.id, when:m.when, where:m.where, who:m.who, title:m.title,
   lines:(m.script || []).length,
@@ -188,6 +200,7 @@ window.__caseInfo = () => ({
 });
 window.__dump  = () => ({
   nodes: Object.keys(G.nodes),
+  seen: G.seenTexts.length,
   lit: Object.keys(G.nodes).filter(k => G.nodes[k].lit),
   talk: Object.assign({}, G.talkProg),
   tec: { prog: Object.assign({}, G.tecProg), lastScene: G.lastScene },
@@ -198,6 +211,7 @@ window.__dump  = () => ({
   bag: bagItems().map(n => n.key),
   ledger: ledgerItems().map(n => n.key),
   collapsed: [...G.collapsed],
+  time: (G && G.time) || "present",
   dim: G._dimKeys || [],
   sel: sel,
   floats: { bubble: !!bubbleEl, dlg: !!dlgWinEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },

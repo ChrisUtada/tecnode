@@ -1,6 +1,7 @@
 {
   "config": {
     "startScene": "SCENE_START",
+    "nowLabel": "7月5日",
     "reusableTools": [
       "ITEM_shoudiantong",
       "ITEMS_htys",

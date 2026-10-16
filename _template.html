@@ -101,6 +101,11 @@
   }
   #stage.grabbing{cursor:grabbing}
   #world{position:absolute; left:0; top:0; width:2000px; height:1300px; transform-origin:0 0}
+  /* 切时刻的淡入淡出（见 03-utils.js 的 swapTime）：**整块世界**（#nodes 节点 + #edges 连线 + #glow 光晕）
+     一起淡 —— 只淡节点层会让连线"留在原地"，看着就是「节点先于连线消失」。
+     纯 opacity 过渡（GPU 友好、不卡）；transition 常挂，两个方向都要淡；镜头 transform 不参与。 */
+  #world{transition:opacity .38s ease}
+  #world.time-fade{opacity:0}
   #edges{position:absolute; left:0; top:0; width:2000px; height:1300px; overflow:visible; pointer-events:none}
   #nodes{position:absolute; left:0; top:0; width:100%; height:100%}
   /* 顶层拖拽镜像层：拖动节点时把它浮到窗口/图标之上（z 高于 #icons:24 与浮窗:25） */
@@ -770,6 +775,27 @@
   #log div.cap{color:var(--text); text-decoration:underline}
   #log div.act{background:var(--bg)}
   #log div.act b{color:var(--text)}
+
+  /* ============ 回忆态：窗体 + 节点切 memory 做旧风格（P3） ============
+     进入任一回忆时刻（G.time !== "present"）时 applyMemMode() 给 #desktop 挂 .mem-mode；
+     离开回忆摘掉类即完全还原、不残留。全部用字面色值、不碰 :root —— 与 .memory 放映卡同一种
+     「另一种纸」（05-apps.css 的 .memory 段）：暗纸身 #dcd8c2 + 近黑标题栏 #2b2b26 + 3px 双线黑框。
+     放在本片（CSS 最后一片）以压过零散在 04 / 05 里的窗口与节点基样式（同特异性后者胜）。 */
+  .mem-mode .syswin{background:#dcd8c2; border:3px double #2b2b26}
+  .mem-mode .syswin-bar{background:#2b2b26; border-bottom-color:#8a8672}
+  .mem-mode .syswin-title{color:#e6e3d2}
+  .mem-mode .syswin-rule{border-color:#8a8672}
+  .mem-mode .syswin-x,.mem-mode .syswin-min{background:#2b2b26; border-color:#8a8672; color:#e6e3d2; box-shadow:none}
+  .mem-mode .syswin-x:hover,.mem-mode .syswin-min:hover{background:#e6e3d2; color:#2b2b26}
+  .mem-mode .syswin-body{color:#3a362c}
+  .mem-mode .node{background:linear-gradient(150deg,#e4dfcb 0%,#dcd8c2 55%,#cdc7ad 100%);
+    border-color:#2b2b26; color:#2b2b26; box-shadow:2px 3px 9px rgba(43,43,38,.32)}
+  .mem-mode .node .n-title{color:#2b2b26}
+  .mem-mode .node .n-sub{color:#6d6858}
+  .mem-mode .node.sel{outline-color:#e6e3d2}
+  .mem-mode .node.time-node,.mem-mode .node.scene-node.hub{border:3px double #2b2b26}
+  .mem-mode .node.unexplored,.mem-mode .node.collapsed{background:#cfc9b0; border-color:#2b2b26; color:#6d6858}
+  .mem-mode .node.unexplored .n-title{color:#6d6858}
 </style>
 </head>
 <body>
@@ -958,7 +984,9 @@ let G, history = [], view = {x:0, y:0, k:1};
 let sel = null;
 
 function blankGraph(){
-  return { nodes:{}, edges:[], explored:new Set(), captured:new Set(), tried:new Set(), talkProg:{}, tecProg:{}, lastScene:null, collapsed:new Set(), seenTexts:[],
+  return { nodes:{}, edges:[], explored:new Set(), captured:new Set(), tried:new Set(), talkProg:{}, tecProg:{}, lastScene:null, collapsed:new Set(), seenTexts:[], time:"present",
+    /* cardSeen：每个时刻的放映卡是否**自动**放过（记在该时刻名下，切档不重放；见 03-utils.js 的 openTimeCardOnce） */
+    cardSeen:{},
     matrix:{vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings:new Set(),
     /* 花园（真名结局的后续温柔）：seed = 执行者头顶还挂着一枚没种下的种子；
        plots = 花坛（{at:下种时刻, hit:开花提示已弹}），长成看真实时间，见 16-cases.js 的花园模块 */
@@ -977,7 +1005,8 @@ function snapshot(){
     explored:[...G.explored], captured:[...G.captured], tried:[...G.tried],
     talkProg: Object.assign({}, G.talkProg),
     tecProg: Object.assign({}, G.tecProg), lastScene: G.lastScene,
-    collapsed: [...G.collapsed],
+    collapsed: [...G.collapsed], time: G.time || "present",
+    cardSeen: Object.assign({}, G.cardSeen || {}),
     matrix: JSON.parse(JSON.stringify(G.matrix)), endings: [...G.endings],
     garden: JSON.parse(JSON.stringify(G.garden || { seed:false, plots:[] }))
   });
@@ -989,7 +1018,9 @@ function restore(str){
      不接力的话，撤销 / 续档会顺手把全场「新」角标洗掉 —— 和"右键钉一下就没了"是同一类毛病。 */
   const unread = {};
   Object.keys(G.nodes).forEach(k => { if (G.nodes[k].unread) unread[k] = true; });
-  G = { nodes:s.nodes, edges:s.edges, explored:new Set(s.explored), captured:new Set(s.captured), tried:new Set(s.tried), talkProg: s.talkProg || {}, tecProg: s.tecProg || {}, lastScene: s.lastScene || null, collapsed: new Set(s.collapsed || []), seenTexts: G.seenTexts || [],
+  G = { nodes:s.nodes, edges:s.edges, explored:new Set(s.explored), captured:new Set(s.captured), tried:new Set(s.tried), talkProg: s.talkProg || {}, tecProg: s.tecProg || {}, lastScene: s.lastScene || null, collapsed: new Set(s.collapsed || []), seenTexts: G.seenTexts || [], time: s.time || "present",
+    /* cardSeen 是玩家知识：撤销 / 续档不回滚（当前 G 的优先），重开游戏则从存档里接回来 */
+    cardSeen: Object.assign({}, s.cardSeen || {}, G.cardSeen || {}),
     matrix: s.matrix || {vision:[], hearing:[], touch:[], smell:[], taste:[]}, endings: new Set(s.endings || []),
     garden: s.garden || { seed:false, plots:[] } };
   /* 旧档迁移：花园字段是「真名结局掉种子」之后才有的。捕获过真名的旧档没有 garden ——
@@ -1039,6 +1070,127 @@ function isSceneKind(k){ return k === "loc" || k === "time"; }
    凡是要拿引用去查 / 建画布节点的地方，都必须过这一道 —— 否则会凭空造出一个 loc: 节点，
    与 containerKey() 算出的 time: 分裂成同一 id 的两个节点。 */
 function nodeKeyOfRef(kind, id){ return isSceneKind(kind) ? containerKey(id) : kind + ":" + id; }
+/* ============ 时间轴 / 时刻图层（方案 B，P1 内核）============
+   时间不再只是「一类节点」，而是画布的一个维度：G.time 记当前所在时刻。
+   "present" = 现在（基准层，显示全部节点）；其余时刻取自 config.memoryScenes，
+   某时刻的节点集**由回忆数据派生**（data.memories）：该 when 下所有 where 的地点 +
+   who 的人物 —— 不新建节点，只按时刻显隐（见 visibleNow）。
+
+   与空间折叠（n.hidden / G.collapsed，由 recomputeHidden 管）**正交**：
+   最终可见 = visibleNow(n) && !n.hidden && !n.stored。两维各写各的标志，互不干扰。 */
+const PRESENT_TIME = "present";
+/* 派生「某时刻的节点键集合」；present 返回 null（= 全显，不做时间过滤）。 */
+function timeStageKeys(t){
+  if (t === PRESENT_TIME) return null;
+  const keys = new Set();
+  (MEMORIES || []).forEach(m => {
+    if (m.when !== t) return;
+    if (m.where) keys.add(containerKey(m.where));        /* 地点：场景节点（loc:xxx） */
+    if (m.who)   keys.add(nodeKeyOfRef("char", m.who));  /* 人物：角色节点（char:xxx） */
+  });
+  return keys;
+}
+/* 「现在」那一档的显示名：案件可在 config.nowLabel 写明它对应的日期（A-001 = 7月5日，
+   见 SCENES_garden 正文「时间：7月5日」）；没写就退回「现在」。 */
+function nowLabel(){ return (DATA && DATA.config && DATA.config.nowLabel) || "现在"; }
+/* 时间轴各档：present 在首位，其余按 SCENE_MEMORY 顺序。P2 的 UI 与 §41 都用它。 */
+function timelineStages(){
+  const out = [{ id: PRESENT_TIME, label: nowLabel(), keys: null }];
+  (SCENE_MEMORY || []).forEach(id => {
+    out.push({ id: id, label: (SCENES[id] && SCENES[id].title) || id, keys: timeStageKeys(id) });
+  });
+  return out;
+}
+function currentStage(){
+  const t = (G && G.time) || PRESENT_TIME;
+  const list = timelineStages();
+  return list.find(s => s.id === t) || list[0];
+}
+/* 时间可见性：当前时刻的节点集里没有它 ⇒ 不可见；present 档全通过。 */
+function visibleNow(n){ if (!n) return false; const st = currentStage(); return !st.keys || st.keys.has(n.key); }
+/* 综合可见（时间 × 空间）：渲染 / 交互 / 聚焦一律认这一个。 */
+function visibleNode(n){ return !!n && !n.hidden && !n.stored && visibleNow(n); }
+/* 切换时刻。只重绘、**不重排**（layout）：节点 x/y 跨时刻共享，
+   重排会把玩家摆好的位置推走 —— 「该时刻的节点留在同一位置」靠的就是这一点。 */
+/* 某时刻回忆发生在哪个地点（数据侧 memories 的 where）；没有就 null。放映卡按它定锚点。 */
+function memPlaceOf(t){ const m = (MEMORIES || []).find(x => x.when === t); return m ? m.where : null; }
+/* 时刻的显示名：present 档用 config.nowLabel（A-001 = 7月5日），其余用日期场景标题。 */
+function timeLabelOf(t){ return t === PRESENT_TIME ? nowLabel() : ((SCENES[t] && SCENES[t].title) || t); }
+/* 回忆时刻的叙述文本（「进入新的时间点后，叙事文本应该随着改变」）。
+   非 present 档时：
+     · 地点节点（该时刻 memories 的 where）→ 那个日期场景的正文 —— 与放映卡同源，
+       详情窗简介与「重看叙事」讲的就都是那一天的事；
+     · 人物节点（该时刻 memories 的 who）→ 他在这天的回忆脚本（旁白 + 台词合成纯文本）。
+   其余情况返回 null = 没有时刻专属叙述，调用方退回静态文本（现在的描述）。 */
+function memNarrOf(t, n){
+  if (!n || !t || t === PRESENT_TIME) return null;
+  const mems = (MEMORIES || []).filter(m => m.when === t);
+  if (!mems.length) return null;
+  if (mems.some(m => m.where && n.key === containerKey(m.where))){
+    const s = SCENES[t] || {};
+    return plain(s.content || s.desc || "") || null;
+  }
+  if (n.kind === "char"){
+    const m = mems.find(x => x.who === n.id);
+    if (m) return memLinesOf(m).map(l =>
+      l.t === "say" ? "——" + ((CHARS[l.who] || {}).name || l.who) + "：" + l.text : l.text
+    ).join("\n") || null;
+  }
+  return null;
+}
+/* 进入某个回忆时刻 = 打开那天的放映卡（P5：时间节点下画布后，这是读回忆的主入口）。
+   锚在该时刻的「地点」节点上方（memories 的 where，一般就是花园）；找不到就不锚定。 */
+function openTimeCard(t){
+  if (!t || t === PRESENT_TIME || !SCENES[t]) return;
+  const ph = memPlaceOf(t);
+  showMemoryCard(t, (ph && G.nodes[containerKey(ph)]) || null);
+}
+/* 真正换档（原子）：改 G.time → 收掉锚在画布上的浮层 → 重绘 → 首次自动开放映卡。
+   （切时刻的入口在**档案窗**按时间记录那一列；放映卡每时刻只自动放一遍，见 openTimeCardOnce，
+     重放走「档案里点当前档」的手动口。） */
+function applyTimeNow(t){
+  G.time = t;
+  closeBubble(); closeNarr(); closePwPop(); closeDlgWin();  /* 锚在画布上的浮层收掉，别指向已隐藏的节点 */
+  render();
+  /* 进入回忆时刻：镜头聚焦在该时刻的发生地点上（memories 的 where；不在画布就跳过）。
+     必须在开放映卡**之前**对焦 —— 卡片按当前视图做「不裁出屏幕」钳制（与 revealScene 同一口径）。 */
+  if (t !== PRESENT_TIME){
+    const ph = memPlaceOf(t);
+    const n = ph ? G.nodes[containerKey(ph)] : null;
+    if (n && visibleNode(n)) centerOnNode(n);
+  }
+  openTimeCardOnce(t);
+}
+/* 每个时刻的放映卡只**自动**放一遍：看没看过记在该时刻名下（G.cardSeen，进快照存档）。
+   之后切档不再重放 —— 想重看点时间轴上当前档的小圆点即可（15-desktop.js 的 endDrag）。 */
+function openTimeCardOnce(t){
+  if (!t || t === PRESENT_TIME || !SCENES[t]) return;
+  if (!G.cardSeen) G.cardSeen = {};
+  if (G.cardSeen[t]) return;
+  G.cardSeen[t] = true;
+  openTimeCard(t);
+}
+/* 切时刻的过场：**整块世界慢慢淡出 → 换档 → 慢慢淡入**。
+   特例：无头验证器里 setTimeout 是空实现（返回 0）→ 同步换档，动画只是装饰（与切案过场同一口径）。 */
+const TIME_FADE_MS = 380;   /* 与 03-desktop.css 里 #world 的 transition 时长保持一致 */
+let timeFadeTimer = 0;
+function swapTime(t){
+  const w = (typeof world !== "undefined") ? world : null;
+  if (!w || !w.classList){ applyTimeNow(t); return; }
+  if (timeFadeTimer){ clearTimeout(timeFadeTimer); timeFadeTimer = 0; }  /* 上一次没落地：新的接管 */
+  if (w.style) w.style.opacity = "";                                      /* 清掉可能留下的内联 opacity */
+  w.classList.add("time-fade");                                          /* 整块淡出 */
+  const tm = setTimeout(() => { timeFadeTimer = 0; applyTimeNow(t); w.classList.remove("time-fade"); }, TIME_FADE_MS);
+  if (!tm){ applyTimeNow(t); w.classList.remove("time-fade"); }          /* 无头：同步换档 */
+  else timeFadeTimer = tm;
+}
+function setTime(t){
+  if (!G) return false;
+  if (t !== PRESENT_TIME && (SCENE_MEMORY || []).indexOf(t) < 0) return false;
+  if (((G && G.time) || PRESENT_TIME) === t) return true;   /* 同档：不换、也不淡 */
+  swapTime(t);
+  return true;
+}
 function labelOf(kind, id){
   if (isSceneKind(kind)) return SCENES[id] ? SCENES[id].title : null;
   if (kind === "item") return ITEMS[id]  ? ITEMS[id].label  : (id.startsWith("DATA_") ? id.replace(/^DATA_/, "") : null);
@@ -1129,6 +1281,28 @@ function updateLogBadge(){
     if (!b){ b = document.createElement("span"); b.className = "badge cnt"; icon.appendChild(b); }
     b.textContent = logUnread;
   } else if (b) b.remove();
+}
+/* 档案角标：新时刻收录（revealScene 建出 time: 节点）时点亮，打开档案窗 / 重置即清。
+   与日志计数角标同一族（.badge，桌面图标上的定位见 05-apps.css 的 .desk-icon .badge）。 */
+let archiveUnread = false;
+function markArchiveNew(){ archiveUnread = true; updateArchiveBadge(); }
+function clearArchiveNew(){ archiveUnread = false; updateArchiveBadge(); }
+function updateArchiveBadge(){
+  const icon = document.getElementById("goto-icon");
+  if (!icon) return;
+  let b = icon.querySelector(".badge");
+  if (archiveUnread){
+    if (!b){ b = document.createElement("span"); b.className = "badge new"; icon.appendChild(b); }
+    b.textContent = "新";
+  } else if (b) b.remove();
+}
+/* 新时刻收录进档案的统一提示口：toast + 档案图标「新」角标。
+   时刻节点的创建口不止一处（展开场景带出 / 摘录点名 / 前往 / 组合与命令产出），
+   提示只认「真的新建了 time: 节点」这一件事 —— 挂在 ensureSceneNode（建场景类节点的唯一入口）上。
+   restore / 读档直接替换 G.nodes、不走 ensureSceneNode ⇒ 开机 / 续档不会乱响。 */
+function announceTimeCollected(){
+  toast("新的档案已收录");
+  markArchiveNew();
 }
 let toastTimer = null;
 function toast(html, fail){
@@ -1231,9 +1405,15 @@ function ensureNode(kind, id, opts){
 /* 建「场景类」节点（场景 / 时间）的唯一入口：kind 由 containerKind() 现算。
    原先 7 处各自写死要建 loc 节点 —— 一旦某个 id 被划成时间节点（config.memoryScenes），
    那些入口会造出 loc 键的节点，而 containerKey() 按 containerKind() 算的是 time 键，
-   同一个 id 就分裂成两个节点、状态各记一半。凡是要建场景节点，一律走这里。 */
+   同一个 id 就分裂成两个节点、状态各记一半。凡是要建场景节点，一律走这里。
+   新时刻收录提示也挂在这里：无论哪条路（展开场景带出 / 摘录点名 / 前往 / 组合产出），
+   真的新建了 time: 节点就 toast + 档案「新」角标（announceTimeCollected）。 */
 function ensureSceneNode(id, opts){
-  return ensureNode(containerKind(id), id, opts);
+  const key = containerKey(id);
+  const isNew = !G.nodes[key];
+  const n = ensureNode(containerKind(id), id, opts);
+  if (isNew && containerKind(id) === "time" && !(opts && opts.silent)) announceTimeCollected();
+  return n;
 }
 /* 「刚上画布 / 刚被取回」的节点有两件事要记，别混成一个 flag：
      fresh  —— 只给这一轮的镜头聚焦用，render() 末尾就擦（一次性）；
@@ -1253,7 +1433,7 @@ function revealScene(sid, silent){
   if (!s) return 0;
   /* 画布上此时只有这一个「未探索」的容器节点？展开后需要重排视野（只平移会溢出）。 */
   const soloBefore = Object.keys(G.nodes).length <= 1;
-  const sn = ensureNode(containerKind(sid), sid, { label: containerTitle(sid) });
+  const sn = ensureSceneNode(sid, { label: containerTitle(sid), silent });
   const firstTime = !G.explored.has(sid);
   G.explored.add(sid);
   /* G.lastScene 是「玩家最后打开的**场景**」，供 TEC 的 sceneTalks 与相遇人物的 homeScene 兜底：
@@ -1274,7 +1454,7 @@ function revealScene(sid, silent){
 
   sceneLocs(sid).forEach(tid => {
     const existed = !!nodeByKey(containerKind(tid), tid);
-    const tn = ensureSceneNode(tid, { label: SCENES[tid].title || tid });
+    const tn = ensureSceneNode(tid, { label: SCENES[tid].title || tid, silent });
     if (!tn.homeScene) tn.homeScene = sid;
     if (!existed){ added++; newKeys.push(tn.key); }
     link(sn.key, tn.key, "move");
@@ -1285,6 +1465,8 @@ function revealScene(sid, silent){
   const fresh = freshKeys();   /* 抢在 render() 之前：本次新建的 + 从收纳里取回的，都要一起框住 */
   layout();          /* 必须重新布局，否则新节点没有坐标 */
   render();
+  /* 新时刻收录提示不在 revealScene 里做：它认「新建了 time: 节点」，而带出日期的入口
+     不止「直接揭示日期」一条（展开场景带出 / 摘录点名都绕过这里）——统一挂在 ensureSceneNode。 */
   if (firstTime && !silent){
     /* 先定镜头（fit / 聚焦），再弹叙事卡：卡片用当前视图做「不裁出屏幕」钳制，
        镜头定了之后钳制才准，否则卡片会盖到节点上（实测） */
@@ -1335,37 +1517,20 @@ function attemptCombo(toolKey, targetKey){
     log("前往场景 <b>" + esc(target.label) + "</b>", "act");
     return;
   }
-  /* 1.5) 回忆小剧场（A-001 的 6月2日 / 7月4日）：时间 × 地点 × 人物 三者凑齐才演出。
-         第一步 —— 时间 × 地点：把一个**时间节点**拖到某个**场景**上 ⇒ 就地绑定地点（n.place），
-         不新增节点（节点数不膨胀、撤销天然可用）。标签末尾挂上地点，看得见这一步生效了。
-         第二步 —— 再拖一个**人物**到绑好地点的时间节点上 ⇒ 按 when × who × where 查回忆表。
-         两条都插在「两个场景之间没有直接通路」之前：时间节点也是场景，不拦下来会被判成"走不过去"。 */
-  const tNode = tool.kind === "time" ? tool : (target.kind === "time" ? target : null);
-  const oNode = tNode === tool ? target : tool;          /* 时间节点对面的那一个 */
-  if (tNode && oNode && oNode.kind === "loc"){
-    if (tNode.place === oNode.id){
-      fail(tNode, oNode, "「" + plain(tNode.label) + "」已经记着这个地点了");
-    } else {
-      tNode.place = oNode.id;
-      log("「" + esc(tNode.label) + "」记下了地点：<b>" + esc(oNode.label) +
-          "</b>（再拖一个人物上去，看看那天发生了什么）", "sys");
-      render();              /* 只重绘（节点副行要跟着变）：这里不该再跑一遍自动布局，把玩家刚摆好的位置揉乱 */
-    }
-    return;
-  }
-  /* 第二步：人物 ×（时间 × 地点）—— 命中的是**时间节点**（它身上带着 when 与 place），人物给 who */
-  const mWhen = target.kind === "time" ? target : (tool.kind === "time" ? tool : null);
-  const mWho  = mWhen === target ? tool : target;
-  if (mWhen && mWho && mWho.kind === "char"){
-    const entry = lookupMemory(mWhen.id, mWho.id, mWhen.place);
+  /* 1.5) 回忆小剧场（方案 B P4）：时间不再占节点，when 由**时间轴当前档**（G.time）承担 ——
+         时间节点已不再上画布（P5），所以「拖时间到地点绑 place」那一步取消。
+         身处某个回忆时刻时，把一个人物拖到某个**地点**节点上 ⇒ 按 when × who × where 查回忆表。
+         插在「两个场景之间没有直接通路」之前：地点是场景，不先拦下来会被判成"走不过去"。 */
+  const mWho   = tool.kind === "char" ? tool : (target.kind === "char" ? target : null);
+  const mWhere = tool.kind === "loc"  ? tool : (target.kind === "loc"  ? target : null);
+  if (mWho && mWhere && G.time && G.time !== PRESENT_TIME){
+    const entry = lookupMemory(G.time, mWho.id, mWhere.id);
     if (entry){
       G.tried.add(triedKey);
-      showMemoryPlay(entry, mWhen);
+      showMemoryPlay(entry, mWhere);   /* 锚在地点节点上方 */
       log("想起了一段回忆：<b>" + esc(entry.title || entry.id) + "</b>", "sys");
     } else {
-      fail(mWhen, mWho, mWhen.place
-        ? "「" + plain((SCENES[mWhen.place] || {}).title || mWhen.place) + "」里没有「" + plain(mWho.label) + "」的回忆"
-        : "「" + plain(mWhen.label) + "」还不知道发生在哪里（先把它拖到一个地点上）");
+      fail(mWho, mWhere, "「" + plain(mWhere.label) + "」里没有「" + plain(mWho.label) + "」的回忆");
     }
     return;
   }
@@ -1945,7 +2110,9 @@ function render(){
   svg.innerHTML = "";
 
   Object.values(G.nodes).forEach(n => {
-    if (n.hidden || n.stored){ n.el = null; return; }
+    /* 时间节点（P5）：不再上画布 —— 时刻改由右上角时间轴承担（15-desktop.js）。
+       它仍留在 G.nodes 里（发现 / 存档 / 时刻派生都靠它），只是不画出来。 */
+    if (n.kind === "time" || !visibleNode(n)){ n.el = null; return; }
     const el = document.createElement("div");
     /* 画布上的长相只看 kind：场景与时间都是宽节点（■ / ◆），书桌 / 垃圾桶是普通物品节点（□）。
        时间节点多挂一个 time-node 类，只为换掉符号与边框，尺寸仍与场景一致。
@@ -1969,9 +2136,6 @@ function render(){
 
     let sub = isContainerNode(n) ? (G.collapsed.has(n.id) ? "已折叠 · 双击展开" : (G.explored.has(n.id) ? "已探索" : "未探索 · 双击展开")) : kindName(n.kind);
     if (n.kind === "clue" && G.captured.has(n.id)) sub = "线索 · 已捕获";
-    /* 时间节点记下了地点（「时间 × 地点」那一步，见 05-combine.js）：副行挂上「◈ 地点」，
-       一眼看得出这段回忆已经落到哪个场景上 —— 这是那一步唯一的即时反馈（不换符号、不加角标）。 */
-    if (n.kind === "time" && n.place && SCENES[n.place]) sub = "◈ " + SCENES[n.place].title;
     el.innerHTML = "<div class='n-title'>" + esc(n.label) + "</div><div class='n-sub'>" + esc(sub) + "</div>";
 
     /* 「条件进入」角标已撤（2026-10-14，用户要求）。它是一枚**实心**药丸，和「新 / 对话 N」
@@ -2017,6 +2181,9 @@ function render(){
   refreshPeopleWin();
   refreshInferWin();    /* 推演窗同理：阵列与执行者头顶的种子对话框都是状态驱动的，
                            撤销 / 续档把 G 滚回去之后，开着的窗不能留着旧 DOM */
+  refreshGotoWin();     /* 档案窗（按时间记录）跟着图刷新：已知时刻变了 / 当前档变了都要重排，
+                           「当前」高亮与「已回顾」状态才会跟着走（关着时是空操作） */
+  applyMemMode();       /* 回忆态（非「现在」）给桌面挂 .mem-mode：窗体 + 节点切 memory 做旧风格 */
   /* 重建 DOM 后恢复选中态并重挂聚焦淡化 */
   if (sel && G.nodes[sel] && G.nodes[sel].el) G.nodes[sel].el.classList.add("sel"); else sel = null;
   applyFocus();
@@ -2094,7 +2261,7 @@ function center(el){
 }
 function updateCrumbs(){
   const total = Object.keys(G.nodes).length;
-  const visible = Object.values(G.nodes).filter(n => !n.hidden && !n.stored).length;
+  const visible = Object.values(G.nodes).filter(visibleNode).length;
   crumbs.innerHTML = "节点 <b>" + visible + "/" + total + "</b> · 已探索场景 <b>" +
     G.explored.size + "/" + Object.keys(SCENES).length + "</b> · 已试组合 <b>" + G.tried.size +
     "</b> · 捕获线索 <b>" + G.captured.size + "</b> · 结局 <b>" + G.endings.size + "/" + ENDINGS.length + "</b>";
@@ -2269,7 +2436,7 @@ function attachInteractions(el, n){
         if (n.kind === "clue") assignClue(n.key, (CLUES[n.id] || {}).type);
         else toast("只有线索能进推演器", true);
       } else if (iconHit === "goto-icon"){
-        if (isSceneKind(n.kind)) gotoScene(n.id);   /* 档案里列的是场景与时间；容器物品（书桌）不在此列 */
+        if (isSceneKind(n.kind)) gotoScene(n.id);   /* 场景拖到档案图标 = 前往（居中并选中）；档案窗本身按时间记录（12-panels.js），容器物品（书桌）不在此列 */
         else toast("只有场景能进档案", true);
       }
       return;
@@ -2396,7 +2563,7 @@ function nodeBox(n){
 }
 /* 把一组节点整体平移到视野中央（只平移，不改 view.k）。 */
 function focusOn(keys, ms){
-  const list = (keys || []).map(k => G.nodes[k]).filter(n => n && !n.hidden && !n.stored);
+  const list = (keys || []).map(k => G.nodes[k]).filter(n => visibleNode(n));
   if (tgReveal && !tgReveal.checked){ lastFocus = { on:false, why:"toggle-off", keys:[] }; return false; }
   if (!list.length){ lastFocus = { on:false, why:"nothing-visible", keys:[] }; return false; }
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -2434,7 +2601,7 @@ function focusOn(keys, ms){
 function freshKeys(){
   return Object.keys(G.nodes).filter(k => {
     const n = G.nodes[k];
-    return n && n.fresh && !n.hidden && !n.stored;
+    return n && n.fresh && visibleNode(n);
   });
 }
 /* 聚焦到「本次新长出来的节点」，把它们整体带到视野中央。
@@ -2443,7 +2610,7 @@ function freshKeys(){
    舞台角落（实测最坏偏离中心 285px）——看着就是"没聚焦"。锚点本身就在玩家眼皮底下，
    不需要镜头带过去；新节点才是要找的那个。 */
 function focusFresh(news){
-  const live = (news || []).filter(k => { const n = G.nodes[k]; return n && !n.hidden && !n.stored; });
+  const live = (news || []).filter(k => visibleNode(G.nodes[k]));
   if (!live.length){ lastFocus = { on:false, why:"no-new-node", keys:[] }; return false; }
   return focusOn(live);
 }
@@ -2912,6 +3079,19 @@ function showCharLine(n){
   return true;
 }
 
+/* 重看对话（详情窗按钮，与场景的「重看叙事」同一口径）：把已说过的话整段重放进对话窗 ——
+   **不推进队列、不再拿线索、不进撤销栈**（重看是回放，不是把流程再走一遍）；
+   台词说完就停在说过的最后一句，点窗继续 = 接着说没说过的（prog 没动，衔接自然）。 */
+function renarrTalk(n){
+  const ch = CHARS[n.id] || {};
+  const queue = charTalkQueue(n);
+  const prog = Math.min(G.talkProg[n.key] || 0, queue.length);
+  if (!prog) return false;                     /* 一句都没聊过：没有可重看的东西 */
+  closeDlgWin();                               /* 从头重放：旧窗整扇收掉（换角色同一口径），首行落下时重新锚定 */
+  for (let i = 0; i < prog; i++) openDlgWin(n, ch, plain(queue[i]));
+  return true;
+}
+
 /* 浮窗初始位置避开左上角操作提示区 */
 function avoidHint(x, y){
   const hint = document.getElementById("hint");
@@ -3012,8 +3192,14 @@ function showNarrCard(n, s){
 function renarrScene(sid){
   const node = G.nodes[containerKey(sid)];
   if (!node) return;
-  const s = containerData(sid) || {};
-  if (SCENE_MEMORY.indexOf(sid) >= 0) showMemoryCard(node, s); else showNarrCard(node, s);
+  /* 身处回忆时刻且这是那天发生故事的地点：放**那一时刻**的放映卡 ——
+     叙事跟着时刻走，不把现在的花园正文放给 7月4日 的花园。 */
+  const mp = (G.time && G.time !== PRESENT_TIME) ? memPlaceOf(G.time) : null;
+  if (mp && containerKey(mp) === containerKey(sid)){
+    showMemoryCard(G.time, node);
+    return;
+  }
+  if (SCENE_MEMORY.indexOf(sid) >= 0) showMemoryCard(sid, node); else showNarrCard(node, containerData(sid) || {});
 }
 
 /* ============ TEC 对话窗口（桌面图标应用） ============ */
@@ -3440,28 +3626,79 @@ function clearSelection(){
   applyFocus();
 }
 
-/* ============ GOTO // 前往：听说过的场景索引 ============ */
 /* seenTexts 不进 snapshot：已经"听说过"的知识不随撤销丢失 */
 function noteSeen(text){
   if (!text) return;
   G.seenTexts.push(String(text));
   if (G.seenTexts.length > 200) G.seenTexts.shift();
 }
-function heardScenes(){
-  const known = new Set(G.explored);
-  Object.keys(G.nodes).forEach(k => {
-    const m = /^(?:loc|time):(.+)$/.exec(k);   /* 时间节点也是「听说的场景」，一并进档案 */
-    if (m) known.add(m[1]);
-  });
-  G.explored.forEach(sid => sceneLocs(sid).forEach(t => known.add(t)));
-  G.seenTexts.forEach(txt => {
-    parseTags(txt).forEach(t => { if (t.kind === "loc" && SCENES[t.id]) known.add(t.id); });
-    for (const id in SCENES){
-      const t = SCENES[id].title;
-      if (t && t.length >= 2 && txt.indexOf(t) >= 0) known.add(id);
+
+/* ============ ARCHIVE // 档案：按时间记录 ============
+   档案不再列地点，而是按**时刻**记录（2026-10-16 与独立时间轴合并）：顶部「现在」，
+   往下是已经获得的时刻，越往下越早。每档一行：日期 + 简介（发生地点 · 在场人物 + 一句开场摘要，
+   从 memories 自动拼，见 timeBriefOf）。点一行 = 切到那刻（整块世界慢淡入淡出；该时刻的放映卡
+   只**自动**放一遍，见 03-utils.js 的 openTimeCardOnce）；点的**就是当前档** = 重放那段回忆。
+   地点的「前往场景」走画布命令入口（08-interact.js 的 gotoScene），不再占档案。 */
+let gotoWinEl = null;
+function closeGotoWin(){ if (gotoWinEl){ gotoWinEl.remove(); gotoWinEl = null; } }
+function toggleGotoWin(){
+  if (gotoWinEl){ closeGotoWin(); return; }
+  const w = makeWindow("ARCHIVE // 档案", closeGotoWin);
+  w.el.classList.add("goto-win");
+  desktopEl.appendChild(w.el);
+  makeFloatDraggable(w.el, false);
+  gotoWinEl = w.el;
+  clearArchiveNew();     /* 打开档案 = 「新」角标已读 */
+  refreshGotoWin();
+}
+/* 某时刻的简介：取 memories 里 when 相同的条目，拼「发生地点 · 在场人物」与一句开场旁白。 */
+function timeBriefOf(t){
+  const mems = (MEMORIES || []).filter(m => m.when === t);
+  const where = (mems[0] && mems[0].where && SCENES[mems[0].where]) ? SCENES[mems[0].where].title : "";
+  const who = [];
+  mems.forEach(m => { if (m.who && who.indexOf(m.who) < 0) who.push(m.who); });
+  const whoTxt = who.map(id => (CHARS[id] && CHARS[id].name) || id).join(" · ");
+  let sum = "";
+  for (let i = 0; i < mems.length && !sum; i++){
+    const line = (mems[i].script || []).find(l => l && l.t === "narr" && l.text);
+    if (line) sum = plain(line.text);
+  }
+  return { where: where, who: whoTxt, sum: sum };
+}
+function refreshGotoWin(){
+  if (!gotoWinEl) return;
+  const body = gotoWinEl.querySelector(".syswin-body");
+  if (!body) return;
+  body.innerHTML = "";
+  /* 档上的档：现在在顶，之后把已知时刻倒序（越往下越早）—— 沿用旧时间轴的顺序 */
+  const list = [{ id: PRESENT_TIME, label: nowLabel() }].concat(
+    timelineKnown().slice().reverse().map(id => ({ id: id, label: (SCENES[id] && SCENES[id].title) || id })));
+  const cur = (G && G.time) || PRESENT_TIME;
+  list.forEach(s => {
+    const d = document.createElement("div");
+    d.className = "goto-item" + (s.id === cur ? " cur" : "");
+    /* 行结构与人册 / 清单同族：.nm（可收缩列）里 .lb 日期 + .ds 简介——.ds 自带**单行省略**，简介永不折行 */
+    const nm = document.createElement("div"); nm.className = "nm";
+    const label = document.createElement("span"); label.className = "lb"; label.textContent = s.label;
+    nm.appendChild(label);
+    const sub = document.createElement("div"); sub.className = "ds";
+    if (s.id === PRESENT_TIME){
+      sub.textContent = "侦查进行中";
+    } else {
+      const b = timeBriefOf(s.id);
+      sub.textContent = ([b.where, b.who].filter(Boolean).join(" —— ") + (b.sum ? "　" + b.sum : "")) || "（还没有关于这一天的记录）";
     }
+    nm.appendChild(sub);
+    const st = document.createElement("span"); st.className = "st";
+    st.textContent = (s.id === cur) ? "当前" : (s.id !== PRESENT_TIME && G.cardSeen && G.cardSeen[s.id] ? "已回顾" : "");
+    d.appendChild(nm); d.appendChild(st);
+    d.addEventListener("click", () => {
+      if (s.id !== cur) setTime(s.id);
+      else if (s.id !== PRESENT_TIME) openTimeCard(s.id);   /* 点当前档 = 重放这段回忆 */
+      closeGotoWin();
+    });
+    body.appendChild(d);
   });
-  return [...known].filter(id => SCENES[id]);
 }
 function gotoScene(sid){
   if (!SCENES[sid]) return;                 /* 档案里只有场景；容器物品（书桌 / 垃圾桶）不在此列 */
@@ -3476,41 +3713,6 @@ function gotoScene(sid){
   applyView();
   selectNode(sn.key);
   log("前往「" + esc(SCENES[sid].title || sid) + "」", "act");
-}
-let gotoWinEl = null;
-function closeGotoWin(){ if (gotoWinEl){ gotoWinEl.remove(); gotoWinEl = null; } }
-function toggleGotoWin(){
-  if (gotoWinEl){ closeGotoWin(); return; }
-  const w = makeWindow("ARCHIVE // 档案", closeGotoWin);
-  w.el.classList.add("goto-win");
-  desktopEl.appendChild(w.el);
-  makeFloatDraggable(w.el, false);
-  gotoWinEl = w.el;
-  refreshGotoWin();
-}
-function refreshGotoWin(){
-  if (!gotoWinEl) return;
-  const body = gotoWinEl.querySelector(".syswin-body");
-  if (!body) return;
-  body.innerHTML = "";
-  const list = heardScenes();
-  if (!list.length){
-    const d = document.createElement("div");
-    d.className = "bag-empty";
-    d.textContent = "（还没有听说任何场景）";
-    body.appendChild(d);
-    return;
-  }
-  list.forEach(sid => {
-    const d = document.createElement("div");
-    d.className = "goto-item";
-    const label = document.createElement("span"); label.textContent = SCENES[sid].title || sid;
-    const st = document.createElement("span"); st.className = "st";
-    st.textContent = (G.explored.has(sid) ? "已探索" : "未探索") + " · " + (nodeByKey(containerKind(sid), sid) ? "在画布" : "未在画布");
-    d.appendChild(label); d.appendChild(st);
-    d.addEventListener("click", () => { gotoScene(sid); closeGotoWin(); });
-    body.appendChild(d);
-  });
 }
 
 /* ============ CLUE LEDGER // 线索册：收纳盒 ============
@@ -4367,9 +4569,12 @@ function memLineSpec(raw){
   const s = String(raw == null ? "" : raw);
   return { t: s.startsWith("——") ? "talk" : "narr", text: s, who: null };
 }
-function showMemoryCard(n, s){
+/* 放映卡：按**日期 id** 打开（P5 起时间节点不再上画布，锚点改由调用方给 —— 时间轴选档时锚在地点节点，
+   详情窗「重看」则锚在该场景节点）。anchorNode 缺席时不锚定，退到默认位置。 */
+function showMemoryCard(sid, anchorNode){
+  const s = SCENES[sid] || {};
   closeNarr();
-  const w = makeWindow("MEMORY // " + (s.title || n.id), closeNarr);
+  const w = makeWindow("MEMORY // " + (s.title || sid), closeNarr);
   const c = w.el;
   c.className = "narr-card memory syswin";
   c.title = "单击任意位置推进下一行，按住可拖动";
@@ -4379,17 +4584,17 @@ function showMemoryCard(n, s){
   narrEl = c;
   const lines = narrText(s.content || s.desc || "").split("\n").map(t => t.trim()).filter(Boolean)
     .map(t => ({ t: "narr", text: t }));
-  sceneTags(n.id).forEach(t => {
+  sceneTags(sid).forEach(t => {
     if (t.kind !== "char") return;
     const ch = CHARS[t.id];
-    const st = ch && (ch.sceneTalks || {})[n.id];
+    const st = ch && (ch.sceneTalks || {})[sid];
     (st || []).forEach(l => lines.push({ t: "talk", text: "——" + (ch.name || t.id) + "：" + plain(l.text || "") }));
   });
   memoryPlay = { el: c, body: w.body, lines: lines, idx: 0, typing: false, cur: null, curText: "" };
   playMemoryLine();
   /* 锚定必须放在第一行落下去之后：空窗口量到的高度只有标题栏那点，算出来的 top 偏下，
      第一行一出现卡片就压住节点（`anchorAboveOrBelow` 承诺的是"不盖节点"）。 */
-  anchorAboveOrBelow(c, n, 14);
+  if (anchorNode) anchorAboveOrBelow(c, anchorNode, 14);
 }
 
 /* ---- 回忆小剧场：时间 × 地点 × 人物 三者凑齐后的演出（05-combine.js 里接线） ---- */
@@ -4501,10 +4706,19 @@ function paintDetail(){
   const n = sel ? G.nodes[sel] : null;
   if (!n){ detailPlaceholder(sel ? "节点已不存在。" : null); return; }
 
+  /* 回忆时刻：叙事文本跟着时刻走 —— 地点讲那天的正文、人物讲那天的回忆，
+     都是从 memories 派生的时刻专属叙述（memNarrOf）；present 档返回 null，照旧用静态文本。 */
+  const mn = memNarrOf(G.time, n);
+  const tlabel = timeLabelOf(G.time);
+
   let html = "<div class='dt'>" + esc(n.label) + "</div>";
   html += "<div class='dmeta'>" + kindName(n.kind) + "</div>";
 
   if (isContainerNode(n)){
+    if (mn){
+      html += "<div class='ddesc'>" + esc(mn) + "</div>";
+      html += "<div class='drow'>时刻：" + esc(tlabel) + "</div>";
+    }
     /* 用「已探索 / 未探索」，与画布节点副标题（07-render.js）统一 —— 展开是动作，探索才是状态。 */
     html += "<div class='drow'>状态：" + (G.explored.has(n.id) ? "已探索" : "未探索") + "</div>";
     /* 正文只在叙事卡里出现一次；详情窗只给回看入口（去重） */
@@ -4517,8 +4731,13 @@ function paintDetail(){
       " · " + (SENSES[c.type] || c.type || "未知") + "</div>";
   } else if (n.kind === "char"){
     const c = CHARS[n.id] || {};
-    html += "<div class='ddesc'>" + esc(plain(c.desc || "（无描述）")) + "</div>";
+    /* 身处回忆时刻且这个人物在那一天有回忆：简介换成一整段回忆脚本，并注明时刻 */
+    html += "<div class='ddesc'>" + esc(mn || plain(c.desc || "（无描述）")) + "</div>";
+    if (mn) html += "<div class='drow'>时刻：" + esc(tlabel) + "</div>";
     html += "<div class='drow'>状态：" + ((G.talkProg[n.key] || 0) >= charTalkQueue(n).length ? "已聊完" : "可对话") + "</div>";
+    /* 聊过就有回看入口（与场景的「重看叙事」同一套）：把已说过的话整段重放进对话窗 */
+    if ((G.talkProg[n.key] || 0) > 0)
+      html += "<div class='drow'><button id='dt-renarr-talk'>[ 重看对话 ]</button></div>";
   } else {
     /* 物品 */
     const it = ITEMS[n.id] || {};
@@ -4562,6 +4781,8 @@ function paintDetail(){
   detailBody.innerHTML = html;
   const rb = document.getElementById("dt-renarr");
   if (rb) rb.addEventListener("click", () => renarrScene(n.id));
+  const rtb = document.getElementById("dt-renarr-talk");
+  if (rtb) rtb.addEventListener("click", () => renarrTalk(n));
 }
 
 /* ============ 摘录：文本物正文里可点的一小段 → 图上长出「目标节点 + 一条连回这张纸的边」 ============
@@ -4618,7 +4839,9 @@ function takeExcerpt(target, srcKey){
   const newEdge = !edgeBetween(srcKey, key, "cond");
   if (isNew || newEdge){
     pushHistory();
-    const n = ensureNode(kind, id, { label: nm });
+    /* 场景 / 时间引用走 ensureSceneNode（唯一入口）：新时刻收录提示挂在它身上，
+       摘录点出「7月4日」这类日期时 toast + 角标才会响 —— 直接 ensureNode 会绕过提示。 */
+    const n = isSceneKind(refKind) ? ensureSceneNode(id, { label: nm }) : ensureNode(refKind, id, { label: nm });
     if (isNew) markFresh(n);
     link(srcKey, key, "cond");
     noteSeen(nm);
@@ -4728,6 +4951,7 @@ window.__pw = function(id){
     /* 光标在窗口/浮层上时滚轮交给窗口自己的滚动条，不触发画布缩放 */
     const t = e.target;
     if (t && t.closest && t.closest(".syswin, #toast, #verdict")) return;
+    /* 画布滚轮**始终是缩放** —— 切时刻只在时间轴窗体上滚（那扇窗自己接管自己的 wheel）。 */
     cancelViewAnim();   /* 玩家缩放 → 接管镜头 */
     e.preventDefault();
     const r = stage.getBoundingClientRect();
@@ -4740,7 +4964,7 @@ window.__pw = function(id){
 })();
 
 function fit(){
-  const keys = Object.keys(G.nodes).filter(k => !G.nodes[k].hidden && !G.nodes[k].stored);
+  const keys = Object.keys(G.nodes).filter(k => visibleNode(G.nodes[k]));
   if (!keys.length) return;
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   keys.forEach(k => {
@@ -4824,6 +5048,21 @@ function resetIconPositions(){
 }
 ICON_LAYOUT.forEach(([id, app]) => attachIcon(document.getElementById(id), app));
 resetIconPositions();
+
+/* ============ 时刻图层（方案 B）：时刻的「已知集合」 ============
+   独立时间轴窗体已删（2026-10-16 与档案合并）：切时刻的入口改在**档案窗**（12-panels.js 的
+   refreshGotoWin，按时间记录、带简介）。这里只留「哪些时刻已经被玩家获得」的判据，供档案与
+   timeStageKeys 使用：该时刻已有画布节点，或已探索过它的场景。 */
+function timelineKnown(){
+  return (SCENE_MEMORY || []).filter(id => !!G.nodes["time:" + id] || G.explored.has(id));
+}
+/* 回忆态：只要不在「现在」，就给桌面根挂 .mem-mode —— 窗体与节点整体切 memory 做旧风格
+   （纯字面色值、不碰 :root，规则见 06-shell.css 末段）。回到「现在」摘掉类即完全还原、不残留。 */
+function applyMemMode(){
+  if (!desktopEl || !desktopEl.classList) return;
+  desktopEl.classList.toggle("mem-mode", ((G && G.time) || PRESENT_TIME) !== PRESENT_TIME);
+}
+
 /* 详情 / 日志静态窗口：× 与拖动 */
 document.getElementById("detail-x").addEventListener("click", () => clearSelection());
 document.getElementById("log-x").addEventListener("click", () => setLogWin(false));
@@ -6372,6 +6611,7 @@ function boot(opts){
      只有换案 / 重置才清（resetTec / closeBagWin / closeClueWin 在各自调用点），
      否则「– 收起 → 展开」回访同一案件时会被顺带收掉。 */
   closeGotoWin();
+  clearArchiveNew();    /* 开局 / 换案 / 重置：档案「新」角标一并清（档都重建了，没有未读可言） */
   closeInferWin();
   closePeopleWin();
   closeMapWin();
@@ -6442,7 +6682,8 @@ window.__overBagDrop = (cx, cy) => overBagDrop(cx, cy);
 window.__cap = key => attemptCapture(key);
 window.__noteSeen = t => noteSeen(t);
 window.__goto = sid => gotoScene(sid);
-window.__gotoList = () => heardScenes();
+window.__gotoList = () => ["present"].concat(timelineKnown().slice().reverse());   /* 档案按时间记录：档 id 清单（现在在顶） */
+window.__view = () => ({ x: view.x, y: view.y, k: view.k });   /* 验证 / 调试：当前镜头（聚焦断言用） */
 window.__clueToggle = () => toggleClueWin();
 window.__clueLedger = () => ledgerList().map(n => ({ key:n.key, id:n.id, label:n.label, sense:(CLUES[n.id] || {}).type }));
 window.__ledgerStore = key => ledgerStore(key);
@@ -6461,6 +6702,15 @@ window.__boardTake = (id, sense, cx, cy) => boardTake(id, sense, cx, cy);   /* �
 window.__matrixItems = () => matrixItems().map(n => n.key);
 window.__infer = () => executeInference();
 window.__render = () => render();   /* 验证 / 调试：手动重绘整张画布（等价于任何一次 render 调用） */
+/* 时间轴 / 时刻图层（方案 B，P1）：切当前时刻（"present" 或 config.memoryScenes 里的 id）。
+   只重绘不重排 ⇒ 「该时刻的节点留在同一位置」。 */
+window.__time = t => setTime(t);
+window.__timeStage = () => (G && G.time) || "present";
+window.__stages = () => timelineStages().map(s => ({ id:s.id, label:s.label, size:s.keys ? s.keys.size : null }));
+window.__visibleNow = () => Object.keys(G.nodes).filter(k => visibleNow(G.nodes[k]));
+window.__visibleKeys = () => Object.keys(G.nodes).filter(k => visibleNode(G.nodes[k]));
+/* 回忆态风格层（P3）：#desktop 上是否挂着 .mem-mode（窗体 + 节点切 memory 做旧风格） */
+window.__memMode = () => !!(desktopEl && desktopEl.classList && desktopEl.classList.contains("mem-mode"));
 window.__inferToggle = () => toggleInferWin();
 window.__ensure = (kind, id) => {
   const d = kind === "clue" ? (CLUES[id] || {}) : (ITEMS[id] || {});
@@ -6519,6 +6769,7 @@ window.__avatarConfirm = () => confirmAvatarPick();
 window.__select = key => key ? selectNode(key) : clearSelection();
 window.__closeFloats = () => { closeBubble(); closeDlgWin(); closeNarr(); closePwPop(); };
 window.__renarr = sid => renarrScene(sid);
+window.__renarrTalk = key => { const n = G.nodes[key]; return n ? renarrTalk(n) : false; };
 /* 回忆小剧场（时间 × 地点 × 人物）：数据表 / 匹配器 / 当前演出进度 / 时间节点绑上的地点 */
 window.__memories = () => (MEMORIES || []).map(m => ({ id:m.id, when:m.when, where:m.where, who:m.who, title:m.title,
   lines:(m.script || []).length,
@@ -6551,6 +6802,7 @@ window.__caseInfo = () => ({
 });
 window.__dump  = () => ({
   nodes: Object.keys(G.nodes),
+  seen: G.seenTexts.length,
   lit: Object.keys(G.nodes).filter(k => G.nodes[k].lit),
   talk: Object.assign({}, G.talkProg),
   tec: { prog: Object.assign({}, G.tecProg), lastScene: G.lastScene },
@@ -6561,6 +6813,7 @@ window.__dump  = () => ({
   bag: bagItems().map(n => n.key),
   ledger: ledgerItems().map(n => n.key),
   collapsed: [...G.collapsed],
+  time: (G && G.time) || "present",
   dim: G._dimKeys || [],
   sel: sel,
   floats: { bubble: !!bubbleEl, dlg: !!dlgWinEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },

@@ -145,6 +145,19 @@ function showCharLine(n){
   return true;
 }
 
+/* 重看对话（详情窗按钮，与场景的「重看叙事」同一口径）：把已说过的话整段重放进对话窗 ——
+   **不推进队列、不再拿线索、不进撤销栈**（重看是回放，不是把流程再走一遍）；
+   台词说完就停在说过的最后一句，点窗继续 = 接着说没说过的（prog 没动，衔接自然）。 */
+function renarrTalk(n){
+  const ch = CHARS[n.id] || {};
+  const queue = charTalkQueue(n);
+  const prog = Math.min(G.talkProg[n.key] || 0, queue.length);
+  if (!prog) return false;                     /* 一句都没聊过：没有可重看的东西 */
+  closeDlgWin();                               /* 从头重放：旧窗整扇收掉（换角色同一口径），首行落下时重新锚定 */
+  for (let i = 0; i < prog; i++) openDlgWin(n, ch, plain(queue[i]));
+  return true;
+}
+
 /* 浮窗初始位置避开左上角操作提示区 */
 function avoidHint(x, y){
   const hint = document.getElementById("hint");
@@ -245,8 +258,14 @@ function showNarrCard(n, s){
 function renarrScene(sid){
   const node = G.nodes[containerKey(sid)];
   if (!node) return;
-  const s = containerData(sid) || {};
-  if (SCENE_MEMORY.indexOf(sid) >= 0) showMemoryCard(node, s); else showNarrCard(node, s);
+  /* 身处回忆时刻且这是那天发生故事的地点：放**那一时刻**的放映卡 ——
+     叙事跟着时刻走，不把现在的花园正文放给 7月4日 的花园。 */
+  const mp = (G.time && G.time !== PRESENT_TIME) ? memPlaceOf(G.time) : null;
+  if (mp && containerKey(mp) === containerKey(sid)){
+    showMemoryCard(G.time, node);
+    return;
+  }
+  if (SCENE_MEMORY.indexOf(sid) >= 0) showMemoryCard(sid, node); else showNarrCard(node, containerData(sid) || {});
 }
 
 /* ============ TEC 对话窗口（桌面图标应用） ============ */

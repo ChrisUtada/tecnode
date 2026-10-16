@@ -34,6 +34,127 @@ function isSceneKind(k){ return k === "loc" || k === "time"; }
    凡是要拿引用去查 / 建画布节点的地方，都必须过这一道 —— 否则会凭空造出一个 loc: 节点，
    与 containerKey() 算出的 time: 分裂成同一 id 的两个节点。 */
 function nodeKeyOfRef(kind, id){ return isSceneKind(kind) ? containerKey(id) : kind + ":" + id; }
+/* ============ 时间轴 / 时刻图层（方案 B，P1 内核）============
+   时间不再只是「一类节点」，而是画布的一个维度：G.time 记当前所在时刻。
+   "present" = 现在（基准层，显示全部节点）；其余时刻取自 config.memoryScenes，
+   某时刻的节点集**由回忆数据派生**（data.memories）：该 when 下所有 where 的地点 +
+   who 的人物 —— 不新建节点，只按时刻显隐（见 visibleNow）。
+
+   与空间折叠（n.hidden / G.collapsed，由 recomputeHidden 管）**正交**：
+   最终可见 = visibleNow(n) && !n.hidden && !n.stored。两维各写各的标志，互不干扰。 */
+const PRESENT_TIME = "present";
+/* 派生「某时刻的节点键集合」；present 返回 null（= 全显，不做时间过滤）。 */
+function timeStageKeys(t){
+  if (t === PRESENT_TIME) return null;
+  const keys = new Set();
+  (MEMORIES || []).forEach(m => {
+    if (m.when !== t) return;
+    if (m.where) keys.add(containerKey(m.where));        /* 地点：场景节点（loc:xxx） */
+    if (m.who)   keys.add(nodeKeyOfRef("char", m.who));  /* 人物：角色节点（char:xxx） */
+  });
+  return keys;
+}
+/* 「现在」那一档的显示名：案件可在 config.nowLabel 写明它对应的日期（A-001 = 7月5日，
+   见 SCENES_garden 正文「时间：7月5日」）；没写就退回「现在」。 */
+function nowLabel(){ return (DATA && DATA.config && DATA.config.nowLabel) || "现在"; }
+/* 时间轴各档：present 在首位，其余按 SCENE_MEMORY 顺序。P2 的 UI 与 §41 都用它。 */
+function timelineStages(){
+  const out = [{ id: PRESENT_TIME, label: nowLabel(), keys: null }];
+  (SCENE_MEMORY || []).forEach(id => {
+    out.push({ id: id, label: (SCENES[id] && SCENES[id].title) || id, keys: timeStageKeys(id) });
+  });
+  return out;
+}
+function currentStage(){
+  const t = (G && G.time) || PRESENT_TIME;
+  const list = timelineStages();
+  return list.find(s => s.id === t) || list[0];
+}
+/* 时间可见性：当前时刻的节点集里没有它 ⇒ 不可见；present 档全通过。 */
+function visibleNow(n){ if (!n) return false; const st = currentStage(); return !st.keys || st.keys.has(n.key); }
+/* 综合可见（时间 × 空间）：渲染 / 交互 / 聚焦一律认这一个。 */
+function visibleNode(n){ return !!n && !n.hidden && !n.stored && visibleNow(n); }
+/* 切换时刻。只重绘、**不重排**（layout）：节点 x/y 跨时刻共享，
+   重排会把玩家摆好的位置推走 —— 「该时刻的节点留在同一位置」靠的就是这一点。 */
+/* 某时刻回忆发生在哪个地点（数据侧 memories 的 where）；没有就 null。放映卡按它定锚点。 */
+function memPlaceOf(t){ const m = (MEMORIES || []).find(x => x.when === t); return m ? m.where : null; }
+/* 时刻的显示名：present 档用 config.nowLabel（A-001 = 7月5日），其余用日期场景标题。 */
+function timeLabelOf(t){ return t === PRESENT_TIME ? nowLabel() : ((SCENES[t] && SCENES[t].title) || t); }
+/* 回忆时刻的叙述文本（「进入新的时间点后，叙事文本应该随着改变」）。
+   非 present 档时：
+     · 地点节点（该时刻 memories 的 where）→ 那个日期场景的正文 —— 与放映卡同源，
+       详情窗简介与「重看叙事」讲的就都是那一天的事；
+     · 人物节点（该时刻 memories 的 who）→ 他在这天的回忆脚本（旁白 + 台词合成纯文本）。
+   其余情况返回 null = 没有时刻专属叙述，调用方退回静态文本（现在的描述）。 */
+function memNarrOf(t, n){
+  if (!n || !t || t === PRESENT_TIME) return null;
+  const mems = (MEMORIES || []).filter(m => m.when === t);
+  if (!mems.length) return null;
+  if (mems.some(m => m.where && n.key === containerKey(m.where))){
+    const s = SCENES[t] || {};
+    return plain(s.content || s.desc || "") || null;
+  }
+  if (n.kind === "char"){
+    const m = mems.find(x => x.who === n.id);
+    if (m) return memLinesOf(m).map(l =>
+      l.t === "say" ? "——" + ((CHARS[l.who] || {}).name || l.who) + "：" + l.text : l.text
+    ).join("\n") || null;
+  }
+  return null;
+}
+/* 进入某个回忆时刻 = 打开那天的放映卡（P5：时间节点下画布后，这是读回忆的主入口）。
+   锚在该时刻的「地点」节点上方（memories 的 where，一般就是花园）；找不到就不锚定。 */
+function openTimeCard(t){
+  if (!t || t === PRESENT_TIME || !SCENES[t]) return;
+  const ph = memPlaceOf(t);
+  showMemoryCard(t, (ph && G.nodes[containerKey(ph)]) || null);
+}
+/* 真正换档（原子）：改 G.time → 收掉锚在画布上的浮层 → 重绘 → 首次自动开放映卡。
+   （切时刻的入口在**档案窗**按时间记录那一列；放映卡每时刻只自动放一遍，见 openTimeCardOnce，
+     重放走「档案里点当前档」的手动口。） */
+function applyTimeNow(t){
+  G.time = t;
+  closeBubble(); closeNarr(); closePwPop(); closeDlgWin();  /* 锚在画布上的浮层收掉，别指向已隐藏的节点 */
+  render();
+  /* 进入回忆时刻：镜头聚焦在该时刻的发生地点上（memories 的 where；不在画布就跳过）。
+     必须在开放映卡**之前**对焦 —— 卡片按当前视图做「不裁出屏幕」钳制（与 revealScene 同一口径）。 */
+  if (t !== PRESENT_TIME){
+    const ph = memPlaceOf(t);
+    const n = ph ? G.nodes[containerKey(ph)] : null;
+    if (n && visibleNode(n)) centerOnNode(n);
+  }
+  openTimeCardOnce(t);
+}
+/* 每个时刻的放映卡只**自动**放一遍：看没看过记在该时刻名下（G.cardSeen，进快照存档）。
+   之后切档不再重放 —— 想重看点时间轴上当前档的小圆点即可（15-desktop.js 的 endDrag）。 */
+function openTimeCardOnce(t){
+  if (!t || t === PRESENT_TIME || !SCENES[t]) return;
+  if (!G.cardSeen) G.cardSeen = {};
+  if (G.cardSeen[t]) return;
+  G.cardSeen[t] = true;
+  openTimeCard(t);
+}
+/* 切时刻的过场：**整块世界慢慢淡出 → 换档 → 慢慢淡入**。
+   特例：无头验证器里 setTimeout 是空实现（返回 0）→ 同步换档，动画只是装饰（与切案过场同一口径）。 */
+const TIME_FADE_MS = 380;   /* 与 03-desktop.css 里 #world 的 transition 时长保持一致 */
+let timeFadeTimer = 0;
+function swapTime(t){
+  const w = (typeof world !== "undefined") ? world : null;
+  if (!w || !w.classList){ applyTimeNow(t); return; }
+  if (timeFadeTimer){ clearTimeout(timeFadeTimer); timeFadeTimer = 0; }  /* 上一次没落地：新的接管 */
+  if (w.style) w.style.opacity = "";                                      /* 清掉可能留下的内联 opacity */
+  w.classList.add("time-fade");                                          /* 整块淡出 */
+  const tm = setTimeout(() => { timeFadeTimer = 0; applyTimeNow(t); w.classList.remove("time-fade"); }, TIME_FADE_MS);
+  if (!tm){ applyTimeNow(t); w.classList.remove("time-fade"); }          /* 无头：同步换档 */
+  else timeFadeTimer = tm;
+}
+function setTime(t){
+  if (!G) return false;
+  if (t !== PRESENT_TIME && (SCENE_MEMORY || []).indexOf(t) < 0) return false;
+  if (((G && G.time) || PRESENT_TIME) === t) return true;   /* 同档：不换、也不淡 */
+  swapTime(t);
+  return true;
+}
 function labelOf(kind, id){
   if (isSceneKind(kind)) return SCENES[id] ? SCENES[id].title : null;
   if (kind === "item") return ITEMS[id]  ? ITEMS[id].label  : (id.startsWith("DATA_") ? id.replace(/^DATA_/, "") : null);
@@ -124,6 +245,28 @@ function updateLogBadge(){
     if (!b){ b = document.createElement("span"); b.className = "badge cnt"; icon.appendChild(b); }
     b.textContent = logUnread;
   } else if (b) b.remove();
+}
+/* 档案角标：新时刻收录（revealScene 建出 time: 节点）时点亮，打开档案窗 / 重置即清。
+   与日志计数角标同一族（.badge，桌面图标上的定位见 05-apps.css 的 .desk-icon .badge）。 */
+let archiveUnread = false;
+function markArchiveNew(){ archiveUnread = true; updateArchiveBadge(); }
+function clearArchiveNew(){ archiveUnread = false; updateArchiveBadge(); }
+function updateArchiveBadge(){
+  const icon = document.getElementById("goto-icon");
+  if (!icon) return;
+  let b = icon.querySelector(".badge");
+  if (archiveUnread){
+    if (!b){ b = document.createElement("span"); b.className = "badge new"; icon.appendChild(b); }
+    b.textContent = "新";
+  } else if (b) b.remove();
+}
+/* 新时刻收录进档案的统一提示口：toast + 档案图标「新」角标。
+   时刻节点的创建口不止一处（展开场景带出 / 摘录点名 / 前往 / 组合与命令产出），
+   提示只认「真的新建了 time: 节点」这一件事 —— 挂在 ensureSceneNode（建场景类节点的唯一入口）上。
+   restore / 读档直接替换 G.nodes、不走 ensureSceneNode ⇒ 开机 / 续档不会乱响。 */
+function announceTimeCollected(){
+  toast("新的档案已收录");
+  markArchiveNew();
 }
 let toastTimer = null;
 function toast(html, fail){

@@ -469,9 +469,12 @@ function memLineSpec(raw){
   const s = String(raw == null ? "" : raw);
   return { t: s.startsWith("——") ? "talk" : "narr", text: s, who: null };
 }
-function showMemoryCard(n, s){
+/* 放映卡：按**日期 id** 打开（P5 起时间节点不再上画布，锚点改由调用方给 —— 时间轴选档时锚在地点节点，
+   详情窗「重看」则锚在该场景节点）。anchorNode 缺席时不锚定，退到默认位置。 */
+function showMemoryCard(sid, anchorNode){
+  const s = SCENES[sid] || {};
   closeNarr();
-  const w = makeWindow("MEMORY // " + (s.title || n.id), closeNarr);
+  const w = makeWindow("MEMORY // " + (s.title || sid), closeNarr);
   const c = w.el;
   c.className = "narr-card memory syswin";
   c.title = "单击任意位置推进下一行，按住可拖动";
@@ -481,17 +484,17 @@ function showMemoryCard(n, s){
   narrEl = c;
   const lines = narrText(s.content || s.desc || "").split("\n").map(t => t.trim()).filter(Boolean)
     .map(t => ({ t: "narr", text: t }));
-  sceneTags(n.id).forEach(t => {
+  sceneTags(sid).forEach(t => {
     if (t.kind !== "char") return;
     const ch = CHARS[t.id];
-    const st = ch && (ch.sceneTalks || {})[n.id];
+    const st = ch && (ch.sceneTalks || {})[sid];
     (st || []).forEach(l => lines.push({ t: "talk", text: "——" + (ch.name || t.id) + "：" + plain(l.text || "") }));
   });
   memoryPlay = { el: c, body: w.body, lines: lines, idx: 0, typing: false, cur: null, curText: "" };
   playMemoryLine();
   /* 锚定必须放在第一行落下去之后：空窗口量到的高度只有标题栏那点，算出来的 top 偏下，
      第一行一出现卡片就压住节点（`anchorAboveOrBelow` 承诺的是"不盖节点"）。 */
-  anchorAboveOrBelow(c, n, 14);
+  if (anchorNode) anchorAboveOrBelow(c, anchorNode, 14);
 }
 
 /* ---- 回忆小剧场：时间 × 地点 × 人物 三者凑齐后的演出（05-combine.js 里接线） ---- */

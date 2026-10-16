@@ -15,9 +15,15 @@ function ensureNode(kind, id, opts){
 /* 建「场景类」节点（场景 / 时间）的唯一入口：kind 由 containerKind() 现算。
    原先 7 处各自写死要建 loc 节点 —— 一旦某个 id 被划成时间节点（config.memoryScenes），
    那些入口会造出 loc 键的节点，而 containerKey() 按 containerKind() 算的是 time 键，
-   同一个 id 就分裂成两个节点、状态各记一半。凡是要建场景节点，一律走这里。 */
+   同一个 id 就分裂成两个节点、状态各记一半。凡是要建场景节点，一律走这里。
+   新时刻收录提示也挂在这里：无论哪条路（展开场景带出 / 摘录点名 / 前往 / 组合产出），
+   真的新建了 time: 节点就 toast + 档案「新」角标（announceTimeCollected）。 */
 function ensureSceneNode(id, opts){
-  return ensureNode(containerKind(id), id, opts);
+  const key = containerKey(id);
+  const isNew = !G.nodes[key];
+  const n = ensureNode(containerKind(id), id, opts);
+  if (isNew && containerKind(id) === "time" && !(opts && opts.silent)) announceTimeCollected();
+  return n;
 }
 /* 「刚上画布 / 刚被取回」的节点有两件事要记，别混成一个 flag：
      fresh  —— 只给这一轮的镜头聚焦用，render() 末尾就擦（一次性）；
@@ -37,7 +43,7 @@ function revealScene(sid, silent){
   if (!s) return 0;
   /* 画布上此时只有这一个「未探索」的容器节点？展开后需要重排视野（只平移会溢出）。 */
   const soloBefore = Object.keys(G.nodes).length <= 1;
-  const sn = ensureNode(containerKind(sid), sid, { label: containerTitle(sid) });
+  const sn = ensureSceneNode(sid, { label: containerTitle(sid), silent });
   const firstTime = !G.explored.has(sid);
   G.explored.add(sid);
   /* G.lastScene 是「玩家最后打开的**场景**」，供 TEC 的 sceneTalks 与相遇人物的 homeScene 兜底：
@@ -58,7 +64,7 @@ function revealScene(sid, silent){
 
   sceneLocs(sid).forEach(tid => {
     const existed = !!nodeByKey(containerKind(tid), tid);
-    const tn = ensureSceneNode(tid, { label: SCENES[tid].title || tid });
+    const tn = ensureSceneNode(tid, { label: SCENES[tid].title || tid, silent });
     if (!tn.homeScene) tn.homeScene = sid;
     if (!existed){ added++; newKeys.push(tn.key); }
     link(sn.key, tn.key, "move");
@@ -69,6 +75,8 @@ function revealScene(sid, silent){
   const fresh = freshKeys();   /* 抢在 render() 之前：本次新建的 + 从收纳里取回的，都要一起框住 */
   layout();          /* 必须重新布局，否则新节点没有坐标 */
   render();
+  /* 新时刻收录提示不在 revealScene 里做：它认「新建了 time: 节点」，而带出日期的入口
+     不止「直接揭示日期」一条（展开场景带出 / 摘录点名都绕过这里）——统一挂在 ensureSceneNode。 */
   if (firstTime && !silent){
     /* 先定镜头（fit / 聚焦），再弹叙事卡：卡片用当前视图做「不裁出屏幕」钳制，
        镜头定了之后钳制才准，否则卡片会盖到节点上（实测） */

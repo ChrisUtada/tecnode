@@ -19,10 +19,19 @@ function paintDetail(){
   const n = sel ? G.nodes[sel] : null;
   if (!n){ detailPlaceholder(sel ? "节点已不存在。" : null); return; }
 
+  /* 回忆时刻：叙事文本跟着时刻走 —— 地点讲那天的正文、人物讲那天的回忆，
+     都是从 memories 派生的时刻专属叙述（memNarrOf）；present 档返回 null，照旧用静态文本。 */
+  const mn = memNarrOf(G.time, n);
+  const tlabel = timeLabelOf(G.time);
+
   let html = "<div class='dt'>" + esc(n.label) + "</div>";
   html += "<div class='dmeta'>" + kindName(n.kind) + "</div>";
 
   if (isContainerNode(n)){
+    if (mn){
+      html += "<div class='ddesc'>" + esc(mn) + "</div>";
+      html += "<div class='drow'>时刻：" + esc(tlabel) + "</div>";
+    }
     /* 用「已探索 / 未探索」，与画布节点副标题（07-render.js）统一 —— 展开是动作，探索才是状态。 */
     html += "<div class='drow'>状态：" + (G.explored.has(n.id) ? "已探索" : "未探索") + "</div>";
     /* 正文只在叙事卡里出现一次；详情窗只给回看入口（去重） */
@@ -35,8 +44,13 @@ function paintDetail(){
       " · " + (SENSES[c.type] || c.type || "未知") + "</div>";
   } else if (n.kind === "char"){
     const c = CHARS[n.id] || {};
-    html += "<div class='ddesc'>" + esc(plain(c.desc || "（无描述）")) + "</div>";
+    /* 身处回忆时刻且这个人物在那一天有回忆：简介换成一整段回忆脚本，并注明时刻 */
+    html += "<div class='ddesc'>" + esc(mn || plain(c.desc || "（无描述）")) + "</div>";
+    if (mn) html += "<div class='drow'>时刻：" + esc(tlabel) + "</div>";
     html += "<div class='drow'>状态：" + ((G.talkProg[n.key] || 0) >= charTalkQueue(n).length ? "已聊完" : "可对话") + "</div>";
+    /* 聊过就有回看入口（与场景的「重看叙事」同一套）：把已说过的话整段重放进对话窗 */
+    if ((G.talkProg[n.key] || 0) > 0)
+      html += "<div class='drow'><button id='dt-renarr-talk'>[ 重看对话 ]</button></div>";
   } else {
     /* 物品 */
     const it = ITEMS[n.id] || {};
@@ -80,6 +94,8 @@ function paintDetail(){
   detailBody.innerHTML = html;
   const rb = document.getElementById("dt-renarr");
   if (rb) rb.addEventListener("click", () => renarrScene(n.id));
+  const rtb = document.getElementById("dt-renarr-talk");
+  if (rtb) rtb.addEventListener("click", () => renarrTalk(n));
 }
 
 /* ============ 摘录：文本物正文里可点的一小段 → 图上长出「目标节点 + 一条连回这张纸的边」 ============
@@ -136,7 +152,9 @@ function takeExcerpt(target, srcKey){
   const newEdge = !edgeBetween(srcKey, key, "cond");
   if (isNew || newEdge){
     pushHistory();
-    const n = ensureNode(kind, id, { label: nm });
+    /* 场景 / 时间引用走 ensureSceneNode（唯一入口）：新时刻收录提示挂在它身上，
+       摘录点出「7月4日」这类日期时 toast + 角标才会响 —— 直接 ensureNode 会绕过提示。 */
+    const n = isSceneKind(refKind) ? ensureSceneNode(id, { label: nm }) : ensureNode(refKind, id, { label: nm });
     if (isNew) markFresh(n);
     link(srcKey, key, "cond");
     noteSeen(nm);

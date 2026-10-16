@@ -905,10 +905,11 @@ const capBefore = window.__dump().captured.length;
 window.__cap('item:ITEM_taideng');           // 台灯没有 hiddenClue
 assert('无可捕获对象时不产生新线索', window.__dump().captured.length === capBefore);
 
-/* 前往：初始已知场景不含门的后面；见过文案后可前往 */
-assert('初始未听说门的后面', !window.__gotoList().includes('SCENES_mdhm'));
+/* 前往：场景不再由档案列出（档案按时间记录），「听说过」仍记在 seenTexts 里，前往走画布入口 */
+assert('门的后面还不曾在画布上', !window.__dump().nodes.includes('loc:SCENES_mdhm'));
+const seen0 = window.__dump().seen;
 window.__noteSeen('你拨开了疯长的大豕草……（如果你已做好准备，请在互动指令中输入“前往 门的后面”）');
-assert('见过文案后听说门的后面', window.__gotoList().includes('SCENES_mdhm'));
+assert('见过文案后记进 seenTexts（「听说过」不随档案改版丢失）', window.__dump().seen === seen0 + 1);
 window.__goto('SCENES_mdhm');
 assert('前往生成场景节点', window.__dump().nodes.includes('loc:SCENES_mdhm'));
 
@@ -1392,8 +1393,8 @@ assert('容器详情提供「重看叙事」按钮', dh.indexOf('dt-renarr') >= 
    「探索」才是留在界面上的状态（画布节点副标题早就写「已探索」，详情窗跟着统一）。 */
 assert('容器详情状态行写「已探索」（不再写「已展开」）',
   dh.indexOf('状态：已探索') >= 0 && dh.indexOf('已展开') < 0);
-assert('档案窗与顶栏计数同步用「已探索 / 未探索」（源码检查）',
-  /G\.explored\.has\(sid\) \? "已探索" : "未探索"/.test(html)
+assert('档案行状态用「当前 / 已回顾」，顶栏计数仍写「已探索场景」（源码检查）',
+  html.indexOf('"当前"') >= 0 && html.indexOf('"已回顾"') >= 0
   && html.indexOf('已探索场景 <b>') >= 0);
 assert('整个引擎里不再出现「已展开 / 未展开」（源码检查：状态一律叫「已探索 / 未探索」）',
   html.indexOf('已展开') < 0 && html.indexOf('未展开') < 0);
@@ -3156,12 +3157,13 @@ assert('NODE_W / NODE_H 都带上 time 键（漏了会让锚定浮窗的 left �
 window.__ensure("time", "SCENES_0602");
 window.__ensure("time", "SCENES_0704");
 window.__render();
-assert('时间节点在画布上的键是 time:（不是 loc:）', !!findEl("time:SCENES_0602"));
-assert('同一日期 id 不会并存一个 loc: 节点',
-  !window.__dump().nodes.includes("loc:SCENES_0602"));
-const tEl40 = findEl("time:SCENES_0602");
-assert('时间节点同时挂 scene-node（尺寸）与 time-node（符号 / 双线框）两个类',
-  !!tEl40 && tEl40._classes.has("scene-node") && tEl40._classes.has("time-node"));
+assert('时间节点在 G 里的键是 time:（不是 loc:）',
+  window.__dump().nodes.includes("time:SCENES_0602") && !window.__dump().nodes.includes("loc:SCENES_0602"));
+/* P5：时间节点不再上画布 —— 时刻改由右上角时间轴承担（发现 / 存档 / 时刻派生仍靠 G.nodes 里的这个节点） */
+assert('时间节点不再渲染到画布上（P5：改由时间轴承担）',
+  !findEl("time:SCENES_0602") && !findEl("time:SCENES_0704"));
+assert('但时间节点仍留在 G.nodes 里（发现 / 续档要它）',
+  window.__dump().nodes.includes("time:SCENES_0602") && window.__dump().nodes.includes("time:SCENES_0704"));
 
 /* 两个时间节点之间照旧「没有直接通路」：kind 换了，loc-loc 那条判定必须同时认 time */
 const lg40 = logs.length;
@@ -3200,14 +3202,14 @@ assert('where 是真实场景（副行取得到它的标题）',
 assert('6 条回忆全部能被三键命中（数据自洽）',
   memsT.every(m => window.__lookupMemory(m.when, m.who, m.where) === m.id));
 
-/* 静态：匹配与接线必须落在正确的位置 */
-assert('回忆分支插在「两个场景之间没有直接通路」之前（时间节点也是场景，不拦下来会被判成走不过去）',
-  html.indexOf('lookupMemory(mWhen.id, mWho.id, mWhen.place)') > 0
-  && html.indexOf('lookupMemory(mWhen.id, mWho.id, mWhen.place)') < html.indexOf('这两个场景之间没有直接通路'));
-assert('n.place 进快照 —— 撤销要把「绑定地点」这一步退回去',
-  /bagFrom:n\.bagFrom, installed:n\.installed, place:n\.place/.test(html));
-assert('时间节点副行挂出绑定的地点（源码检查）',
-  /n\.kind === "time" && n\.place && SCENES\[n\.place\]/.test(html));
+/* 静态：匹配与接线必须落在正确的位置（P4：when 改由时间轴当前档承担，不再是「时间节点上的 place」） */
+assert('回忆分支插在「两个场景之间没有直接通路」之前（地点是场景，不拦下来会被判成走不过去）',
+  html.indexOf('lookupMemory(G.time, mWho.id, mWhere.id)') > 0
+  && html.indexOf('lookupMemory(G.time, mWho.id, mWhere.id)') < html.indexOf('这两个场景之间没有直接通路'));
+assert('回忆分支只在回忆时刻（非 present）生效（源码检查）',
+  html.indexOf('if (mWho && mWhere && G.time && G.time !== PRESENT_TIME){') > 0);
+assert('时间节点不再挂地点副行（P5：节点下画布，绑地点那一步取消）',
+  html.indexOf('sub = "◈ "') < 0);
 assert('剧场与放映卡共用一台状态机（memoryPlay / playMemoryLine / advanceMemory）',
   /function showMemoryPlay\(entry, n\)\{/.test(html) && /function lookupMemory\(when, who, where\)\{/.test(html)
   && html.indexOf('memoryPlay = { el: c, body: w.body, lines: memLinesOf(entry)') > 0);
@@ -3221,47 +3223,48 @@ assert('回忆是「重看」：脚本行只做标签转名字，不当第二条
 window.__reveal("SCENES_garden");
 window.__reveal("SCENES_0602");
 window.__closeFloats();
-const nodesBefore41 = window.__dump().nodes.length;
 
-/* ---- 第一步：时间 × 地点 ---- */
-window.__combo("time:SCENES_0602", "loc:SCENES_garden");
-assert('拖时间到地点 ⇒ 就地绑定 n.place（不新增节点）',
-  window.__placeOf("time:SCENES_0602") === "SCENES_garden"
-  && window.__dump().nodes.length === nodesBefore41);
-assert('绑定后副行挂上「◈ 地点」（这一步唯一的即时反馈）',
-  (findEl("time:SCENES_0602")._html || "").indexOf("◈ 植物学家的花园") >= 0);
-assert('只改这一个节点，别的不受影响',
-  window.__placeOf("time:SCENES_0704") === null && window.__placeOf("loc:SCENES_garden") === null);
-assert('绑定会留一条案卷（说得清这一步做了什么）',
-  logs.length > 0 && logs[logs.length - 1].indexOf('记下了地点') >= 0);
+/* ---- 选到 6月2日：轴选档 = 打开那天的放映卡（P5 起时间节点不在画布上，这是读回忆的主入口） ---- */
+window.__time('SCENES_0602');
+assert('选到 6/2 ⇒ 打开那天的 MEMORY 放映卡（时间节点已下画布，改由轴承担）',
+  window.__memoryState().open === true && window.__memoryState().total > 0);
+const memCardEl = ids['world'].children.find(c => c._classes.has('memory') && c._classes.has('narr-card') && !c._classes.has('mem-play'));
+assert('放映卡走 .memory 血统（黑标题栏 / 暗纸身 / 双线框）', !!memCardEl && memCardEl._classes.has('memory'));
+assert('放映卡锚在地点节点上方，定位是实数',
+  !!memCardEl && /^-?[\d.]+px$/.test(memCardEl.style.left || '') && /^-?[\d.]+px$/.test(memCardEl.style.top || ''));
+window.__closeFloats();
+window.__time('SCENES_0602');   /* 已经是 6/2：changed=false */
+assert('同档再选一次不重放（只有真的换档才开卡）', window.__memoryState().open === false);
 
-/* 反向（地点拖到时间）同样成立，并且这一步进撤销栈 —— 撤销要把 place 退回 null */
-window.__combo("loc:SCENES_garden", "time:SCENES_0704");
-assert('反向（地点拖到时间）同样成立', window.__placeOf("time:SCENES_0704") === "SCENES_garden");
-ids['btn-undo']._ev.click[0]();
-assert('撤销把「绑定地点」退回去（place 进了快照），早先那一条不受影响',
-  window.__placeOf("time:SCENES_0704") === null && window.__placeOf("time:SCENES_0602") === "SCENES_garden");
+/* ---- 每个时刻的放映卡只自动放一遍：看没看过记在该时刻名下（G.cardSeen，进快照存档）。
+   再切回来不重放 —— 想重看就点时间轴上当前档的小圆点（手动重放口）。 ---- */
+window.__time('present');
+assert('切回「现在」：不自动开卡（「现在」没有放映卡）', window.__memoryState().open === false);
+window.__time('SCENES_0704');
+assert('第一次切到 7/4：自动开放映卡', window.__memoryState().open === true);
+window.__closeFloats();
+window.__time('present');
+window.__time('SCENES_0704');
+assert('第二次切到 7/4：不再重放（数据已记在该时刻名下）', window.__memoryState().open === false);
 
-/* ---- 第二步：人物 ×（时间 × 地点） ---- */
-/* (a) 时间节点还没绑地点：只提示先给地点，不误演、不放任落进通用反应表 */
-window.__combo("char:CHARS_luhengs", "time:SCENES_0704");
-assert('时间节点没绑地点时拖人物上去 ⇒ 提示先给地点，不误演',
-  window.__memoryState().open === false
-  && logs.length > 0 && logs[logs.length - 1].indexOf('还不知道发生在哪里') >= 0);
-/* (b) 绑了地点、但这段回忆确实不在这里：说清「谁 / 在哪」没有，而不是"没有反应"那种噪音 */
-window.__combo("time:SCENES_0704", "loc:SCENES_garden");
-window.__combo("char:CHARS_JS", "time:SCENES_0704");
+/* ---- 人物 × 地点：when 取当前档，who × where 取拖拽的两端 ---- */
+/* (a) 换到 7/4，拖一个当天没有回忆的人上去：说清「谁 / 在哪」没有，而不是"没有反应"那种噪音 */
+window.__time('SCENES_0704');
+window.__closeFloats();
+window.__combo("char:CHARS_JS", "loc:SCENES_garden");
 assert('地点对得上、但没有这个人的回忆 ⇒ 明确说没有（且不误演）',
   window.__memoryState().open === false
   && logs.length > 0 && logs[logs.length - 1].indexOf('没有「槿杉」的回忆') >= 0);
-/* (c) 三键齐了（时间 × 地点 × 人物）⇒ 命中回忆表并演出小剧场 */
-window.__combo("char:CHARS_luhengs", "time:SCENES_0602");
-assert('三键齐了 ⇒ 命中并演出回忆小剧场',
+/* (b) 回到 6/2，三键齐了（when=当前档 × who × where）⇒ 命中回忆表并演出小剧场 */
+window.__time('SCENES_0602');
+window.__closeFloats();
+window.__combo("char:CHARS_luhengs", "loc:SCENES_garden");
+assert('三键齐了（when=当前档 × who × where）⇒ 命中并演出回忆小剧场',
   window.__memoryState().open === true && window.__memoryState().entry === "MEM_0602_lhs");
 const mpEl = ids['world'].children.find(c => c._classes.has('mem-play'));
 assert('剧场是 .memory 血统（黑标题栏 / 暗纸身 / 3px 双线黑框都跟着来）',
   !!mpEl && mpEl._classes.has('memory') && mpEl._classes.has('narr-card'));
-assert('剧场锚在时间节点上方，定位是实数（left / top 都不是 NaN）',
+assert('剧场锚在地点节点上方，定位是实数（left / top 都不是 NaN）',
   !!mpEl && /^-?[\d.]+px$/.test(mpEl.style.left || '') && /^-?[\d.]+px$/.test(mpEl.style.top || ''));
 assert('剧场标题 = MEMORY // 回忆名',
   !!mpEl && (mpEl.querySelector('.syswin-title') || {})._text === 'MEMORY // 6月2日 · 陆珩松');
@@ -3288,7 +3291,7 @@ assert('台词走打字机并落到行元素上（与放映卡同一套 typeInto
   sayRows.every(r => ((r.querySelector('.mp-text') || {})._text || '').length > 0));
 
 /* 点击推进 + 拖过不算（与放映卡同一套口径） */
-window.__combo("char:CHARS_zs", "time:SCENES_0602");
+window.__combo("char:CHARS_zs", "loc:SCENES_garden");
 const mpEl2 = ids['world'].children.find(c => c._classes.has('mem-play'));
 const mp2Lines = () => mpEl2.querySelector('.syswin-body').children.length;
 const mp2Before = mp2Lines();
@@ -3494,6 +3497,352 @@ else {
     bagWin40.querySelectorAll('.bag-item').length === 0 && !board40._classes.has('over'));
 }
 window.__closeFloats();
+
+/* ==================== 时间轴内核（方案 B P1） ====================
+   G.time 记当前时刻；某时刻的节点集由回忆数据派生（该 when 的 where 地点 + who 人物）。
+   最终可见 = visibleNow(n) && !n.hidden && !n.stored（时间 × 空间两维正交）。
+   切时刻只重绘不重排，故「该时刻的节点留在同一位置」。 */
+console.log('\n=== 时间轴内核（方案 B P1）：G.time / 派生时刻节点集 / 时间×空间正交 ===');
+
+assert('时间轴内核落在 03-utils.js（源码检查）',
+  html.indexOf('const PRESENT_TIME = "present";') >= 0 &&
+  /function visibleNow\(n\)\{/.test(html) && /function visibleNode\(n\)\{/.test(html) &&
+  /function setTime\(t\)\{/.test(html) && /function timelineStages\(\)\{/.test(html));
+assert('派生：某时刻节点集 = 该 when 的 where 地点 + who 人物（源码检查）',
+  html.indexOf('if (m.where) keys.add(containerKey(m.where));') >= 0 &&
+  html.indexOf('if (m.who)   keys.add(nodeKeyOfRef("char", m.who));') >= 0);
+assert('渲染改认 visibleNode，旧的 hidden||stored 短路已撤（源码检查）',
+  html.indexOf('if (n.kind === "time" || !visibleNode(n)){ n.el = null; return; }') >= 0 &&
+  html.indexOf('if (n.hidden || n.stored){ n.el = null; return; }') < 0);
+assert('聚焦 / 命中 / fit 一律走 visibleNode（源码检查）',
+  html.indexOf('const list = (keys || []).map(k => G.nodes[k]).filter(n => visibleNode(n));') >= 0 &&
+  html.indexOf('return n && n.fresh && visibleNode(n);') >= 0 &&
+  html.indexOf('const keys = Object.keys(G.nodes).filter(k => visibleNode(G.nodes[k]));') >= 0);
+assert('G.time 进快照 / 出档 / 默认（源码检查）',
+  html.indexOf('collapsed: [...G.collapsed], time: G.time || "present",') >= 0 &&
+  html.indexOf('seenTexts: G.seenTexts || [], time: s.time || "present",') >= 0 &&
+  /lastScene:null, collapsed:new Set\(\), seenTexts:\[\], time:"present"/.test(html));
+{
+  const atn = (() => { const s = html.slice(html.indexOf('function applyTimeNow(t){')); return s.slice(0, s.indexOf('\n}')); })();
+  const sw  = (() => { const s = html.slice(html.indexOf('function swapTime(t){')); return s.slice(0, s.indexOf('\n}')); })();
+  assert('切时刻只重绘不重排（applyTimeNow 内调 render()、不碰 layout）',
+    atn.indexOf('render()') >= 0 && atn.indexOf('layout') < 0);
+  assert('过场（swapTime）也不重排（只 toggle .time-fade + 换档）',
+    sw.indexOf('layout') < 0 && sw.indexOf('time-fade') > 0);
+}
+
+/* 备齐节点：地点 + 在场人物 + 两个分属不同时刻的人物 + 一条「现在」的线索 */
+const T_GARDEN = 'loc:SCENES_garden', T_LU = 'char:CHARS_luhengs', T_ZS = 'char:CHARS_zs',
+      T_FB = 'char:NPC_FB',      T_CLUE = 'clue:CLUES_V_luheng';
+window.__ensure('loc', 'SCENES_garden');
+window.__ensure('char', 'CHARS_luhengs');
+window.__ensure('char', 'CHARS_zs');
+window.__ensure('char', 'NPC_FB');
+window.__ensure('clue', 'CLUES_V_luheng');
+window.__time('present');
+window.__render();
+
+assert('时间轴档位 = 现在 + 两个日期（present 在首位）',
+  window.__stages().map(s => s.id).join(',') === 'present,SCENES_0602,SCENES_0704');
+assert('派生集大小：6/2 = 地点1 + 在场4；7/4 = 地点1 + 在场2',
+  window.__stages().find(s => s.id === 'SCENES_0602').size === 5 &&
+  window.__stages().find(s => s.id === 'SCENES_0704').size === 3);
+assert('present 档：时间不过滤（所有节点都可见）',
+  window.__timeStage() === 'present' && window.__visibleNow().length === window.__dump().nodes.length);
+
+/* 切到 6 月 2 日 */
+const tPosBefore = window.__dump().pos[T_LU];
+window.__time('SCENES_0602');
+assert('切到 6/2：当前时刻已改', window.__timeStage() === 'SCENES_0602');
+assert('6/2 档：地点与在场人物可见（陆珩松 / 傅柏 / 朱穗）',
+  [T_GARDEN, T_LU, T_FB, T_ZS].every(k => window.__visibleNow().includes(k)));
+assert('6/2 档：地点节点确实渲染在画布上（DOM 存在）', !!findEl(T_GARDEN));
+assert('6/2 档：不属于该时刻的「现在」线索被隐藏', !window.__visibleNow().includes(T_CLUE));
+assert('时间隐藏的节点没有 DOM 元素（render 已跳过）', !findEl(T_CLUE));
+assert('时间隐藏的节点仍在图中（只是不上画布，切回 / 撤销能复原）',
+  window.__dump().nodes.indexOf(T_CLUE) >= 0);
+assert('时间隐藏**不写** n.hidden（时间维与空间维各写各的标志）',
+  window.__dump().hidden.indexOf(T_CLUE) < 0);
+
+/* 切到 7 月 4 日：陆珩松两档都在 → 位置不变；朱穗在；傅柏（6/2 专属）隐藏 */
+window.__time('SCENES_0704');
+const tPosAfter = window.__dump().pos[T_LU];
+assert('切时刻不改节点坐标：两档都在的陆珩松留原位',
+  tPosBefore.x === tPosAfter.x && tPosBefore.y === tPosAfter.y);
+assert('7/4 档：在场人物（陆珩松 / 朱穗）与地点可见',
+  [T_GARDEN, T_LU, T_ZS].every(k => window.__visibleNow().includes(k)));
+assert('7/4 档：6/2 专属的傅柏被隐藏', !window.__visibleNow().includes(T_FB));
+
+/* 非法时刻拒绝；切回 present 复原 */
+assert('切到未知时刻被拒（时刻不变）',
+  window.__time('SCENES_bogus') === false && window.__timeStage() === 'SCENES_0704');
+window.__time('present');
+assert('切回 present：全部节点重新可见',
+  window.__visibleNow().length === window.__dump().nodes.length && window.__timeStage() === 'present');
+
+/* ==================== 档案窗（按时间记录） ====================
+   独立时间轴窗体已删（2026-10-16 合并进档案）：切时刻的入口改在档案窗（ARCHIVE // 档案）——
+   顶部「现在」，往下是已获得的时刻（倒序），每档带简介（地点 · 在场人物 + 一句开场摘要，memories 拼）。
+   点一行 = 切到那刻；点的就是当前档 = 重放那段回忆（放映卡每时刻只自动放一遍，见 openTimeCardOnce）。 */
+console.log('\n=== 档案窗（按时间记录）：时刻清单 / 简介 / 切档 ===');
+
+assert('时间轴窗体已删（#timeline / refreshTimeline / bindTimelineDrag 不在产物，源码检查）',
+  html.indexOf('<div id="timeline"') < 0 && html.indexOf('refreshTimeline') < 0 &&
+  html.indexOf('bindTimelineDrag') < 0 && html.indexOf('timelineScrubbing') < 0);
+assert('档案窗按时间记录：render 末尾接 refreshGotoWin（源码检查）',
+  html.indexOf('refreshGotoWin();') >= 0 && /function timeBriefOf\(t\)\{/.test(html) &&
+  html.indexOf('className = "nm"') >= 0 && html.indexOf('className = "ds"') >= 0);
+assert('新时刻收录有提示：toast + 档案「新」角标（源码检查）',
+  html.indexOf('toast("新的档案已收录")') >= 0 && html.indexOf('markArchiveNew()') >= 0 &&
+  html.indexOf('clearArchiveNew()') >= 0 && html.indexOf('badge new') >= 0);
+assert('收录提示下沉到唯一入口：ensureSceneNode 新建 time 节点即 announceTimeCollected（源码检查）',
+  /function ensureSceneNode\(id, opts\)\{[\s\S]{0,300}announceTimeCollected\(\)/.test(html) &&
+  /function announceTimeCollected\(\)\{[\s\S]{0,120}toast\("新的档案已收录"\)/.test(html));
+assert('revealScene 不再自带收录提示（hadSelf 块已撤）且走统一入口（源码检查）',
+  html.indexOf('hadSelf') < 0 &&
+  /function revealScene\(sid, silent\)\{[\s\S]{0,300}ensureSceneNode\(sid, \{ label: containerTitle\(sid\), silent \}\)/.test(html));
+assert('摘录点名日期也走统一入口：takeExcerpt 场景引用走 ensureSceneNode（源码检查）',
+  /const n = isSceneKind\(refKind\) \? ensureSceneNode\(id, \{ label: nm \}\) : ensureNode\(refKind, id, \{ label: nm \}\);/.test(html));
+assert('进入时刻镜头聚焦地点：applyTimeNow 对焦 memPlaceOf（源码检查）',
+  /function applyTimeNow\(t\)\{[\s\S]{0,600}centerOnNode\(n\)/.test(html));
+assert('「现在」档名来自 config.nowLabel（A-001 = 7月5日）',
+  /function nowLabel\(\)\{ return \(DATA && DATA\.config && DATA\.config\.nowLabel\)/.test(html) &&
+  html.indexOf('"nowLabel":"7月5日"') >= 0);
+
+const gotoWin = () => ids['desktop'].querySelector('.goto-win');
+const gotoRows = () => (gotoWin() ? gotoWin().querySelectorAll('.goto-item') : []);
+const gotoOpen = () => { ids['goto-icon']._ev.dblclick[0](); };
+const gotoClose = () => { ids['goto-icon']._ev.dblclick[0](); };
+/* 全新开局：档案只有「现在」一行（时刻清单常驻，获得日期后逐行补上） */
+ids['btn-reset']._ev.click[0]();
+window.__render();
+gotoOpen();
+assert('开局档案也有「现在」一行（时刻清单常驻）', gotoRows().length === 1);
+assert('当前档高亮在「现在」行，状态列写「当前」',
+  gotoRows()[0]._classes.has('cur') && (gotoRows()[0].querySelector('.st') || {})._text === '当前');
+gotoClose();
+
+/* 获得第一个时刻（6月2日）后：档案多一行，简介从 memories 拼；收录有 toast + 角标 */
+assert('重置后档案「新」角标已清', !ids['goto-icon'].querySelector('.badge'));
+window.__reveal("SCENES_garden");   /* 先把发生地点放上画布（聚焦断言要对得上节点） */
+window.__closeFloats();
+window.__reveal("SCENES_0602");
+window.__render();
+assert('新时刻收录：toast「新的档案已收录」', (ids['toast']._html || '').indexOf('新的档案已收录') >= 0);
+assert('新时刻收录：档案图标挂「新」角标', !!ids['goto-icon'].querySelector('.badge'));
+gotoOpen();
+assert('打开档案后「新」角标清掉', !ids['goto-icon'].querySelector('.badge'));
+assert('获得 6/2 后：档案两行（现在在顶、6月2日 在下）',
+  gotoRows().length === 2 && ((gotoRows()[1].querySelector('.lb') || {})._text === '6月2日'));
+assert('6/2 行带简介（.ds 含地点「花园」，单行省略样式）',
+  ((gotoRows()[1].querySelector('.ds') || {})._text || '').indexOf('花园') >= 0);
+assert('当前档高亮仍在「现在」',
+  gotoRows()[0]._classes.has('cur') && !gotoRows()[1]._classes.has('cur'));
+
+/* 点 6/2 行 = 切到那刻（档案随点击关闭）；镜头聚焦到该时刻的发生地点；重开：高亮跟着当前档走 */
+const v0 = window.__view();
+gotoRows()[1]._ev.click[0]();
+assert('点「6月2日」行 → 切到 6/2', window.__timeStage() === 'SCENES_0602');
+const v1 = window.__view();
+assert('进入 6/2：镜头聚焦到发生地点（view 被移动）', v1.x !== v0.x || v1.y !== v0.y);
+gotoOpen();
+assert('重开档案：高亮移到 6/2 行', gotoRows()[1]._classes.has('cur') && !gotoRows()[0]._classes.has('cur'));
+
+/* 收录提示认「真的新建了 time: 节点」，不认入口 —— 真实玩法两条主路都要响：
+   展开「访客记录」带出 7月4日（sceneLocs 路；6/2 已在画布上，不会重复响）。
+   旧实现只在 revealScene 直揭日期时提示，展开场景带出 / 摘录点名这两条主路都是哑的。 */
+window.__reveal("SCENES_fkjl");
+window.__render();
+assert('展开「访客记录」带出 7/4：同样 toast + 角标（sceneLocs 路径）',
+  (ids['toast']._html || '').indexOf('新的档案已收录') >= 0 && !!ids['goto-icon'].querySelector('.badge'));
+
+/* 再获得 7/4：三行且倒序（现在 / 7月4日 / 6月2日）；开着的档案跟着 render 即时刷新 */
+window.__ensure("time", "SCENES_0704");
+window.__render();
+assert('获得 7/4 后：档案三行（现在 / 7月4日 / 6月2日），开着的窗已即时刷新',
+  gotoRows().length === 3 &&
+  ((gotoRows()[1].querySelector('.lb') || {})._text === '7月4日') &&
+  ((gotoRows()[2].querySelector('.lb') || {})._text === '6月2日'));
+/* 点「现在」行 = 不切档也不重放（「现在」没有放映卡），只关窗 */
+gotoRows()[0]._ev.click[0]();
+assert('点「现在」行：档不变', window.__timeStage() === 'present');
+window.__time('present');
+
+/* ==================== 叙事文本随时刻变化 ====================
+   进入回忆时刻后，叙事跟着时刻走（2026-10-16）：
+   · 详情窗：地点简介换成那天的正文（放映卡同源）、人物简介换成他那天的回忆脚本，并注明「时刻：…」；
+   · 重看叙事：身处回忆时刻时重看该地点的叙事，放的是**那一时刻**的放映卡，不是现在的正文。 */
+console.log('\n=== 叙事文本随时刻变化：详情窗 + 重看叙事 ===');
+
+assert('时刻叙述助手就位：memNarrOf / timeLabelOf（源码检查）',
+  /function memNarrOf\(t, n\)\{/.test(html) && /function timeLabelOf\(t\)\{/.test(html));
+assert('详情窗按时刻出文本：paintDetail 接 memNarrOf 并注明「时刻」（源码检查）',
+  html.indexOf('const mn = memNarrOf(G.time, n);') >= 0 && html.indexOf('时刻：') >= 0);
+assert('重看叙事跟时刻走：renarrScene 在回忆时刻放该时刻的放映卡（源码检查）',
+  html.indexOf('memPlaceOf(G.time)') >= 0 && html.indexOf('showMemoryCard(G.time, node);') >= 0);
+
+/* 运行时：「现在」档 —— 花园详情没有时刻行（静态内容口径不变） */
+window.__ensure('char', 'CHARS_luhengs');
+window.__ensure('char', 'CHARS_zs');
+window.__time('present');
+window.__select('loc:SCENES_garden');
+const dhNow = ids['detail-body']._html || '';
+assert('现在档：花园详情没有「时刻」行', dhNow.indexOf('时刻：') < 0);
+
+/* 切到 6/2：花园详情的简介换成那天的正文（放映卡同源），并注明时刻 */
+window.__time('SCENES_0602');
+window.__render();
+window.__select('loc:SCENES_garden');
+const dh0602 = ids['detail-body']._html || '';
+assert('6/2 档：花园详情注明「时刻：6月2日」', dh0602.indexOf('时刻：6月2日') >= 0);
+assert('6/2 档：花园简介换成那天的正文（「身为助手的朱穗来到花园」）',
+  dh0602.indexOf('身为助手的朱穗来到花园') >= 0);
+assert('6/2 档：详情文本确实变了（与现在档不同）', dh0602 !== dhNow);
+
+/* 人物：简介换成「他/她在那一天」的回忆脚本 */
+window.__select('char:CHARS_zs');
+const dhZs = ids['detail-body']._html || '';
+assert('6/2 档：朱穗的简介换成她那天的回忆（「抱着文件走进花园」）',
+  dhZs.indexOf('抱着文件走进花园') >= 0 && dhZs.indexOf('时刻：6月2日') >= 0);
+window.__select('char:CHARS_luhengs');
+const dhLu0602 = ids['detail-body']._html || '';
+assert('6/2 档：陆珩松的简介是 6/2 的回忆（含回忆台词行）',
+  dhLu0602.indexOf('已经是第三次为他们拍摄合影了') >= 0);
+/* 切到 7/4：同一个人物，简介跟着换成 7/4 的回忆 —— 这就是「叙事文本随着改变」 */
+window.__time('SCENES_0704');
+window.__render();
+window.__select('char:CHARS_luhengs');
+const dhLu0704 = ids['detail-body']._html || '';
+assert('7/4 档：陆珩松的简介换成 7/4 的回忆（「握紧注射器」+ 时刻：7月4日）',
+  dhLu0704.indexOf('握紧注射器') >= 0 && dhLu0704.indexOf('时刻：7月4日') >= 0);
+assert('同一人物跨档简介不同（叙事随时刻变化）', dhLu0602 !== dhLu0704);
+
+/* 重看叙事跟时刻走：7/4 档重看花园 → 放 7/4 的放映卡，不是现在的花园正文 */
+window.__renarr('SCENES_garden');
+assert('7/4 档重看花园叙事：放的是 7/4 的放映卡（MEMORY 开卡）',
+  window.__memoryState().open === true);
+
+/* ==================== 人物对话重看按钮 ====================
+   人物详情也有回看入口（与场景的「重看叙事」同一套）：聊过才出现「重看对话」，
+   点了把已说过的话整段重放进对话窗 —— 不推进队列、不再拿线索、不进撤销栈（重看是回放）。 */
+console.log('\n=== 人物对话重看按钮：详情窗「重看对话」 ===');
+
+assert('重看按钮就位：paintDetail 出 dt-renarr-talk + renarrTalk 接线（源码检查）',
+  html.indexOf("id='dt-renarr-talk'") >= 0 && html.indexOf('重看对话') >= 0 &&
+  /function renarrTalk\(n\)\{/.test(html) && /renarrTalk\(n\)\);/.test(html));
+{
+  const rt = html.slice(html.indexOf('function renarrTalk(n){'));
+  const rtBody = rt.slice(0, rt.indexOf('\n}'));
+  assert('重看是回放：renarrTalk 不推进队列 / 不拿线索 / 不进撤销栈（源码检查）',
+    rtBody.length > 0 && rtBody.indexOf('pushHistory') < 0 &&
+    rtBody.indexOf('talkClues') < 0 && rtBody.indexOf('G.talkProg[n.key] =') < 0 &&
+    rtBody.indexOf('closeDlgWin()') >= 0);
+}
+
+/* 运行时：没聊过没有按钮；聊过出现；重放无副作用 */
+window.__time('present');
+window.__render();
+window.__select('char:CHARS_luhengs');
+assert('没聊过：人物详情没有「重看对话」按钮',
+  (ids['detail-body']._html || '').indexOf('dt-renarr-talk') < 0);
+
+window.__talk('char:CHARS_luhengs');
+window.__talk('char:CHARS_luhengs');
+window.__select('char:CHARS_luhengs');
+assert('聊过两句后：人物详情出现「重看对话」按钮',
+  (ids['detail-body']._html || '').indexOf("id='dt-renarr-talk'") >= 0);
+
+const rtTalkBefore = JSON.stringify(window.__dump().talk);
+const rtCapBefore = window.__dump().captured.length;
+const rtHistBefore = window.__dump().history;
+window.__closeFloats();
+window.__renarrTalk('char:CHARS_luhengs');
+assert('点「重看对话」：DIALOG 窗重新打开（整段重放）', window.__dump().floats.dlg === true);
+assert('重看不推进队列（talkProg 原样）', JSON.stringify(window.__dump().talk) === rtTalkBefore);
+assert('重看不拿线索', window.__dump().captured.length === rtCapBefore);
+assert('重看不进撤销栈', window.__dump().history === rtHistBefore);
+assert('一句没聊过的人物重看：不开新窗（陆珩松的窗留着）',
+  window.__renarrTalk('char:CHARS_zs') === false && window.__dump().floats.dlg === true);
+/* 重放后点窗继续 = 接着说没说过的第三句（prog 没动，衔接自然） */
+const dlgEl3 = (() => { window.__talk('char:CHARS_luhengs'); return window.__dump().talk['char:CHARS_luhengs']; })();
+assert('重放后再点窗：从第三句接着说（prog=3）', dlgEl3 === 3);
+
+
+/* ==================== 回忆态风格层（方案 B P3） ====================
+   不在「现在」时给 #desktop 挂 .mem-mode：窗体 + 节点整体切 memory 做旧风格
+   （暗纸身 #dcd8c2 + 近黑标题栏 #2b2b26 + 3px 双线框；全字面色值、不碰 :root）。 */
+console.log('\n=== 回忆态风格层（方案 B P3）：窗体 + 节点切 memory 做旧风 ===');
+
+assert('风格层挂载函数 + render 接线（源码检查）',
+  /function applyMemMode\(\)\{/.test(html) && html.indexOf('applyMemMode();') >= 0 &&
+  html.indexOf('desktopEl.classList.toggle("mem-mode"') >= 0);
+assert('.mem-mode 覆盖样式落在 06-shell.css（源码检查）',
+  /\.mem-mode \.syswin\{background:#dcd8c2; border:3px double #2b2b26\}/.test(html) &&
+  /\.mem-mode \.syswin-bar\{background:#2b2b26/.test(html) &&
+  /\.mem-mode \.node\{background:linear-gradient\(150deg,#e4dfcb/.test(html));
+{
+  const MEM_END = '.mem-mode .node.unexplored .n-title{color:#6d6858}';
+  const memBlock = html.slice(html.indexOf('.mem-mode .syswin{'), html.indexOf(MEM_END) + MEM_END.length);
+  assert('回忆态配色全用字面色值、不借 :root token（源码检查）',
+    memBlock.length > 0 && memBlock.indexOf('var(') < 0);
+}
+
+/* 运行时：现在 → 无风格；切到 6/2 → 有；切回 → 无（完全还原、不残留） */
+window.__ensure("time", "SCENES_0602");
+window.__time('present');
+window.__render();
+assert('「现在」态：桌面没有 .mem-mode', window.__memMode() === false);
+window.__time('SCENES_0602');
+assert('回忆态（6/2）：桌面挂上 .mem-mode', window.__memMode() === true);
+window.__time('present');
+assert('切回「现在」：.mem-mode 摘掉、完全还原', window.__memMode() === false);
+
+/* ==================== 切时刻过场：淡入淡出 ====================
+   换档不再是硬切：#world 先淡出 → 换内容 → 淡回（见 03-utils.js 的 swapTime）。
+   无头里 setTimeout 是空实现，临时换一个「捕获回调、不执行」的版本来验证「先淡出、后换档」。 */
+console.log('\n=== 切时刻过场：淡入淡出 + 滚轮切换 ===');
+
+assert('过场机制就位：整块世界一起淡（节点 + 连线），不再逐颗动画（源码检查）',
+  html.indexOf('#world.time-fade{opacity:0}') >= 0 &&
+  html.indexOf('w.classList.add("time-fade")') >= 0 &&
+  html.indexOf('staggerNodesIn') < 0 && html.indexOf('.node.time-in') < 0);
+assert('#edges / #nodes 都在 #world 里（所以整体淡能连线条一起盖住，不会"节点先没、线还在"）',
+  /<div id="world">[\s\S]{0,400}id="edges"[\s\S]{0,400}id="nodes"/.test(html));
+assert('换档入口在档案窗：点行走 setTime（源码检查）',
+  html.indexOf('if (s.id !== cur) setTime(s.id);') >= 0 &&
+  html.indexOf('openTimeCard(s.id)') >= 0);
+assert('换档过场整块淡、且放映卡每时刻只自动放一遍（源码检查）',
+  html.indexOf('openTimeCardOnce') >= 0 && html.indexOf('G.cardSeen') >= 0);
+
+window.__ensure("time", "SCENES_0602");
+window.__time('present');
+assert('先回到「现在」', window.__timeStage() === 'present' && !ids['world']._classes.has('time-fade'));
+
+const realST = global.setTimeout;
+let fadeCb = null;
+global.setTimeout = fn => { fadeCb = fn; return 1; };   /* 捕获回调、不执行（模拟「定时器还没到点」） */
+window.__time('SCENES_0602');
+assert('起淡出：#world 挂上 .time-fade', ids['world']._classes.has('time-fade'));
+assert('淡出期间还没换档（换档推迟到淡出结束）', window.__timeStage() === 'present');
+global.setTimeout = realST;                            /* 先还原，再让回调落地（无头口径） */
+fadeCb && fadeCb();
+assert('淡出结束 → 真正换档到 6/2', window.__timeStage() === 'SCENES_0602');
+assert('换完摘掉 .time-fade（淡回）', !ids['world']._classes.has('time-fade'));
+
+/* 档案点行切换走的就是这条淡入淡出（无独立擦拨通路） */
+window.__time('present');
+
+/* 画布滚轮 = 缩放，**不切档**（切时刻只在档案窗点行） */
+window.__time('present');
+ids['stage']._ev.wheel[0]({ deltaY: 120, preventDefault(){}, stopPropagation(){} });
+assert('画布滚轮不切档（画布上仍是缩放；切时刻只在档案窗点行）', window.__timeStage() === 'present');
+
+{
+  const s = html.slice(html.indexOf('stage.addEventListener("wheel"'));
+  const body = s.slice(0, s.indexOf('}, { passive: false });'));
+  assert('画布滚轮纯缩放（body 里有 view.k 缩放、没有 setTime）',
+    body.length > 0 && body.indexOf('setTime(') < 0 && body.indexOf('view.k') >= 0);
+}
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

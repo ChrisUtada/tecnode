@@ -26,6 +26,11 @@
   }
   #stage.grabbing{cursor:grabbing}
   #world{position:absolute; left:0; top:0; width:2000px; height:1300px; transform-origin:0 0}
+  /* 切时刻的淡入淡出（见 03-utils.js 的 swapTime）：**整块世界**（#nodes 节点 + #edges 连线 + #glow 光晕）
+     一起淡 —— 只淡节点层会让连线"留在原地"，看着就是「节点先于连线消失」。
+     纯 opacity 过渡（GPU 友好、不卡）；transition 常挂，两个方向都要淡；镜头 transform 不参与。 */
+  #world{transition:opacity .38s ease}
+  #world.time-fade{opacity:0}
   #edges{position:absolute; left:0; top:0; width:2000px; height:1300px; overflow:visible; pointer-events:none}
   #nodes{position:absolute; left:0; top:0; width:100%; height:100%}
   /* 顶层拖拽镜像层：拖动节点时把它浮到窗口/图标之上（z 高于 #icons:24 与浮窗:25） */
