@@ -4420,7 +4420,8 @@ function buildSeedPop(){
 }
 function makeSeedDraggable(pop, handle){
   const h = handle || pop;                 /* 把手缺省退整块（老调用点兼容） */
-  let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null;
+  let dragging = false, moved = false, sx = 0, sy = 0, mirror = null, offx = 0, offy = 0, sr = null,
+      grab = null;          /* 按下时量好的抓取信息（残影修复的关键，见 pointerdown 里注释） */
   /* 被 render() 打断时的收尾（见 07-render.js 的登记表）：摘镜像、把原气泡放回来 */
   const abortSeedDrag = () => {
     if (!dragging) return;
@@ -4433,6 +4434,11 @@ function makeSeedDraggable(pop, handle){
     if (e.button !== 0) return;
     dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
     sr = desktopEl.getBoundingClientRect();
+    /* 抓取偏移必须**按下时**量好：拖到首帧 move 才量的话，offx 会混入「按下→首帧」之间
+       指针预先走过的距离（快抓 20-60px）——镜像出生钉在原位、之后全程落后指尖，正是残影。
+       同时记下按下瞬间的 rect 和指针位置：rect 可能是入场动画缩放中的值，首帧要用。 */
+    grab = { r: h.getBoundingClientRect(), w: h.offsetWidth || 32, hh: h.offsetHeight || 32,
+             px: e.clientX, py: e.clientY };
     registerDrag(abortSeedDrag);
     try { h.setPointerCapture(e.pointerId); } catch(_){}
     e.stopPropagation();
@@ -4446,17 +4452,21 @@ function makeSeedDraggable(pop, handle){
     if (!mirror){
       const layer = document.getElementById("drag-layer");
       /* 跟手的是**种子图本身**（用户口径）——镜像只克隆那张图，不是整块白卡气泡 */
-      const r = h.getBoundingClientRect();
-      offx = e.clientX - r.left; offy = e.clientY - r.top;
+      const g = grab;
+      /* 尺寸取**布局**尺寸（offsetWidth），不取 rect：种子气泡带着 pop 缩放动画（scale .6→1），
+         动画没走完就起拖时 rect 量到的是缩放后的值（实测 32 → 19）。抓取偏移按全尺寸等比
+         放大（k），指尖捏着种子上的相对位置才对得上。 */
+      const k = g.r.width > 0 ? g.w / g.r.width : 1;
+      offx = (g.px - g.r.left) * k;
+      offy = (g.py - g.r.top ) * k;
       mirror = h.cloneNode(true);
       mirror.className = "mx-seed-mirror drag-mirror";
       mirror.style.position = "absolute"; mirror.style.transform = "none";
-      /* 尺寸取**布局**尺寸（offsetWidth），不取 rect：种子气泡带着 pop 缩放动画（scale .6→1），
-         动画没走完就起拖时 rect 量到的是缩放后的值（实测 32 → 19）。 */
-      mirror.style.width = (h.offsetWidth || 32) + "px";
-      mirror.style.height = (h.offsetHeight || 32) + "px";
-      mirror.style.left = (r.left - sr.left) + "px";
-      mirror.style.top  = (r.top  - sr.top ) + "px";
+      mirror.style.width = g.w + "px";
+      mirror.style.height = g.hh + "px";
+      /* 出生位置 = 按下时种子的视觉位置（与缩放中的气泡同心对齐），不再用移动后的指针反推 */
+      mirror.style.left = (g.r.left - (g.w  - g.r.width ) / 2 - sr.left) + "px";
+      mirror.style.top  = (g.r.top  - (g.hh - g.r.height) / 2 - sr.top ) + "px";
       mirror.style.visibility = "hidden";
       layer.appendChild(mirror);
       pop.style.visibility = "hidden";     /* 原气泡（含白卡）整体隐去，画面上只剩跟手的种子 */

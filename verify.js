@@ -2633,6 +2633,15 @@ assert('种子拖拽把手只有图本身（气泡白卡不是把手）（源码
            src.indexOf('pop.addEventListener("pointerdown"') < 0; })());
 assert('种子拖放落点 = overGardenDrop → gardenPlant（源码检查）',
   html.indexOf('if (overGardenDrop(e.clientX, e.clientY)){ gardenPlant(e.clientX, e.clientY); return; }') >= 0);
+assert('残影修复：抓取偏移在按下时就量好 + 缩放比例校正（不在首帧 move 反推）',
+  (() => { const a = html.indexOf('function makeSeedDraggable(pop, handle){');
+    if (a < 0) return false;
+    const b = html.indexOf('function riteEnd(', a);
+    const src = html.slice(a, b > a ? b : undefined);
+    return src.indexOf('grab = { r: h.getBoundingClientRect(), w: h.offsetWidth || 32, hh: h.offsetHeight || 32,') >= 0 &&
+           src.indexOf('px: e.clientX, py: e.clientY };') >= 0 &&
+           src.indexOf('const k = g.r.width > 0 ? g.w / g.r.width : 1;') >= 0 &&
+           src.indexOf('offx = (g.px - g.r.left) * k;') >= 0; })());
 assert('下种过 requireCase 门（源码检查）',
   /function gardenPlant\(cx, cy\)\{\r?\n\s*if \(!gardenOK\(\) \|\| !G\.garden\.seed\) return false;\r?\n\s*if \(!requireCase\(\)\)/.test(html));
 assert('没有固定坛位：株记百分比坐标、越界夹回（源码检查）',
@@ -3116,6 +3125,17 @@ assert('拖动种子：跟手的镜像是**种子图本身**（IMG + mx-seed-mir
 seedIm41._ev.pointerup[0](ev41({ clientX: 50, clientY: 40 }));
 assert('松手（没落进花园）：镜像收走、气泡放回来',
   dlEl41().children.length === 0 && !pop41.style.visibility);
+
+/* ---- C3. 残影修复：抓取偏移锚定在**按下时**，首帧大位移也不脱手 ---- */
+seedIm41._ev.pointerdown[0](ev41({ clientX: 10, clientY: 8 }));
+seedIm41._ev.pointermove[0](ev41({ clientX: 60, clientY: 44 }));   /* 首帧就走 50px+（快抓） */
+const mir41b = dlEl41().children[0];
+assert('快抓首帧大位移：镜像 = 指针 − 按下时偏移（60−10 / 44−8），不钉原位、不落后指尖',
+  !!mir41b && mir41b.style.left === '50px' && mir41b.style.top === '36px');
+seedIm41._ev.pointermove[0](ev41({ clientX: 70, clientY: 44 }));
+assert('后续帧偏移固定不变（始终跟手）', mir41b.style.left === '60px' && mir41b.style.top === '36px');
+seedIm41._ev.pointerup[0](ev41({ clientX: 70, clientY: 44 }));
+assert('收尾干净：镜像收走、气泡放回', dlEl41().children.length === 0 && !pop41.style.visibility);
 
 /* ---- D. 真名震动：拖过窗口留下的内联 animation:none 不该把它盖掉 ---- */
 const iwD = ids['desktop'].querySelector('.infer-win');
