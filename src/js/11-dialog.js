@@ -2,8 +2,7 @@
 function charTalkQueue(n){
   const ch = CHARS[n.id] || {};
   const norm = arr => (arr || []).map(o => typeof o === "string" ? o : (o && o.text) || "").filter(Boolean);
-  const base = norm((ch.talkQueue && ch.talkQueue.length) ? ch.talkQueue :
-                    ((ch.defaultTalks && ch.defaultTalks.length) ? ch.defaultTalks : ch.lines));
+  const base = norm(ch.talkQueue);
   const scene = norm((ch.sceneTalks || {})[n.homeScene]);
   return base.concat(scene);
 }
@@ -505,6 +504,7 @@ function initTecChip(){
    代价：窗口盖住的图标在窗口开着时点不到 —— 窗口可以拖走，这是可接受的取舍。 */
 function nodeDropTargets(){
   const list = [];
+  if (chatWinEl) list.push("chat-win");                                  /* 多人对话窗开着时，窗口优先于下面所有图标 */
   if (bagWinEl) list.push("bag-win");                                    /* 只在证物袋窗口开着时才是落点 */
   if (clueWinEl) list.push("clue-win");                                  /* 同上：线索册窗口开着才算落点 */
   list.push("bag-dock","clue-icon","tec-dock","infer-icon","goto-icon","tec-avatar");
@@ -514,6 +514,7 @@ function nodeDropTargets(){
 /* 落点元素解析：两扇收纳窗是每次开窗临时建的，没有稳定的 DOM 查询入口，直接引用变量（关窗即置 null）；
    其余都是静态图标 / 头像，按 id 取即可。 */
 function dropTargetEl(id){
+  if (id === "chat-win") return chatWinEl;
   if (id === "bag-win") return bagWinEl;
   if (id === "clue-win") return clueWinEl;
   return document.getElementById(id);
@@ -610,10 +611,10 @@ function tecAnalyze(key){
 }
 
 function tecTalk(){
-  /* 点击 = 闲聊（defaultTalks 逐条推进，不循环：说完就停，点了也不再有新句）。
+  /* 点击 = 闲聊（talkQueue 逐条推进，不循环：说完就停，点了也不再有新句）。
      不给实质提示：提示的唯一来源是「拖节点 → 分析」。不进撤销栈——一句闲聊没有可撤销的状态。 */
   const tec = CHARS["CHARS_TEC"] || {};
-  const def = (tec.defaultTalks && tec.defaultTalks.length) ? tec.defaultTalks : (tec.talkQueue || []);
+  const def = tec.talkQueue || [];
   if (!def.length){ if (!tecWinEl) toggleTecWin(); tecSay("（把节点拖到我身上，我来分析）"); return; }
   const idx = G.tecProg._def || 0;
   if (idx >= def.length) return;              /* 台词说完：停止推进 */
@@ -661,4 +662,150 @@ function updateTecBadge(){
   /* 驻留态（– 收起）= 右下角那块助手卡片，不落在图标上（用户明确要求"收进右下角带头像的一块"） */
   showTecChip(tecMin);
   updateTecChip();
+}
+
+/* ============ 多人对话（会话级，不进 G / 撤销栈） ============
+   participants 是本剧本允许出场的全集；初始拖过来的两人只是「已加入」子集。
+   因此三人剧本可以由两人命中，播到第三人的第一句时才暂停等那个人被拖进窗。 */
+let chatSession = null, chatWinEl = null;
+
+function dialogueSetKey(ids){ return (ids || []).slice().sort().join("|"); }
+function lookupDialogue(ids){
+  const key = dialogueSetKey(ids);
+  const exact = (DIALOGUES || []).find(d => dialogueSetKey(d.participants) === key);
+  if (exact) return exact;
+  return (DIALOGUES || []).find(d => ids.every(id => (d.participants || []).indexOf(id) >= 0)) || null;
+}
+function monologueOf(charId){
+  return (DIALOGUES || []).find(d => (d.participants || []).length === 1 && d.participants[0] === charId) || null;
+}
+function closeChatWin(){
+  if (chatSession && chatSession.current) cancelType(chatSession.current.el);
+  if (chatWinEl){ chatWinEl.remove(); chatWinEl = null; }
+  chatSession = null;
+}
+function chatHint(text){
+  if (!chatWinEl) return;
+  const h = chatWinEl.querySelector(".chat-hint");
+  if (h) h.textContent = text;
+}
+function openChatSession(entry, initialIds){
+  closeChatWin();
+  const ids = initialIds.slice();
+  chatSession = { entry, joined:new Set(ids), idx:0, waitingFor:null, typing:false, current:null, done:false };
+  const solo = (entry.participants || []).length === 1;
+  const title = (solo ? "独白 // " : "DIALOGUE // ") +
+    ids.map(id => labelOf("char", id) || id).join(" × ");
+  const w = makeWindow(title, closeChatWin);
+  const b = w.el;
+  b.className = "chat-win syswin";
+  const lines = document.createElement("div");
+  lines.className = "chat-lines";
+  const hint = document.createElement("div");
+  hint.className = "chat-hint";
+  hint.textContent = "点框内任意位置继续";
+  w.body.appendChild(lines);
+  w.body.appendChild(hint);
+  b.addEventListener("click", () => { if (!b._dragged) chatNext(); });
+  desktopEl.appendChild(b);
+  makeFloatDraggable(b, false);
+  chatWinEl = b;
+  chatAdvance();
+  return true;
+}
+function startChatCombo(a, b){
+  const ids = [a.id, b.id];
+  const entry = lookupDialogue(ids) ||
+    { id:null, participants:ids, script:[{ t:"narr", text:"他们没什么可说的。" }] };
+  return openChatSession(entry, ids);
+}
+function startMonologue(charId){
+  const entry = monologueOf(charId);
+  if (!entry) return false;
+  return openChatSession(entry, [charId]);
+}
+function chatAdvance(){
+  const s = chatSession;
+  if (!s || s.done || s.waitingFor) return false;
+  const line = s.entry.script[s.idx];
+  if (!line){
+    s.done = true;
+    chatHint("对话结束");
+    return false;
+  }
+  if (line.t === "say" && !s.joined.has(line.who)){
+    s.waitingFor = line.who;
+    chatHint("把「" + (labelOf("char", line.who) || line.who) + "」拖进对话框");
+    return false;
+  }
+  s.idx += 1;
+  const lines = chatWinEl.querySelector(".chat-lines");
+  const d = document.createElement("div");
+  d.className = "chat-line " + (line.t === "say" ? "say" : "narr");
+  const full = plain(line.text || "");
+  if (line.t === "say"){
+    const who = document.createElement("span");
+    who.className = "chat-who";
+    who.textContent = labelOf("char", line.who) || line.who;
+    d.appendChild(who);
+  }
+  const txt = document.createElement("span");
+  txt.className = "chat-text";
+  d.appendChild(txt);
+  lines.appendChild(d);
+  lines.scrollTop = lines.scrollHeight;
+  const cur = { el:txt, full };
+  s.current = cur;
+  s.typing = true;
+  chatHint("点窗内补全本句");
+  typeInto(txt, full, { done:() => {
+    if (chatSession === s && s.current === cur){
+      s.typing = false;
+      if (!s.waitingFor && !s.done) chatHint("点框内任意位置继续");
+    }
+  } });
+  return true;
+}
+function chatNext(){
+  const s = chatSession;
+  if (!s) return false;
+  if (s.typing && s.current){
+    cancelType(s.current.el);
+    s.current.el.textContent = s.current.full;
+    s.typing = false;
+    chatHint("点框内任意位置继续");
+    return true;
+  }
+  if (s.waitingFor || s.done) return false;
+  return chatAdvance();
+}
+function chatJoin(key){
+  const n = G.nodes[key], s = chatSession;
+  if (!n || n.kind !== "char" || !s) return false;
+  if (s.joined.has(n.id)) return false;          /* 已在场：忽略 */
+  if (!s.waitingFor || n.id !== s.waitingFor){
+    chatHint("插不上话");
+    return false;
+  }
+  s.joined.add(n.id);
+  s.waitingFor = null;
+  chatHint("点框内任意位置继续");
+  chatAdvance();                                /* 从被截住的那一句立刻续播 */
+  return true;
+}
+function chatDrop(key){
+  const n = G.nodes[key];
+  if (!n || n.kind !== "char"){
+    if (chatSession) chatHint("只有人物能加入这段对话");
+    return false;
+  }
+  return chatJoin(key);
+}
+function chatState(){
+  const s = chatSession;
+  if (!s) return { open:false, id:null, participants:[], joined:[], idx:0, total:0, waitingFor:null, typing:false, done:false };
+  return { open:!!chatWinEl, id:s.entry.id, participants:(s.entry.participants || []).slice(),
+    joined:[...s.joined], idx:s.idx, total:(s.entry.script || []).length,
+    waitingFor:s.waitingFor, typing:!!s.typing, done:!!s.done,
+    lines:chatWinEl ? chatWinEl.querySelector(".chat-lines").children.length : 0 };
 }

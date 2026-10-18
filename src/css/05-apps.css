@@ -39,6 +39,16 @@
   .dlg-win{position:absolute; width:332px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:28; overflow:hidden}
+  /* 多人对话窗：独立桌面浮窗，变量与 .dlg-win 分开；视觉沿用 TEC 的纸墨语言 */
+  .chat-win{position:absolute; right:18px; top:72px; width:390px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:26; overflow:hidden; cursor:grab}
+  .chat-win.over{outline:2px dashed var(--text); outline-offset:3px}
+  .chat-win .chat-lines{max-height:300px; overflow-y:auto; padding:8px 10px}
+  .chat-line{font-size:12px; line-height:1.75; padding:5px 0; border-bottom:1px dashed var(--line2)}
+  .chat-line .chat-who{display:inline-block; color:var(--muted); font-weight:700; margin-right:7px}
+  .chat-line.narr{color:var(--faint); font-style:italic}
+  .chat-hint{font-size:10.5px; color:var(--muted); padding:6px 10px 8px; border-top:1px solid var(--edge-soft)}
   .tec-win .tec-lines, .dlg-win .tec-lines{max-height:240px; overflow:auto; margin-bottom:8px}
   .tec-win .tec-line, .dlg-win .tec-line{font-size:12px; line-height:1.7; padding:3px 0; border-bottom:1px dashed var(--line2)}
   .tec-win .tec-hint, .dlg-win .tec-hint{font-size:10.5px; color:var(--faint); margin-top:6px}

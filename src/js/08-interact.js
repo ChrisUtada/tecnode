@@ -130,7 +130,8 @@ function attachInteractions(el, n){
     if (iconHit){
       /* 松手落在桌面图标上 → 对应功能，自己弹回原位 */
       springBack(el, ox, oy);
-      if (iconHit === "bag-dock" || iconHit === "bag-win") bagStore(n.key);
+      if (iconHit === "chat-win") chatDrop(n.key);
+      else if (iconHit === "bag-dock" || iconHit === "bag-win") bagStore(n.key);
       else if (iconHit === "clue-icon" || iconHit === "clue-win") ledgerStore(n.key);
       else if (iconHit === "tec-dock" || iconHit === "tec-avatar" || iconHit === "tec-chip") tecAnalyze(n.key);
       else if (iconHit === "infer-icon"){
@@ -190,6 +191,12 @@ function attachInteractions(el, n){
 
   el.addEventListener("dblclick", () => {
     clearFresh(n);          /* 双击也算「点过」：角标立刻摘掉 */
+    /* 场景与物品共用命令主行为：有 commands 先跑第一条；没有才按原逻辑展开 / 折叠。
+       现有场景都没配 commands，所以旧数据的展开行为不变。 */
+    if (isSceneKind(n.kind)){
+      const cmds = (SCENES[n.id] || {}).commands || [];
+      if (cmds.length){ runCommand(n, cmds[0]); return; }
+    }
     if (isContainerNode(n)){   /* 容器一律双击展开 / 折叠（书桌、垃圾桶也一样） */
       if (G.collapsed.has(n.id) || G.explored.has(n.id)){ toggleCollapse(n.id); selectNode(n.key); return; }
       revealScene(n.id); selectNode(n.key); return;

@@ -207,6 +207,16 @@
   .dlg-win{position:absolute; width:332px;
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:28; overflow:hidden}
+  /* 多人对话窗：独立桌面浮窗，变量与 .dlg-win 分开；视觉沿用 TEC 的纸墨语言 */
+  .chat-win{position:absolute; right:18px; top:72px; width:390px;
+    background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
+    box-shadow:var(--win-shadow); z-index:26; overflow:hidden; cursor:grab}
+  .chat-win.over{outline:2px dashed var(--text); outline-offset:3px}
+  .chat-win .chat-lines{max-height:300px; overflow-y:auto; padding:8px 10px}
+  .chat-line{font-size:12px; line-height:1.75; padding:5px 0; border-bottom:1px dashed var(--line2)}
+  .chat-line .chat-who{display:inline-block; color:var(--muted); font-weight:700; margin-right:7px}
+  .chat-line.narr{color:var(--faint); font-style:italic}
+  .chat-hint{font-size:10.5px; color:var(--muted); padding:6px 10px 8px; border-top:1px solid var(--edge-soft)}
   .tec-win .tec-lines, .dlg-win .tec-lines{max-height:240px; overflow:auto; margin-bottom:8px}
   .tec-win .tec-line, .dlg-win .tec-line{font-size:12px; line-height:1.7; padding:3px 0; border-bottom:1px dashed var(--line2)}
   .tec-win .tec-hint, .dlg-win .tec-hint{font-size:10.5px; color:var(--faint); margin-top:6px}
@@ -935,7 +945,7 @@ function iconSvg(name, size){
    每个案件一份与 <script id="gamedata"> 同构的数据对象。applyCaseData() 负责把数据
    装进下面这些模块级绑定，因此它们必须是 let（切换案件时整体替换）。 */
 let DATA, SCENES, ITEMS, CHARS, CLUES, START, ENDINGS;
-let REUSABLE_TOOLS, LIGHT_SOURCES, SCENE_MEMORY, MEMORIES;
+let REUSABLE_TOOLS, LIGHT_SOURCES, SCENE_MEMORY, MEMORIES, DIALOGUES;
 
 function applyCaseData(data){
   DATA   = data || {};
@@ -958,6 +968,8 @@ function applyCaseData(data){
   SCENE_MEMORY   = cfg.memoryScenes  || ["SCENES_0602", "SCENES_0704"];
   /* 回忆小剧场：时间 × 地点 × 人物 三者凑齐后演出的脚本（见 13-matrix.js 的 lookupMemory） */
   MEMORIES       = DATA.memories || [];
+  /* 多人对话剧本：人物组合命中后由 11-dialog.js 的会话状态机播放 */
+  DIALOGUES      = DATA.dialogues || [];
 }
 applyCaseData(JSON.parse(document.getElementById("gamedata").textContent));
 /* 五感槽位名 */
@@ -1197,7 +1209,7 @@ function openTimeCard(t){
      重放走「档案里点当前档」的手动口。） */
 function applyTimeNow(t){
   G.time = t;
-  closeBubble(); closeNarr(); closePwPop(); closeDlgWin();  /* 锚在画布上的浮层收掉，别指向已隐藏的节点 */
+  closeBubble(); closeNarr(); closePwPop(); closeDlgWin(); closeChatWin();  /* 锚在画布上的浮层与多人会话都收掉，别指向已隐藏的节点 */
   if (t !== PRESENT_TIME) spawnMemCast(t);   /* 那天文本里在场的人物跟到画布上（朱穗们）——须赶在 render 前 */
   render();
   /* 进入回忆时刻：镜头聚焦在该时刻的发生地点上（memories 的 where；不在画布就跳过）。
@@ -1247,6 +1259,7 @@ function labelOf(kind, id){
   return null;
 }
 function findReactable(kind, id){
+  if (isSceneKind(kind)) return SCENES[id];   /* 场景与物品的 reactions 同表查找 */
   if (kind === "item") return ITEMS[id];
   if (kind === "char") return CHARS[id];
   if (kind === "clue") return CLUES[id];
@@ -1362,11 +1375,11 @@ function toast(html, fail){
 }
 
 /* ============ 反应索引 ============ */
-/* 数据语义：目标.presentReactions[工具] / 目标.itemReactions[工具] / 目标.reactions[工具] */
+/* 数据语义：目标.itemReactions[工具] / 目标.reactions[工具]；useItem 走 commands，不走这里 */
 function lookupReaction(ownerKind, ownerId, toolId){
   const owner = findReactable(ownerKind, ownerId);
   if (!owner) return null;
-  for (const f of ["presentReactions", "itemReactions", "reactions"]){
+  for (const f of ["itemReactions", "reactions"]){
     const tbl = owner[f];
     if (tbl && tbl[toolId]) return { field:f, react:tbl[toolId] };
   }
@@ -1613,6 +1626,13 @@ function attemptCombo(toolKey, targetKey){
   /* 两个场景之间没有直接通路：这是"走不过去"，明确说清楚，不往下走反应表 */
   if (isSceneKind(tool.kind) && isSceneKind(target.kind)){
     fail(tool, target, "这两个场景之间没有直接通路");
+    return;
+  }
+
+  /* 人物 → 人物是专用对话通道：先查 dialogues，命中就播剧本，没命中也给默认回应；
+     不消耗节点、不进反应表，现有 showCharLine 单角色对话仍走原入口。 */
+  if (tool.kind === "char" && target.kind === "char"){
+    startChatCombo(tool, target);
     return;
   }
 
@@ -2505,7 +2525,8 @@ function attachInteractions(el, n){
     if (iconHit){
       /* 松手落在桌面图标上 → 对应功能，自己弹回原位 */
       springBack(el, ox, oy);
-      if (iconHit === "bag-dock" || iconHit === "bag-win") bagStore(n.key);
+      if (iconHit === "chat-win") chatDrop(n.key);
+      else if (iconHit === "bag-dock" || iconHit === "bag-win") bagStore(n.key);
       else if (iconHit === "clue-icon" || iconHit === "clue-win") ledgerStore(n.key);
       else if (iconHit === "tec-dock" || iconHit === "tec-avatar" || iconHit === "tec-chip") tecAnalyze(n.key);
       else if (iconHit === "infer-icon"){
@@ -2565,6 +2586,12 @@ function attachInteractions(el, n){
 
   el.addEventListener("dblclick", () => {
     clearFresh(n);          /* 双击也算「点过」：角标立刻摘掉 */
+    /* 场景与物品共用命令主行为：有 commands 先跑第一条；没有才按原逻辑展开 / 折叠。
+       现有场景都没配 commands，所以旧数据的展开行为不变。 */
+    if (isSceneKind(n.kind)){
+      const cmds = (SCENES[n.id] || {}).commands || [];
+      if (cmds.length){ runCommand(n, cmds[0]); return; }
+    }
     if (isContainerNode(n)){   /* 容器一律双击展开 / 折叠（书桌、垃圾桶也一样） */
       if (G.collapsed.has(n.id) || G.explored.has(n.id)){ toggleCollapse(n.id); selectNode(n.key); return; }
       revealScene(n.id); selectNode(n.key); return;
@@ -3012,8 +3039,7 @@ function makeFloatDraggable(el, inWorld, handle){
 function charTalkQueue(n){
   const ch = CHARS[n.id] || {};
   const norm = arr => (arr || []).map(o => typeof o === "string" ? o : (o && o.text) || "").filter(Boolean);
-  const base = norm((ch.talkQueue && ch.talkQueue.length) ? ch.talkQueue :
-                    ((ch.defaultTalks && ch.defaultTalks.length) ? ch.defaultTalks : ch.lines));
+  const base = norm(ch.talkQueue);
   const scene = norm((ch.sceneTalks || {})[n.homeScene]);
   return base.concat(scene);
 }
@@ -3515,6 +3541,7 @@ function initTecChip(){
    代价：窗口盖住的图标在窗口开着时点不到 —— 窗口可以拖走，这是可接受的取舍。 */
 function nodeDropTargets(){
   const list = [];
+  if (chatWinEl) list.push("chat-win");                                  /* 多人对话窗开着时，窗口优先于下面所有图标 */
   if (bagWinEl) list.push("bag-win");                                    /* 只在证物袋窗口开着时才是落点 */
   if (clueWinEl) list.push("clue-win");                                  /* 同上：线索册窗口开着才算落点 */
   list.push("bag-dock","clue-icon","tec-dock","infer-icon","goto-icon","tec-avatar");
@@ -3524,6 +3551,7 @@ function nodeDropTargets(){
 /* 落点元素解析：两扇收纳窗是每次开窗临时建的，没有稳定的 DOM 查询入口，直接引用变量（关窗即置 null）；
    其余都是静态图标 / 头像，按 id 取即可。 */
 function dropTargetEl(id){
+  if (id === "chat-win") return chatWinEl;
   if (id === "bag-win") return bagWinEl;
   if (id === "clue-win") return clueWinEl;
   return document.getElementById(id);
@@ -3620,10 +3648,10 @@ function tecAnalyze(key){
 }
 
 function tecTalk(){
-  /* 点击 = 闲聊（defaultTalks 逐条推进，不循环：说完就停，点了也不再有新句）。
+  /* 点击 = 闲聊（talkQueue 逐条推进，不循环：说完就停，点了也不再有新句）。
      不给实质提示：提示的唯一来源是「拖节点 → 分析」。不进撤销栈——一句闲聊没有可撤销的状态。 */
   const tec = CHARS["CHARS_TEC"] || {};
-  const def = (tec.defaultTalks && tec.defaultTalks.length) ? tec.defaultTalks : (tec.talkQueue || []);
+  const def = tec.talkQueue || [];
   if (!def.length){ if (!tecWinEl) toggleTecWin(); tecSay("（把节点拖到我身上，我来分析）"); return; }
   const idx = G.tecProg._def || 0;
   if (idx >= def.length) return;              /* 台词说完：停止推进 */
@@ -3671,6 +3699,152 @@ function updateTecBadge(){
   /* 驻留态（– 收起）= 右下角那块助手卡片，不落在图标上（用户明确要求"收进右下角带头像的一块"） */
   showTecChip(tecMin);
   updateTecChip();
+}
+
+/* ============ 多人对话（会话级，不进 G / 撤销栈） ============
+   participants 是本剧本允许出场的全集；初始拖过来的两人只是「已加入」子集。
+   因此三人剧本可以由两人命中，播到第三人的第一句时才暂停等那个人被拖进窗。 */
+let chatSession = null, chatWinEl = null;
+
+function dialogueSetKey(ids){ return (ids || []).slice().sort().join("|"); }
+function lookupDialogue(ids){
+  const key = dialogueSetKey(ids);
+  const exact = (DIALOGUES || []).find(d => dialogueSetKey(d.participants) === key);
+  if (exact) return exact;
+  return (DIALOGUES || []).find(d => ids.every(id => (d.participants || []).indexOf(id) >= 0)) || null;
+}
+function monologueOf(charId){
+  return (DIALOGUES || []).find(d => (d.participants || []).length === 1 && d.participants[0] === charId) || null;
+}
+function closeChatWin(){
+  if (chatSession && chatSession.current) cancelType(chatSession.current.el);
+  if (chatWinEl){ chatWinEl.remove(); chatWinEl = null; }
+  chatSession = null;
+}
+function chatHint(text){
+  if (!chatWinEl) return;
+  const h = chatWinEl.querySelector(".chat-hint");
+  if (h) h.textContent = text;
+}
+function openChatSession(entry, initialIds){
+  closeChatWin();
+  const ids = initialIds.slice();
+  chatSession = { entry, joined:new Set(ids), idx:0, waitingFor:null, typing:false, current:null, done:false };
+  const solo = (entry.participants || []).length === 1;
+  const title = (solo ? "独白 // " : "DIALOGUE // ") +
+    ids.map(id => labelOf("char", id) || id).join(" × ");
+  const w = makeWindow(title, closeChatWin);
+  const b = w.el;
+  b.className = "chat-win syswin";
+  const lines = document.createElement("div");
+  lines.className = "chat-lines";
+  const hint = document.createElement("div");
+  hint.className = "chat-hint";
+  hint.textContent = "点框内任意位置继续";
+  w.body.appendChild(lines);
+  w.body.appendChild(hint);
+  b.addEventListener("click", () => { if (!b._dragged) chatNext(); });
+  desktopEl.appendChild(b);
+  makeFloatDraggable(b, false);
+  chatWinEl = b;
+  chatAdvance();
+  return true;
+}
+function startChatCombo(a, b){
+  const ids = [a.id, b.id];
+  const entry = lookupDialogue(ids) ||
+    { id:null, participants:ids, script:[{ t:"narr", text:"他们没什么可说的。" }] };
+  return openChatSession(entry, ids);
+}
+function startMonologue(charId){
+  const entry = monologueOf(charId);
+  if (!entry) return false;
+  return openChatSession(entry, [charId]);
+}
+function chatAdvance(){
+  const s = chatSession;
+  if (!s || s.done || s.waitingFor) return false;
+  const line = s.entry.script[s.idx];
+  if (!line){
+    s.done = true;
+    chatHint("对话结束");
+    return false;
+  }
+  if (line.t === "say" && !s.joined.has(line.who)){
+    s.waitingFor = line.who;
+    chatHint("把「" + (labelOf("char", line.who) || line.who) + "」拖进对话框");
+    return false;
+  }
+  s.idx += 1;
+  const lines = chatWinEl.querySelector(".chat-lines");
+  const d = document.createElement("div");
+  d.className = "chat-line " + (line.t === "say" ? "say" : "narr");
+  const full = plain(line.text || "");
+  if (line.t === "say"){
+    const who = document.createElement("span");
+    who.className = "chat-who";
+    who.textContent = labelOf("char", line.who) || line.who;
+    d.appendChild(who);
+  }
+  const txt = document.createElement("span");
+  txt.className = "chat-text";
+  d.appendChild(txt);
+  lines.appendChild(d);
+  lines.scrollTop = lines.scrollHeight;
+  const cur = { el:txt, full };
+  s.current = cur;
+  s.typing = true;
+  chatHint("点窗内补全本句");
+  typeInto(txt, full, { done:() => {
+    if (chatSession === s && s.current === cur){
+      s.typing = false;
+      if (!s.waitingFor && !s.done) chatHint("点框内任意位置继续");
+    }
+  } });
+  return true;
+}
+function chatNext(){
+  const s = chatSession;
+  if (!s) return false;
+  if (s.typing && s.current){
+    cancelType(s.current.el);
+    s.current.el.textContent = s.current.full;
+    s.typing = false;
+    chatHint("点框内任意位置继续");
+    return true;
+  }
+  if (s.waitingFor || s.done) return false;
+  return chatAdvance();
+}
+function chatJoin(key){
+  const n = G.nodes[key], s = chatSession;
+  if (!n || n.kind !== "char" || !s) return false;
+  if (s.joined.has(n.id)) return false;          /* 已在场：忽略 */
+  if (!s.waitingFor || n.id !== s.waitingFor){
+    chatHint("插不上话");
+    return false;
+  }
+  s.joined.add(n.id);
+  s.waitingFor = null;
+  chatHint("点框内任意位置继续");
+  chatAdvance();                                /* 从被截住的那一句立刻续播 */
+  return true;
+}
+function chatDrop(key){
+  const n = G.nodes[key];
+  if (!n || n.kind !== "char"){
+    if (chatSession) chatHint("只有人物能加入这段对话");
+    return false;
+  }
+  return chatJoin(key);
+}
+function chatState(){
+  const s = chatSession;
+  if (!s) return { open:false, id:null, participants:[], joined:[], idx:0, total:0, waitingFor:null, typing:false, done:false };
+  return { open:!!chatWinEl, id:s.entry.id, participants:(s.entry.participants || []).slice(),
+    joined:[...s.joined], idx:s.idx, total:(s.entry.script || []).length,
+    waitingFor:s.waitingFor, typing:!!s.typing, done:!!s.done,
+    lines:chatWinEl ? chatWinEl.querySelector(".chat-lines").children.length : 0 };
 }
 
 /* ============ 选中聚焦（dim 非邻居） ============ */
@@ -4831,6 +5005,9 @@ function paintDetail(){
     /* 聊过就有回看入口（与场景的「重看叙事」同一套）：把已说过的话整段重放进对话窗 */
     if ((G.talkProg[n.key] || 0) > 0)
       html += "<div class='drow'><button id='dt-renarr-talk'>[ 重看对话 ]</button></div>";
+    /* 独白是独立剧本通道：不影响双击角色继续 talkQueue 的既有行为 */
+    if (monologueOf(n.id))
+      html += "<div class='drow'><button id='dt-monologue'>[ 播放独白 ]</button></div>";
   } else {
     /* 物品 */
     const it = ITEMS[n.id] || {};
@@ -4876,6 +5053,8 @@ function paintDetail(){
   if (rb) rb.addEventListener("click", () => renarrScene(n.id));
   const rtb = document.getElementById("dt-renarr-talk");
   if (rtb) rtb.addEventListener("click", () => renarrTalk(n));
+  const mtb = document.getElementById("dt-monologue");
+  if (mtb) mtb.addEventListener("click", () => startMonologue(n.id));
 }
 
 /* ============ 摘录：文本物正文里可点的一小段 → 图上长出「目标节点 + 一条连回这张纸的边」 ============
@@ -5216,6 +5395,7 @@ document.getElementById("btn-reset").addEventListener("click", () => {
   clearCaseState(CASE_ID);   /* 重置也清掉本案存档，避免下次回访又续上旧进度 */
   resetTec();                /* 重置是全新开局，TEC 也一并清空 */
   closeDlgWin();             /* 角色对话窗跟着清（台词进度已随 G 重置，旧窗挂在失效节点上） */
+  closeChatWin();            /* 多人会话及其打字机定时器也随重置清理 */
   closeBagWin();             /* 证物袋窗同理：常驻于离屏/回访，不常驻于重置 */
   closeClueWin();            /* 线索册窗与证物袋同级：同样只在此处与换案时清 */
   boot();
@@ -5580,7 +5760,7 @@ function enterCase(id){
 function doEnterCase(id, from){
   const c = caseById(id);
   const snap = loadCaseState(id);    /* 先把目标案的档读出来，再存旧案，免得两边撞在一起 */
-  if (from){ saveCaseState(from); resetTec(); closeDlgWin(); closeBagWin(); closeClueWin(); }   /* 只有换案才清 TEC、对话窗与两扇收纳窗；同案回访保留 */
+  if (from){ saveCaseState(from); resetTec(); closeDlgWin(); closeChatWin(); closeBagWin(); closeClueWin(); }   /* 只有换案才清 TEC、单人和多人对话窗与两扇收纳窗；同案回访保留 */
   applyCaseData(CASE_DATA[id]);      /* 2. 载目标案数据 */
   CASE_ID = id;
   progress.last = id; saveProgress();
@@ -5611,7 +5791,7 @@ function parkCase(p){
     history = [];
     /* 浮层都锚在画布上，画布一藏就没意义了，一起收掉
        （TEC 是独立助手窗、证物袋 / 线索册是随身收纳，三扇常驻窗都保留） */
-    closeBubble(); closeNarr(); closePwPop();
+    closeBubble(); closeNarr(); closePwPop(); closeChatWin();
     clearSelection();
     setDetailWin(false);
   };
@@ -6703,6 +6883,7 @@ function boot(opts){
   closePwPop();
   closeBubble();
   closeNarr();
+  closeChatWin();          /* 多人会话是独立会话态：开局 / 换案 / 重置都清掉定时器与窗口 */
   /* 注意：TEC 窗、证物袋窗、线索册窗都不在这里关。三扇常驻窗（独立助手 / 随身收纳 / 随身册子），
      只有换案 / 重置才清（resetTec / closeBagWin / closeClueWin 在各自调用点），
      否则「– 收起 → 展开」回访同一案件时会被顺带收掉。 */
@@ -6872,7 +7053,11 @@ window.__avatarOpen = () => openAvatarWin();
 window.__avatarPick = id => { avatarPickId = id; renderAvatarWin(); };
 window.__avatarConfirm = () => confirmAvatarPick();
 window.__select = key => key ? selectNode(key) : clearSelection();
-window.__closeFloats = () => { closeBubble(); closeDlgWin(); closeNarr(); closePwPop(); };
+window.__closeFloats = () => { closeBubble(); closeDlgWin(); closeNarr(); closePwPop(); closeChatWin(); };
+window.__chatState = () => chatState();
+window.__chatNext = () => chatNext();
+window.__chatJoin = key => chatDrop(key);
+window.__chatMono = id => startMonologue(id);
 window.__renarr = sid => renarrScene(sid);
 window.__renarrTalk = key => { const n = G.nodes[key]; return n ? renarrTalk(n) : false; };
 /* 回忆小剧场（时间 × 地点 × 人物）：数据表 / 匹配器 / 当前演出进度 / 时间节点绑上的地点 */
@@ -6921,7 +7106,7 @@ window.__dump  = () => ({
   time: (G && G.time) || "present",
   dim: G._dimKeys || [],
   sel: sel,
-  floats: { bubble: !!bubbleEl, dlg: !!dlgWinEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
+  floats: { bubble: !!bubbleEl, dlg: !!dlgWinEl, narr: !!narrEl, pw: !!pwPop, chat: !!chatWinEl, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
   matrix: JSON.parse(JSON.stringify(G.matrix)),
   endings: [...G.endings],
   garden: G.garden ? { seed: !!G.garden.seed, plots: gardenPlots().filter(Boolean).length } : null,

@@ -51,6 +51,9 @@ function paintDetail(){
     /* 聊过就有回看入口（与场景的「重看叙事」同一套）：把已说过的话整段重放进对话窗 */
     if ((G.talkProg[n.key] || 0) > 0)
       html += "<div class='drow'><button id='dt-renarr-talk'>[ 重看对话 ]</button></div>";
+    /* 独白是独立剧本通道：不影响双击角色继续 talkQueue 的既有行为 */
+    if (monologueOf(n.id))
+      html += "<div class='drow'><button id='dt-monologue'>[ 播放独白 ]</button></div>";
   } else {
     /* 物品 */
     const it = ITEMS[n.id] || {};
@@ -96,6 +99,8 @@ function paintDetail(){
   if (rb) rb.addEventListener("click", () => renarrScene(n.id));
   const rtb = document.getElementById("dt-renarr-talk");
   if (rtb) rtb.addEventListener("click", () => renarrTalk(n));
+  const mtb = document.getElementById("dt-monologue");
+  if (mtb) mtb.addEventListener("click", () => startMonologue(n.id));
 }
 
 /* ============ 摘录：文本物正文里可点的一小段 → 图上长出「目标节点 + 一条连回这张纸的边」 ============

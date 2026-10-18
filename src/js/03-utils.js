@@ -156,7 +156,7 @@ function openTimeCard(t){
      重放走「档案里点当前档」的手动口。） */
 function applyTimeNow(t){
   G.time = t;
-  closeBubble(); closeNarr(); closePwPop(); closeDlgWin();  /* 锚在画布上的浮层收掉，别指向已隐藏的节点 */
+  closeBubble(); closeNarr(); closePwPop(); closeDlgWin(); closeChatWin();  /* 锚在画布上的浮层与多人会话都收掉，别指向已隐藏的节点 */
   if (t !== PRESENT_TIME) spawnMemCast(t);   /* 那天文本里在场的人物跟到画布上（朱穗们）——须赶在 render 前 */
   render();
   /* 进入回忆时刻：镜头聚焦在该时刻的发生地点上（memories 的 where；不在画布就跳过）。
@@ -206,6 +206,7 @@ function labelOf(kind, id){
   return null;
 }
 function findReactable(kind, id){
+  if (isSceneKind(kind)) return SCENES[id];   /* 场景与物品的 reactions 同表查找 */
   if (kind === "item") return ITEMS[id];
   if (kind === "char") return CHARS[id];
   if (kind === "clue") return CLUES[id];
@@ -321,11 +322,11 @@ function toast(html, fail){
 }
 
 /* ============ 反应索引 ============ */
-/* 数据语义：目标.presentReactions[工具] / 目标.itemReactions[工具] / 目标.reactions[工具] */
+/* 数据语义：目标.itemReactions[工具] / 目标.reactions[工具]；useItem 走 commands，不走这里 */
 function lookupReaction(ownerKind, ownerId, toolId){
   const owner = findReactable(ownerKind, ownerId);
   if (!owner) return null;
-  for (const f of ["presentReactions", "itemReactions", "reactions"]){
+  for (const f of ["itemReactions", "reactions"]){
     const tbl = owner[f];
     if (tbl && tbl[toolId]) return { field:f, react:tbl[toolId] };
   }

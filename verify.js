@@ -112,7 +112,9 @@ ids['log'].appendChild = function(c){ logs.push(String(c._html || c._text || '')
 
 let errs = 0;
 try {
-  new Function(jsCode)();
+  /* 测试专用出口：只暴露数据表引用与查找函数，方便末尾注入自造场景；
+     不改引擎行为，也不进入构建产物。 */
+  new Function(jsCode + '\n;window.__sceneTest = { data: SCENES, findReactable };')();
 } catch (e) {
   errs++;
   console.log('RUNTIME ERROR:', e.message);
@@ -1100,7 +1102,7 @@ assert('点击闲聊不再推进场景档案进度', (window.__dump().tec.prog['
 twEl._ev.click[0]();
 twEl._ev.click[0]();
 const tlDone = tlines();
-assert('TEC 三条闲聊说完（defaultTalks 共 3 条）', tlDone === tl0 + 3);
+assert('TEC 三条闲聊说完（talkQueue 共 3 条）', tlDone === tl0 + 3);
 console.log('DBG 18e: tl0=' + tl0 + ' tlDone=' + tlDone + ' _def=' + window.__dump().tec.prog._def +
   ' twEl=' + (twEl.parentNode ? 'in-dom' : 'detached') + ' floats.tec=' + window.__dump().floats.tec);
 twEl._ev.click[0]();
@@ -1416,16 +1418,17 @@ window.__closeFloats();
 
 /* 物品描述统一在详情窗承载（不论有没有命令）；双击无命令物品只选中、不再弹提示条 */
 window.__reveal('SCENES_choutiyi');
-window.__reveal('SCENES_garden');           /* 黑影：没有命令的物品，描述只在详情窗 */
-window.__select('item:ITEM_something');
+window.__reveal('SCENES_choutier');
+window.__reveal('SCENES_garden');           /* 剪刀：没有命令的物品，描述只在详情窗 */
+window.__select('item:ITEMS_jd');
 dh = ids['detail-body']._html || '';
-assert('无命令物品：描述也在详情窗（唯一出口）', dh.indexOf('摇摇晃晃') >= 0);
+assert('无命令物品：描述也在详情窗（唯一出口）', dh.indexOf('锋利') >= 0);
 window.__select('item:ITEMS_zhiwu');
 dh = ids['detail-body']._html || '';
 assert('有命令物品：描述同样在详情窗', dh.indexOf('自生自灭') >= 0);
 /* 双击无命令物品 = 选中（不再走顶部提示条） */
 ids['toast'].innerHTML = '__sentinel__';
-window.__talk('item:ITEM_something');
+window.__talk('item:ITEMS_jd');
 assert('双击无命令物品不再走提示条', ids['toast'].innerHTML === '__sentinel__');
 assert('双击无命令物品：仍被选中（详情窗开着）', window.__dump().floats.detail === true);
 
@@ -2016,7 +2019,7 @@ assert('两扇收纳窗同层（z-index 25）且都带拖动手型',
 assert('线索册窗也有悬停虚线高亮（与证物袋同款）',
   /\.clue-win\.over\{[^}]*outline:2px dashed var\(--text\)/.test(html));
 assert('两扇收纳窗的清理点对齐：换案 / 重置显式负责，boot 不再收（对话窗跟 resetTec 同点清理）',
-  html.indexOf('saveCaseState(from); resetTec(); closeDlgWin(); closeBagWin(); closeClueWin();') > 0 &&
+  html.indexOf('saveCaseState(from); resetTec(); closeDlgWin(); closeChatWin(); closeBagWin(); closeClueWin();') > 0 &&
   html.indexOf('closeBagWin();             /* 证物袋窗同理') > 0 &&
   html.indexOf('closeClueWin();            /* 线索册窗与证物袋同级') > 0 &&
   html.indexOf('refreshClueWin();  /* 册窗同理（同样是常驻窗，恢复的图变了） */') > 0);
@@ -3930,6 +3933,74 @@ assert('画布滚轮不切档（画布上仍是缩放；切时刻只在档案窗
   assert('画布滚轮纯缩放（body 里有 view.k 缩放、没有 setTime）',
     body.length > 0 && body.indexOf('setTime(') < 0 && body.indexOf('view.k') >= 0);
 }
+
+/* ==================== 多人对话：等待加人 / 断点续播 / 独白 ==================== */
+console.log('\n=== 多人对话：两人发起 → 第三人加入 ===');
+ids['btn-reset']._ev.click[0]();
+window.__ensure('char', 'CHARS_zs');
+window.__ensure('char', 'NPC_FB');
+window.__ensure('char', 'CHARS_JS');
+window.__ensure('char', 'CHARS_luhengs');
+window.__combo('char:CHARS_zs', 'char:NPC_FB');
+let chatNow = window.__chatState();
+assert('人物组合命中三人剧本并打开独立对话窗', chatNow.open && chatNow.id === 'DLG_garden_review' &&
+  chatNow.participants.length === 3 && chatNow.total === 6);
+assert('stub 下首句打字机同步落全文', !chatNow.typing && chatNow.idx === 1 &&
+  ids['desktop'].querySelector('.chat-lines').children[0].querySelector('.chat-text').textContent.indexOf('清理残叶时') >= 0);
+window.__chatNext();
+window.__chatNext();
+chatNow = window.__chatState();
+const chatWaitIdx = chatNow.idx;
+assert('播到第三句时暂停等待槿杉加入', chatNow.waitingFor === 'CHARS_JS' && chatWaitIdx === 2 && !chatNow.done);
+assert('等待期间点击不推进', window.__chatNext() === false && window.__chatState().idx === chatWaitIdx);
+assert('已在场角色加入被忽略', window.__chatJoin('char:NPC_FB') === false && window.__chatState().idx === chatWaitIdx);
+assert('非所需角色插不上话', window.__chatJoin('char:CHARS_luhengs') === false &&
+  window.__chatState().waitingFor === 'CHARS_JS' && window.__chatState().idx === chatWaitIdx);
+assert('所需角色加入后从断点续播', window.__chatJoin('char:CHARS_JS') === true &&
+  window.__chatState().waitingFor === null && window.__chatState().idx === 3 &&
+  ids['desktop'].querySelector('.chat-lines').children[2].querySelector('.chat-text').textContent.indexOf('背面的剂量') >= 0);
+for (let chatGuard = 0; chatGuard < 12 && !window.__chatState().done; chatGuard++) window.__chatNext();
+chatNow = window.__chatState();
+assert('三人剧本续播到结束', chatNow.done && chatNow.idx === chatNow.total && chatNow.lines === 6);
+
+console.log('\n=== 多人对话：独白入口与单参与者状态机 ===');
+window.__select('char:CHARS_luhengs');
+const monoBtn = document.getElementById('dt-monologue');
+assert('有独白剧本的角色详情窗显示「播放独白」', !!monoBtn);
+/* stub 的 getElementById 不解析 HTML，会给每次 paintDetail 都挂一个监听器；
+   取最后一次（当前角色）的监听器，避开早期场景节点留下的空操作。 */
+monoBtn._ev.click[monoBtn._ev.click.length - 1]();
+chatNow = window.__chatState();
+assert('独白只有一名参与者且首句可播', chatNow.open && chatNow.id === 'DLG_lhs_alone' &&
+  chatNow.participants.length === 1 && chatNow.joined.length === 1 && chatNow.idx === 1 && !chatNow.waitingFor);
+for (let monoGuard = 0; monoGuard < 10 && !window.__chatState().done; monoGuard++) window.__chatNext();
+chatNow = window.__chatState();
+assert('独白全程没有等待加人、能播完', chatNow.done && !chatNow.waitingFor && chatNow.lines === 4);
+window.__talk('char:CHARS_luhengs');
+assert('现有 showCharLine 与多人会话互不影响', window.__dump().floats.dlg === true && window.__dump().floats.chat === true);
+
+console.log('\n=== 多人对话：普通组合回归 ===');
+ids['btn-reset']._ev.click[0]();
+window.__reveal('SCENES_garden');
+window.__reveal('SCENES_choutiyi');
+window.__cmd('ITEM_shoudiantong', 0);
+window.__combo('item:ITEM_shoudiantong', 'item:ITEM_something');
+assert('物品组合仍按 useItem 解锁尸体场景', window.__dump().nodes.includes('loc:SCENES_body'));
+
+/* ==================== 场景命令 / 场景反应支持 ====================
+   自造场景只注入无头内存，不改 data/case-a001.json。 */
+console.log('\n=== 场景 commands / 场景反应支持 ===');
+window.__sceneTest.data.SCENE_CMD_TEST = {
+  title: '命令场景', content: '测试用场景',
+  commands: [{ type: 'text', label: '测试命令', value: '场景命令已执行' }]
+};
+window.__reveal('SCENE_CMD_TEST');
+const sceneCmdEl = ids['nodes'].children.find(c => c.dataset.key === 'loc:SCENE_CMD_TEST');
+sceneCmdEl._ev.dblclick[0]();
+assert('场景有 commands 时双击执行第一条命令（不是展开 / 折叠）',
+  logs.length > 0 && logs[logs.length - 1].indexOf('场景命令已执行') >= 0);
+assert('findReactable 对场景返回场景数据（reactions 同物品规则）',
+  window.__sceneTest.findReactable('loc', 'SCENE_CMD_TEST') === window.__sceneTest.data.SCENE_CMD_TEST);
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

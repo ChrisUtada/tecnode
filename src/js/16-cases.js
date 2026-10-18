@@ -331,7 +331,7 @@ function enterCase(id){
 function doEnterCase(id, from){
   const c = caseById(id);
   const snap = loadCaseState(id);    /* 先把目标案的档读出来，再存旧案，免得两边撞在一起 */
-  if (from){ saveCaseState(from); resetTec(); closeDlgWin(); closeBagWin(); closeClueWin(); }   /* 只有换案才清 TEC、对话窗与两扇收纳窗；同案回访保留 */
+  if (from){ saveCaseState(from); resetTec(); closeDlgWin(); closeChatWin(); closeBagWin(); closeClueWin(); }   /* 只有换案才清 TEC、单人和多人对话窗与两扇收纳窗；同案回访保留 */
   applyCaseData(CASE_DATA[id]);      /* 2. 载目标案数据 */
   CASE_ID = id;
   progress.last = id; saveProgress();
@@ -362,7 +362,7 @@ function parkCase(p){
     history = [];
     /* 浮层都锚在画布上，画布一藏就没意义了，一起收掉
        （TEC 是独立助手窗、证物袋 / 线索册是随身收纳，三扇常驻窗都保留） */
-    closeBubble(); closeNarr(); closePwPop();
+    closeBubble(); closeNarr(); closePwPop(); closeChatWin();
     clearSelection();
     setDetailWin(false);
   };

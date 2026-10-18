@@ -12,7 +12,7 @@
  *   - gamedata 用 JSON.stringify(JSON.parse(raw)) 注入，保证产物里它是一整行
  *   - _template.html 的 gamedata 位写占位符 __GAME_DATA_A001__
  *   - editor.html 与 index.html 同规则构建（壳在 src/editor/shell.html，
- *     CSS = src/css/01-font.css + 02-base.css + src/editor/*.css，JS = src/editor/*.js），
+ *     CSS = src/css/01-font.css + 02-base.css + 03-desktop.css + 04-nodes.css + src/editor/*.css，JS = src/editor/*.js），
  *     gamedata 同样包在 <script type="application/json" id="gamedata"> 里，--check 的归一化直接适用
  *   - **editor 是可选项**：src/editor/shell.html 不在盘上时跳过 editor 目标（另一台机器
  *     没提交编辑器源码的常见情形），index/_template/standalone 照常构建。判据只认「壳在不在」：
@@ -127,10 +127,10 @@ function assembleTarget(shellLabel, shellFile, css, js, cssWhere, jsWhere, mode)
   };
 }
 
-/* 编辑器只共享游戏的前两片 CSS（字体 + 主题变量 / header / 按钮），
-   桌面、节点、浮窗那些游戏专用切片不进编辑器 */
+/* 编辑器共享游戏的前四片 CSS（字体、主题、桌面骨架、节点卡片），
+   05/06 的应用窗与游戏结束态不进来；系统浮窗外观由 src/editor 自己增量补 */
 function readSharedBaseCss() {
-  return ["01-font.css", "02-base.css"].map((f) => ({
+  return ["01-font.css", "02-base.css", "03-desktop.css", "04-nodes.css"].map((f) => ({
     name: "src/css/" + f,
     text: fs.readFileSync(path.join(ROOT, "src", "css", f), "utf8"),
   }));

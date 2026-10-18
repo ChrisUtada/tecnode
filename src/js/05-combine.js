@@ -41,6 +41,13 @@ function attemptCombo(toolKey, targetKey){
     return;
   }
 
+  /* 人物 → 人物是专用对话通道：先查 dialogues，命中就播剧本，没命中也给默认回应；
+     不消耗节点、不进反应表，现有 showCharLine 单角色对话仍走原入口。 */
+  if (tool.kind === "char" && target.kind === "char"){
+    startChatCombo(tool, target);
+    return;
+  }
+
   /* 2) 目标直接有反应表 */
   let owner = null, hit = lookupReaction(target.kind, target.id, tool.id);
   if (hit) owner = target;

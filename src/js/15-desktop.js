@@ -188,6 +188,7 @@ document.getElementById("btn-reset").addEventListener("click", () => {
   clearCaseState(CASE_ID);   /* 重置也清掉本案存档，避免下次回访又续上旧进度 */
   resetTec();                /* 重置是全新开局，TEC 也一并清空 */
   closeDlgWin();             /* 角色对话窗跟着清（台词进度已随 G 重置，旧窗挂在失效节点上） */
+  closeChatWin();            /* 多人会话及其打字机定时器也随重置清理 */
   closeBagWin();             /* 证物袋窗同理：常驻于离屏/回访，不常驻于重置 */
   closeClueWin();            /* 线索册窗与证物袋同级：同样只在此处与换案时清 */
   boot();

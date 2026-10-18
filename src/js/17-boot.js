@@ -5,6 +5,7 @@ function boot(opts){
   closePwPop();
   closeBubble();
   closeNarr();
+  closeChatWin();          /* 多人会话是独立会话态：开局 / 换案 / 重置都清掉定时器与窗口 */
   /* 注意：TEC 窗、证物袋窗、线索册窗都不在这里关。三扇常驻窗（独立助手 / 随身收纳 / 随身册子），
      只有换案 / 重置才清（resetTec / closeBagWin / closeClueWin 在各自调用点），
      否则「– 收起 → 展开」回访同一案件时会被顺带收掉。 */
@@ -174,7 +175,11 @@ window.__avatarOpen = () => openAvatarWin();
 window.__avatarPick = id => { avatarPickId = id; renderAvatarWin(); };
 window.__avatarConfirm = () => confirmAvatarPick();
 window.__select = key => key ? selectNode(key) : clearSelection();
-window.__closeFloats = () => { closeBubble(); closeDlgWin(); closeNarr(); closePwPop(); };
+window.__closeFloats = () => { closeBubble(); closeDlgWin(); closeNarr(); closePwPop(); closeChatWin(); };
+window.__chatState = () => chatState();
+window.__chatNext = () => chatNext();
+window.__chatJoin = key => chatDrop(key);
+window.__chatMono = id => startMonologue(id);
 window.__renarr = sid => renarrScene(sid);
 window.__renarrTalk = key => { const n = G.nodes[key]; return n ? renarrTalk(n) : false; };
 /* 回忆小剧场（时间 × 地点 × 人物）：数据表 / 匹配器 / 当前演出进度 / 时间节点绑上的地点 */
@@ -223,7 +228,7 @@ window.__dump  = () => ({
   time: (G && G.time) || "present",
   dim: G._dimKeys || [],
   sel: sel,
-  floats: { bubble: !!bubbleEl, dlg: !!dlgWinEl, narr: !!narrEl, pw: !!pwPop, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
+  floats: { bubble: !!bubbleEl, dlg: !!dlgWinEl, narr: !!narrEl, pw: !!pwPop, chat: !!chatWinEl, bag: !!bagWinEl, goto: !!gotoWinEl, matrix: !!inferWinEl, tec: !!tecWinEl, clue: !!clueWinEl, people: !!peopleWinEl, detail: detailWinOpen, logs: logWinOpen },
   matrix: JSON.parse(JSON.stringify(G.matrix)),
   endings: [...G.endings],
   garden: G.garden ? { seed: !!G.garden.seed, plots: gardenPlots().filter(Boolean).length } : null,
