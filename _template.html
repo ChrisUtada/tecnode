@@ -3733,18 +3733,60 @@ function updateTecBadge(){
 
 /* ============ 多人对话（会话级，不进 G / 撤销栈） ============
    participants 是本剧本允许出场的全集；初始拖过来的两人只是「已加入」子集。
-   因此三人剧本可以由两人命中，播到第三人的第一句时才暂停等那个人被拖进窗。 */
+   因此三人剧本可以由两人命中，播到第三人的第一句时才暂停等那个人被拖进窗。
+
+   剧本可以绑语境（when / where）：同一对人，在 7月4日 的花园和「现在」说的不该是同一段话。
+   语境**从全局推出、不问玩家** —— 「人物拖人物」那一瞬画布上没有「站在哪」这个状态：
+     · when  = 当前时刻 G.time；
+     · where = 那一天发生在哪个地点，走 memPlaceOf()（A-001 里时刻↔地点一对一，
+                renarrScene 判「该放哪一天的放映卡」用的是同一个函数）。
+   没写语境 = 通用脚本，任何时候都能说；写了而此刻对不上 = **不播**（播出来台词就错位了）。 */
 let chatSession = null, chatWinEl = null;
 
-function dialogueSetKey(ids){ return (ids || []).slice().sort().join("|"); }
-function lookupDialogue(ids){
-  const key = dialogueSetKey(ids);
-  const exact = (DIALOGUES || []).find(d => dialogueSetKey(d.participants) === key);
-  if (exact) return exact;
-  return (DIALOGUES || []).find(d => ids.every(id => (d.participants || []).indexOf(id) >= 0)) || null;
+function chatContext(){
+  const t = (G && G.time) || PRESENT_TIME;
+  if (!t || t === PRESENT_TIME) return null;   /* 「现在」没有回忆语境 */
+  return { when:t, where:memPlaceOf(t) };
 }
-function monologueOf(charId){
-  return (DIALOGUES || []).find(d => (d.participants || []).length === 1 && d.participants[0] === charId) || null;
+/* 一条剧本与当前语境的三种关系：
+   fit  = 语境命中（写了 when 且对上；where 写了也要对上）
+   free = 没写语境，任何时候都能说
+   miss = 写了语境但此刻不符 —— 内容会错位，不播 */
+function dialogueFit(d, ctx){
+  const w = d && d.when, ph = d && d.where;
+  if (!w && !ph) return "free";
+  if (!ctx || w !== ctx.when) return "miss";
+  if (ph && ctx.where && ph !== ctx.where) return "miss";
+  return "fit";
+}
+function dialogueSetKey(ids){ return (ids || []).slice().sort().join("|"); }
+/* 同一组候选里语境优先：先 fit，再 free，都没有就 null（miss 不是候选，别把错位的台词播出去） */
+function pickDialogue(list, ctx){
+  return list.find(d => dialogueFit(d, ctx) === "fit") ||
+         list.find(d => dialogueFit(d, ctx) === "free") || null;
+}
+function lookupDialogue(ids, ctx){
+  ctx = ctx || chatContext();
+  const key = dialogueSetKey(ids);
+  const pool = DIALOGUES || [];
+  const exact = pool.filter(d => dialogueSetKey(d.participants) === key);
+  const hit = pickDialogue(exact, ctx);
+  if (hit) return hit;
+  /* 集合不完全相等的兜底：三人剧本可以由两人命中（第三人之后加入） */
+  const loose = pool.filter(d => exact.indexOf(d) < 0 && ids.every(id => (d.participants || []).indexOf(id) >= 0));
+  return pickDialogue(loose, ctx);
+}
+/* 区分「真没写剧本」与「写了但此刻不合时宜」—— 后者要给一句不同的说明，
+   否则作者会以为自己的剧本没被认出来。 */
+function dialogueBlocked(ids, ctx){
+  ctx = ctx || chatContext();
+  return (DIALOGUES || []).some(d =>
+    ids.every(id => (d.participants || []).indexOf(id) >= 0) && dialogueFit(d, ctx) === "miss");
+}
+function monologueOf(charId, ctx){
+  ctx = ctx || chatContext();
+  return pickDialogue((DIALOGUES || []).filter(d =>
+    (d.participants || []).length === 1 && d.participants[0] === charId), ctx);
 }
 function closeChatWin(){
   if (chatSession && chatSession.current) cancelType(chatSession.current.el);
@@ -3774,7 +3816,10 @@ function openChatSession(entry, initialIds){
   const ids = initialIds.slice();
   chatSession = { entry, joined:new Set(ids), idx:0, waitingFor:null, typing:false, current:null, done:false };
   const solo = (entry.participants || []).length === 1;
-  const title = (solo ? "独白 // " : "DIALOGUE // ") +
+  /* 带语境的剧本在标题里点明是哪一段记忆：「DIALOGUE // 7月4日 · 朱穗 × 陆珩松」——
+     玩家切到回忆时刻才看得到这段对话，标题跟着说清楚，免得以为是现在发生的事。 */
+  const whenLabel = entry.when ? timeLabelOf(entry.when) : "";
+  const title = (solo ? "独白 // " : "DIALOGUE // ") + (whenLabel ? whenLabel + " · " : "") +
     ids.map(id => labelOf("char", id) || id).join(" × ");
   const w = makeWindow(title, closeChatWin);
   const b = w.el;
@@ -3797,8 +3842,10 @@ function openChatSession(entry, initialIds){
 }
 function startChatCombo(a, b){
   const ids = [a.id, b.id];
-  const entry = lookupDialogue(ids) ||
-    { id:null, participants:ids, script:[{ t:"narr", text:"他们没什么可说的。" }] };
+  const ctx = chatContext();
+  const entry = lookupDialogue(ids, ctx) ||
+    { id:null, participants:ids,
+      script:[{ t:"narr", text: dialogueBlocked(ids, ctx) ? "此刻他们没什么可说的。" : "他们没什么可说的。" }] };
   return openChatSession(entry, ids);
 }
 function startMonologue(charId){
@@ -3907,7 +3954,8 @@ function chatDrop(key){
 function chatState(){
   const s = chatSession;
   if (!s) return { open:false, id:null, participants:[], joined:[], idx:0, total:0, waitingFor:null, typing:false, done:false };
-  return { open:!!chatWinEl, id:s.entry.id, participants:(s.entry.participants || []).slice(),
+  return { open:!!chatWinEl, id:s.entry.id, when:s.entry.when || null,
+    participants:(s.entry.participants || []).slice(),
     joined:[...s.joined], idx:s.idx, total:(s.entry.script || []).length,
     waitingFor:s.waitingFor, typing:!!s.typing, done:!!s.done,
     lines:chatWinEl ? chatWinEl.querySelector(".chat-lines").children.length : 0 };
@@ -7124,12 +7172,18 @@ window.__chatState = () => chatState();
 window.__chatNext = () => chatNext();
 window.__chatJoin = key => chatDrop(key);
 window.__chatMono = id => startMonologue(id);
-/* 多人对话数据表：两人剧本的功能测试入口（participants 按集合比较，与 lookupDialogue 同口径） */
+/* 多人对话数据表：两人剧本的功能测试入口（participants 按集合比较，与 lookupDialogue 同口径）；
+   when / where 是剧本语境，fit 是它与「当前时刻」的关系（fit / free / miss） */
 window.__dialogues = () => (DIALOGUES || []).map(d => ({ id:d.id, participants:(d.participants || []).slice(),
+  when:d.when || null, where:d.where || null, fit:dialogueFit(d, chatContext()),
   lines:(d.script || []).length,
   kinds:(d.script || []).map(x => x.t),
   cast:(d.script || []).filter(x => x.t === "say").map(x => x.who),
   texts:(d.script || []).map(x => x.text || "") }));
+/* 语境与被挡下的判断：验证「有剧本但此刻不合时宜」时不必去读窗口 DOM */
+window.__chatCtx = () => chatContext();
+window.__lookupDialogue = ids => { const e = lookupDialogue(ids); return e ? e.id : null; };
+window.__dialogueBlocked = ids => dialogueBlocked(ids);
 window.__renarr = sid => renarrScene(sid);
 window.__renarrTalk = key => { const n = G.nodes[key]; return n ? renarrTalk(n) : false; };
 /* 回忆小剧场（时间 × 地点 × 人物）：数据表 / 匹配器 / 当前演出进度 / 时间节点绑上的地点 */

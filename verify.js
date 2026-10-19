@@ -4057,6 +4057,39 @@ assert('12 行 = 4 旁白 + 8 对话（不是独白、也不是三人剧本）',
 assert('台词确实取自 7/4 花园叙事（咏叹调 / 抑制剂 / 美工刀）',
   dlgText.indexOf('G弦的咏叹调') >= 0 && dlgText.indexOf('抑制剂') >= 0 && dlgText.indexOf('美工刀') >= 0);
 
+console.log('\n=== 多人对话：语境门（when × where）===');
+/* 剧本可以只在某一段记忆里成立。这段台词说的是「7月4日的花园」，
+   语境由 G.time（当前时刻）+ memPlaceOf（那一刻的地点）推出，不问玩家。 */
+window.__time('present');
+assert('两人剧本带语境：when = 7月4日、where = 花园',
+  dlg0704.when === 'SCENES_0704' && dlg0704.where === 'SCENES_garden');
+assert('三人剧本与独白没写语境（通用脚本，任何时候都能说）',
+  dlgTbl.filter(d => d.id !== 'DLG_0704_zs_lhs').every(d => !d.when && !d.where));
+assert('现在时刻没有语境（chatContext 返回 null）', window.__chatCtx() === null);
+assert('现在时刻：两人剧本被判为 miss，lookupDialogue 不返回它',
+  dlgTbl.find(d => d.id === 'DLG_0704_zs_lhs').fit === 'miss' &&
+  window.__lookupDialogue(['CHARS_zs', 'CHARS_luhengs']) === null &&
+  window.__dialogueBlocked(['CHARS_zs', 'CHARS_luhengs']) === true);
+window.__combo('char:CHARS_luhengs', 'char:CHARS_zs');
+chatNow = window.__chatState();
+const chatLsMiss = ids['desktop'].querySelector('.chat-lines');
+assert('现在时刻同一对人物：改成「此刻他们没什么可说的。」（不播错位的台词）',
+  chatNow.open && chatNow.id === null && chatNow.total === 1 &&
+  chatLsMiss.children[0].querySelector('.chat-text').textContent === '此刻他们没什么可说的。');
+window.__closeFloats();
+
+window.__time('SCENES_0704');
+const dlgFitNow = window.__dialogues().find(d => d.id === 'DLG_0704_zs_lhs');
+assert('切到 7/4：语境 = 时刻 × 那一刻的地点，两人剧本变 fit',
+  JSON.stringify(window.__chatCtx()) === JSON.stringify({ when:'SCENES_0704', where:'SCENES_garden' }) &&
+  dlgFitNow.fit === 'fit' &&
+  window.__lookupDialogue(['CHARS_zs', 'CHARS_luhengs']) === 'DLG_0704_zs_lhs');
+window.__time('SCENES_0602');
+assert('换到 6/2：同一对人物同样说不出来（时刻不对就是不对，where 一样也不行）',
+  window.__chatCtx().when === 'SCENES_0602' &&
+  window.__lookupDialogue(['CHARS_zs', 'CHARS_luhengs']) === null);
+window.__time('SCENES_0704');
+
 /* 反着拖：先拖陆珩松到朱穗。lookupDialogue 按参与者集合匹配，与拖动顺序无关。 */
 window.__combo('char:CHARS_luhengs', 'char:CHARS_zs');
 chatNow = window.__chatState();
@@ -4067,6 +4100,8 @@ assert('开窗即两人在场：不等待加人、首句已播',
 const chatTitle2 = ids['desktop'].querySelector('.chat-win').querySelector('.syswin-title').textContent;
 assert('窗口标题是 DIALOGUE 且带两人姓名',
   chatTitle2.indexOf('DIALOGUE') >= 0 && chatTitle2.indexOf('朱穗') >= 0 && chatTitle2.indexOf('陆珩松') >= 0);
+assert('带语境的剧本在标题里点明那一刻（DIALOGUE // 7月4日 · …）',
+  chatNow.when === 'SCENES_0704' && chatTitle2.indexOf('7月4日') >= 0);
 const chatLs2 = ids['desktop'].querySelector('.chat-lines');
 assert('首行落的是 7/4 花园旁白，且旁白不带头像位',
   chatLs2.children.length === 1 &&

@@ -1129,6 +1129,8 @@
     },
     {
       "id": "DLG_0704_zs_lhs",
+      "when": "SCENES_0704",
+      "where": "SCENES_garden",
       "participants": ["CHARS_zs", "CHARS_luhengs"],
       "script": [
         { "t": "narr", "text": "花园里只剩G弦的咏叹调。朱穗伏在书桌上，呼吸浅得像是随时会断。" },
