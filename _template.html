@@ -5,11 +5,17 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>T.E.C-OS 节点原型 MVP v2</title>
 <style>
+  /* 凤凰点阵体（Vonwaon Bitmap，CC0 1.0）—— 全站唯一字体，12px 字模。
+     仓库里这份是按「项目用字 + GB2312 一级常用字」裁过的子集（tools/subset-font.py 生成），
+     不能再手改；缺字会按下面的栈回落到宋体、笔画风格突变，所以 verify 有一条覆盖守卫盯着。
+     字号可以比 12px 大（对话 / 剧场正文 13px），但**不要引入第二档字模**：16px 版的笔画
+     只有 1px，相对字号是 1/16，比这一档细一圈，放进界面就像"另一种字"。 */
   @font-face{
     font-family:'VonwaonBitmap';
     src:url(assets/font.ttf) format('truetype');
     font-weight:100 900; font-style:normal; font-display:swap;
   }
+
   :root{
     --bg:#e9e5d6; --card:#f5f2e8; --line:#2b2b26; --line2:#c0bcaa;
     --text:#2b2b26; --muted:#5c584a; --faint:#8a8672;
@@ -32,6 +38,9 @@
                   7px 9px 22px rgba(78,72,54,.28),
                   1px 2px 4px rgba(78,72,54,.16);
     --r-win:13px; --r-sm:11px; --r-btn:8px;
+    /* 唯一字体栈：凤凰点阵体 12px 档。字号可放大（正文 13px），字体只有这一根 —— 换第二档
+       字模会把笔画粗细换掉，整页看着不统一。 */
+    --font-ui:"VonwaonBitmap","SimSun","NSimSun","MS Mincho","MS Gothic",serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{
@@ -212,11 +221,32 @@
     background:var(--card); border:1px solid var(--edge); border-radius:var(--r-win);
     box-shadow:var(--win-shadow); z-index:26; overflow:hidden; cursor:grab}
   .chat-win.over{outline:2px dashed var(--text); outline-offset:3px}
-  .chat-win .chat-lines{max-height:300px; overflow-y:auto; padding:8px 10px}
-  .chat-line{font-size:12px; line-height:1.75; padding:5px 0; border-bottom:1px dashed var(--line2)}
-  .chat-line .chat-who{display:inline-block; color:var(--muted); font-weight:700; margin-right:7px}
-  .chat-line.narr{color:var(--faint); font-style:italic}
-  .chat-hint{font-size:10.5px; color:var(--muted); padding:6px 10px 8px; border-top:1px solid var(--edge-soft)}
+  .chat-win .chat-lines{max-height:340px; overflow-y:auto; padding:10px 12px}
+  /* 正文 13px —— **与节点详情面板同一档**（`.detail-win .syswin-body` 也是 13px / 行高 1.7）。
+     口径：全站只有一根 12px 字模，正文靠「字号 +8%」把它渲染得略厚一点，而不是换第二档字体。
+     试过 16px 字模：点阵确实更锐利，但那档字模的笔画是 1px（相对 16px 只有 1/16），
+     比全站其余文字细一圈，看着像"另一种字"；13px 落在 1.08 倍，笔画的墨色和详情窗一致。
+     行高 1.7，末行去掉分隔线，底边干净收口。 */
+  .chat-line{font-family:var(--font-ui); font-size:13px; line-height:1.7; padding:6px 0;
+    border-bottom:1px dashed var(--line2)}
+  .chat-line:last-child{border-bottom:none}
+  /* 带头像的一行（say）：左 30×30 头像位 + 右「名字 / 台词」两行 —— 排法与回忆剧场 .mp-av 同源，
+     只是聊天窗行更密、窗更窄（390），所以头像比剧场那档 40 收小到 30，正文才不被挤。 */
+  .chat-line.say{display:flex; gap:9px; align-items:flex-start}
+  .chat-av{flex:0 0 30px; width:30px; height:30px; border-radius:6px; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; background:var(--bg); border:1px solid var(--edge)}
+  .chat-av img{width:100%; height:100%; display:block; image-rendering:pixelated}
+  .chat-ini{font-size:15px; font-weight:700; color:var(--muted)}
+  .chat-line-main{flex:1 1 auto; min-width:0}
+  .chat-line .chat-who{display:block; font-family:var(--font-ui); font-size:12px; color:var(--muted);
+    font-weight:700; letter-spacing:.5px; margin-bottom:2px}
+  /* 旁白：**不用斜体** —— 中文斜体是合成倾斜，笔画发虚、读着不舒服；字体样式一律 normal。
+     层级靠墨色分（比台词浅一档 --muted），字号与台词一视同仁，不缩小。 */
+  .chat-line.narr{color:var(--muted); font-style:normal}
+  /* 底注条：平时**不占位**（:empty 直接隐藏），只在「等某人加入 / 插不上话」这类有用的话冒出来；
+     没有常驻底注。 */
+  .chat-hint{font-size:11px; color:var(--muted); padding:6px 12px 8px; border-top:1px solid var(--edge-soft)}
+  .chat-hint:empty{display:none}
   .tec-win .tec-lines, .dlg-win .tec-lines{max-height:240px; overflow:auto; margin-bottom:8px}
   .tec-win .tec-line, .dlg-win .tec-line{font-size:12px; line-height:1.7; padding:3px 0; border-bottom:1px dashed var(--line2)}
   .tec-win .tec-hint, .dlg-win .tec-hint{font-size:10.5px; color:var(--faint); margin-top:6px}
@@ -448,7 +478,7 @@
      再把「旁白 / 带头像的多人对话」排出来。比放映卡宽一档，头像列才不挤（332 宽时头像会顶掉正文）。
      这里全部用字面色值、不碰 :root token：它和结局遮罩一样是"另一种纸"，不该反染全局配色。 ---- */
   .memory.mem-play{width:420px}
-  .mem-play .mem-line{margin-bottom:8px; line-height:1.85}
+  .mem-play .mem-line{margin-bottom:8px; font-size:13px; line-height:1.7}
   .mem-play .mem-say{display:flex; gap:9px; align-items:flex-start; margin-bottom:9px}
   .mem-play .mp-av{flex:0 0 40px; width:40px; height:40px; border-radius:9px; overflow:hidden;
     display:flex; align-items:center; justify-content:center; background:#ccc7ad; border:1px solid #8a8672}
@@ -456,7 +486,7 @@
   .mem-play .mp-ini{font-size:19px; font-weight:700; color:#5c584a}
   .mem-play .mp-say-main{flex:1 1 auto; min-width:0}
   .mem-play .mp-name{font-size:11px; font-weight:700; letter-spacing:1px; color:#5c584a; margin-bottom:1px}
-  .mem-play .mp-text{font-size:13px; line-height:1.8}
+  .mem-play .mp-text{font-size:13px; line-height:1.7}
   #ending-overlay{position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(24,23,20,.97);
     z-index:100; display:none; color:#e6e3d2; cursor:pointer; user-select:none}
   #ending-overlay .eol{max-width:640px; margin:12vh auto 0; padding:0 26px; font-size:15px; line-height:2.1; white-space:pre-wrap}
@@ -3726,6 +3756,19 @@ function chatHint(text){
   const h = chatWinEl.querySelector(".chat-hint");
   if (h) h.textContent = text;
 }
+/* 贴底：**别写 scrollTop = scrollHeight** —— 刚 append 完那一瞬布局还是脏的，
+   scrollHeight 仍是旧值，赋值会被 clamp 到旧上限，末行就被窗底裁掉十几像素。
+   先读一次 scrollHeight 强制刷新布局，再给超大值让浏览器自己 clamp 到真实上限；
+   最后用 rAF 兜一次（换行 / 字体回流可能晚一帧）。 */
+function scrollChatBottom(){
+  const ls = chatWinEl && chatWinEl.querySelector(".chat-lines");
+  if (!ls) return;
+  void ls.scrollHeight;
+  ls.scrollTop = 1e7;
+  if (typeof requestAnimationFrame === "function"){
+    requestAnimationFrame(() => { if (ls.isConnected !== false) ls.scrollTop = 1e7; });
+  }
+}
 function openChatSession(entry, initialIds){
   closeChatWin();
   const ids = initialIds.slice();
@@ -3740,7 +3783,9 @@ function openChatSession(entry, initialIds){
   lines.className = "chat-lines";
   const hint = document.createElement("div");
   hint.className = "chat-hint";
-  hint.textContent = "点框内任意位置继续";
+  /* 底注条平时留空（CSS 里 :empty 直接隐藏）—— 只在「等某人加入 / 插不上话」时才写字，
+     不再有常驻的「点框内任意位置继续」。 */
+  hint.textContent = "";
   w.body.appendChild(lines);
   w.body.appendChild(hint);
   b.addEventListener("click", () => { if (!b._dragged) chatNext(); });
@@ -3767,7 +3812,7 @@ function chatAdvance(){
   const line = s.entry.script[s.idx];
   if (!line){
     s.done = true;
-    chatHint("对话结束");
+    chatHint("");
     return false;
   }
   if (line.t === "say" && !s.joined.has(line.who)){
@@ -3778,27 +3823,47 @@ function chatAdvance(){
   s.idx += 1;
   const lines = chatWinEl.querySelector(".chat-lines");
   const d = document.createElement("div");
-  d.className = "chat-line " + (line.t === "say" ? "say" : "narr");
   const full = plain(line.text || "");
-  if (line.t === "say"){
-    const who = document.createElement("span");
-    who.className = "chat-who";
-    who.textContent = labelOf("char", line.who) || line.who;
-    d.appendChild(who);
-  }
   const txt = document.createElement("span");
   txt.className = "chat-text";
-  d.appendChild(txt);
+  if (line.t === "say"){
+    /* 带头像的一行（与回忆剧场 playMemoryLine 同构）：左头像位 + 右「名字 / 台词」两行。
+       头像走 rosterAvatar：TEC / 执行者有图，剧情角色暂无美术稿 -> 首字方块（与名册 / 剧场同一退路）。
+       **别给头像挂 .tec-avatar 类** —— 它在窗口拖动排除表里，挂上整扇对话窗就拖不动了。 */
+    d.className = "chat-line say";
+    const nm = labelOf("char", line.who) || line.who;
+    const av = document.createElement("div");
+    av.className = "chat-av";
+    const art = rosterAvatar(line.who);
+    if (art){
+      const im = document.createElement("img");
+      im.src = art; im.alt = nm; im.draggable = false;
+      av.appendChild(im);
+    } else {
+      const ini = document.createElement("span");
+      ini.className = "chat-ini"; ini.textContent = String(nm).slice(0, 1);
+      av.appendChild(ini);
+    }
+    const main = document.createElement("div");
+    main.className = "chat-line-main";
+    const who = document.createElement("div");
+    who.className = "chat-who"; who.textContent = nm;
+    main.appendChild(who); main.appendChild(txt);
+    d.appendChild(av); d.appendChild(main);
+  } else {
+    d.className = "chat-line narr";
+    d.appendChild(txt);
+  }
   lines.appendChild(d);
-  lines.scrollTop = lines.scrollHeight;
+  scrollChatBottom();
   const cur = { el:txt, full };
   s.current = cur;
   s.typing = true;
-  chatHint("点窗内补全本句");
+  chatHint("");
   typeInto(txt, full, { done:() => {
     if (chatSession === s && s.current === cur){
       s.typing = false;
-      if (!s.waitingFor && !s.done) chatHint("点框内任意位置继续");
+      scrollChatBottom();          /* 打字把最后一行撑到换行时，再贴一次底 */
     }
   } });
   return true;
@@ -3810,7 +3875,8 @@ function chatNext(){
     cancelType(s.current.el);
     s.current.el.textContent = s.current.full;
     s.typing = false;
-    chatHint("点框内任意位置继续");
+    chatHint("");
+    scrollChatBottom();   /* 补完本句会把行撑到换行 —— 不重贴底的话，末句要等到下一次推进才归位 */
     return true;
   }
   if (s.waitingFor || s.done) return false;
@@ -3826,7 +3892,7 @@ function chatJoin(key){
   }
   s.joined.add(n.id);
   s.waitingFor = null;
-  chatHint("点框内任意位置继续");
+  chatHint("");
   chatAdvance();                                /* 从被截住的那一句立刻续播 */
   return true;
 }
@@ -7058,6 +7124,12 @@ window.__chatState = () => chatState();
 window.__chatNext = () => chatNext();
 window.__chatJoin = key => chatDrop(key);
 window.__chatMono = id => startMonologue(id);
+/* 多人对话数据表：两人剧本的功能测试入口（participants 按集合比较，与 lookupDialogue 同口径） */
+window.__dialogues = () => (DIALOGUES || []).map(d => ({ id:d.id, participants:(d.participants || []).slice(),
+  lines:(d.script || []).length,
+  kinds:(d.script || []).map(x => x.t),
+  cast:(d.script || []).filter(x => x.t === "say").map(x => x.who),
+  texts:(d.script || []).map(x => x.text || "") }));
 window.__renarr = sid => renarrScene(sid);
 window.__renarrTalk = key => { const n = G.nodes[key]; return n ? renarrTalk(n) : false; };
 /* 回忆小剧场（时间 × 地点 × 人物）：数据表 / 匹配器 / 当前演出进度 / 时间节点绑上的地点 */

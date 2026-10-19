@@ -1128,6 +1128,24 @@
       ]
     },
     {
+      "id": "DLG_0704_zs_lhs",
+      "participants": ["CHARS_zs", "CHARS_luhengs"],
+      "script": [
+        { "t": "narr", "text": "花园里只剩G弦的咏叹调。朱穗伏在书桌上，呼吸浅得像是随时会断。" },
+        { "t": "say", "who": "CHARS_zs", "text": "陆老师……？我好像睡着了。" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "别动。很快就结束了。" },
+        { "t": "say", "who": "CHARS_zs", "text": "你手里拿的是什么？" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "抑制剂。只差最后一步，我就能让所有人都活下来。" },
+        { "t": "say", "who": "CHARS_zs", "text": "所有人……包括槿老师，也包括我吗？" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "朱穗，你只要再睡一会儿。" },
+        { "t": "narr", "text": "针尖逼近。朱穗猛地挣开，手在落满灰烬的桌面上胡乱摸索。" },
+        { "t": "say", "who": "CHARS_zs", "text": "别过来——！" },
+        { "t": "narr", "text": "慌乱之中，她握住了美工刀，向前刺出。陆珩松闷哼一声，松开了手。" },
+        { "t": "say", "who": "CHARS_zs", "text": "对不起……对不起……" },
+        { "t": "narr", "text": "她推开花园的门，逃进夜里。身后的唱机还在转。" }
+      ]
+    },
+    {
       "id": "DLG_lhs_alone",
       "participants": ["CHARS_luhengs"],
       "script": [

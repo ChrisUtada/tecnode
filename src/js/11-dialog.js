@@ -689,6 +689,19 @@ function chatHint(text){
   const h = chatWinEl.querySelector(".chat-hint");
   if (h) h.textContent = text;
 }
+/* 贴底：**别写 scrollTop = scrollHeight** —— 刚 append 完那一瞬布局还是脏的，
+   scrollHeight 仍是旧值，赋值会被 clamp 到旧上限，末行就被窗底裁掉十几像素。
+   先读一次 scrollHeight 强制刷新布局，再给超大值让浏览器自己 clamp 到真实上限；
+   最后用 rAF 兜一次（换行 / 字体回流可能晚一帧）。 */
+function scrollChatBottom(){
+  const ls = chatWinEl && chatWinEl.querySelector(".chat-lines");
+  if (!ls) return;
+  void ls.scrollHeight;
+  ls.scrollTop = 1e7;
+  if (typeof requestAnimationFrame === "function"){
+    requestAnimationFrame(() => { if (ls.isConnected !== false) ls.scrollTop = 1e7; });
+  }
+}
 function openChatSession(entry, initialIds){
   closeChatWin();
   const ids = initialIds.slice();
@@ -703,7 +716,9 @@ function openChatSession(entry, initialIds){
   lines.className = "chat-lines";
   const hint = document.createElement("div");
   hint.className = "chat-hint";
-  hint.textContent = "点框内任意位置继续";
+  /* 底注条平时留空（CSS 里 :empty 直接隐藏）—— 只在「等某人加入 / 插不上话」时才写字，
+     不再有常驻的「点框内任意位置继续」。 */
+  hint.textContent = "";
   w.body.appendChild(lines);
   w.body.appendChild(hint);
   b.addEventListener("click", () => { if (!b._dragged) chatNext(); });
@@ -730,7 +745,7 @@ function chatAdvance(){
   const line = s.entry.script[s.idx];
   if (!line){
     s.done = true;
-    chatHint("对话结束");
+    chatHint("");
     return false;
   }
   if (line.t === "say" && !s.joined.has(line.who)){
@@ -741,27 +756,47 @@ function chatAdvance(){
   s.idx += 1;
   const lines = chatWinEl.querySelector(".chat-lines");
   const d = document.createElement("div");
-  d.className = "chat-line " + (line.t === "say" ? "say" : "narr");
   const full = plain(line.text || "");
-  if (line.t === "say"){
-    const who = document.createElement("span");
-    who.className = "chat-who";
-    who.textContent = labelOf("char", line.who) || line.who;
-    d.appendChild(who);
-  }
   const txt = document.createElement("span");
   txt.className = "chat-text";
-  d.appendChild(txt);
+  if (line.t === "say"){
+    /* 带头像的一行（与回忆剧场 playMemoryLine 同构）：左头像位 + 右「名字 / 台词」两行。
+       头像走 rosterAvatar：TEC / 执行者有图，剧情角色暂无美术稿 -> 首字方块（与名册 / 剧场同一退路）。
+       **别给头像挂 .tec-avatar 类** —— 它在窗口拖动排除表里，挂上整扇对话窗就拖不动了。 */
+    d.className = "chat-line say";
+    const nm = labelOf("char", line.who) || line.who;
+    const av = document.createElement("div");
+    av.className = "chat-av";
+    const art = rosterAvatar(line.who);
+    if (art){
+      const im = document.createElement("img");
+      im.src = art; im.alt = nm; im.draggable = false;
+      av.appendChild(im);
+    } else {
+      const ini = document.createElement("span");
+      ini.className = "chat-ini"; ini.textContent = String(nm).slice(0, 1);
+      av.appendChild(ini);
+    }
+    const main = document.createElement("div");
+    main.className = "chat-line-main";
+    const who = document.createElement("div");
+    who.className = "chat-who"; who.textContent = nm;
+    main.appendChild(who); main.appendChild(txt);
+    d.appendChild(av); d.appendChild(main);
+  } else {
+    d.className = "chat-line narr";
+    d.appendChild(txt);
+  }
   lines.appendChild(d);
-  lines.scrollTop = lines.scrollHeight;
+  scrollChatBottom();
   const cur = { el:txt, full };
   s.current = cur;
   s.typing = true;
-  chatHint("点窗内补全本句");
+  chatHint("");
   typeInto(txt, full, { done:() => {
     if (chatSession === s && s.current === cur){
       s.typing = false;
-      if (!s.waitingFor && !s.done) chatHint("点框内任意位置继续");
+      scrollChatBottom();          /* 打字把最后一行撑到换行时，再贴一次底 */
     }
   } });
   return true;
@@ -773,7 +808,8 @@ function chatNext(){
     cancelType(s.current.el);
     s.current.el.textContent = s.current.full;
     s.typing = false;
-    chatHint("点框内任意位置继续");
+    chatHint("");
+    scrollChatBottom();   /* 补完本句会把行撑到换行 —— 不重贴底的话，末句要等到下一次推进才归位 */
     return true;
   }
   if (s.waitingFor || s.done) return false;
@@ -789,7 +825,7 @@ function chatJoin(key){
   }
   s.joined.add(n.id);
   s.waitingFor = null;
-  chatHint("点框内任意位置继续");
+  chatHint("");
   chatAdvance();                                /* 从被截住的那一句立刻续播 */
   return true;
 }

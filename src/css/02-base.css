@@ -20,6 +20,9 @@
                   7px 9px 22px rgba(78,72,54,.28),
                   1px 2px 4px rgba(78,72,54,.16);
     --r-win:13px; --r-sm:11px; --r-btn:8px;
+    /* 唯一字体栈：凤凰点阵体 12px 档。字号可放大（正文 13px），字体只有这一根 —— 换第二档
+       字模会把笔画粗细换掉，整页看着不统一。 */
+    --font-ui:"VonwaonBitmap","SimSun","NSimSun","MS Mincho","MS Gothic",serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{

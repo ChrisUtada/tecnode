@@ -3959,6 +3959,65 @@ assert('非所需角色插不上话', window.__chatJoin('char:CHARS_luhengs') ==
 assert('所需角色加入后从断点续播', window.__chatJoin('char:CHARS_JS') === true &&
   window.__chatState().waitingFor === null && window.__chatState().idx === 3 &&
   ids['desktop'].querySelector('.chat-lines').children[2].querySelector('.chat-text').textContent.indexOf('背面的剂量') >= 0);
+/* 头像位：narr 行没有，say 行每行一个；剧情角色暂无美术稿 -> 首字方块（与名册 / 剧场同一退路） */
+const chatLs = ids['desktop'].querySelector('.chat-lines');
+const chNarr = chatLs.children[0], chZs = chatLs.children[1], chJs = chatLs.children[2];
+assert('旁白行不带头像位', !!chNarr && !chNarr.querySelector('.chat-av'));
+assert('说话行每行恰好一个头像位（朱穗 / 槿杉都带）',
+  chZs.querySelectorAll('.chat-av').length === 1 && chJs.querySelectorAll('.chat-av').length === 1);
+assert('头像在左、名字与台词在右（av 是 main 的前一个兄弟）',
+  chZs.children.length === 2 && chZs.children[0]._classes.has('chat-av') &&
+  chZs.children[1]._classes.has('chat-line-main'));
+assert('名字取自 CHARS（朱穗），台词仍在 .chat-text 里',
+  chZs.querySelector('.chat-who').textContent === '朱穗' &&
+  chZs.querySelector('.chat-text').textContent.indexOf('配比要留档') >= 0);
+assert('剧情角色暂无美术稿 -> 首字方块（朱穗 -> 朱）',
+  !!chZs.querySelector('.chat-ini') && chZs.querySelector('.chat-ini').textContent === '朱');
+assert('对话头像样式（30×30 头位 + flex 两栏 + 像素图不模糊）',
+  /\.chat-line\.say\{[^}]*display:flex/.test(html) &&
+  /\.chat-av\{[^}]*width:30px/.test(html) &&
+  /\.chat-av img\{[^}]*image-rendering:pixelated/.test(html));
+assert('源码：说话行走 rosterAvatar（有图用图、无稿退首字）',
+  html.indexOf('const art = rosterAvatar(line.who);') >= 0 &&
+  html.indexOf('av.className = "chat-av";') >= 0);
+/* 排版口径（用户反馈：字太小 / 旁白模糊 / 有斜体 / 不要底注 / 「对话字体跟其他的不统一」） */
+assert('正文 13px / 行高 1.7，走唯一那根 12px 字模（与节点详情同一档，笔画粗细才一致）',
+  /\.chat-line\{[^}]*font-family:var\(--font-ui\)/.test(html) &&
+  /\.chat-line\{[^}]*font-size:13px/.test(html) &&
+  /\.chat-line\{[^}]*line-height:1\.7/.test(html));
+assert('节点详情正文同为 13px / 1.7（对话窗与详情窗并排看不能两样）',
+  /\.detail-win \.syswin-body\{[^}]*font-size:13px; line-height:1\.7/.test(html));
+assert('全站只注册一根 @font-face（不再挂 16px 字模 —— 那档笔画细一圈，会显得不统一）',
+  (html.match(/@font-face\{/g) || []).length === 1 &&
+  html.indexOf("font-family:'VonwaonBitmap';") >= 0 &&
+  html.indexOf('VonwaonBitmap16') < 0 && html.indexOf('font16.ttf') < 0);
+assert('剧场正文与对话同档（.mem-line / .mp-text 都是 13px / 1.7）',
+  /\.mem-play \.mem-line\{[^}]*font-size:13px[^}]*line-height:1\.7/.test(html) &&
+  /\.mem-play \.mp-text\{[^}]*font-size:13px[^}]*line-height:1\.7/.test(html));
+assert('名字仍比正文小一档（12px，同一根字模）',
+  /\.chat-line \.chat-who\{[^}]*font-family:var\(--font-ui\)[^}]*font-size:12px/.test(html));
+assert('旁白不斜体（中文斜体是合成倾斜、笔画发虚），font-style 一律 normal',
+  /\.chat-line\.narr\{[^}]*font-style:normal/.test(html) &&
+  html.indexOf('.chat-line.narr{color:var(--faint); font-style:italic}') < 0 &&
+  html.indexOf('font-style:italic') < 0);
+assert('旁白用 --muted（比台词浅一档就够，--faint 浅到读不清）',
+  /\.chat-line\.narr\{[^}]*color:var\(--muted\)/.test(html));
+assert('底注条 :empty 直接隐藏（没有常驻底注，只在等加人/插不上话时冒出来）',
+  /\.chat-hint:empty\{display:none\}/.test(html));
+assert('无信息底注文案已清空（点框内继续 / 点窗内补全 / 对话结束都不再写）',
+  html.indexOf('chatHint("点框内任意位置继续")') < 0 &&
+  html.indexOf('hint.textContent = "点框内任意位置继续";') < 0 &&
+  html.indexOf('chatHint("点窗内补全本句")') < 0 &&
+  html.indexOf('chatHint("对话结束")') < 0);
+assert('必要引导还在（等人加入的那句仍会写进底注条）',
+  html.indexOf('」拖进对话框') >= 0);
+assert('贴底用超大 scrollTop 让浏览器 clamp（append 后立刻读 scrollHeight 会被截在旧上限，末行被裁）',
+  /function scrollChatBottom\(\)\{[\s\S]{0,200}ls\.scrollTop = 1e7;/.test(html) &&
+  /lines\.appendChild\(d\);\s*scrollChatBottom\(\);/.test(html) &&
+  /s\.typing = false;\s*scrollChatBottom\(\);/.test(html));
+const chatHintNow = ids['desktop'].querySelector('.chat-hint');
+assert('正常推进时底注条内容是空串（不占位）',
+  !!chatHintNow && String(chatHintNow.textContent) === '');
 for (let chatGuard = 0; chatGuard < 12 && !window.__chatState().done; chatGuard++) window.__chatNext();
 chatNow = window.__chatState();
 assert('三人剧本续播到结束', chatNow.done && chatNow.idx === chatNow.total && chatNow.lines === 6);
@@ -3978,6 +4037,64 @@ chatNow = window.__chatState();
 assert('独白全程没有等待加人、能播完', chatNow.done && !chatNow.waitingFor && chatNow.lines === 4);
 window.__talk('char:CHARS_luhengs');
 assert('现有 showCharLine 与多人会话互不影响', window.__dump().floats.dlg === true && window.__dump().floats.chat === true);
+
+console.log('\n=== 多人对话：两人剧本（7/4 花园 · 朱穗 × 陆珩松）===');
+/* 7月4日的叙事（SCENES_0704 正文 + TEC 档案 + 两段回忆）抽成一段真正的两人对话。
+   这是「人物 × 人物」通道唯一的正向样本：此前数据表里只有三人剧本与独白，
+   两人组合永远落到默认的「他们没什么可说的。」。 */
+const dlgTbl = window.__dialogues();
+const dlg0704 = dlgTbl.find(d => d.id === 'DLG_0704_zs_lhs');
+const dlgText = dlg0704 ? dlg0704.texts.join('|') : '';
+assert('两人剧本进了数据表：参与者恰好两人（朱穗 / 陆珩松）',
+  !!dlg0704 && dlg0704.participants.length === 2 &&
+  dlg0704.participants.indexOf('CHARS_zs') >= 0 && dlg0704.participants.indexOf('CHARS_luhengs') >= 0);
+assert('旁白与对话都有，两个说话人都分到了台词',
+  dlg0704.kinds.indexOf('narr') >= 0 && dlg0704.kinds.indexOf('say') >= 0 &&
+  dlg0704.cast.indexOf('CHARS_zs') >= 0 && dlg0704.cast.indexOf('CHARS_luhengs') >= 0);
+assert('12 行 = 4 旁白 + 8 对话（不是独白、也不是三人剧本）',
+  dlg0704.lines === 12 && dlg0704.kinds.filter(k => k === 'narr').length === 4 &&
+  dlg0704.kinds.filter(k => k === 'say').length === 8);
+assert('台词确实取自 7/4 花园叙事（咏叹调 / 抑制剂 / 美工刀）',
+  dlgText.indexOf('G弦的咏叹调') >= 0 && dlgText.indexOf('抑制剂') >= 0 && dlgText.indexOf('美工刀') >= 0);
+
+/* 反着拖：先拖陆珩松到朱穗。lookupDialogue 按参与者集合匹配，与拖动顺序无关。 */
+window.__combo('char:CHARS_luhengs', 'char:CHARS_zs');
+chatNow = window.__chatState();
+assert('反向组合同样命中两人剧本（参与者按集合比较）',
+  chatNow.open && chatNow.id === 'DLG_0704_zs_lhs' && chatNow.participants.length === 2);
+assert('开窗即两人在场：不等待加人、首句已播',
+  chatNow.joined.length === 2 && !chatNow.waitingFor && chatNow.idx === 1 && chatNow.total === 12);
+const chatTitle2 = ids['desktop'].querySelector('.chat-win').querySelector('.syswin-title').textContent;
+assert('窗口标题是 DIALOGUE 且带两人姓名',
+  chatTitle2.indexOf('DIALOGUE') >= 0 && chatTitle2.indexOf('朱穗') >= 0 && chatTitle2.indexOf('陆珩松') >= 0);
+const chatLs2 = ids['desktop'].querySelector('.chat-lines');
+assert('首行落的是 7/4 花园旁白，且旁白不带头像位',
+  chatLs2.children.length === 1 &&
+  chatLs2.children[0].querySelector('.chat-text').textContent.indexOf('G弦的咏叹调') >= 0 &&
+  !chatLs2.children[0].querySelector('.chat-av'));
+window.__chatNext();
+assert('第二行朱穗开口：有头像位，名字与台词分两栏',
+  !!chatLs2.children[1].querySelector('.chat-av') &&
+  chatLs2.children[1].querySelector('.chat-who').textContent === '朱穗' &&
+  chatLs2.children[1].querySelector('.chat-text').textContent.indexOf('陆老师') >= 0);
+
+for (let twoGuard = 0; twoGuard < 30 && !window.__chatState().done; twoGuard++) window.__chatNext();
+chatNow = window.__chatState();
+assert('12 行一次播完（两人都在场，中途不卡等待）',
+  chatNow.done && chatNow.idx === 12 && chatNow.lines === 12 && !chatNow.waitingFor);
+const chatLsFinal = ids['desktop'].querySelector('.chat-lines');
+let twoSay = 0, twoSayAv = 0, twoNarr = 0, twoNarrAv = 0;
+for (let twoI = 0; twoI < chatLsFinal.children.length; twoI++){
+  const twoRow = chatLsFinal.children[twoI];
+  const twoHasAv = !!twoRow.querySelector('.chat-av');
+  if (twoRow._classes.has('say')){ twoSay++; if (twoHasAv) twoSayAv++; }
+  else { twoNarr++; if (twoHasAv) twoNarrAv++; }
+}
+assert('逐行核对：8 个说话行 8 个头像位 / 4 个旁白行 0 个头像位',
+  twoSay === 8 && twoSayAv === 8 && twoNarr === 4 && twoNarrAv === 0);
+assert('陆珩松的台词行：名字正确、无美术稿退首字「陆」',
+  chatLsFinal.children[2].querySelector('.chat-who').textContent === '陆珩松' &&
+  chatLsFinal.children[2].querySelector('.chat-ini').textContent === '陆');
 
 console.log('\n=== 多人对话：普通组合回归 ===');
 ids['btn-reset']._ev.click[0]();
@@ -4001,6 +4118,67 @@ assert('场景有 commands 时双击执行第一条命令（不是展开 / 折�
   logs.length > 0 && logs[logs.length - 1].indexOf('场景命令已执行') >= 0);
 assert('findReactable 对场景返回场景数据（reactions 同物品规则）',
   window.__sceneTest.findReactable('loc', 'SCENE_CMD_TEST') === window.__sceneTest.data.SCENE_CMD_TEST);
+
+/* ==================== 字体覆盖守卫 ====================
+   用户反馈「有些字字体不一样」：font.ttf 是裁剪过的子集，缺字按 CSS 栈回落到宋体，
+   同一行里笔画风格突变。这里直接读 TTF 的 cmap（format 4，不引第三方依赖），
+   把「页面里出现的每个汉字」和「剧情数据里的每个汉字」分别对照两档字体。
+   以后写进生僻字，这条会立刻变红，而不是悄悄掉宋体。 */
+function ttfCharset(file){
+  const buf = fs.readFileSync(path.join(__dirname, file));
+  const numTables = buf.readUInt16BE(4);
+  let cmap = -1;
+  for (let i = 0; i < numTables; i++){
+    const o = 12 + i * 16;
+    if (buf.toString('ascii', o, o + 4) === 'cmap') cmap = buf.readUInt32BE(o + 8);
+  }
+  if (cmap < 0) throw new Error(file + ' 没有 cmap 表');
+  const n = buf.readUInt16BE(cmap + 2);
+  let sub = -1;
+  for (let i = 0; i < n; i++){
+    const o = cmap + 4 + i * 8;
+    if (buf.readUInt16BE(o) === 3 && buf.readUInt16BE(o + 2) === 1){
+      sub = cmap + buf.readUInt32BE(o + 4);
+    }
+  }
+  if (sub < 0) throw new Error(file + ' 没有 Windows BMP cmap');
+  if (buf.readUInt16BE(sub) !== 4) throw new Error(file + ' 的 cmap 不是 format 4');
+  const seg = buf.readUInt16BE(sub + 6) / 2;
+  const ends = sub + 14, starts = ends + seg * 2 + 2;
+  const deltas = starts + seg * 2, ranges = deltas + seg * 2;
+  const set = new Set();
+  for (let i = 0; i < seg; i++){
+    const s = buf.readUInt16BE(starts + i * 2), e = buf.readUInt16BE(ends + i * 2);
+    if (s === 0xFFFF) continue;
+    const d = buf.readInt16BE(deltas + i * 2), r = buf.readUInt16BE(ranges + i * 2);
+    for (let cp = s; cp <= e; cp++){
+      let g;
+      if (r === 0){ g = (cp + d) & 0xFFFF; }
+      else {
+        g = buf.readUInt16BE(ranges + i * 2 + r + (cp - s) * 2);
+        if (g) g = (g + d) & 0xFFFF;
+      }
+      if (g) set.add(cp);
+    }
+  }
+  return set;
+}
+function cjkOf(text){
+  const out = new Set();
+  for (const ch of text){
+    const c = ch.codePointAt(0);
+    if (c >= 0x4E00 && c <= 0x9FFF) out.add(c);
+  }
+  return out;
+}
+console.log('\n=== 字体覆盖 ===');
+const fontChars = ttfCharset('src/assets/font.ttf');
+const missPage = [...cjkOf(html)].filter(c => !fontChars.has(c));
+assert('字体覆盖页面里出现的每个汉字（cmap ' + fontChars.size + ' 字，缺 ' + missPage.length +
+  (missPage.length ? '：' + missPage.map(c => String.fromCharCode(c)).join('') : '') + '）', missPage.length === 0);
+const missData = [...cjkOf(JSON.stringify(JSON.parse(jsonText)))].filter(c => !fontChars.has(c));
+assert('字体覆盖剧情数据里的每个汉字（对话 / 剧场正文缺字会掉宋体；缺 ' + missData.length +
+  (missData.length ? '：' + missData.map(c => String.fromCharCode(c)).join('') : '') + '）', missData.length === 0);
 
 console.log('\n' + (errs === 0 && bad === 0 ? '=> 全部通过，无运行时错误' : '=> 存在问题：运行时 ' + errs + ' / 断言失败 ' + bad));
 

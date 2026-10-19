@@ -1,3 +1,8 @@
+  /* 凤凰点阵体（Vonwaon Bitmap，CC0 1.0）—— 全站唯一字体，12px 字模。
+     仓库里这份是按「项目用字 + GB2312 一级常用字」裁过的子集（tools/subset-font.py 生成），
+     不能再手改；缺字会按下面的栈回落到宋体、笔画风格突变，所以 verify 有一条覆盖守卫盯着。
+     字号可以比 12px 大（对话 / 剧场正文 13px），但**不要引入第二档字模**：16px 版的笔画
+     只有 1px，相对字号是 1/16，比这一档细一圈，放进界面就像"另一种字"。 */
   @font-face{
     font-family:'VonwaonBitmap';
     src:url(@@ASSET:font.ttf@@) format('truetype');

@@ -180,6 +180,12 @@ window.__chatState = () => chatState();
 window.__chatNext = () => chatNext();
 window.__chatJoin = key => chatDrop(key);
 window.__chatMono = id => startMonologue(id);
+/* 多人对话数据表：两人剧本的功能测试入口（participants 按集合比较，与 lookupDialogue 同口径） */
+window.__dialogues = () => (DIALOGUES || []).map(d => ({ id:d.id, participants:(d.participants || []).slice(),
+  lines:(d.script || []).length,
+  kinds:(d.script || []).map(x => x.t),
+  cast:(d.script || []).filter(x => x.t === "say").map(x => x.who),
+  texts:(d.script || []).map(x => x.text || "") }));
 window.__renarr = sid => renarrScene(sid);
 window.__renarrTalk = key => { const n = G.nodes[key]; return n ? renarrTalk(n) : false; };
 /* 回忆小剧场（时间 × 地点 × 人物）：数据表 / 匹配器 / 当前演出进度 / 时间节点绑上的地点 */
