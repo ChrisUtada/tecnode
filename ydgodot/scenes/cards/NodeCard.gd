@@ -10,6 +10,7 @@ signal activated(key: String)
 signal combo_requested(tool_key: String, target_key: String)
 signal selected(key: String)
 signal dragged(key: String)
+signal drag_released(key: String, at_global: Vector2)
 
 const PAD := 8.0
 const DRAG_THRESHOLD := 5.0
@@ -115,6 +116,7 @@ func _gui_input(event: InputEvent) -> void:
 			_pressed = false
 			if _dragging:
 				_dragging = false
+				drag_released.emit(card_key, event.global_position)
 				var target := _card_under(event.global_position)
 				if target != "" and target != card_key:
 					combo_requested.emit(card_key, target)

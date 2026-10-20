@@ -143,5 +143,16 @@ func finish_now() -> void:
 		set_process(true)
 
 
+## 撤销 / 重开时把进行中的分析收掉（已写进日志的结果保留，不回收）
+func cancel_analysis() -> void:
+	if not _analyzing:
+		return
+	_analyzing = false
+	set_process(false)
+	_bar.visible = false
+	_btn.disabled = false
+	_hint.text = "还要再看点什么？"
+
+
 func done_count() -> int:
 	return _done_count

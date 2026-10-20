@@ -107,3 +107,14 @@ static func button(text: String) -> Button:
 	b.add_theme_stylebox_override("pressed", button_style(false, true))
 	b.focus_mode = Control.FOCUS_NONE
 	return b
+
+
+static func primary_button(text: String) -> Button:
+	var b := button(text)
+	b.add_theme_color_override("font_color", CARD)
+	b.add_theme_color_override("font_hover_color", TEXT)
+	b.add_theme_color_override("font_pressed_color", CARD)
+	b.add_theme_stylebox_override("normal", flat(LINE, R_BTN, LINE))
+	b.add_theme_stylebox_override("hover", flat(CARD, R_BTN, LINE))
+	b.add_theme_stylebox_override("pressed", flat(FACE_LO, R_BTN, LINE))
+	return b

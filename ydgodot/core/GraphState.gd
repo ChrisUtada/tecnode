@@ -19,6 +19,14 @@ var tec_prog: Dictionary = {}     # scene id -> 已分析条数
 var collapsed: Dictionary = {}    # 容器 id -> true（展开过又收起）
 var stored: Dictionary = {}       # node key -> 收纳去向（"BAG" / "LEDGER" / "MATRIX" / 场景 id）
 var hidden: Dictionary = {}       # node key -> true（被更高层级的动作隐藏）
+var matrix: Dictionary = {}       # 五感槽位：sense -> Array[clue id]（推演桌布）
+var endings: Dictionary = {}      # 已达成结局 id -> true
+var tried: Dictionary = {}        # "tool>target" -> true（失败组合的痕迹，Web 的 tried）
+var talk_prog: Dictionary = {}    # 人物 id -> 对话进度（P2 对话系统用，快照先接住）
+var card_seen: Dictionary = {}    # 时刻 -> true（玩家知识：读过就不再自动重放）
+var debuted: Dictionary = {}      # 人物 id -> true（登场置位）
+var time: String = "present"      # 当前时刻；初始是「现在」
+var garden: Dictionary = {"seed": false, "plots": []}   # 真名结局后的花园
 var selected: String = ""
 var last_scene: String = ""
 
@@ -27,9 +35,23 @@ const BAG := "BAG"                # 证物袋：什么都收
 const LEDGER := "LEDGER"          # 线索册：只有线索能进
 const MATRIX := "MATRIX"          # 推演桌布：归位的线索
 
+## 五感顺序与显示名（Web 版 SENSES 的键序 —— 排序、遍历都按它来）
+const SENSES := ["vision", "hearing", "touch", "smell", "taste"]
+const SENSE_NAMES := {
+	"vision": "视觉", "hearing": "听觉", "touch": "触觉",
+	"smell": "嗅觉", "taste": "味觉",
+}
+
 
 func _init(p_case: CaseLoader) -> void:
 	case_def = p_case
+	_blank_matrix()
+
+
+func _blank_matrix() -> void:
+	matrix = {}
+	for sense in SENSES:
+		matrix[sense] = []
 
 
 func key_of(kind: String, id: String) -> String:
@@ -60,6 +82,7 @@ func add_node(kind: String, id: String) -> Dictionary:
 		"pinned": false,     # 钉住：折叠容器时不跟着藏（Web 版右键钉住）
 		"bag_from": "",      # 进袋前的来源容器 id（袋清单标注「来自 ×××」）
 		"installed": {},      # 装在本节点上的零件（item id -> true）
+		"captured": kind == "clue" and captured.has(id),
 	}
 	nodes[key] = n
 	return n
@@ -217,6 +240,8 @@ func store(key: String, where: String) -> void:
 
 func take(key: String) -> String:
 	var where := String(stored.get(key, ""))
+	if where == MATRIX:
+		_remove_from_matrix(String(node(key).get("id", "")))
 	stored.erase(key)
 	hidden.erase(key)
 	return where
@@ -272,6 +297,8 @@ func take_back(key: String, x: float = -1.0, y: float = -1.0) -> bool:
 	if not stored.has(key):
 		return false
 	var n := node(key)
+	if String(stored[key]) == MATRIX:
+		_remove_from_matrix(String(n.get("id", "")))
 	stored.erase(key)
 	hidden.erase(key)
 	n["pinned"] = false
@@ -286,7 +313,11 @@ func take_back(key: String, x: float = -1.0, y: float = -1.0) -> bool:
 func restash(key: String, from: String, to: String) -> bool:
 	if not stored.has(key) or String(stored[key]) != from or from == to:
 		return false
+	if to != BAG and to != LEDGER:
+		return false
 	var n := node(key)
+	if from == MATRIX:
+		_remove_from_matrix(String(n.get("id", "")))
 	n["pinned"] = false
 	if to == BAG:
 		n["bag_from"] = String(n.get("home_scene", ""))
@@ -296,15 +327,29 @@ func restash(key: String, from: String, to: String) -> bool:
 	return true
 
 
-## 归位到推演桌布（线索 → 某感官槽位）
-func matrix_assign(key: String, sense: String) -> bool:
+# ── 推演桌布（五感槽位）────────────────────────────────────────────────
+
+## 归位到推演桌布（线索 → 某感官槽位）。`sense` 省略时按线索自身的感官归位。
+## 与 Web 的 assignClue 同口径：不管线索现在在画布 / 袋 / 册，都能直接改写去向；
+## 同一槽位重复归位返回 false；感官不符也返回 false。
+func matrix_assign(key: String, sense: String = "") -> bool:
 	var n := node(key)
 	if n.is_empty() or String(n["kind"]) != "clue":
 		return false
 	var cl := case_def.clue_of(String(n["id"]))
-	if cl == null or cl.sense != sense:
+	if cl == null:
 		return false
+	if sense == "":
+		sense = cl.sense
+	if not matrix.has(sense) or cl.sense != sense:
+		return false
+	var list: Array = matrix[sense]
+	if list.has(cl.id):
+		return false
+	_remove_from_matrix(cl.id)
+	list.append(cl.id)
 	stored[key] = MATRIX
+	hidden.erase(key)
 	n["pinned"] = false
 	return true
 
@@ -314,6 +359,88 @@ func matrix_take(key: String, x: float = -1.0, y: float = -1.0) -> bool:
 	if String(stored.get(key, "")) != MATRIX:
 		return false
 	return take_back(key, x, y)
+
+
+## 桌布上的线索 id（按五感顺序摊平）
+func matrix_ids() -> Array:
+	var out: Array = []
+	for sense in SENSES:
+		out.append_array(matrix.get(sense, []))
+	return out
+
+
+## 桌布上的节点 key（对齐 Web 的 matrixItems）
+func matrix_items() -> Array:
+	var out: Array = []
+	for key in stored.keys():
+		if String(stored[key]) == MATRIX:
+			out.append(key)
+	return out
+
+
+func matrix_count() -> int:
+	return matrix_ids().size()
+
+
+func matrix_has(id: String) -> bool:
+	return matrix_ids().has(id)
+
+
+func matrix_slot_of(id: String) -> String:
+	for sense in SENSES:
+		if (matrix.get(sense, []) as Array).has(id):
+			return sense
+	return ""
+
+
+func _remove_from_matrix(id: String) -> void:
+	for sense in SENSES:
+		(matrix[sense] as Array).erase(id)
+
+
+## 推演判定：当前槽位里的线索**恰好**等于某条结局的配方（Web 版 executeInference 同口径）。
+## 数据顺序优先（ENDINGS.find 的等价实现），返回第一个命中的 EndingDef，否则 null。
+func match_ending() -> EndingDef:
+	var ids := {}
+	for sense in SENSES:
+		for id in matrix[sense]:
+			ids[String(id)] = true
+	for ending in case_def.endings:
+		if ending == null or ending.recipe.size() != ids.size():
+			continue
+		var all := true
+		for clue in ending.recipe:
+			if clue == null or not ids.has(clue.id):
+				all = false
+				break
+		if all:
+			return ending
+	return null
+
+
+## 记录结局达成（供 P1.5 快照 / 结局图鉴使用）
+func mark_ending(id: String) -> void:
+	endings[id] = true
+
+
+## 从正文里捕获 [clue:X]（TEC 解读 / 命令文本共用）—— 与 Web 的 gotClues 同口径
+func capture_clues(text: String, from_key: String = "") -> Array:
+	var got: Array = []
+	for tag in case_def.tags_of(text):
+		if tag["kind"] != "clue":
+			continue
+		var cid: String = tag["id"]
+		got.append(capture_clue(cid, from_key))
+	return got
+
+
+func capture_clue(cid: String, from_key: String = "") -> String:
+	captured[cid] = true
+	var n := add_node("clue", cid)
+	n["captured"] = true
+	if from_key != "":
+		link(from_key, String(n["key"]), "entity")
+	return String(n["key"])
 
 
 ## 折叠后的隐藏重算（对齐 Web 的 recomputeHidden）：

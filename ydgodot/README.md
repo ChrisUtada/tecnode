@@ -3,7 +3,7 @@
 > 迁移根目录。**后续迁移的所有内容都在这里**：工程、资源、测试、烘焙产物、转换脚本、文档。
 > 计划与阶段目标见 [`GODOT_PORT_PLAN.md`](./GODOT_PORT_PLAN.md)。
 
-## 当前状态：P1 进行中（P1.1 数据迁移已完成）
+## 当前状态：P1 已完成（P1.1–P1.6），下一步 P2
 
 - **P0 垂直切片**：可跑（下面这条链路）
 - **P1.1 JSON → Resource 迁移**：✅ 数据全部落在 `cases/a001/**/*.tres`，运行时**不再读 JSON**
@@ -15,11 +15,30 @@
   - 命令：text / choice / conditional / useItem / password / reveal 六型齐全，含光照门、零件门、`installs` 记账、工具消耗
   - 收纳窗已接进桌面：左侧图标栏点「证物袋」「线索册」能开窗、逐条取回
   - 回归：`test_p12.gd` 37 项（收纳三态 / 隐藏重算 / 判定顺序 / 消耗）
-- **P1.4–P1.6**（五感与推演桌布 / 快照撤销存档 / 开场适性测试）：未开工
+- **P1.4 五感与推演桌布**：✅ 已落地
+  - 槽位：`GraphState.matrix`（vision / hearing / touch / smell / taste），归位 / 取回 / 袋册桌布三向搬运
+  - 桌布窗：`MatrixWin`（执行者居中、五感锚点、外圆 + 五芒星虚线阵、线索芯片）
+  - 推演：长按执行者 2.5 秒蓄力描星；配方必须**恰好**相等（多一条也不算）
+  - 结局：命中后分幕演出 + 真名遮罩（`真名已识破 ——花魄——`），末帧按钮「确认捕获」
+  - 捕获：TEC 解读场景时捕获 `hiddenClue`（尸体 → 植物学家陆珩松）
+  - 回归：`test_p14.gd` 56 项（含真鼠标事件把线索卡拖上桌布）
+- **P1.5 快照 / 撤销 / 存档**：✅ 已落地
+  - `SaveSystem`：快照字段对齐 Web（nodes / edges / explored / captured / tried / talkProg / tecProg / lastScene / collapsed / time / cardSeen / debuted / matrix / endings / garden），节点含位置、点亮、钉住、零件、收纳去向
+  - 撤销：页眉「撤销」按钮，最多 60 步；只记录真正改变状态的步骤（发光门、错密码、纯文本不占步）
+  - 存档：`user://tec_case_<id>.save`，每次有效操作自动写盘；正常启动自动续档，`重来` 清档，`--shot` / 无头测试不写盘
+  - 恢复：原地写回 `GraphState`，重建卡片与收纳 / 桌布视图，隐藏状态重算
+  - 回归：`test_p15.gd` 85 项（快照往返 / 原地恢复 / 撤销上限 / JSON + 磁盘 / 桌面接线）
+- **P1.6 开场适性测试 / 调查员证**：✅ 已落地
+  - 流程：姓名 → 3 道五感题（每题 5 个选项，多数决、平局取先达到）→ 选头像 → 调查员证 → 确认领证
+  - 证件：`TEC-XX-0000` 编号、签发日期、五感主导型与判词、像素头像、红色「T.E.C 核准」印章
+  - 持久化：`user://tec_investigator.json`（与案件存档独立，`重来` 不清）；有证时正常启动跳过开场
+  - 页眉证章：领证后显示「▣ 姓名 · 编号」，点击回看调查员证；`--shot` / 无头测试 / `--no-intro` 不弹开场
+  - 回归：`test_p16.gd` 61 项（五感判定 / 编号 / 读写档 / 完整三步 UI / 页眉 / 回看 / 重来不清证）
 
 一条完整链路已在 Godot 4.7 里跑通，其余系统尚未搬迁：
 
 ```
+开场：适性测试（姓名 → 3 问 → 头像）→ 调查员证 → 页眉证章
 桌面壳（暗色页眉 / 图标栏 / 案件窗）
   └ 画布：单场景「植物学家的花园」展开（卡片节点 + 柔和浮雕）
       └ 拖放组合：手电筒 ——拖到——> 黑影（先要点亮，否则被发光门拦下）
@@ -45,30 +64,37 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 "$GODOT" --headless --path ydgodot --script res://tests/headless/test_migration.gd
 "$GODOT" --headless --path ydgodot --script res://tests/headless/test_commands.gd
 "$GODOT" --headless --path ydgodot --script res://tests/headless/test_p12.gd
+"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p14.gd
+"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p15.gd
+"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p16.gd
 
 # 3.5) 重跑数据迁移（JSON → .tres；只在确认数据基准后跑）
 "$GODOT" --headless --path ydgodot --script res://tools/json_to_tres.gd
 
-# 4) 视觉自查：跑一遍切片，把 13 张截图存进 docs/
+# 4) 视觉自查：跑一遍切片，把 15 张截图存进 docs/
 "$GODOT" --path ydgodot --resolution 1280x800 -- --shot
+
+# 4.5) 开场 / 调查员证截图（6 张，写到 docs/p1_1*.png）
+"$GODOT" --path ydgodot --resolution 1280x800 -- --shot --shot-intro
 ```
 
 - `--fast`：把「分析计时」「结局分幕延迟」压到 0（无头/测试旁路，见计划 §四.3）。
-- `--shot`：跑固定剧本并截图（`docs/p0_*.png`）。截图需要真实渲染，**不能加 `--headless`**。
+- `--shot`：跑固定剧本并截图（`docs/p0_*.png`、`docs/p1_*.png`）。截图需要真实渲染，**不能加 `--headless`**。
+- `--no-intro`：跳过开场适性测试（无证时也不弹）。
 
 ## 目录
 
 | 路径 | 内容 |
 |---|---|
-| `core/` | 纯逻辑（不挂场景树，可无头测）：`CaseLoader` / `GraphState` / `ComboSystem` |
+| `core/` | 纯逻辑（不挂场景树，可无头测）：`CaseLoader` / `GraphState` / `ComboSystem` / `SaveSystem` / `Investigator` |
 | `scenes/` | `Desktop.tscn` + `Desktop.gd`（壳与接线）、`cards/NodeCard.gd`、`windows/*` |
 | `ui/` | `TecTheme.gd`（配色/字体/StyleBox）、`shaders/surface.gdshader`（浮雕）、`shaders/paper.gdshader`（纸纹） |
 | `cases/a001/` | **内容数据（唯一形态）**：`case.tres` 索引 + `scenes/` `items/` `chars/` `clues/` `memories/` `dialogues/` `endings/`，一实体一文件 |
 | `core/defs/` | 25 个自定义 Resource 类（`SceneDef` / `ItemDef` / `CommandDef` 六子类 / `CharDef` …） |
 | `data/` | `case-a001.json` —— **已冻结为只读档案**（迁移输入 + 对照基准，运行时不再读它） |
 | `assets/raw/` | `src/assets/` 的拷贝（字体 / 头像 / OGG / 花园序列帧） |
-| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 32）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 14）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）—— **共 152 项** |
-| `docs/` | P0 切片 6 张 + P1 新特性 7 张截图（P3 对拍基线从这些图起步） |
+| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 32）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 14）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）—— **共 354 项** |
+| `docs/` | P0 切片 6 张 + P1 新特性 15 张截图（P3 对拍基线从这些图起步） |
 | `tools/` | P1 的 `json_to_tres.gd` 与对拍工具（待建） |
 
 ## P0 已做 / 明确没做
@@ -84,11 +110,10 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 - 结局演出：分幕台词按 `delay` 落下、点击继续、遮罩收幕
 - 无头回归两层（逻辑 + 界面），全绿
 
-**没做（P1 起）**
+**没做（P2 起）**
 
-- JSON → `.tres` Resource 迁移（含类型化引用与 `@tool` 校验）
 - 真实布局算法（现在是 4 列网格，无连线、无层级、无镜头聚焦/缩放）
-- 撤销栈 / 快照 / 存档、收纳（证物袋 / 线索册）、详情窗、人物名册、对话系统
+- 详情窗、人物名册、对话系统
 - 回忆/时间轴、案件切换、音乐播放器、花园彩蛋
 - 打字机、窗口最小化、系统窗层级与 z 序的完整规则
 
@@ -101,7 +126,8 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 | 叙事卡 | 锚在触发节点上方、可拖 | 固定在右下角的浮窗（可拖） |
 | 手电筒来源 | 书桌 → 左侧抽屉 → 手电筒 | 开局直接放在画布上（抽屉链路属 P1.2） |
 | 数据形态 | `data/case-a001.json` 直读 | `cases/a001/**/*.tres`（P1.1），JSON 冻结为档案 |
-| 结局触发 | 推演桌布命中配方 | 切片里「分析过尸体场景」即演示（`TRUE_E` 的分幕脚本） |
+| 结局触发 | 推演桌布命中配方 | 已接推演桌布；`--shot` 仍直接播放 `TRUE_E` 以保留 P0 对拍基线 |
+| 调查员头像库 | 常驻两人 + 已结识人物，领证后可再更换 | 常驻两人 + 画布上已出现的人物；回看证件已接，换头像 / 人名册属 P2 |
 | 字体回退 | VonwaonBitmap → SimSun → … | 全字形字体直导，**不配 fallback** |
 
 ## 约定

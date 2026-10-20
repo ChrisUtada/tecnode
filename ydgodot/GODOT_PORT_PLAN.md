@@ -1,6 +1,6 @@
 # T.E.C-OS → Godot 4 移植计划
 
-> 状态：计划 v2（未开工） ｜ 目标引擎：Godot 4.x（GDScript，2D） ｜ 目标平台：桌面（Windows 优先）
+> 状态：计划 v2（P0–P1 完成，P2 起待做） ｜ 目标引擎：Godot 4.x（GDScript，2D） ｜ 目标平台：桌面（Windows 优先）
 > 前置阅读：`README.md`、`EDITOR_PLAN.md` ｜ 迁移基准：`data/case-a001.json`
 > **v2 变更**：内容创作确定迁入 Godot 编辑器，Web 编辑器（editor.html）弃用；数据层从「JSON 不动」改为「JSON → Resource（.tres）一次性迁移」，详见 §一.1 与 §二.5。
 > **迁移根目录（2026-10-20 定）**：`nodes-mvp/ydgodot/` —— **后续迁移的一切内容都放在这里**：Godot 工程（`project.godot` 直接位于 `ydgodot/` 根）、资源、测试、烘焙产物、转换脚本、文档。仓库其余部分（`src/`、`data/`、`index.html` 等 Web 版）在迁移验证通过前保持只读参考、不迁移、不改动。
@@ -168,8 +168,10 @@ ydgodot/                           # ← 迁移根目录（Godot project.godot �
 > - ✅ **运行时已切资源**：`CaseLoader` 只认 `.tres`（JSON 冻结为档案），`GraphState` / `ComboSystem` 改用 `SceneDef` / `ItemDef` / `CommandDef`；P0 的逻辑 20 项 + 界面 10 项回归仍全绿。
 > - ✅ **P1.2 图状态全量**（`core/GraphState.gd`）：节点 / 边 / 展开（`reveal_scene` + `reveal_container`）/ 折叠 / **收纳三态**（`BAG` 证物袋 · `LEDGER` 线索册 · `MATRIX` 推演桌布，含 `bag_store` / `ledger_store` / `matrix_assign` / `take_back` / `restash` 跨窗搬运）/ **折叠后的隐藏重算**（`recompute_hidden`：钉住的、跟场外有连线的都不藏）/ `delete_node`（连边一起走）/ 可复用工具查询。收纳窗已接进桌面（`scenes/windows/StorageWin.gd`，证物袋 + 线索册两扇）。
 > - ✅ **P1.3 命令系统六型**（`core/CommandSystem.gd`）：text / choice / conditional / useItem / password / reveal 全部落地，含**光照门**（列出的灯至少亮一盏）、**零件门**（`requires` 必须已装在目标上）、`installs` 记账、工具消耗（非可复用工具用完消失，可复用工具留着，开关 `consume_tools`）。判定顺序对齐 Web：**先查零件，再查工具发不发光**。
-> - ✅ **回归 152 项全绿**：`test_p0` 20 · `test_ui` 32 · `test_migration` 14 · `test_commands` 49 · **`test_p12` 37**（本轮新增：收纳三态 / 折叠隐藏重算 / 零件优先判定 / 工具消耗 / 删节点）。
-> - ⬜ P1.4–P1.6（五感与推演桌布 / 快照撤销存档 / 开场适性测试）未开工。
+> - ✅ **P1.4 五感与推演桌布**：`GraphState.matrix` 五感槽位（归位 / 取回 / 袋册桌布三向搬运）；`scenes/windows/MatrixWin.gd` 推演桌布（执行者居中、五感锚点、外圆 + 五芒星虚线阵、线索芯片拖出取回）；长按执行者 2.5 秒蓄力描星；配方**恰好相等**才命中（多一条也失败）；命中后分幕演出 + 真名遮罩（`真名已识破 ——花魄——`），末帧「确认捕获」；TEC 解读捕获 `hiddenClue`（尸体 → 植物学家陆珩松）。
+> - ✅ **P1.5 快照 / 撤销 / 存档**（`core/SaveSystem.gd`）：快照对齐 Web（nodes / edges / explored / captured / tried / talkProg / tecProg / lastScene / collapsed / time / cardSeen / debuted / matrix / endings / garden；节点含位置 / 点亮 / 钉住 / 零件 / 收纳去向），恢复为原地写回；撤销栈上限 60；磁盘存档 `user://tec_case_<id>.save`，有效操作自动写盘、正常启动续档、`重来` 清档；`--shot` 与无头测试不写盘。桌面新增「撤销」按钮，恢复后重建卡片 / 收纳窗 / 桌布。
+> - ✅ **P1.6 开场适性测试 / 调查员证**（`core/Investigator.gd` + `scenes/windows/IntroWin.gd`）：姓名 → 3 道五感题（多数决、平局取先达到）→ 头像 → 调查员证 → 确认领证；证件含 `TEC-XX-0000` 编号 / 签发日期 / 五感主导型与判词 / 像素头像 / 红色核准印章；`user://tec_investigator.json` 独立持久化，正常启动有证跳过开场，页眉证章可回看证件；`--shot` / 无头 / `--no-intro` 不弹。
+> - ✅ **回归 354 项全绿**：`test_p0` 20 · `test_ui` 32 · `test_migration` 14 · `test_commands` 49 · `test_p12` 37 · `test_p14` 56 · `test_p15` 85 · **`test_p16` 61**（本轮新增：五感判定 / 编号 / 证件读写 / 三步 UI / 页眉证章 / 回看 / 重来不清证）。
 
 ### P2 · 系统全量（1–2 周）——补齐桌面生态
 

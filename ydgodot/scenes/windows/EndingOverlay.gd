@@ -17,6 +17,11 @@ var _name_label: Label
 var _box: VBoxContainer
 var _hint: Label
 var _message: String = ""
+var _truename: String = ""
+var _is_true := false
+var _truename_shown := false
+var _shown_message := ""
+var _final_text := "收下这份记录"
 
 
 func setup_overlay() -> void:
@@ -55,7 +60,7 @@ func setup_overlay() -> void:
 	_box.add_theme_constant_override("separation", 14)
 	col.add_child(_box)
 
-	_hint = TecTheme.label("点击继续", 11, TecTheme.FAINT)
+	_hint = TecTheme.label(_final_text, 11, TecTheme.FAINT)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.visible = false
 	col.add_child(_hint)
@@ -66,11 +71,22 @@ func play(ending: EndingDef) -> void:
 		return
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)   # 每次开演前重新贴合父级（防父级尺寸后到）
 	_lines = ending.lines
-	_message = ending.message
+	_is_true = ending.is_true_capture
+	_truename = ending.truename if _is_true else ""
+	# 真名结局的大段说明留给花园（Web 版同口径），遮罩上只落真名
+	_message = "" if _is_true else ending.message
+	_final_text = "确认捕获" if _is_true else "收下这份记录"
 	_name_label.text = ending.name
 	_idx = 0
 	_shown = 0
 	_wait = 0.0
+	_truename_shown = false
+	_shown_message = ""
+	_hint.text = _final_text
+	_hint.visible = false
+	for child in _box.get_children():
+		_box.remove_child(child)
+		child.queue_free()
 	_playing = true
 	visible = true
 	move_to_front()
@@ -101,6 +117,15 @@ func _process(delta: float) -> void:
 
 
 func _show_message() -> void:
+	if _is_true and _truename != "" and not _truename_shown:
+		var tn := TecTheme.label("真名已识破\n——%s——" % _truename, 26, TecTheme.CARD)
+		tn.name = "truename"
+		tn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		tn.custom_minimum_size = Vector2(560, 0)
+		tn.add_theme_constant_override("line_spacing", 8)
+		_box.add_child(tn)
+		_truename_shown = true
 	if _message != "":
 		var m := TecTheme.label(_message, 12, TecTheme.LINE2)
 		m.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -108,10 +133,27 @@ func _show_message() -> void:
 		m.custom_minimum_size = Vector2(620, 0)
 		m.add_theme_constant_override("line_spacing", 6)
 		_box.add_child(m)
+		_shown_message = _message
 		_message = ""
 	_hint.visible = true
 	_playing = false
 	set_process(false)
+
+
+## 测试 / 截图旁路：把剩下的分幕一次放完
+func finish_now() -> void:
+	if not visible:
+		return
+	while _idx < _lines.size():
+		var line: EndingLineDef = _lines[_idx]
+		_idx += 1
+		_shown += 1
+		var l := TecTheme.label(line.text, 15, TecTheme.CARD)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(560, 0)
+		_box.add_child(l)
+	_show_message()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -129,3 +171,19 @@ func shown_count() -> int:
 
 func total_lines() -> int:
 	return _lines.size()
+
+
+func truename_shown() -> bool:
+	return _truename_shown
+
+
+func final_text() -> String:
+	return _final_text
+
+
+func shown_message() -> String:
+	return _shown_message
+
+
+func truename() -> String:
+	return _truename

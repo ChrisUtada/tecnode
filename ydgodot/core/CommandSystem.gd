@@ -223,15 +223,7 @@ func _apply_payload(payload: PayloadDef, node_key: String) -> Dictionary:
 
 ## 正文里出现的 [clue:X] 直接记为已捕获，并把线索节点建出来
 func _capture_clues(text: String) -> Array:
-	var got: Array = []
-	for tag in case_def.tags_of(text):
-		if tag["kind"] != "clue":
-			continue
-		var cid: String = tag["id"]
-		graph.captured[cid] = true
-		var n := graph.add_node("clue", cid)
-		got.append(n["key"])
-	return got
+	return graph.capture_clues(text)
 
 
 func _ok(message: String) -> Dictionary:

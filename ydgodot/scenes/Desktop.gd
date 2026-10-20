@@ -30,7 +30,17 @@ var _pw_pop: PasswordPop = null
 var _pw_ctx: Dictionary = {}
 var _bag_win: StorageWin = null
 var _ledger_win: StorageWin = null
+var _matrix_win: MatrixWin = null
+var _last_ending_id := ""
 var _flash_supply_note := false
+var _save: SaveSystem = null
+var _save_enabled := true
+var _storage_before: Dictionary = {}
+var _investigator: Dictionary = {}
+var _inv_path := Investigator.PATH
+var _intro: IntroWin = null
+var _inv_chip: Button = null
+var _cert_win: SysWindow = null
 
 
 func _ready() -> void:
@@ -39,13 +49,30 @@ func _ready() -> void:
 	if not case_def.load_case():
 		push_error("案件数据装载失败：" + case_def.load_error)
 		return
+	_save_enabled = not _has_arg("--shot") and DisplayServer.get_name() != "headless"
+	_investigator = Investigator.load_from(_inv_path)
 	graph = GraphState.new(case_def)
 	combos = ComboSystem.new(case_def, graph)
 	_cmds = CommandSystem.new(case_def, graph)
 	_build_ui()
-	_start_slice()
+	_refresh_chip()
+	if _resume_allowed() and _resume_from_save():
+		_show_toast("已继续上次进度")
+	else:
+		_start_slice()
+	if _intro_allowed() and _investigator.is_empty():
+		_open_intro()
 	if _has_arg("--shot"):
-		_shot_flow.call_deferred()
+		if _has_arg("--shot-intro"):
+			_shot_intro_flow.call_deferred()
+		else:
+			_shot_flow.call_deferred()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_autosave()
+		get_tree().quit()
 
 
 ## 命令行参数（`--` 之后的用户参数）
@@ -131,14 +158,43 @@ func _build_header() -> void:
 	_crumb = TecTheme.label("案件 A-001", TecTheme.FS_BODY, TecTheme.LINE2)
 	_crumb.name = "crumb"
 	_crumb.position = Vector2(258, 12)
-	_crumb.size = Vector2(560, 28)
+	_crumb.size = Vector2(430, 28)
 	head.add_child(_crumb)
+
+	_inv_chip = TecTheme.button("")
+	_inv_chip.name = "inv_chip"
+	_inv_chip.position = Vector2(700, 11)
+	_inv_chip.size = Vector2(214, 30)
+	_inv_chip.clip_text = true
+	_inv_chip.add_theme_font_size_override("font_size", 11)
+	_inv_chip.add_theme_color_override("font_color", TecTheme.CARD)
+	_inv_chip.add_theme_color_override("font_hover_color", TecTheme.TEXT)
+	_inv_chip.add_theme_color_override("font_pressed_color", TecTheme.TEXT)
+	var chip_normal := TecTheme.flat(Color(0, 0, 0, 0), TecTheme.R_BTN, TecTheme.CARD)
+	var chip_hover := TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.CARD)
+	chip_normal.content_margin_left = 8
+	chip_normal.content_margin_right = 8
+	chip_hover.content_margin_left = 8
+	chip_hover.content_margin_right = 8
+	_inv_chip.add_theme_stylebox_override("normal", chip_normal)
+	_inv_chip.add_theme_stylebox_override("hover", chip_hover)
+	_inv_chip.add_theme_stylebox_override("pressed", chip_hover)
+	_inv_chip.visible = false
+	_inv_chip.pressed.connect(_open_cert_review)
+	head.add_child(_inv_chip)
+
+	var undo_btn := TecTheme.button("撤销")
+	undo_btn.name = "btn_undo"
+	undo_btn.position = Vector2(930, 11)
+	undo_btn.size = Vector2(84, 30)
+	undo_btn.pressed.connect(_undo)
+	head.add_child(undo_btn)
 
 	var reset_btn := TecTheme.button("重来")
 	reset_btn.name = "btn_reset"
-	reset_btn.position = Vector2(1040, 11)
-	reset_btn.size = Vector2(80, 30)
-	reset_btn.pressed.connect(_start_slice)
+	reset_btn.position = Vector2(1022, 11)
+	reset_btn.size = Vector2(90, 30)
+	reset_btn.pressed.connect(_reset_case)
 	head.add_child(reset_btn)
 
 	var tec_btn := TecTheme.button("TEC")
@@ -189,7 +245,7 @@ func _build_icons() -> void:
 	col.position = Vector2(22, 30)
 	col.add_theme_constant_override("separation", 10)
 	_desk.add_child(col)
-	for pair in [["TEC", "tec"], ["证物袋", "bag"], ["线索册", "clue"], ["档案袋", "goto"]]:
+	for pair in [["TEC", "tec"], ["证物袋", "bag"], ["线索册", "clue"], ["推演桌布", "infer"], ["档案袋", "goto"]]:
 		var b := TecTheme.button(String(pair[0]))
 		b.custom_minimum_size = Vector2(96, 40)
 		b.name = "icon_" + String(pair[1])
@@ -199,6 +255,8 @@ func _build_icons() -> void:
 			b.pressed.connect(func(): _toggle_storage(GraphState.BAG))
 		elif String(pair[1]) == "clue":
 			b.pressed.connect(func(): _toggle_storage(GraphState.LEDGER))
+		elif String(pair[1]) == "infer":
+			b.pressed.connect(_toggle_matrix)
 		else:
 			b.pressed.connect(func(): _show_toast("这个东西还没搬过来（P1 再做）"))
 		col.add_child(b)
@@ -227,15 +285,72 @@ func _build_toast() -> void:
 
 # ── 切片 ────────────────────────────────────────────────────────────────
 
-func _start_slice() -> void:
+func _case_id() -> String:
+	return case_def.case_def.id if case_def != null and case_def.case_def != null else ""
+
+
+func _resume_allowed() -> bool:
+	if not _save_enabled or _has_arg("--fresh"):
+		return false
+	return DisplayServer.get_name() != "headless"
+
+
+## 重建一套运行时对象（图 / 命令系统 / 存档），并清掉旧卡片与会话窗
+func _new_runtime() -> void:
 	for c in _card_layer.get_children():
 		if c is NodeCard:
+			_card_layer.remove_child(c)
 			c.queue_free()
 	_cards.clear()
 	graph = GraphState.new(case_def)
 	combos = ComboSystem.new(case_def, graph)
 	_cmds = CommandSystem.new(case_def, graph)
+	_save = SaveSystem.new(graph, _case_id())
 	_selected = ""
+	graph.selected = ""
+	_last_ending_id = ""
+	_storage_before = {}
+	if _ending != null:
+		_ending.visible = false
+	if _tec != null:
+		_tec.cancel_analysis()
+		_tec.visible = false
+	if _pw_pop != null and is_instance_valid(_pw_pop):
+		_pw_pop.queue_free()
+	_pw_pop = null
+	_pw_ctx = {}
+	if _narr != null and is_instance_valid(_narr):
+		_narr.queue_free()
+	_narr = null
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_matrix_win.queue_free()
+	_matrix_win = null
+	if _bag_win != null and is_instance_valid(_bag_win):
+		_bag_win.queue_free()
+	_bag_win = null
+	if _ledger_win != null and is_instance_valid(_ledger_win):
+		_ledger_win.queue_free()
+	_ledger_win = null
+
+
+func _reset_case() -> void:
+	if _save != null:
+		_save.clear_save()
+	_start_slice()
+	_show_toast("已重置为初始状态")
+
+
+func _resume_from_save() -> bool:
+	_new_runtime()
+	if not _save.load_from_disk():
+		_save.clear_history()
+		return false
+	_rebuild_from_graph()
+	return true
+
+
+func _start_slice() -> void:
+	_new_runtime()
 
 	# 切片固定从花园开始：config.startScene 是封面标题页（SCENE_START），不是调查起点
 	var sid := SLICE_SCENE
@@ -262,6 +377,100 @@ func _set_crumb(text: String) -> void:
 		_crumb.text = text
 	if _case_win != null:
 		_case_win.set_title(text)
+
+
+# ── 调查员 / 开场适性测试 ───────────────────────────────────────────────
+
+func _intro_allowed() -> bool:
+	if DisplayServer.get_name() == "headless":
+		return false
+	return not _has_arg("--shot") and not _has_arg("--no-intro")
+
+
+func _refresh_chip() -> void:
+	if _inv_chip == null:
+		return
+	if _investigator.is_empty():
+		_inv_chip.visible = false
+		_inv_chip.text = ""
+		_inv_chip.tooltip_text = ""
+		return
+	_inv_chip.text = "▣ %s · %s" % [String(_investigator.get("name", "")), String(_investigator.get("id", ""))]
+	_inv_chip.tooltip_text = _inv_chip.text
+	_inv_chip.visible = true
+
+
+func _avatar_pool() -> Array:
+	var out: Array = Investigator.AVATAR_INITIAL.duplicate()
+	for key in graph.nodes.keys():
+		if not String(key).begins_with("char:"):
+			continue
+		var id := String(key).substr(5)
+		if id != "CHARS_TEC" and not out.has(id):
+			out.append(id)
+	return out
+
+
+func _avatar_names() -> Dictionary:
+	var out := {"CHARS_EXEC": "执行者", "CHARS_TEC": "TEC"}
+	if case_def == null:
+		return out
+	for id in _avatar_pool():
+		var ch := case_def.char_of(String(id))
+		if ch != null and ch.name != "":
+			out[String(id)] = ch.name
+	return out
+
+
+func _locked_avatar_count() -> int:
+	if case_def == null:
+		return 0
+	var pool := _avatar_pool()
+	var n := 0
+	for id in case_def.chars.keys():
+		if not pool.has(String(id)):
+			n += 1
+	return n
+
+
+func _open_intro() -> IntroWin:
+	if _intro != null and is_instance_valid(_intro):
+		return _intro
+	var w := IntroWin.new()
+	w.name = "intro"
+	w.store_path = _inv_path
+	w.setup(_avatar_pool(), _avatar_names(), _locked_avatar_count())
+	w.finished.connect(_on_intro_finished)
+	w.tree_exited.connect(_on_intro_closed)
+	add_child(w)
+	_intro = w
+	return w
+
+
+func _on_intro_closed() -> void:
+	_intro = null
+
+
+func _on_intro_finished(card: Dictionary) -> void:
+	_investigator = card.duplicate(true)
+	_refresh_chip()
+	_show_toast("调查员 %s 已接入 T.E.C-OS" % String(_investigator.get("name", "")))
+
+
+func _open_cert_review() -> void:
+	if _investigator.is_empty():
+		return
+	if _cert_win != null and is_instance_valid(_cert_win):
+		_cert_win.queue_free()
+		_cert_win = null
+	var w := SysWindow.new()
+	w.name = "cert_win"
+	w.setup("INVESTIGATOR // 调查员证", 340, 540)
+	w.position = Vector2(470, 40)
+	_desk.add_child(w)
+	w.content.add_child(IntroWin.build_cert(_investigator))
+	w.tree_exited.connect(func(): _cert_win = null)
+	_cert_win = w
 
 
 func _show_toast(text: String, warn: bool = false) -> void:
@@ -297,6 +506,102 @@ func _hide_toast() -> void:
 	_toast.visible = false
 
 
+# ── 撤销 / 存档 ─────────────────────────────────────────────────────────
+
+func _autosave() -> void:
+	if _save == null or not _save_enabled:
+		return
+	if not _save.save_to_disk():
+		push_warning("自动存档失败：" + _save.last_error)
+
+
+## 动作开始前拍一张；动作结束后状态真的变了才入撤销栈并写盘
+func _commit(before: Dictionary) -> void:
+	if before.is_empty() or _save == null:
+		return
+	if JSON.stringify(before) == JSON.stringify(_save.snapshot()):
+		return
+	_save.push_history(before)
+	_autosave()
+
+
+func dbg_undo() -> bool:
+	return _undo()
+
+
+func dbg_history_size() -> int:
+	return _save.history.size() if _save != null else 0
+
+
+func dbg_save() -> bool:
+	return _save.save_to_disk() if _save != null else false
+
+
+func dbg_load() -> bool:
+	if _save == null or not _save.load_from_disk():
+		return false
+	_rebuild_from_graph()
+	return true
+
+
+func dbg_clear_save() -> void:
+	if _save != null:
+		_save.clear_save()
+
+
+func dbg_save_path() -> String:
+	return _save.path if _save != null else ""
+
+
+func dbg_use_temp_save(p_path: String) -> void:
+	_save = SaveSystem.new(graph, _case_id(), p_path)
+	_save.clear_save()
+	_save.clear_history()
+
+
+func _undo() -> bool:
+	if _save == null or not _save.can_undo():
+		_show_toast("没有可撤销的操作", true)
+		return false
+	if not _save.undo():
+		_show_toast("撤销失败：" + _save.last_error, true)
+		return false
+	_rebuild_from_graph()
+	_autosave()
+	_show_toast("已撤销上一步")
+	return true
+
+
+## 按当前图状态重建所有卡片（撤销 / 续档共用）
+func _rebuild_from_graph() -> void:
+	for c in _card_layer.get_children():
+		if c is NodeCard:
+			_card_layer.remove_child(c)
+			c.queue_free()
+	_cards.clear()
+	_selected = ""
+	graph.selected = ""
+	_storage_before = {}
+	if _pw_pop != null and is_instance_valid(_pw_pop):
+		_pw_pop.queue_free()
+	_pw_pop = null
+	_pw_ctx = {}
+	if _narr != null and is_instance_valid(_narr):
+		_narr.queue_free()
+	_narr = null
+	_ending.visible = false
+	if _tec != null:
+		_tec.cancel_analysis()
+		_tec.set_meta("selected_scene", "")
+	for key in graph.nodes.keys():
+		_spawn_card(String(key))
+	_apply_hidden()
+	_refresh_matrix_views()
+	_last_ending_id = String(graph.endings.keys()[0]) if not graph.endings.is_empty() else ""
+	var sid := graph.last_scene
+	_set_crumb("案件 A-001 // " + case_def.scene_title(sid) if sid != "" else "案件 A-001")
+
+
 # ── 卡片 ────────────────────────────────────────────────────────────────
 
 func _spawn_card(key: String) -> NodeCard:
@@ -314,6 +619,7 @@ func _spawn_card(key: String) -> NodeCard:
 	card.selected.connect(_on_card_selected)
 	card.activated.connect(_on_card_activated)
 	card.dragged.connect(_on_card_dragged)
+	card.drag_released.connect(_on_card_drag_released)
 	card.combo_requested.connect(_on_card_combo)
 	_card_layer.add_child(card)
 	_cards[key] = card
@@ -334,6 +640,14 @@ func _on_card_dragged(key: String) -> void:
 	graph.selected = key
 
 
+## 拖到推演桌布窗口上 = 归位（Web 版 overMatrixDrop 的画布侧入口）
+func _on_card_drag_released(key: String, at_global: Vector2) -> void:
+	if _matrix_win == null or not is_instance_valid(_matrix_win):
+		return
+	if _matrix_win.board_global_rect().has_point(at_global):
+		_assign_to_matrix(key)
+
+
 func _on_card_activated(key: String) -> void:
 	var n := graph.node(key)
 	if n.is_empty():
@@ -346,19 +660,23 @@ func _on_card_activated(key: String) -> void:
 		_toggle_container("item", id)
 		return
 	# 其余：跑第一条命令（text / password / choice / conditional / reveal 都从这儿进）
+	var before := _save.snapshot()
 	var res := combos.activate(key)
 	if res.is_empty():
 		return
 	_apply_outcome(res, key)
+	_commit(before)
 
 
 ## 容器双重身份：第一次双击展开，已展开再双击收起（对齐 Web 的展开 / 折叠）
 func _toggle_container(kind: String, id: String) -> void:
+	var before := _save.snapshot()
 	if graph.explored.has(id) and not graph.is_collapsed(id):
 		graph.collapse(id)
 		_apply_hidden()
 		_show_toast("收起了「%s」" % case_def.label_of(kind, id))
 		_relayout()
+		_commit(before)
 		return
 	var fresh := graph.reveal_container(kind, id)
 	graph.uncollapse(id)
@@ -373,6 +691,7 @@ func _toggle_container(kind: String, id: String) -> void:
 		_set_crumb("案件 A-001 // " + case_def.scene_title(id))
 	else:
 		_show_toast("展开了「%s」" % case_def.label_of(kind, id))
+	_commit(before)
 
 
 ## 把图状态的隐藏结论落到卡片上（对齐 Web 的 recomputeHidden：钉住的、跟场外有连线的都不藏）
@@ -398,6 +717,8 @@ func _apply_outcome(res: Dictionary, node_key: String) -> void:
 		_spawn_card(String(k))
 	for k in res.get("reveal", []):
 		_spawn_card(String(k))
+	for k in res.get("captured", []):
+		_refresh_or_spawn_card(String(k))
 	if bool(res.get("lit_changed", false)):
 		if _cards.has(node_key):
 			_cards[node_key].refresh()
@@ -421,6 +742,7 @@ func _toggle_storage(kind: String) -> void:
 		_bag_win.name = "bag_win"
 		_bag_win.setup_store("EVIDENCE BAG // 证物袋", GraphState.BAG, graph, case_def)
 		_bag_win.position = Vector2(150, 300)
+		_bag_win.will_take.connect(_on_storage_will_take)
 		_bag_win.took.connect(_on_storage_took)
 		_bag_win.closed.connect(func(): _bag_win = null)
 		_desk.add_child(_bag_win)
@@ -434,10 +756,17 @@ func _toggle_storage(kind: String) -> void:
 	_ledger_win.name = "clue_win"
 	_ledger_win.setup_store("CLUE LEDGER // 线索册", GraphState.LEDGER, graph, case_def)
 	_ledger_win.position = Vector2(410, 300)
+	_ledger_win.will_take.connect(_on_storage_will_take)
 	_ledger_win.took.connect(_on_storage_took)
+	_ledger_win.to_matrix.connect(_on_ledger_to_matrix)
 	_ledger_win.closed.connect(func(): _ledger_win = null)
 	_desk.add_child(_ledger_win)
 	_ledger_win.move_to_front()
+
+
+## 收纳窗取出前先拍快照（StorageWin 自己改图，Desktop 只能从信号里抢在它前面）
+func _on_storage_will_take(_key: String) -> void:
+	_storage_before = _save.snapshot()
 
 
 ## 从收纳窗取回：节点回到画布，并刷新两个清单窗
@@ -449,29 +778,135 @@ func _on_storage_took(key: String) -> void:
 		_bag_win.refresh_store()
 	if _ledger_win != null and is_instance_valid(_ledger_win):
 		_ledger_win.refresh_store()
+	_commit(_storage_before)
+	_storage_before = {}
+
+
+# ── 推演桌布（五感槽位 / 归位 / 长按推演）──────────────────────────────
+
+func _toggle_matrix() -> void:
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_matrix_win.queue_free()
+		_matrix_win = null
+		return
+	_matrix_win = MatrixWin.new()
+	_matrix_win.name = "matrix_win"
+	_matrix_win.setup_matrix(graph, case_def)
+	_matrix_win.position = Vector2(336, 40)
+	_matrix_win.clue_taken.connect(_on_matrix_took)
+	_matrix_win.clue_dropped.connect(_on_matrix_dropped)
+	_matrix_win.inference_requested.connect(_run_inference)
+	_desk.add_child(_matrix_win)
+	_matrix_win.move_to_front()
+
+
+## 画布 / 册子 → 桌布。感官自动取线索自身的 sense（与 Web 的 assignClue 一致）。
+func _assign_to_matrix(key: String) -> bool:
+	var n := graph.node(key)
+	if n.is_empty():
+		return false
+	if String(n["kind"]) != "clue":
+		_show_toast("只有线索能归位到推演桌布", true)
+		return false
+	var cl := case_def.clue_of(String(n["id"]))
+	if cl == null:
+		return false
+	var before := _save.snapshot()
+	if not graph.matrix_assign(key):
+		_show_toast("「%s」的感官类型是%s，归位失败" % [n.get("label", ""), GraphState.SENSE_NAMES.get(cl.sense, cl.sense)], true)
+		return false
+	_apply_hidden()
+	_refresh_or_spawn_card(key)
+	_refresh_matrix_views()
+	_commit(before)
+	return true
+
+
+func _on_matrix_took(key: String) -> void:
+	var before := _save.snapshot()
+	if not graph.matrix_take(key):
+		return
+	_apply_hidden()
+	_refresh_or_spawn_card(key)
+	_refresh_matrix_views()
+	_commit(before)
+
+
+## 桌布上的线索拖到线索册 = 改归册子；拖出桌布到别处 = 取回画布
+func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
+	if _ledger_win != null and is_instance_valid(_ledger_win) \
+		and _ledger_win.get_global_rect().has_point(at_global):
+		var before := _save.snapshot()
+		if graph.restash(key, GraphState.MATRIX, GraphState.LEDGER):
+			_apply_hidden()
+			_refresh_matrix_views()
+			_commit(before)
+			return
+	_on_matrix_took(key)
+
+
+func _on_ledger_to_matrix(key: String) -> void:
+	var before := _save.snapshot()
+	if graph.matrix_assign(key):
+		_apply_hidden()
+		_refresh_matrix_views()
+		_commit(before)
+	else:
+		_show_toast("这条线索没有可用的感官槽位", true)
+
+
+func _refresh_matrix_views() -> void:
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_matrix_win.refresh_matrix()
+	if _bag_win != null and is_instance_valid(_bag_win):
+		_bag_win.refresh_store()
+	if _ledger_win != null and is_instance_valid(_ledger_win):
+		_ledger_win.refresh_store()
+
+
+## 长按蓄力完成 → 配方判定（Web 的 executeInference）：恰好命中才算，多余线索也失败
+func _run_inference() -> void:
+	var hit := graph.match_ending()
+	if hit == null:
+		if _matrix_win != null and is_instance_valid(_matrix_win):
+			_matrix_win.show_heartbroken()
+		_show_toast("推演失败：当前阵列不匹配任何结局配方", true)
+		return
+	var before := _save.snapshot()
+	graph.mark_ending(hit.id)
+	_last_ending_id = hit.id
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_matrix_win.play_shock()
+	_ending.play(hit)
+	_commit(before)
+
+
+func _refresh_or_spawn_card(key: String) -> void:
+	var card: NodeCard = _cards.get(key, null)
+	if card == null:
+		card = _spawn_card(key)
+	if card != null:
+		card.visible = graph.is_visible(key)
+		card.refresh()
 
 
 ## 供测试钩子 / 后续接线用：把当前选中的节点收进某个收纳处
 func dbg_store(kind: String) -> bool:
 	if _selected == "":
 		return false
+	if kind == GraphState.MATRIX:
+		return _assign_to_matrix(_selected)
+	var before := _save.snapshot()
 	var ok := false
 	if kind == GraphState.BAG:
 		ok = graph.bag_store(_selected)
 	elif kind == GraphState.LEDGER:
 		ok = graph.ledger_store(_selected)
-	elif kind == GraphState.MATRIX:
-		var n := graph.node(_selected)
-		if not n.is_empty() and n.get("kind", "") == "clue":
-			var cl := case_def.clue_of(String(n["id"]))
-			ok = graph.matrix_assign(_selected, cl.sense if cl != null else "")
 	if not ok:
 		return false
 	_apply_hidden()
-	if _bag_win != null and is_instance_valid(_bag_win):
-		_bag_win.refresh_store()
-	if _ledger_win != null and is_instance_valid(_ledger_win):
-		_ledger_win.refresh_store()
+	_refresh_matrix_views()
+	_commit(before)
 	return true
 
 
@@ -510,6 +945,7 @@ func _open_password(node_key: String) -> void:
 func _submit_password(text: String) -> void:
 	if _pw_ctx.is_empty():
 		return
+	var before := _save.snapshot()
 	var res := _cmds.submit_password(String(_pw_ctx["node_key"]), _pw_ctx["cmd"], text)
 	if bool(res.get("wrong_password", false)):
 		if _pw_pop != null and is_instance_valid(_pw_pop):
@@ -521,9 +957,11 @@ func _submit_password(text: String) -> void:
 	_pw_pop = null
 	_apply_outcome(res, String(_pw_ctx["node_key"]))
 	_pw_ctx = {}
+	_commit(before)
 
 
 func _on_card_combo(tool_key: String, target_key: String) -> void:
+	var before := _save.snapshot()
 	var res := combos.use_item(tool_key, target_key)
 	if res.has("blocked") and res["blocked"]:
 		_show_toast(String(res.get("message", "")), true)     # 发光门：不记 tried、不进撤销
@@ -536,7 +974,10 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 			_expand_scene(next_scene, true)
 		for k in res.get("reveal", []):
 			_spawn_card(String(k))
+		for k in res.get("captured", []):
+			_refresh_or_spawn_card(String(k))
 		_relayout()
+		_commit(before)
 	else:
 		var msg := String(res.get("message", ""))
 		if msg != "":
@@ -618,10 +1059,42 @@ func _toggle_tec() -> void:
 
 
 func _on_tec_analysis_done(scene_id: String) -> void:
+	var before := _save.snapshot()
 	graph.tec_prog[scene_id] = int(graph.tec_prog.get(scene_id, 0)) + 1
-	if scene_id == "SCENES_body":
-		var e := case_def.ending_by_id("TRUE_E")
-		_ending.play(e)
+	_capture_hidden_clue(scene_id)
+	_commit(before)
+
+
+## TEC 解读完成后捕获 hiddenClue（场景 / 物品同一套字段；当前先接场景分析链路）
+func _capture_hidden_clue(scene_id: String) -> void:
+	var s := case_def.scene_of(scene_id)
+	if s == null or s.hidden_clue == null:
+		return
+	var host := graph.key_of("loc", scene_id)
+	var got: Array = []
+	var seen := {}
+	for clue in s.hidden_clue.clues:
+		if clue == null or graph.captured.has(clue.id) or seen.has(clue.id):
+			continue
+		seen[clue.id] = true
+		got.append(graph.capture_clue(clue.id, host))
+	for tag in case_def.tags_of(s.hidden_clue.text):
+		var cid := String(tag["id"])
+		if tag["kind"] != "clue" or graph.captured.has(cid) or seen.has(cid):
+			continue
+		seen[cid] = true
+		got.append(graph.capture_clue(cid, host))
+	if got.is_empty():
+		return
+	for key in got:
+		_refresh_or_spawn_card(String(key))
+	_relayout()
+	var names: Array = []
+	for key in got:
+		var n := graph.node(String(key))
+		if not n.is_empty() and not names.has(String(n.get("label", ""))):
+			names.append(String(n.get("label", "")))
+	_show_toast("捕获线索：" + "、".join(names))
 
 
 # ── 测试钩子（与 Web 版 window.__* 同名，便于把操作脚本逐行翻译）──────────
@@ -639,7 +1112,13 @@ func dbg_state() -> Dictionary:
 		"stored": graph.stored.keys(),
 		"hidden": graph.hidden.keys(),
 		"installed": _installed_map(),
+		"matrix": graph.matrix.duplicate(true),
+		"matrix_ids": graph.matrix_ids(),
+		"endings": graph.endings.keys(),
 		"ending_visible": _ending.visible if _ending != null else false,
+		"ending_id": _last_ending_id,
+		"can_undo": _save.can_undo() if _save != null else false,
+		"history": _save.history.size() if _save != null else 0,
 	}
 
 
@@ -719,6 +1198,83 @@ func dbg_tec_finish() -> int:
 	return _tec.done_count() if _tec != null else 0
 
 
+func dbg_tec_complete() -> void:
+	if _tec != null:
+		_tec.finish_now()
+
+
+# ── 推演桌布测试钩子（P1.4）────────────────────────────────────────────
+
+func dbg_open_matrix() -> MatrixWin:
+	if _matrix_win == null or not is_instance_valid(_matrix_win):
+		_toggle_matrix()
+	return _matrix_win
+
+
+func dbg_matrix_assign(key: String) -> bool:
+	return _assign_to_matrix(key)
+
+
+func dbg_matrix_win() -> MatrixWin:
+	return _matrix_win if _matrix_win != null and is_instance_valid(_matrix_win) else null
+
+
+func dbg_matrix_charge() -> void:
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_matrix_win.finish_charge()
+
+
+func dbg_matrix_take(key: String) -> void:
+	_on_matrix_took(key)
+
+
+func dbg_ending() -> EndingOverlay:
+	return _ending
+
+
+func dbg_ending_id() -> String:
+	return _last_ending_id
+
+
+func dbg_ending_finish() -> void:
+	if _ending != null:
+		_ending.finish_now()
+
+
+# ── 调查员测试钩子（P1.6）──────────────────────────────────────────────
+
+func dbg_use_temp_investigator(path: String) -> void:
+	_inv_path = path
+	_investigator = Investigator.load_from(path)
+	_refresh_chip()
+
+
+func dbg_clear_investigator() -> void:
+	Investigator.clear(_inv_path)
+	_investigator = {}
+	_refresh_chip()
+
+
+func dbg_investigator() -> Dictionary:
+	return _investigator.duplicate(true)
+
+
+func dbg_open_intro() -> IntroWin:
+	return _open_intro()
+
+
+func dbg_intro_open() -> bool:
+	return _intro != null and is_instance_valid(_intro)
+
+
+func dbg_open_cert() -> void:
+	_open_cert_review()
+
+
+func dbg_cert_open() -> bool:
+	return _cert_win != null and is_instance_valid(_cert_win)
+
+
 # ── 截图采样（P0 视觉自查：跑一遍切片，按阶段存 PNG 到 docs/）──────────
 
 func _wait(sec: float) -> void:
@@ -753,8 +1309,12 @@ func _shot_flow() -> void:
 	await _shot("res://docs/p0_4_tec.png")
 	_tec.finish_now()
 	await _wait(0.25)
+	# P1.4 起 TEC 分析不再直接触发结局：这里仍按 P0 基线直接放 TRUE_E，只为保留对拍图
+	_ending.play(case_def.ending_by_id("TRUE_E"))
+	await _wait(0.25)
 	await _shot("res://docs/p0_5_ending.png")
-	await _wait(1.6)
+	_ending.finish_now()
+	await _wait(0.25)
 	await _shot("res://docs/p0_6_ending_full.png")
 
 	# ── P1 新特性：容器展开 / 选项节点 / 密码弹窗 / 折叠 ──
@@ -802,6 +1362,52 @@ func _shot_flow() -> void:
 	_toggle_storage(GraphState.LEDGER)
 	await _wait(0.35)
 	await _shot("res://docs/p1_7_ledger.png")
+
+	# ── 推演桌布（P1.4）：五感归位 → 长按 → 真名遮罩 ──
+	var true_e := case_def.ending_by_id("TRUE_E")
+	for clue in true_e.recipe:
+		_ensure_card("clue", clue.id)
+		_assign_to_matrix(graph.key_of("clue", clue.id))
+	dbg_open_matrix()
+	await _wait(0.4)
+	await _shot("res://docs/p1_8_matrix.png")
+
+	dbg_matrix_charge()
+	await _wait(0.3)
+	dbg_ending_finish()
+	await _wait(0.3)
+	await _shot("res://docs/p1_9_truename.png")
+	quit_app()
+
+
+func _shot_intro_flow() -> void:
+	await _wait(0.4)
+	_inv_path = "user://shot_investigator.json"
+	Investigator.clear(_inv_path)
+	_investigator = {}
+	_refresh_chip()
+	var w := _open_intro()
+	await _wait(0.4)
+	await _shot("res://docs/p1_10_intro_name.png")
+	w.dbg_set_name("林雾")
+	w.dbg_begin()
+	await _wait(0.3)
+	await _shot("res://docs/p1_11_intro_quiz.png")
+	w.dbg_answer(0)
+	w.dbg_answer(0)
+	w.dbg_answer(2)
+	await _wait(0.3)
+	await _shot("res://docs/p1_12_intro_avatar.png")
+	w.dbg_confirm_pick()
+	await _wait(0.3)
+	await _shot("res://docs/p1_13_intro_card.png")
+	w.dbg_confirm()
+	await _wait(0.5)
+	await _shot("res://docs/p1_14_investigator.png")
+	_open_cert_review()
+	await _wait(0.3)
+	await _shot("res://docs/p1_15_cert.png")
+	Investigator.clear(_inv_path)
 	quit_app()
 
 

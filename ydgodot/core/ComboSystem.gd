@@ -80,13 +80,4 @@ func activate(node_key: String) -> Dictionary:
 
 ## 从一次成功的组合里抽出「新获得的线索」（P0：正文里出现的 [clue:] 直接记为已捕获）
 func capture_clues(text: String) -> Array:
-	var got: Array = []
-	for tag in case_def.tags_of(text):
-		if tag["kind"] != "clue":
-			continue
-		if graph.captured.has(tag["id"]):
-			continue
-		graph.captured[tag["id"]] = true
-		var n := graph.add_node("clue", tag["id"])
-		got.append(n["key"])
-	return got
+	return graph.capture_clues(text)

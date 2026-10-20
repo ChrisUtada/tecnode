@@ -6,7 +6,9 @@ extends SysWindow
 ## 单击一行 = 取回画布（回到窗旁边的位置）。
 ## 证物袋什么都收；线索册只有线索能进（规则在 GraphState.ledger_store 里）。
 
+signal will_take(key: String)
 signal took(key: String)
+signal to_matrix(key: String)
 
 var store_kind: String = GraphState.BAG
 var graph: GraphState
@@ -75,6 +77,13 @@ func _make_row(key: String) -> Control:
 			var src := TecTheme.label("来自 " + case_def.label_of("item", from_id), TecTheme.FS_SMALL, TecTheme.FAINT)
 			hb.add_child(src)
 
+	if store_kind == GraphState.LEDGER:
+		var to_mx := TecTheme.button("上桌布")
+		to_mx.custom_minimum_size = Vector2(54, 22)
+		to_mx.add_theme_font_size_override("font_size", 10)
+		to_mx.pressed.connect(func(): to_matrix.emit(key))
+		hb.add_child(to_mx)
+
 	var btn := TecTheme.button("取回")
 	btn.custom_minimum_size = Vector2(44, 22)
 	btn.add_theme_font_size_override("font_size", 10)
@@ -84,8 +93,9 @@ func _make_row(key: String) -> Control:
 
 
 func _take(key: String) -> void:
-	if graph == null:
+	if graph == null or not graph.stored.has(key):
 		return
+	will_take.emit(key)
 	if not graph.take_back(key):
 		return
 	took.emit(key)
