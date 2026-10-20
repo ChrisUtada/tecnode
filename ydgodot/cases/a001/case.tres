@@ -101,6 +101,7 @@ id = "a001"
 title = "植物学家的花园"
 now_label = "7月5日"
 start_scene = ExtResource("93_tsyvq")
+memory_scenes = Array[ExtResource("82_jlytl")]([ExtResource("83_nuq7q"), ExtResource("84_n1k20")])
 reusable_tools = Array[ExtResource("38_n6r24")]([ExtResource("70_obmwm"), ExtResource("48_6ik2m"), ExtResource("43_o1oyk")])
 scenes = Array[ExtResource("82_jlytl")]([ExtResource("83_nuq7q"), ExtResource("84_n1k20"), ExtResource("85_acvrc"), ExtResource("86_fcdy5"), ExtResource("87_whedv"), ExtResource("88_ojv88"), ExtResource("89_ggdel"), ExtResource("90_jwtsw"), ExtResource("91_vnxqr"), ExtResource("92_w76jq"), ExtResource("93_tsyvq")])
 items = Array[ExtResource("38_n6r24")]([ExtResource("39_mjix7"), ExtResource("40_2f5ti"), ExtResource("41_b1csa"), ExtResource("42_or17n"), ExtResource("43_o1oyk"), ExtResource("44_l25v2"), ExtResource("45_0ocef"), ExtResource("46_36yjm"), ExtResource("47_gqk4s"), ExtResource("48_6ik2m"), ExtResource("49_p16ng"), ExtResource("50_kttn1"), ExtResource("51_3wylt"), ExtResource("52_ism85"), ExtResource("53_w5jxm"), ExtResource("54_460d5"), ExtResource("55_5ia8i"), ExtResource("56_7num7"), ExtResource("57_x83pb"), ExtResource("58_3v7ej"), ExtResource("59_h1fhh"), ExtResource("60_x4f07"), ExtResource("61_8166h"), ExtResource("62_1ecvo"), ExtResource("63_oep0u"), ExtResource("64_7tluk"), ExtResource("65_v053d"), ExtResource("66_sb60n"), ExtResource("67_24jo7"), ExtResource("68_cjpaf"), ExtResource("69_bv2lm"), ExtResource("70_obmwm"), ExtResource("71_yiwh0"), ExtResource("72_eceob"), ExtResource("73_yss88"), ExtResource("74_xvf80")])

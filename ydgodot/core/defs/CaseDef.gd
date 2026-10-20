@@ -6,6 +6,7 @@ extends Resource
 @export var title: String = ""
 @export var now_label: String = ""
 @export var start_scene: SceneDef = null
+@export var memory_scenes: Array[SceneDef] = []
 @export var reusable_tools: Array[ItemDef] = []
 @export var scenes: Array[SceneDef] = []
 @export var items: Array[ItemDef] = []

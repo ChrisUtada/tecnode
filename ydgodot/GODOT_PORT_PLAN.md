@@ -1,6 +1,6 @@
 # T.E.C-OS → Godot 4 移植计划
 
-> 状态：计划 v2（P0–P1 完成，P2.1 / P2.2 完成，P2.3 起待做） ｜ 目标引擎：Godot 4.x（GDScript，2D） ｜ 目标平台：桌面（Windows 优先）
+> 状态：计划 v2（P0–P2 完成，P3 视觉追平待做） ｜ 目标引擎：Godot 4.x（GDScript，2D） ｜ 目标平台：桌面（Windows 优先）
 > 前置阅读：`README.md`、`EDITOR_PLAN.md` ｜ 迁移基准：`data/case-a001.json`
 > **v2 变更**：内容创作确定迁入 Godot 编辑器，Web 编辑器（editor.html）弃用；数据层从「JSON 不动」改为「JSON → Resource（.tres）一次性迁移」，详见 §一.1 与 §二.5。
 > **迁移根目录（2026-10-20 定）**：`nodes-mvp/ydgodot/` —— **后续迁移的一切内容都放在这里**：Godot 工程（`project.godot` 直接位于 `ydgodot/` 根）、资源、测试、烘焙产物、转换脚本、文档。仓库其余部分（`src/`、`data/`、`index.html` 等 Web 版）在迁移验证通过前保持只读参考、不迁移、不改动。
@@ -175,14 +175,20 @@ ydgodot/                           # ← 迁移根目录（Godot project.godot �
 > - ✅ **P2.1 案件系统**：`core/CaseCatalog.gd` 案件索引（A001 可玩 / A002 占位，UI id 与数据 id 解耦）+ 独立进度 `user://tec_progress.json`（`unlocked` / `completed` / `last`，损坏容错、未知 id 清洗）；`scenes/windows/CaseMapWin.gd` 案件地图（当前 / 进入 / 锁定 / 待接入 / 可进入）；案件窗 `×` 收进地图图标并打「已关闭」角标、`–` 收进右下角 170×56 案件卡片，两处先存盘、点落点原位展开；TRUE_E 标记完成并解锁 A002（A002 无数据时只提示待接入），旧存档里的 TRUE_E 在续档时补记。
 > - ✅ **P2.2 TEC 生态**：`scenes/windows/TecWindow.gd` 重写（对话历史 / 点窗闲聊 / 5–8 秒分析进度条 / 档案逐条解读）；新增 `scenes/windows/TecChip.gd`（右下角 196×56 助手卡片，分析中显示进度、完成后打未读圆点、点卡片还原）；场景按 `sceneTalks` 读出并捕获台词 / `hiddenClue` 线索，物品 / 人物走 reaction 表，线索节点拒绝、忙碌拒绝；拖放支持 TEC 图标 / 窗口头像 / 助手卡片；`graph.tec_prog` 同时保存档案游标与闲聊游标，随快照持久化；`--shot-p2` 扩到九张（四张案件 + 五张 TEC）。
 > - ✅ **回归 509 项全绿**：`test_p0` 20 · `test_ui` 32 · `test_migration` 14 · `test_commands` 49 · `test_p12` 37 · `test_p14` 56 · `test_p15` 85 · `test_p16` 61 · `test_p21` 71 · **`test_p22` 84**（本轮新增：对话游标 / 收起还原 / 分析进度 / 档案 / 反应表 / 拖放命中 / 撤销 / 重置清理）。
+> - ✅ **P2.3 回忆系统**：`config.memoryScenes` → 三档时间轴；`GraphState` 新增 `time` / `card_seen` / `debuted` / `visible_node` / `spawn_mem_cast` / `timeline_known`，`loc:SCENES_0602` 自动收敛到 `time:` 且时间节点不上画布；新增 `scenes/windows/ArchiveWin.gd`（已知时刻倒序 / 简介 / 当前 / 已回顾 / 新角标）与 `MemCard.gd`（放映卡 + 回忆小剧场：暗纸、打字机、点击推进、整卡拖动、旁白 + 带头像台词、锚定避让）；时刻 × 人物 × 地点命中 `memories` 时由拖放触发小剧场，不捕获线索；`--shot-p2` 扩到十二张（新增档案窗 / 放映卡 / 小剧场）。
+> - ✅ **回归 674 项全绿**：`test_p0` 20 · `test_ui` 32 · `test_migration` 15 · `test_commands` 49 · `test_p12` 37 · `test_p14` 56 · `test_p15` 85 · `test_p16` 61 · `test_p21` 71 · `test_p22` 84 · **`test_p23` 164**（本轮新增：数据契约 / 时间图层 / debut 门控 / 快照 / 档案窗 / 放映卡 / 回忆小剧场）。
+> - ✅ **P2.4 多人对话系统**：`core/DialogueSystem.gd`（语境优先 fit → free，miss 不播；精确集合优先，三人剧本可由两人 loose 命中；blocked fallback、独白查询）+ `core/DialogueSession.gd`（joined / step / waitingFor / join / done）；`scenes/windows/ChatWindow.gd`（右上 390 宽、内容自适应高度、45ms/字打字机、点击补全/推进、旁白 + 带头像台词、贴底不裁末行、等待提示与拖人加入）；桌面接线人物 × 人物、拖人物到对话窗、双击人物开独白（无详情窗，暂用此入口，P3 追平）、切时刻 / 重置 / 切案 / 撤销恢复关窗；`--shot-p2` 扩到十五张（新增多人对话 / 等待加入 / 独白）。
+> - ✅ **回归 776 项全绿**：`test_p0` 20 · `test_ui` 32 · `test_migration` 15 · `test_commands` 49 · `test_p12` 37 · `test_p14` 56 · `test_p15` 85 · `test_p16` 61 · `test_p21` 71 · `test_p22` 84 · `test_p23` 164 · **`test_p24` 102**（本轮新增：语境匹配 / loose / fallback / 状态机 / 打字机 / 拖人 / 独白 / 生命周期）。
+> - ✅ **P2.5 音乐播放器 / 花园彩蛋**：`core/GardenSystem.gd`（五阶段真实时间 0 / 45 / 90 / 135 / 180 秒；位置百分数 8..92 / 30..85；老档归一化并回填 `narr`；`grant_seed` 只发一枚且不覆盖已有旁白；旁白按句 / 逗号切段到约 150 字）+ `scenes/windows/MusicWin.gd`（唱针 `ITEMS_cz` 装到唱机 `ITEMS_changji` 后出现播放器；播放 / 暂停 / 停止 / 进度跳转；关窗音乐继续）+ `MusicDock.gd`（右下角 238×60 卡片）+ `GardenWin.gd`（548 宽自由花圃、种子落点夹紧、种后拖动、开花后逐段旁白、窗口随内容伸缩）；`MatrixWin` 执行者头顶种子气泡拖到花园窗 / 图标下种；`Desktop` 动态图标 / 角标、TRUE_E 确认捕获发种子、快照 / 撤销 / 读档 / 重开清理；`SaveSystem` 为缺 `garden` 的 TRUE_E 旧档补种子；`SysWindow.enable_controls(..., show_min)` 支持花园窗不显示最小化。`--shot-p2` 扩到二十张（新增音乐 / dock / 种子 / 花园 / 旁白）。
+> - ✅ **回归 922 项全绿**：`test_p0` 20 · `test_ui` 32 · `test_migration` 15 · `test_commands` 49 · `test_p12` 37 · `test_p14` 56 · `test_p15` 85 · `test_p16` 61 · `test_p21` 71 · `test_p22` 84 · `test_p23` 164 · `test_p24` 102 · **`test_p25` 146**（本轮新增：花园核心 / 老档迁移 / 播放器状态 / 进度跳转 / 图标收放 / dock / 种子投放 / 拖动 / 旁白 / 存档）。
 
 ### P2 · 系统全量（1–2 周）——补齐桌面生态
 
 1. ✅ 案件系统：案件地图、收起/关闭两落点、切换与续档、角标体系（P2.1）。
 2. ✅ TEC 生态：对话窗、分析进度条、右下角助手卡片、档案解读（P2.2）。
-3. 回忆系统：时间轴切档、放映卡、人物登场门控（debut）、回忆小剧场。
-4. 多人对话系统：对话窗、打字机、中途加人等待/续播、独白。
-5. 音乐播放器（唱针装上后解锁）、花园彩蛋（种子/花坛真实时间生长）。
+3. ✅ 回忆系统：时间轴切档、放映卡、人物登场门控（debut）、回忆小剧场（P2.3）。
+4. ✅ 多人对话系统：对话窗、打字机、中途加人等待/续播、独白（P2.4）。
+5. ✅ 音乐播放器（唱针装上后解锁）、花园彩蛋（种子/花坛真实时间生长）（P2.5）。
 
 **验收**：与浏览器版逐项对表（附清单核对表），全部 ✅。
 

@@ -119,6 +119,8 @@ func restore(s: Dictionary) -> bool:
 		var installed = n.get("installed", {})
 		n["installed"] = (installed as Dictionary).duplicate(true) if installed is Dictionary else {}
 		n["captured"] = bool(n.get("captured", false))
+		n["fresh"] = bool(n.get("fresh", false))
+		n["unread"] = bool(n.get("unread", false))
 		var where := String(n.get("storedIn", ""))
 		if where != "":
 			graph.stored[key] = where
@@ -157,12 +159,15 @@ func restore(s: Dictionary) -> bool:
 		graph.card_seen[String(key)] = bool((s.get("cardSeen", {}) as Dictionary)[key])
 	for key in (s.get("debuted", {}) as Dictionary).keys():
 		graph.debuted[String(key)] = bool((s.get("debuted", {}) as Dictionary)[key])
-	var garden_in = s.get("garden", {})
+	var garden_in = s.get("garden", null)
 	if garden_in is Dictionary:
 		graph.garden = (garden_in as Dictionary).duplicate(true)
 		if not (graph.garden.get("plots", []) is Array):
 			graph.garden["plots"] = []
 		graph.garden["seed"] = bool(graph.garden.get("seed", false))
+	elif _as_array(s.get("endings", [])).has("TRUE_E"):
+		# P2.5 老档迁移：走完真名但存档还没有 garden 字段 → 补一枚种子
+		graph.garden = {"seed": true, "plots": []}
 
 	var matrix_in = s.get("matrix", {})
 	if matrix_in is Dictionary:

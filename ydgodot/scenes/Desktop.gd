@@ -7,6 +7,7 @@ extends Control
 const HEADER_H := 52.0
 const SLICE_SCENE := "SCENES_garden"
 const CARD_PAD := 8.0
+const MEM_CARD_MIN_X := 132.0
 
 var case_def: CaseLoader
 var graph: GraphState
@@ -36,6 +37,14 @@ var _pw_ctx: Dictionary = {}
 var _bag_win: StorageWin = null
 var _ledger_win: StorageWin = null
 var _matrix_win: MatrixWin = null
+var _archive_win: ArchiveWin = null
+var _mem_card: MemCard = null
+var _chat_win: ChatWindow = null
+var dialogues: DialogueSystem = null
+var _archive_btn: Button = null
+var _archive_badge: PanelContainer = null
+var _archive_new := false
+var _suppress_archive_new := false
 var _last_ending_id := ""
 var _flash_supply_note := false
 var _save: SaveSystem = null
@@ -60,6 +69,13 @@ var _dock_card: Button = null
 var _dock_code: Label = null
 var _dock_title: Label = null
 var _dock_sub: Label = null
+var _music_btn: Button = null
+var _music_win: MusicWin = null
+var _music_dock: MusicDock = null
+var _garden_btn: Button = null
+var _garden_badge: PanelContainer = null
+var _garden_win: GardenWin = null
+var _garden_drop_before: Dictionary = {}
 
 
 func _ready() -> void:
@@ -168,6 +184,8 @@ func _build_ui() -> void:
 func setup_ending() -> void:
 	add_child(_ending)
 	_ending.setup_overlay()
+	if not _ending.finished.is_connected(_on_ending_finished):
+		_ending.finished.connect(_on_ending_finished)
 
 
 func _build_header() -> void:
@@ -303,9 +321,45 @@ func _build_icons() -> void:
 			_map_btn = b
 			b.pressed.connect(_toggle_case_map)
 		else:
-			b.pressed.connect(func(): _show_toast("这个东西还没搬过来（P2 再做）"))
+			_archive_btn = b
+			b.pressed.connect(_toggle_archive)
 		col.add_child(b)
 	_build_map_badge()
+	_build_archive_badge()
+
+	_music_btn = TecTheme.button("播放器")
+	_music_btn.name = "icon_music"
+	_music_btn.custom_minimum_size = Vector2(96, 40)
+	_music_btn.tooltip_text = "打开音乐播放器（唱针已装上唱机）"
+	_music_btn.visible = false
+	_music_btn.pressed.connect(_toggle_music_win)
+	col.add_child(_music_btn)
+
+	_garden_btn = TecTheme.button("花园")
+	_garden_btn.name = "icon_garden"
+	_garden_btn.custom_minimum_size = Vector2(96, 40)
+	_garden_btn.tooltip_text = "去花园看看真名留下的种子"
+	_garden_btn.visible = false
+	_garden_btn.pressed.connect(_open_garden)
+	col.add_child(_garden_btn)
+
+	_garden_badge = PanelContainer.new()
+	_garden_badge.name = "garden_badge"
+	_garden_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var gsb := TecTheme.flat(TecTheme.LINE, 6, TecTheme.LINE)
+	gsb.content_margin_left = 5
+	gsb.content_margin_right = 5
+	gsb.content_margin_top = 1
+	gsb.content_margin_bottom = 1
+	_garden_badge.add_theme_stylebox_override("panel", gsb)
+	var gl := TecTheme.label("", 9, TecTheme.CARD)
+	gl.name = "Label"
+	gl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	gl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_garden_badge.add_child(gl)
+	_garden_badge.position = Vector2(50, -5)
+	_garden_badge.visible = false
+	_garden_btn.add_child(_garden_badge)
 
 
 func _build_map_badge() -> void:
@@ -327,6 +381,264 @@ func _build_map_badge() -> void:
 	_map_badge.position = Vector2(58, -5)
 	_map_badge.visible = false
 	_map_btn.add_child(_map_badge)
+
+
+func _build_archive_badge() -> void:
+	if _archive_btn == null:
+		return
+	_archive_badge = PanelContainer.new()
+	_archive_badge.name = "archive_badge"
+	_archive_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := TecTheme.flat(TecTheme.LINE, 6, TecTheme.LINE)
+	sb.content_margin_left = 5
+	sb.content_margin_right = 5
+	sb.content_margin_top = 1
+	sb.content_margin_bottom = 1
+	_archive_badge.add_theme_stylebox_override("panel", sb)
+	var l := TecTheme.label("新", 9, TecTheme.CARD)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_archive_badge.add_child(l)
+	_archive_badge.position = Vector2(58, -5)
+	_archive_badge.visible = false
+	_archive_btn.add_child(_archive_badge)
+
+
+# ── 音乐播放器 / 花园彩蛋（P2.5）────────────────────────────────────────
+
+func _music_unlocked() -> bool:
+	if graph == null:
+		return false
+	for n in graph.nodes.values():
+		var ins = n.get("installed", {})
+		if ins is Dictionary and bool(ins.get("ITEMS_cz", false)):
+			return true
+	return false
+
+
+func _refresh_app_icons() -> void:
+	if graph == null:
+		return
+	var music := _music_unlocked()
+	if _music_btn != null:
+		_music_btn.visible = music
+	if not music:
+		if _music_win != null and is_instance_valid(_music_win):
+			_music_win.queue_free()
+		_music_win = null
+		if _music_dock != null and is_instance_valid(_music_dock):
+			_music_dock.queue_free()
+		_music_dock = null
+
+	var garden := GardenSystem.has_garden(graph)
+	if _garden_btn != null:
+		_garden_btn.visible = garden
+	if not garden:
+		if _garden_win != null and is_instance_valid(_garden_win):
+			_garden_win.queue_free()
+		_garden_win = null
+		if _garden_badge != null:
+			_garden_badge.visible = false
+		return
+	GardenSystem.normalize(graph, case_def)
+	var plots: Array = graph.garden.get("plots", [])
+	var seed := bool(graph.garden.get("seed", false))
+	if _garden_badge != null:
+		if not plots.is_empty():
+			_garden_badge.visible = true
+			var lab: Label = _garden_badge.get_node_or_null("Label")
+			if lab != null:
+				lab.text = "%d 株" % plots.size()
+		elif seed:
+			_garden_badge.visible = true
+			var lab: Label = _garden_badge.get_node_or_null("Label")
+			if lab != null:
+				lab.text = "种子"
+		else:
+			_garden_badge.visible = false
+
+
+func _toggle_music_win() -> void:
+	if _music_win == null or not is_instance_valid(_music_win):
+		_open_music()
+		return
+	if _music_win.visible:
+		_on_music_closed()
+		return
+	if _music_dock != null and is_instance_valid(_music_dock) and _music_dock.visible:
+		_restore_music()
+		return
+	_open_music()
+
+
+func _open_music() -> void:
+	if not _music_unlocked():
+		return
+	if _music_win == null or not is_instance_valid(_music_win):
+		_music_win = MusicWin.new()
+		_music_win.name = "music_win"
+		_music_win.setup_music()
+		_music_win.position = Vector2(906, 414)
+		_music_win.closed.connect(_on_music_closed)
+		_music_win.minimized.connect(_minimize_music)
+		_music_win.progress_changed.connect(_on_music_progress)
+		_desk.add_child(_music_win)
+	_music_win.visible = true
+	_music_win.move_to_front()
+	if _music_dock != null:
+		_music_dock.visible = false
+
+
+func _ensure_music_dock() -> MusicDock:
+	if _music_dock != null and is_instance_valid(_music_dock):
+		return _music_dock
+	_music_dock = MusicDock.new()
+	_music_dock.name = "music_dock"
+	_music_dock.setup_dock()
+	_music_dock.position = Vector2(1026, 532)
+	_music_dock.restore_requested.connect(_restore_music)
+	_music_dock.toggle_requested.connect(_toggle_music)
+	_music_dock.stop_requested.connect(_stop_music)
+	_desk.add_child(_music_dock)
+	_music_dock.visible = false
+	return _music_dock
+
+
+func _minimize_music() -> void:
+	if _music_win == null:
+		return
+	_music_win.visible = false
+	var dock := _ensure_music_dock()
+	dock.update_state(_music_win.state())
+	dock.visible = true
+	dock.move_to_front()
+
+
+func _restore_music() -> void:
+	if _music_win == null or not is_instance_valid(_music_win):
+		_open_music()
+		if _music_dock != null:
+			_music_dock.visible = false
+		return
+	_music_win.visible = true
+	_music_win.move_to_front()
+	if _music_dock != null:
+		_music_dock.visible = false
+
+
+func _on_music_closed() -> void:
+	if _music_win != null:
+		_music_win.visible = false
+	if _music_dock != null:
+		_music_dock.visible = false
+	if _music_win != null and _music_win.is_playing():
+		_show_toast("播放器已收起，音乐继续")
+
+
+func _on_music_progress(_cur: float, _dur: float) -> void:
+	if _music_dock != null and _music_dock.visible and _music_win != null:
+		_music_dock.update_state(_music_win.state())
+
+
+func _toggle_music() -> void:
+	if _music_win == null:
+		return
+	_music_win.toggle_current()
+	if _music_dock != null and _music_dock.visible:
+		_music_dock.update_state(_music_win.state())
+
+
+func _stop_music() -> void:
+	if _music_win == null:
+		return
+	_music_win.stop()
+	if _music_dock != null:
+		_music_dock.visible = false
+
+
+func _open_garden() -> void:
+	if not GardenSystem.has_garden(graph):
+		return
+	if _garden_win != null and is_instance_valid(_garden_win):
+		_garden_win.queue_free()
+		_garden_win = null
+		return
+	GardenSystem.normalize(graph, case_def)
+	_garden_win = GardenWin.new()
+	_garden_win.name = "garden_win"
+	_garden_win.setup_garden(graph, case_def)
+	_garden_win.position = Vector2(380, 58)
+	_garden_win.closed.connect(func(): _garden_win = null)
+	_garden_win.plant_moved.connect(func(_idx): _autosave())
+	_garden_win.garden_changed.connect(_on_garden_changed)
+	_garden_win.plot_bloomed.connect(_on_garden_bloomed)
+	_desk.add_child(_garden_win)
+	_garden_win.move_to_front()
+
+
+func _on_garden_changed() -> void:
+	_autosave()
+	_refresh_app_icons()
+
+
+func _on_garden_bloomed(_idx: int, fresh: bool) -> void:
+	if fresh:
+		_show_toast("花园里的种子开花了")
+
+
+## 种子从桌布拖到花园窗 / 花园图标；成功返回 true，MatrixWin 据此决定是否弹回。
+func _drop_seed(at_global: Vector2) -> bool:
+	if graph == null or not GardenSystem.has_garden(graph):
+		return false
+	if not bool(graph.garden.get("seed", false)):
+		return false
+	var spot := {}
+	var over_win := _garden_win != null and is_instance_valid(_garden_win) \
+		and _garden_win.get_global_rect().has_point(at_global)
+	var over_icon := _garden_btn != null and _garden_btn.visible \
+		and _garden_btn.get_global_rect().has_point(at_global)
+	if over_win:
+		spot = _garden_win.spot_of_global(at_global)
+	elif over_icon:
+		spot = GardenSystem.spot_of(GardenSystem.DEFAULT_X, GardenSystem.DEFAULT_Y)
+	else:
+		return false
+	var before := _save.snapshot() if _save != null else {}
+	if not GardenSystem.plant(graph, float(spot["x"]), float(spot["y"])):
+		return false
+	GardenSystem.normalize(graph, case_def)
+	_commit(before)
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_matrix_win.refresh_seed()
+	if _garden_win != null and is_instance_valid(_garden_win):
+		_garden_win.refresh()
+		if over_icon:
+			_garden_win.move_to_front()
+	else:
+		_open_garden()
+	_refresh_app_icons()
+	_show_toast("种下了「真名」")
+	return true
+
+
+func _on_seed_dropped(at_global: Vector2) -> void:
+	_drop_seed(at_global)
+
+
+func _on_ending_finished() -> void:
+	if _last_ending_id == "":
+		return
+	var e := case_def.ending_by_id(_last_ending_id)
+	if e == null or not e.is_true_capture:
+		return
+	GardenSystem.normalize(graph, case_def)
+	if not GardenSystem.grant_seed(graph, e.message, case_def):
+		return
+	_autosave()
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_matrix_win.refresh_seed()
+	_refresh_app_icons()
+	_show_toast("花盆里多了一枚种子。去花园种下它。")
 
 
 func _build_case_park() -> void:
@@ -549,6 +861,11 @@ func _close_case_transients() -> void:
 	if _narr != null and is_instance_valid(_narr):
 		_narr.queue_free()
 	_narr = null
+	_close_mem_card()
+	_close_chat()
+	if _archive_win != null and is_instance_valid(_archive_win):
+		_archive_win.queue_free()
+	_archive_win = null
 	_hide_tec()
 	_selected = ""
 	if graph != null:
@@ -586,6 +903,7 @@ func _new_runtime() -> void:
 	combos = ComboSystem.new(case_def, graph)
 	_cmds = CommandSystem.new(case_def, graph)
 	_save = SaveSystem.new(graph, _case_id())
+	dialogues = DialogueSystem.new(case_def, graph)
 	_selected = ""
 	graph.selected = ""
 	_last_ending_id = ""
@@ -600,6 +918,12 @@ func _new_runtime() -> void:
 	if _narr != null and is_instance_valid(_narr):
 		_narr.queue_free()
 	_narr = null
+	_close_mem_card()
+	_close_chat()
+	if _archive_win != null and is_instance_valid(_archive_win):
+		_archive_win.queue_free()
+	_archive_win = null
+	_clear_archive_new()
 	if _matrix_win != null and is_instance_valid(_matrix_win):
 		_matrix_win.queue_free()
 	_matrix_win = null
@@ -612,6 +936,16 @@ func _new_runtime() -> void:
 	if _map_win != null and is_instance_valid(_map_win):
 		_map_win.queue_free()
 	_map_win = null
+	if _music_win != null and is_instance_valid(_music_win):
+		_music_win.queue_free()
+	_music_win = null
+	if _music_dock != null and is_instance_valid(_music_dock):
+		_music_dock.queue_free()
+	_music_dock = null
+	if _garden_win != null and is_instance_valid(_garden_win):
+		_garden_win.queue_free()
+	_garden_win = null
+	_refresh_app_icons()
 
 
 func _reset_case() -> void:
@@ -817,6 +1151,7 @@ func _commit(before: Dictionary) -> void:
 		return
 	_save.push_history(before)
 	_autosave()
+	_refresh_app_icons()
 
 
 func dbg_undo() -> bool:
@@ -878,6 +1213,16 @@ func _rebuild_from_graph() -> void:
 	_selected = ""
 	graph.selected = ""
 	_storage_before = {}
+	GardenSystem.normalize(graph, case_def)
+	if _music_win != null and is_instance_valid(_music_win):
+		_music_win.queue_free()
+	_music_win = null
+	if _music_dock != null and is_instance_valid(_music_dock):
+		_music_dock.queue_free()
+	_music_dock = null
+	if _garden_win != null and is_instance_valid(_garden_win):
+		_garden_win.queue_free()
+	_garden_win = null
 	if _pw_pop != null and is_instance_valid(_pw_pop):
 		_pw_pop.queue_free()
 	_pw_pop = null
@@ -885,18 +1230,27 @@ func _rebuild_from_graph() -> void:
 	if _narr != null and is_instance_valid(_narr):
 		_narr.queue_free()
 	_narr = null
+	_close_mem_card()
+	_close_chat()
+	if _archive_win != null and is_instance_valid(_archive_win):
+		_archive_win.queue_free()
+	_archive_win = null
+	_clear_archive_new()
 	_ending.visible = false
 	if _tec != null:
 		_tec.cancel_analysis()
 		_sync_tec_chip()
+	_suppress_archive_new = true
 	for key in graph.nodes.keys():
 		_spawn_card(String(key))
+	_suppress_archive_new = false
 	_apply_hidden()
 	_refresh_matrix_views()
 	_last_ending_id = String(graph.endings.keys()[0]) if not graph.endings.is_empty() else ""
 	var sid := graph.last_scene
 	_set_crumb(_case_label() + " // " + case_def.scene_title(sid) if sid != "" else _case_label())
 	_update_case_chrome()
+	_refresh_app_icons()
 
 
 # ── 卡片 ────────────────────────────────────────────────────────────────
@@ -907,8 +1261,12 @@ func _spawn_card(key: String) -> NodeCard:
 	var n := graph.node(key)
 	if n.is_empty():
 		return null
-	var w := GraphState.SCENE_W if n["kind"] == "loc" else GraphState.ENT_W
-	var h := GraphState.SCENE_H if n["kind"] == "loc" else GraphState.ENT_H
+	if String(n["kind"]) == "time":
+		if not _suppress_archive_new and graph.has_unread(key):
+			_mark_archive_new()
+		return null                       # 时间节点不上画布（入口在档案窗）
+	var w := GraphState.SCENE_W if GraphState.is_scene_kind(String(n["kind"])) else GraphState.ENT_W
+	var h := GraphState.SCENE_H if GraphState.is_scene_kind(String(n["kind"])) else GraphState.ENT_H
 	var card := NodeCard.new()
 	card.name = "card_" + key.replace(":", "_")
 	card.setup(key, String(n["kind"]), n, w, h)
@@ -935,6 +1293,10 @@ func _on_card_dragged(key: String) -> void:
 
 ## 拖到推演桌布窗口上 = 归位（Web 版 overMatrixDrop 的画布侧入口）
 func _on_card_drag_released(key: String, at_global: Vector2) -> void:
+	if _chat_drop_hit(at_global):
+		_chat_drop(key)
+		_relayout()
+		return
 	if _matrix_win != null and is_instance_valid(_matrix_win) \
 		and _matrix_win.board_global_rect().has_point(at_global):
 		_assign_to_matrix(key)
@@ -958,6 +1320,8 @@ func _on_card_activated(key: String) -> void:
 	var before := _save.snapshot()
 	var res := combos.activate(key)
 	if res.is_empty():
+		if String(n["kind"]) == "char" and _open_monologue(id):
+			return
 		return
 	_apply_outcome(res, key)
 	_commit(before)
@@ -993,7 +1357,7 @@ func _toggle_container(kind: String, id: String) -> void:
 func _apply_hidden() -> void:
 	graph.recompute_hidden()
 	for key in _cards.keys():
-		(_cards[key] as NodeCard).visible = graph.is_visible(String(key))
+		(_cards[key] as NodeCard).visible = graph.visible_node(graph.node(String(key)))
 
 
 ## 统一落地一次命令结果：提示 / 长卡片 / 刷新 / 重排
@@ -1069,7 +1433,7 @@ func _on_storage_will_take(_key: String) -> void:
 ## 从收纳窗取回：节点回到画布，并刷新两个清单窗
 func _on_storage_took(key: String) -> void:
 	if _cards.has(key):
-		(_cards[key] as NodeCard).visible = true
+		(_cards[key] as NodeCard).visible = graph.visible_node(graph.node(key))
 	_relayout()
 	if _bag_win != null and is_instance_valid(_bag_win):
 		_bag_win.refresh_store()
@@ -1095,6 +1459,7 @@ func _toggle_matrix() -> void:
 	_matrix_win.clue_taken.connect(_on_matrix_took)
 	_matrix_win.clue_dropped.connect(_on_matrix_dropped)
 	_matrix_win.inference_requested.connect(_run_inference)
+	_matrix_win.seed_dropped.connect(_on_seed_dropped)
 	_desk.add_child(_matrix_win)
 	_matrix_win.move_to_front()
 
@@ -1157,6 +1522,7 @@ func _on_ledger_to_matrix(key: String) -> void:
 func _refresh_matrix_views() -> void:
 	if _matrix_win != null and is_instance_valid(_matrix_win):
 		_matrix_win.refresh_matrix()
+		_matrix_win.refresh_seed()
 	if _bag_win != null and is_instance_valid(_bag_win):
 		_bag_win.refresh_store()
 	if _ledger_win != null and is_instance_valid(_ledger_win):
@@ -1189,7 +1555,7 @@ func _refresh_or_spawn_card(key: String) -> void:
 	if card == null:
 		card = _spawn_card(key)
 	if card != null:
-		card.visible = graph.is_visible(key)
+		card.visible = graph.visible_node(graph.node(key))
 		card.refresh()
 
 
@@ -1265,6 +1631,10 @@ func _submit_password(text: String) -> void:
 
 func _on_card_combo(tool_key: String, target_key: String) -> void:
 	var before := _save.snapshot()
+	if _try_memory_combo(tool_key, target_key, before):
+		return
+	if _try_dialogue_combo(tool_key, target_key):
+		return
 	var res := combos.use_item(tool_key, target_key)
 	if res.has("blocked") and res["blocked"]:
 		_show_toast(String(res.get("message", "")), true)     # 发光门：不记 tried、不进撤销
@@ -1290,13 +1660,14 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 
 func _expand_scene(sid: String, show_narr: bool) -> void:
 	var fresh := graph.reveal_scene(sid)
-	var had := _cards.has(graph.key_of("loc", sid))
+	var key := graph.scene_key(sid)
+	var had := _cards.has(key)
 	for k in fresh:
 		_spawn_card(String(k))
 	if not had:
-		_spawn_card(graph.key_of("loc", sid))
-	if _cards.has(graph.key_of("loc", sid)):
-		_cards[graph.key_of("loc", sid)].refresh()
+		_spawn_card(key)
+	if _cards.has(key):
+		_cards[key].refresh()
 	_relayout()
 	if show_narr:
 		_show_narr(sid)
@@ -1304,10 +1675,10 @@ func _expand_scene(sid: String, show_narr: bool) -> void:
 
 
 func _show_narr(sid: String) -> void:
-	var n := graph.node(graph.key_of("loc", sid))
+	var n := graph.node(graph.scene_key(sid))
 	if n.is_empty():
 		return
-	var body := case_def.text_of("loc", sid)
+	var body := case_def.text_of(graph.normalize_kind("loc", sid), sid)
 	if _narr != null and is_instance_valid(_narr):
 		_narr.queue_free()
 	_narr = NarrCard.new()
@@ -1323,11 +1694,328 @@ func _on_narr_closed() -> void:
 	_narr = null
 
 
+# ── 档案 / 时间图层 / 回忆放映 ─────────────────────────────────────────
+
+func _toggle_archive() -> void:
+	if not _require_case():
+		return
+	if _archive_win != null and is_instance_valid(_archive_win):
+		_archive_win.queue_free()
+		_archive_win = null
+		return
+	_archive_win = ArchiveWin.new()
+	_archive_win.name = "archive_win"
+	_archive_win.setup_archive(graph, case_def)
+	_archive_win.position = Vector2(458, 84)
+	_archive_win.time_selected.connect(_on_archive_time)
+	_archive_win.closed.connect(func(): _archive_win = null)
+	_desk.add_child(_archive_win)
+	_archive_win.move_to_front()
+	_clear_archive_new()
+	for sid in graph.timeline_known():
+		graph.clear_fresh(graph.scene_key(String(sid)))
+
+
+func _on_archive_time(tid: String) -> void:
+	_select_time(tid)
+
+
+func _try_memory_combo(tool_key: String, target_key: String, before: Dictionary) -> bool:
+	if graph == null or case_def == null or graph.time == GraphState.PRESENT_TIME:
+		return false
+	var tool := graph.node(tool_key)
+	var target := graph.node(target_key)
+	if tool.is_empty() or target.is_empty():
+		return false
+	var who: Dictionary = {}
+	var where: Dictionary = {}
+	var where_key := ""
+	if String(tool["kind"]) == "char":
+		who = tool
+	elif String(target["kind"]) == "char":
+		who = target
+	if String(tool["kind"]) == "loc":
+		where = tool
+		where_key = tool_key
+	elif String(target["kind"]) == "loc":
+		where = target
+		where_key = target_key
+	if who.is_empty() or where.is_empty():
+		return false
+	var mem := case_def.memory_for(graph.time, String(who["id"]), String(where["id"]))
+	graph.tried[tool_key + ">" + target_key] = true
+	if mem != null:
+		_open_memory_play(mem, where_key)
+		var title := mem.title if mem.title != "" else mem.id
+		_show_toast("想起了一段回忆：" + title)
+	else:
+		_show_toast("「%s」里没有「%s」的回忆" % [String(where["label"]), String(who["label"])], true)
+	_commit(before)
+	_relayout()
+	return true
+
+
+## 换档 = 改 graph.time → 收掉锚在画布上的浮层 → 带出那天的登场人物 → 重算可见性。
+func _select_time(tid: String) -> bool:
+	if graph == null or case_def == null:
+		return false
+	if tid != GraphState.PRESENT_TIME and not case_def.is_time_id(tid):
+		return false
+	if graph.time == tid:
+		if tid != GraphState.PRESENT_TIME:
+			_open_time_card(tid)
+		return true
+	_close_time_transients()
+	graph.time = tid
+	_selected = ""
+	graph.selected = ""
+	if tid != GraphState.PRESENT_TIME:
+		graph.spawn_mem_cast(tid)
+	_sync_cards_for_time()
+	_apply_hidden()
+	_sync_time_crumb()
+	_open_time_card_once(tid)
+	_autosave()
+	return true
+
+
+func _close_time_transients() -> void:
+	if _pw_pop != null and is_instance_valid(_pw_pop):
+		_pw_pop.queue_free()
+	_pw_pop = null
+	_pw_ctx = {}
+	if _narr != null and is_instance_valid(_narr):
+		_narr.queue_free()
+	_narr = null
+	_close_mem_card()
+	_close_chat()
+
+
+## 把图上已有、但还没上过画布的实体补成卡片；已存在的只刷新（时刻切换不重排）。
+func _sync_cards_for_time() -> void:
+	for key in graph.nodes.keys():
+		var n := graph.node(String(key))
+		if n.is_empty() or String(n["kind"]) == "time":
+			continue
+		if _cards.has(String(key)):
+			(_cards[String(key)] as NodeCard).refresh()
+		else:
+			_spawn_card(String(key))
+
+
+func _sync_time_crumb() -> void:
+	if graph.time != GraphState.PRESENT_TIME:
+		_set_crumb(_case_label() + " // " + graph.time_label_of())
+		return
+	var sid := graph.last_scene
+	if sid != "":
+		_set_crumb(_case_label() + " // " + case_def.scene_title(sid))
+	else:
+		_set_crumb(_case_label() + " // " + graph.time_label_of())
+
+
+## 每档回忆的放映卡只自动放一遍；重放走档案里点当前档。
+func _open_time_card_once(tid: String) -> void:
+	if tid == GraphState.PRESENT_TIME or not case_def.is_time_id(tid):
+		return
+	if bool(graph.card_seen.get(tid, false)):
+		return
+	graph.card_seen[tid] = true
+	_open_time_card(tid)
+	_autosave()
+
+
+func _open_time_card(tid: String) -> void:
+	if tid == GraphState.PRESENT_TIME or not case_def.is_time_id(tid):
+		return
+	_close_mem_card()
+	_mem_card = MemCard.new()
+	_mem_card.name = "mem_card"
+	_mem_card.setup_memory("MEMORY // " + case_def.time_label_of(tid), _memory_lines(tid))
+	_mem_card.closed.connect(_on_mem_closed)
+	_desk.add_child(_mem_card)
+	_anchor_memory_card(_mem_card, tid)
+	_mem_card.move_to_front()
+
+
+## 放映卡正文 = 日期场景正文（按行拆）+ 该场景里各角色当天的 sceneTalks。
+func _memory_lines(tid: String) -> Array:
+	var out: Array = []
+	var s := case_def.scene_of(tid)
+	if s == null:
+		return out
+	var body := s.content if s.content.strip_edges() != "" else s.desc
+	for raw in case_def.strip_tags(body).split("\n"):
+		var line := String(raw).strip_edges()
+		if line != "":
+			out.append(line)
+	for tag in case_def.tags_of(s.content):
+		if String(tag["kind"]) != "char":
+			continue
+		var cid := String(tag["id"])
+		if cid == "CHARS_TEC":
+			continue
+		var ch := case_def.char_of(cid)
+		if ch == null:
+			continue
+		for st in ch.scene_talks:
+			if st == null or st.scene == null or st.scene.id != tid:
+				continue
+			for raw in st.lines:
+				var talk_line := case_def.strip_tags(String(raw)).strip_edges()
+				if talk_line != "":
+					out.append("——%s：%s" % [ch.name, talk_line])
+	return out
+
+
+func _memory_play_lines(mem: MemoryDef) -> Array:
+	var out: Array = []
+	for line in mem.script_lines:
+		if line == null:
+			continue
+		var text := case_def.strip_tags(line.text).strip_edges()
+		if text == "":
+			continue
+		var kind := "say" if line.kind == "say" else "narr"
+		var who_id := line.who.id if line.who != null else ""
+		var who_name := line.who.name if line.who != null else ""
+		out.append({"t": kind, "text": text, "who": who_id, "name": who_name})
+	return out
+
+
+func _open_memory_play(mem: MemoryDef, where_key: String) -> void:
+	if mem == null:
+		return
+	_close_mem_card()
+	_mem_card = MemCard.new()
+	_mem_card.name = "mem_card"
+	var title := mem.title if mem.title != "" else mem.id
+	_mem_card.setup_play("MEMORY // " + title, _memory_play_lines(mem), 420, 300)
+	_mem_card.closed.connect(_on_mem_closed)
+	_desk.add_child(_mem_card)
+	_anchor_card_to(_mem_card, where_key)
+	_mem_card.move_to_front()
+
+
+## 锚在该时刻的发生地点上方；上方放不下就放下面，再整体钳进桌面。
+func _anchor_memory_card(card: MemCard, tid: String) -> void:
+	var place := case_def.mem_place_of(tid)
+	_anchor_card_to(card, graph.scene_key(place.id) if place != null else "")
+
+
+func _anchor_card_to(card: MemCard, node_key: String) -> void:
+	if card == null:
+		return
+	var area := Vector2(1280.0, 800.0 - HEADER_H)
+	var pos := Vector2(700.0, 290.0)
+	var nc := _cards.get(node_key) as NodeCard
+	if nc != null and is_instance_valid(nc) and nc.visible:
+		var target := nc.get_global_rect()
+		var origin := _desk.get_global_rect().position
+		pos.x = target.position.x - origin.x + (target.size.x - card.size.x) * 0.5
+		var above := target.position.y - origin.y - card.size.y - 14.0
+		if above >= 8.0:
+			pos.y = above
+		else:
+			pos.y = target.position.y - origin.y + target.size.y + 14.0
+	pos.x = clampf(pos.x, MEM_CARD_MIN_X, area.x - card.size.x - 8.0)
+	pos.y = clampf(pos.y, 8.0, area.y - card.size.y - 8.0)
+	card.position = pos
+
+
+func _close_mem_card() -> void:
+	if _mem_card != null and is_instance_valid(_mem_card):
+		_mem_card.queue_free()
+	_mem_card = null
+
+
+func _on_mem_closed() -> void:
+	_mem_card = null
+
+
+func _close_chat() -> void:
+	if _chat_win != null and is_instance_valid(_chat_win):
+		_chat_win.queue_free()
+	_chat_win = null
+
+
+func _on_chat_closed() -> void:
+	_chat_win = null
+
+
+## 对话窗固定贴右上（Web `.chat-win`：right 18 / top 72；desk 已让出 header，再减 PAD 14）。
+func _open_chat(entry: DialogueDef, ids: Array) -> bool:
+	if entry == null or case_def == null:
+		return false
+	_close_chat()
+	_chat_win = ChatWindow.new()
+	_chat_win.name = "chat_win"
+	_chat_win.setup_chat(entry, ids, case_def)
+	_chat_win.closed.connect(_on_chat_closed)
+	_desk.add_child(_chat_win)
+	_chat_win.position = Vector2(858, 58)
+	_chat_win.z_index = 30
+	_chat_win.move_to_front()
+	return true
+
+
+func _open_monologue(char_id: String) -> bool:
+	if dialogues == null:
+		return false
+	var entry := dialogues.monologue_of(char_id)
+	if entry == null:
+		return false
+	return _open_chat(entry, [char_id])
+
+
+func _try_dialogue_combo(tool_key: String, target_key: String) -> bool:
+	if dialogues == null:
+		return false
+	var a := graph.node(tool_key)
+	var b := graph.node(target_key)
+	if a.is_empty() or b.is_empty():
+		return false
+	if String(a["kind"]) != "char" or String(b["kind"]) != "char":
+		return false
+	var ids := [String(a["id"]), String(b["id"])]
+	var entry := dialogues.lookup(ids)
+	if entry == null:
+		entry = dialogues.fallback(ids)
+	return _open_chat(entry, ids)
+
+
+func _chat_drop_hit(at_global: Vector2) -> bool:
+	var chat := dbg_chat()
+	return chat != null and chat.get_global_rect().has_point(at_global)
+
+
+func _chat_drop(key: String) -> bool:
+	var chat := dbg_chat()
+	if chat == null or graph == null:
+		return false
+	var n := graph.node(key)
+	if n.is_empty():
+		return false
+	return chat.drop_node(String(n["kind"]), String(n["id"]))
+
+
+func _mark_archive_new() -> void:
+	_archive_new = true
+	if _archive_badge != null:
+		_archive_badge.visible = true
+
+
+func _clear_archive_new() -> void:
+	_archive_new = false
+	if _archive_badge != null:
+		_archive_badge.visible = false
+
+
 ## 极简布局：场景卡在前，实体随后，四列网格（P1 换成真正的分层排布 + 连线）
 func _relayout() -> void:
 	var order: Array = []
 	# 1) 当前切片场景的 loc 卡最先
-	var first_loc := graph.key_of("loc", SLICE_SCENE)
+	var first_loc := graph.scene_key(SLICE_SCENE)
 	if _cards.has(first_loc):
 		order.append(first_loc)
 	# 2) 其余 loc 卡
@@ -1354,8 +2042,11 @@ func _relayout() -> void:
 
 func _tec_key(target: String) -> String:
 	if target.contains(":"):
+		var parts := target.split(":", true, 1)
+		if parts.size() == 2:
+			return graph.key_of(parts[0], parts[1])
 		return target
-	return graph.key_of("loc", target)
+	return graph.scene_key(target)
 
 
 func _open_tec() -> void:
@@ -1438,6 +2129,7 @@ func _tec_drop_hit(at_global: Vector2) -> bool:
 func _start_tec_analysis(key: String) -> bool:
 	if not _require_case() or _tec == null:
 		return false
+	key = _tec_key(key)
 	var n := graph.node(key)
 	if n.is_empty():
 		return false
@@ -1486,7 +2178,7 @@ func _refresh_clue_keys(keys: Array) -> void:
 
 func _hidden_clue_of(kind: String, id: String) -> HiddenClueDef:
 	match kind:
-		"loc":
+		"loc", "time":
 			var s := case_def.scene_of(id)
 			return s.hidden_clue if s != null else null
 		"item":
@@ -1524,8 +2216,9 @@ func _capture_node_hidden_clues(kind: String, id: String, host_key: String) -> D
 
 ## TEC 解读完成后捕获 hiddenClue（场景 / 物品同一套字段；当前先接场景分析链路）
 func _capture_hidden_clue(scene_id: String) -> void:
-	var host := graph.key_of("loc", scene_id)
-	var res := _capture_node_hidden_clues("loc", scene_id, host)
+	var kind := graph.normalize_kind("loc", scene_id)
+	var host := graph.key_of(kind, scene_id)
+	var res := _capture_node_hidden_clues(kind, scene_id, host)
 	if res["keys"].is_empty():
 		return
 	_show_toast("捕获线索：" + "、".join(res["names"]))
@@ -1596,7 +2289,7 @@ func _on_tec_analysis_done(target: String) -> void:
 	var kind := String(n["kind"])
 	var id := String(n["id"])
 	var label := String(n.get("label", id))
-	if kind == "loc":
+	if GraphState.is_scene_kind(kind):
 		var talks := _tec_talk_lines(id)
 		var prog := int(graph.tec_prog.get(id, 0))
 		var unread := talks.size() - prog
@@ -1794,6 +2487,153 @@ func dbg_tec_info() -> Dictionary:
 	}
 
 
+# ── 档案 / 放映卡测试钩子（P2.3）──────────────────────────────────────
+
+func dbg_open_archive() -> ArchiveWin:
+	if _archive_win == null or not is_instance_valid(_archive_win):
+		_toggle_archive()
+	return _archive_win
+
+
+func dbg_archive_press(tid: String) -> bool:
+	if _archive_win == null or not is_instance_valid(_archive_win):
+		return false
+	return _archive_win.press_time(tid)
+
+
+func dbg_archive_new() -> bool:
+	return _archive_new
+
+
+# ── 多人对话 / 独白测试钩子（P2.4）────────────────────────────────────
+
+func dbg_chat() -> ChatWindow:
+	if _chat_win != null and is_instance_valid(_chat_win):
+		return _chat_win
+	return null
+
+
+func dbg_chat_state() -> Dictionary:
+	var chat := dbg_chat()
+	if chat == null:
+		return {"open": false, "id": "", "participants": [], "joined": [], "idx": 0,
+			"total": 0, "waitingFor": "", "typing": false, "done": false, "lines": 0}
+	return chat.state()
+
+
+func dbg_chat_advance() -> bool:
+	var chat := dbg_chat()
+	return chat.advance() if chat != null else false
+
+
+func dbg_chat_finish() -> void:
+	var chat := dbg_chat()
+	if chat != null:
+		chat.finish_line()
+
+
+func dbg_chat_drop(kind: String, id: String) -> bool:
+	var chat := dbg_chat()
+	return chat.drop_node(kind, id) if chat != null else false
+
+
+func dbg_chat_drop_key(key: String) -> bool:
+	return _chat_drop(key)
+
+
+func dbg_chat_hint() -> String:
+	var chat := dbg_chat()
+	return chat.hint_text() if chat != null else ""
+
+
+func dbg_chat_title() -> String:
+	var chat := dbg_chat()
+	return chat.title if chat != null else ""
+
+
+func dbg_chat_rect() -> Rect2:
+	var chat := dbg_chat()
+	return chat.get_global_rect() if chat != null else Rect2()
+
+
+func dbg_chat_close() -> void:
+	_close_chat()
+
+
+func dbg_open_dialogue(id: String, ids: Array) -> bool:
+	if dialogues == null:
+		return false
+	return _open_chat(dialogues.by_id(id), ids)
+
+
+func dbg_open_monologue(char_id: String) -> bool:
+	return _open_monologue(char_id)
+
+
+func dbg_dialogues() -> DialogueSystem:
+	return dialogues
+
+
+func dbg_time() -> String:
+	return graph.time if graph != null else ""
+
+
+func dbg_time_label() -> String:
+	return graph.time_label_of() if graph != null else ""
+
+
+func dbg_time_known() -> Array:
+	return graph.timeline_known() if graph != null else []
+
+
+func dbg_set_time(tid: String) -> bool:
+	return _select_time(tid)
+
+
+func dbg_mem_card() -> MemCard:
+	return _mem_card
+
+
+func dbg_mem_advance() -> bool:
+	return _mem_card.advance() if _mem_card != null and is_instance_valid(_mem_card) else false
+
+
+func dbg_close_mem() -> void:
+	_close_mem_card()
+
+
+func dbg_card_visible(key: String) -> bool:
+	var card: NodeCard = _cards.get(key, null)
+	return card != null and card.visible
+
+
+func dbg_card_pos(key: String) -> Vector2:
+	var card: NodeCard = _cards.get(key, null)
+	return card.position if card != null else Vector2.ZERO
+
+
+func dbg_mem_pos() -> Vector2:
+	return _mem_card.position if _mem_card != null and is_instance_valid(_mem_card) else Vector2.ZERO
+
+
+func dbg_combo_ui(tool_id: String, target_id: String) -> void:
+	if graph == null:
+		return
+	_on_card_combo(_dbg_node_key(tool_id), _dbg_node_key(target_id))
+
+
+func _dbg_node_key(id: String) -> String:
+	for key in graph.nodes.keys():
+		var n := graph.node(String(key))
+		if String(n.get("id", "")) == id and String(n.get("kind", "")) != "time":
+			return String(key)
+	return graph.key_of(CaseLoader.kind_of_ref(id), id)
+
+
+func dbg_toast_text() -> String:
+	return _toast_label.text if _toast_label != null else ""
+
+
 # ── 推演桌布测试钩子（P1.4）────────────────────────────────────────────
 
 func dbg_open_matrix() -> MatrixWin:
@@ -1837,6 +2677,128 @@ func dbg_confirm_ending() -> void:
 		return
 	_ending.visible = false
 	_ending.finished.emit()
+
+
+# ── 音乐播放器 / 花园测试钩子（P2.5）──────────────────────────────────
+
+func dbg_music_icon_visible() -> bool:
+	return _music_btn != null and _music_btn.visible
+
+
+func dbg_garden_icon_visible() -> bool:
+	return _garden_btn != null and _garden_btn.visible
+
+
+func dbg_garden_badge_text() -> String:
+	if _garden_badge == null or not _garden_badge.visible:
+		return ""
+	var l: Label = _garden_badge.get_node_or_null("Label")
+	return l.text if l != null else ""
+
+
+func dbg_music_win() -> MusicWin:
+	return _music_win if _music_win != null and is_instance_valid(_music_win) else null
+
+
+func dbg_music_dock() -> MusicDock:
+	return _music_dock if _music_dock != null and is_instance_valid(_music_dock) else null
+
+
+func dbg_click_music_icon() -> void:
+	_toggle_music_win()
+
+
+func dbg_open_music() -> MusicWin:
+	_open_music()
+	return dbg_music_win()
+
+
+func dbg_minimize_music() -> void:
+	_minimize_music()
+
+
+func dbg_restore_music() -> void:
+	_restore_music()
+
+
+func dbg_close_music() -> void:
+	_on_music_closed()
+
+
+func dbg_music_play(id: String) -> bool:
+	var w := dbg_music_win()
+	if w == null:
+		w = dbg_open_music()
+	return w.play_track(id) if w != null else false
+
+
+func dbg_music_toggle() -> bool:
+	return _music_win.toggle_current() if dbg_music_win() != null else false
+
+
+func dbg_music_stop() -> void:
+	_stop_music()
+
+
+func dbg_music_state() -> Dictionary:
+	var w := dbg_music_win()
+	if w == null:
+		return {}
+	var s := w.state()
+	s["win_visible"] = w.visible
+	s["dock_visible"] = _music_dock != null and is_instance_valid(_music_dock) and _music_dock.visible
+	return s
+
+
+func dbg_garden_win() -> GardenWin:
+	return _garden_win if _garden_win != null and is_instance_valid(_garden_win) else null
+
+
+func dbg_open_garden() -> GardenWin:
+	if _garden_win == null or not is_instance_valid(_garden_win):
+		_open_garden()
+	return dbg_garden_win()
+
+
+func dbg_close_garden() -> void:
+	if _garden_win != null and is_instance_valid(_garden_win):
+		_garden_win.queue_free()
+	_garden_win = null
+
+
+func dbg_garden_state() -> Dictionary:
+	var w := dbg_garden_win()
+	if w != null:
+		return w.dbg_state()
+	return {}
+
+
+func dbg_garden_icon_rect() -> Rect2:
+	return _garden_btn.get_global_rect() if _garden_btn != null else Rect2()
+
+
+func dbg_drop_seed(at_global: Vector2) -> bool:
+	return _drop_seed(at_global)
+
+
+func dbg_play_true_ending() -> void:
+	if _ending == null:
+		return
+	_last_ending_id = "TRUE_E"
+	_ending.play(case_def.ending_by_id("TRUE_E"))
+
+
+func dbg_touch_garden_plot(idx: int, at_ms: int) -> bool:
+	if graph == null or not (graph.garden is Dictionary):
+		return false
+	var plots: Array = graph.garden.get("plots", [])
+	if idx < 0 or idx >= plots.size():
+		return false
+	plots[idx]["at"] = at_ms
+	plots[idx]["hit"] = false
+	if _garden_win != null and is_instance_valid(_garden_win):
+		_garden_win.refresh()
+	return true
 
 
 # ── 案件系统测试钩子（P2.1）────────────────────────────────────────────
@@ -2143,7 +3105,128 @@ func _shot_p2_flow() -> void:
 	_open_tec()
 	await _wait(0.35)
 	await _shot("res://docs/p2_9_tec_archive.png")
+
+	_hide_tec()
+	_expand_scene("SCENES_fkjl", false)
+	await _wait(0.35)
+	_toggle_archive()
+	await _wait(0.35)
+	await _shot("res://docs/p2_10_archive.png")
+	_toggle_archive()
+	await _wait(0.15)
+
+	_expand_scene("SCENES_lhsdst", false)
+	await _wait(0.2)
+	_select_time("SCENES_0602")
+	await _wait(0.5)
+	_show_mem_lines(3)
+	await _wait(0.3)
+	await _shot("res://docs/p2_11_memory_card.png")
+
+	_close_mem_card()
+	_on_card_combo("char:NPC_FB", "loc:SCENES_garden")
+	await _wait(0.3)
+	_show_mem_lines(4)
+	await _wait(0.35)
+	await _shot("res://docs/p2_12_memory_play.png")
+
+	_close_mem_card()
+	_select_time("SCENES_0704")
+	await _wait(0.5)
+	_close_mem_card()
+	_hide_toast()
+	_on_card_combo("char:CHARS_zs", "char:CHARS_luhengs")
+	await _wait(0.35)
+	_show_chat_lines(5)
+	_hide_toast()
+	await _wait(0.35)
+	await _shot("res://docs/p2_13_dialogue.png")
+	_close_chat()
+
+	var garden := dialogues.by_id("DLG_garden_review") if dialogues != null else null
+	_open_chat(garden, ["CHARS_zs", "NPC_FB"])
+	await _wait(0.3)
+	_chat_win.finish_line()
+	_chat_win.advance()
+	_chat_win.finish_line()
+	_chat_win.advance()
+	_hide_toast()
+	await _wait(0.35)
+	await _shot("res://docs/p2_14_dialogue_join.png")
+	_close_chat()
+
+	_open_monologue("CHARS_luhengs")
+	await _wait(0.3)
+	_show_chat_lines(4)
+	_hide_toast()
+	await _wait(0.35)
+	await _shot("res://docs/p2_15_monologue.png")
+	_close_chat()
+
+	# ── P2.5 音乐播放器 / 花园彩蛋 ──
+	_ensure_card("item", "ITEMS_changji")
+	_ensure_card("item", "ITEMS_cz")
+	dbg_combo_ui("ITEMS_cz", "ITEMS_changji")
+	_hide_toast()
+	var music := dbg_open_music()
+	if music != null:
+		music.play_track("Air_Bach")
+		await _wait(0.2)
+		music.seek_ratio(0.25)
+	await _wait(0.8)
+	await _shot("res://docs/p2_16_music.png")
+	_minimize_music()
+	await _wait(0.45)
+	await _shot("res://docs/p2_17_music_dock.png")
+	_restore_music()
+	_stop_music()
+	_on_music_closed()
+
+	dbg_play_true_ending()
+	dbg_confirm_ending()
+	await _wait(0.25)
+	dbg_open_matrix()
+	_hide_toast()
+	await _wait(0.4)
+	await _shot("res://docs/p2_18_matrix_seed.png")
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_matrix_win.queue_free()
+	_matrix_win = null
+	var gwin := dbg_open_garden()
+	_hide_toast()
+	await _wait(0.45)
+	await _shot("res://docs/p2_19_garden_seed.png")
+	if gwin != null:
+		_drop_seed(gwin.field_global_rect().get_center())
+		dbg_touch_garden_plot(0, GardenSystem.now_ms_now() - 181000)
+		gwin._process(1.1)
+		await _wait(0.2)
+		gwin.dbg_open_narr(0)
+		gwin.dbg_advance_narr()
+		_hide_toast()
+		await _wait(0.45)
+		await _shot("res://docs/p2_20_garden_narr.png")
 	quit_app()
+
+
+func _show_chat_lines(n: int) -> void:
+	if _chat_win == null or not is_instance_valid(_chat_win):
+		return
+	_chat_win.finish_line()
+	for i in maxi(0, n - 1):
+		if not _chat_win.advance():
+			break
+		_chat_win.finish_line()
+
+
+func _show_mem_lines(n: int) -> void:
+	if _mem_card == null or not is_instance_valid(_mem_card):
+		return
+	_mem_card.finish_line()
+	for i in maxi(0, n - 1):
+		if not _mem_card.advance():
+			break
+		_mem_card.finish_line()
 
 
 func _ensure_card(kind: String, id: String) -> void:

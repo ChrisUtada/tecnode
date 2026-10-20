@@ -9,6 +9,7 @@ extends SysWindow
 signal clue_dropped(key: String, at_global: Vector2)
 signal clue_taken(key: String)
 signal inference_requested
+signal seed_dropped(at_global: Vector2)
 
 const BOARD_W := 560.0
 const BOARD_H := 420.0
@@ -33,6 +34,7 @@ var _board: Control
 var _chip_layer: Control
 var _exec: Control
 var _emote: PanelContainer = null
+var _seed_pop: PanelContainer = null
 var _hint: Label
 var _chips: Dictionary = {}          # clue id -> PanelContainer
 var _charging := false
@@ -41,6 +43,10 @@ var _rite_duration := RITE_SEC
 var _pressed_chip := ""
 var _chip_press := Vector2.ZERO
 var _chip_moved := false
+var _seed_dragging := false
+var _seed_press := Vector2.ZERO
+var _seed_grab := Vector2.ZERO
+var _seed_moved := false
 
 
 func setup_matrix(p_graph: GraphState, p_case: CaseLoader) -> void:
@@ -67,6 +73,7 @@ func setup_matrix(p_graph: GraphState, p_case: CaseLoader) -> void:
 	_board.add_child(_chip_layer)
 
 	_build_executor()
+	_build_seed_pop()
 
 	_hint = TecTheme.label("长按执行者蓄力推演 · 双击 / 拖出桌布取回线索", 10, TecTheme.FAINT)
 	_hint.position = Vector2(12, BOARD_H - 20)
@@ -105,6 +112,86 @@ func _build_executor() -> void:
 	avatar.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.add_child(avatar)
+
+
+func _build_seed_pop() -> void:
+	_seed_pop = PanelContainer.new()
+	_seed_pop.name = "mx_seedpop"
+	_seed_pop.size = Vector2(44, 44)
+	_seed_pop.position = _seed_home()
+	_seed_pop.mouse_filter = Control.MOUSE_FILTER_STOP
+	_seed_pop.tooltip_text = "真名留下的种子 · 拖进花园"
+	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE, 1)
+	sb.shadow_color = TecTheme.BEVEL_LO
+	sb.shadow_size = 5
+	sb.shadow_offset = Vector2(2, 3)
+	_seed_pop.add_theme_stylebox_override("panel", sb)
+	var img := TextureRect.new()
+	img.name = "seed"
+	img.texture = load("res://assets/raw/flower/plant_seed.png")
+	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	img.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	img.offset_left = 5
+	img.offset_top = 5
+	img.offset_right = -5
+	img.offset_bottom = -5
+	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_seed_pop.add_child(img)
+	_seed_pop.gui_input.connect(_on_seed_input)
+	_board.add_child(_seed_pop)
+	refresh_seed()
+
+
+func _seed_home() -> Vector2:
+	return Vector2(BOARD_W * 0.5 - 22.0, BOARD_H * 0.5 - 42.0 - 52.0)
+
+
+func refresh_seed() -> void:
+	if _seed_pop == null or not is_instance_valid(_seed_pop):
+		return
+	var has := graph != null and graph.garden is Dictionary and bool(graph.garden.get("seed", false))
+	_seed_pop.visible = has
+	if has:
+		_seed_pop.position = _seed_home()
+		_seed_pop.modulate = Color.WHITE
+
+
+func _on_seed_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_seed_dragging = true
+			_seed_moved = false
+			_seed_press = event.global_position
+			_seed_grab = _seed_pop.global_position
+			_seed_pop.move_to_front()
+		else:
+			if not _seed_dragging:
+				return
+			_seed_dragging = false
+			if _seed_moved:
+				seed_dropped.emit(event.global_position)
+				if _seed_pop.visible:
+					_snap_seed_home()
+			else:
+				_bounce_seed()
+		return
+	if event is InputEventMouseMotion and _seed_dragging:
+		if event.global_position.distance_to(_seed_press) > 3.0:
+			_seed_moved = true
+		if _seed_moved:
+			_seed_pop.global_position = _seed_grab + (event.global_position - _seed_press)
+
+
+func _snap_seed_home() -> void:
+	var t := create_tween()
+	t.tween_property(_seed_pop, "position", _seed_home(), 0.16).set_ease(Tween.EASE_OUT)
+
+
+func _bounce_seed() -> void:
+	var home := _seed_home()
+	var t := create_tween()
+	t.tween_property(_seed_pop, "position", home + Vector2(0, -5), 0.08)
+	t.tween_property(_seed_pop, "position", home, 0.1)
 
 
 # ── 渲染 ────────────────────────────────────────────────────────────────
@@ -396,3 +483,18 @@ func charge_ratio() -> float:
 
 func is_charging() -> bool:
 	return _charging
+
+
+func seed_visible() -> bool:
+	return _seed_pop != null and is_instance_valid(_seed_pop) and _seed_pop.visible
+
+
+func seed_global_rect() -> Rect2:
+	if _seed_pop == null or not is_instance_valid(_seed_pop):
+		return Rect2()
+	return _seed_pop.get_global_rect()
+
+
+func dbg_drop_seed(at_global: Vector2) -> void:
+	if seed_visible():
+		seed_dropped.emit(at_global)

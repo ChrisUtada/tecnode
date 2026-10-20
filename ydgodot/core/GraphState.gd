@@ -10,6 +10,11 @@ const SCENE_H := 54.0
 const ENT_W := 130.0
 const ENT_H := 46.0
 
+const PRESENT_TIME := "present"
+const MEM_CAST_DX := 60.0
+const MEM_CAST_DY := 150.0
+const MEM_CAST_STEP := 96.0
+
 var case_def: CaseLoader
 var nodes: Dictionary = {}        # key -> {key, kind, id, label, x, y, lit, home_scene, pinned, bag_from}
 var edges: Array = []             # {a: key, b: key, rel: "entity"|"move"|"cond"}
@@ -25,7 +30,7 @@ var tried: Dictionary = {}        # "tool>target" -> true（失败组合的痕�
 var talk_prog: Dictionary = {}    # 人物 id -> 对话进度（P2 对话系统用，快照先接住）
 var card_seen: Dictionary = {}    # 时刻 -> true（玩家知识：读过就不再自动重放）
 var debuted: Dictionary = {}      # 人物 id -> true（登场置位）
-var time: String = "present"      # 当前时刻；初始是「现在」
+var time: String = PRESENT_TIME    # 当前时刻；初始是「现在」
 var garden: Dictionary = {"seed": false, "plots": []}   # 真名结局后的花园
 var selected: String = ""
 var last_scene: String = ""
@@ -54,8 +59,26 @@ func _blank_matrix() -> void:
 		matrix[sense] = []
 
 
+## 数据侧的 [loc:SCENES_0602] 与画布侧的 time:SCENES_0602 必须收敛到同一个键。
+## 这是 GraphState 的「nodeKeyOfRef」边界：凡是从引用推节点键的地方都走这里。
+func normalize_kind(kind: String, id: String) -> String:
+	if kind == "scene":
+		kind = "loc"
+	if kind == "loc" and case_def != null and case_def.is_time_id(id):
+		return "time"
+	return kind
+
+
+static func is_scene_kind(kind: String) -> bool:
+	return kind == "loc" or kind == "time" or kind == "scene"
+
+
 func key_of(kind: String, id: String) -> String:
-	return "%s:%s" % [kind, id]
+	return "%s:%s" % [normalize_kind(kind, id), id]
+
+
+func scene_key(id: String) -> String:
+	return key_of("loc", id)
 
 
 func has(kind: String, id: String) -> bool:
@@ -67,6 +90,7 @@ func node(key: String) -> Dictionary:
 
 
 func add_node(kind: String, id: String) -> Dictionary:
+	kind = normalize_kind(kind, id)
 	var key := key_of(kind, id)
 	if nodes.has(key):
 		return nodes[key]
@@ -83,6 +107,8 @@ func add_node(kind: String, id: String) -> Dictionary:
 		"bag_from": "",      # 进袋前的来源容器 id（袋清单标注「来自 ×××」）
 		"installed": {},      # 装在本节点上的零件（item id -> true）
 		"captured": kind == "clue" and captured.has(id),
+		"fresh": false,       # 本次新出现（档案 / 卡片的「新」角标）
+		"unread": false,      # 玩家还没点过它
 	}
 	nodes[key] = n
 	return n
@@ -151,6 +177,7 @@ func reveal_scene(sid: String) -> Array:
 	var sn := add_node("loc", sid)
 	if not explored.has(sid):
 		fresh.append(sn["key"])
+		mark_fresh(String(sn["key"]))
 	explored[sid] = true
 	last_scene = sid
 
@@ -165,7 +192,10 @@ func reveal_scene(sid: String) -> Array:
 			n["home_scene"] = sid
 		if not existed:
 			fresh.append(n["key"])
-		link(sn["key"], n["key"], "move" if kind == "loc" else "entity")
+			mark_fresh(String(n["key"]))
+		if kind == "char":
+			meet_char_at(id, sid)         # 这个场景正是 debut 点的，此刻置位
+		link(sn["key"], n["key"], "move" if is_scene_kind(String(n["kind"])) else "entity")
 	return fresh
 
 
@@ -173,16 +203,18 @@ func reveal_scene(sid: String) -> Array:
 
 ## 是不是「容器」：场景，或 content 里带标签的物品（书桌 / 抽屉 / 垃圾桶）
 func is_container(kind: String, id: String) -> bool:
-	if kind == "loc":
+	var k := normalize_kind(kind, id)
+	if k == "loc" or k == "time":
 		return case_def.scene_of(id) != null
-	if kind != "item":
+	if k != "item":
 		return false
 	var it := case_def.item_of(id)
 	return it != null and case_def.tags_of(it.content).size() > 0
 
 
 func container_content(kind: String, id: String) -> String:
-	if kind == "loc":
+	var k := normalize_kind(kind, id)
+	if k == "loc" or k == "time":
 		var s := case_def.scene_of(id)
 		return s.content if s != null else ""
 	var it := case_def.item_of(id)
@@ -199,6 +231,7 @@ func reveal_container(kind: String, id: String) -> Array:
 	var host := add_node(kind, id)
 	if not explored.has(id):
 		fresh.append(host["key"])
+		mark_fresh(String(host["key"]))
 	explored[id] = true
 	collapsed.erase(id)
 
@@ -213,7 +246,10 @@ func reveal_container(kind: String, id: String) -> Array:
 			n["home_scene"] = id
 		if not existed:
 			fresh.append(n["key"])
-		link(host_key, n["key"], "move" if k == "loc" else "entity")
+			mark_fresh(String(n["key"]))
+		if k == "char":
+			meet_char_at(cid, id)
+		link(host_key, n["key"], "move" if is_scene_kind(String(n["kind"])) else "entity")
 	return fresh
 
 
@@ -256,6 +292,183 @@ func set_hidden(key: String, on: bool) -> void:
 
 func is_visible(key: String) -> bool:
 	return not hidden.has(key) and not stored.has(key) and nodes.has(key)
+
+
+func mark_fresh(key: String) -> void:
+	var n := node(key)
+	if n.is_empty():
+		return
+	n["fresh"] = true
+	n["unread"] = true
+
+
+## 玩家点过这个节点 ⇒ 摘掉「新」角标（Web 的 clearFresh）
+func clear_fresh(key: String) -> void:
+	var n := node(key)
+	if n.is_empty():
+		return
+	n["fresh"] = false
+	n["unread"] = false
+
+
+func has_unread(key: String) -> bool:
+	return bool(node(key).get("unread", false))
+
+
+# ── 时间轴 / 时刻图层 / 登场门控（对齐 Web 03-utils.js）─────────────────
+
+## 某时刻的节点集由回忆数据派生：该 when 下所有 where 地点 + who 人物。
+## present 返回 null = 全显，不做时间过滤。
+func time_stage_keys(t: String):
+	if t == PRESENT_TIME:
+		return null
+	var keys: Array = []
+	for m in case_def.memories_for(t):
+		if m.where != null and not keys.has(scene_key(m.where.id)):
+			keys.append(scene_key(m.where.id))
+		if m.who != null and not keys.has(key_of("char", m.who.id)):
+			keys.append(key_of("char", m.who.id))
+	return keys
+
+
+## 时间轴各档：present 在首位，其余按 config.memoryScenes 顺序。
+func timeline_stages() -> Array:
+	var out: Array = [
+		{"id": PRESENT_TIME, "label": case_def.now_label(), "keys": null},
+	]
+	for sid in case_def.memory_scene_ids():
+		out.append({
+			"id": sid,
+			"label": case_def.scene_title(String(sid)),
+			"keys": time_stage_keys(String(sid)),
+		})
+	return out
+
+
+func current_stage() -> Dictionary:
+	var stages := timeline_stages()
+	for s in stages:
+		if String(s["id"]) == time:
+			return s
+	return stages[0]
+
+
+## 已经获得的时刻：画布上已有该时刻节点，或已探索过它。
+func timeline_known() -> Array:
+	var out: Array = []
+	for sid in case_def.memory_scene_ids():
+		var id := String(sid)
+		if nodes.has(scene_key(id)) or explored.has(id):
+			out.append(id)
+	return out
+
+
+func time_label_of(t: String = "") -> String:
+	return case_def.time_label_of(t if t != "" else time)
+
+
+func mem_place_of(t: String) -> SceneDef:
+	return case_def.mem_place_of(t)
+
+
+## 时间可见性：当前时刻的节点集里没有它 ⇒ 不可见；present 档全通过。
+func visible_now(n: Dictionary) -> bool:
+	if n.is_empty():
+		return false
+	var st := current_stage()
+	var keys = st.get("keys", null)
+	return keys == null or (keys as Array).has(String(n["key"]))
+
+
+func char_debut(id: String) -> String:
+	var c := case_def.char_of(id)
+	return c.debut.id if c != null and c.debut != null else ""
+
+
+func char_debuted(id: String) -> bool:
+	if char_debut(id) == "":
+		return true
+	return debuted.has(id)
+
+
+## 到达 debut（幂等）：展开场景 / 进入回忆时刻时调用。
+func meet_char_at(id: String, sid: String) -> void:
+	if char_debut(id) != sid:
+		return
+	debuted[id] = true
+
+
+## 人物在「现在」档的登场点：sceneTalks 里第一个非回忆场景；没有 = 现在档不登场。
+func char_now_scene(id: String) -> String:
+	var c := case_def.char_of(id)
+	if c == null:
+		return ""
+	for st in c.scene_talks:
+		if st == null or st.scene == null:
+			continue
+		if not case_def.is_time_id(st.scene.id):
+			return st.scene.id
+	return ""
+
+
+func char_now_met(id: String) -> bool:
+	if id == "CHARS_TEC":
+		return true
+	var sid := char_now_scene(id)
+	return sid != "" and explored.has(sid)
+
+
+## 综合可见（时间 × 空间 × 登场）：渲染 / 交互 / 聚焦一律认这一个。
+func visible_node(n: Dictionary) -> bool:
+	if n.is_empty() or hidden.has(String(n["key"])) or stored.has(String(n["key"])):
+		return false
+	if String(n["kind"]) == "char":
+		var id := String(n["id"])
+		if not char_debuted(id):
+			return false
+		if not visible_now(n):
+			return false
+		var keys = current_stage().get("keys", null)
+		if keys == null and not char_now_met(id):
+			return false
+		return true
+	return visible_now(n)
+
+
+## 进入回忆时刻：把那天文本里在场的、且 debut 正是这一刻的人物带出画布。
+## 已存在的节点不动（不重复提示、不挪坐标）；返回新增数量。
+func spawn_mem_cast(t: String) -> int:
+	var s := case_def.scene_of(t)
+	if s == null or not case_def.is_time_id(t):
+		return 0
+	var place := case_def.mem_place_of(t)
+	var pn: Dictionary = nodes.get(scene_key(place.id), {}) if place != null else {}
+	var hx := float(pn.get("x", 0.0)) if not pn.is_empty() else -1.0
+	var hy := float(pn.get("y", 0.0)) if not pn.is_empty() else -1.0
+	var added := 0
+	var i := 0
+	for tag in case_def.tags_of(s.content):
+		var tag_i := i
+		i += 1
+		if String(tag["kind"]) != "char":
+			continue
+		var cid := String(tag["id"])
+		if char_debut(cid) != t:
+			continue                      # 登场点不在这一刻：文本提及 ≠ 遇到
+		var existed := has("char", cid)
+		var n := add_node("char", cid)
+		if String(n.get("home_scene", "")) == "":
+			n["home_scene"] = t
+		meet_char_at(cid, t)
+		if not existed:
+			added += 1
+			if hx >= 0.0:
+				n["x"] = hx + MEM_CAST_DX + float(tag_i % 3) * MEM_CAST_STEP
+				n["y"] = hy + MEM_CAST_DY + float(int(tag_i / 3)) * MEM_CAST_STEP
+			mark_fresh(String(n["key"]))
+			if not pn.is_empty():
+				link(String(pn["key"]), String(n["key"]), "entity")
+	return added
 
 
 ## 节点是不是「容器」—— 容器（场景 / 书桌 / 抽屉 / 垃圾桶）是不可收纳的落脚点

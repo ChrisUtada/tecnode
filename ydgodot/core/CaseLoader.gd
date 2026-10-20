@@ -9,9 +9,11 @@ extends RefCounted
 ## 因为它们是「文本协议」的入口，与数据形态无关；其余一律直接用 Resource。
 
 const CASE_PATH := "res://cases/a001/case.tres"
+const DEFAULT_MEMORY_SCENES := ["SCENES_0602", "SCENES_0704"]
 
 var path: String
 var case_def: CaseDef = null
+var memory_scenes: Array[SceneDef] = []
 var scenes: Dictionary = {}      # id -> SceneDef
 var items: Dictionary = {}       # id -> ItemDef
 var chars: Dictionary = {}       # id -> CharDef
@@ -55,6 +57,11 @@ func _index() -> void:
 	memories = case_def.memories
 	dialogues = case_def.dialogues
 	endings = case_def.endings
+	memory_scenes = case_def.memory_scenes
+	if memory_scenes.is_empty():
+		for id in DEFAULT_MEMORY_SCENES:
+			if scenes.has(id):
+				memory_scenes.append(scenes[id])
 
 
 # ── 查询 ────────────────────────────────────────────────────────────────
@@ -94,7 +101,7 @@ func clue_of(id: String) -> ClueDef:
 ## 按 kind 取实体（画布 kind = loc/item/char/clue）
 func def_of(kind: String, id: String) -> Resource:
 	match kind:
-		"loc", "scene":
+		"loc", "scene", "time":
 			return scene_of(id)
 		"item":
 			return item_of(id)
@@ -107,7 +114,7 @@ func def_of(kind: String, id: String) -> Resource:
 
 func label_of(kind: String, id: String) -> String:
 	match kind:
-		"loc", "scene":
+		"loc", "scene", "time":
 			var s := scene_of(id)
 			return s.title if s != null else id
 		"item":
@@ -125,6 +132,80 @@ func label_of(kind: String, id: String) -> String:
 func scene_title(id: String) -> String:
 	var s := scene_of(id)
 	return s.title if s != null else id
+
+
+func is_time_id(id: String) -> bool:
+	for s in memory_scenes:
+		if s != null and s.id == id:
+			return true
+	return false
+
+
+## 场景引用在画布上的 kind：时刻场景是 "time"，其余是 "loc"。
+func scene_kind(id: String) -> String:
+	return "time" if is_time_id(id) else "loc"
+
+
+func memory_scene_ids() -> Array:
+	var out: Array = []
+	for s in memory_scenes:
+		if s != null:
+			out.append(s.id)
+	return out
+
+
+func memories_for(when_id: String) -> Array[MemoryDef]:
+	var out: Array[MemoryDef] = []
+	for m in memories:
+		if m != null and m.when != null and m.when.id == when_id:
+			out.append(m)
+	return out
+
+
+## 回忆小剧场匹配器：when × who × where 三者全中才算命中。
+func memory_for(when_id: String, who_id: String, where_id: String) -> MemoryDef:
+	for m in memories:
+		if m == null:
+			continue
+		if m.when != null and m.when.id == when_id \
+			and m.who != null and m.who.id == who_id \
+			and m.where != null and m.where.id == where_id:
+			return m
+	return null
+
+
+## 某时刻回忆发生的地点（取该时刻第一条回忆的 where）。
+func mem_place_of(when_id: String) -> SceneDef:
+	for m in memories_for(when_id):
+		return m.where
+	return null
+
+
+func time_label_of(t: String) -> String:
+	if t == "present":
+		return now_label()
+	return scene_title(t)
+
+
+## 档案窗简介：发生地点 · 在场人物 + 一句开场旁白。
+func time_brief_of(t: String) -> Dictionary:
+	var mems := memories_for(t)
+	var where := ""
+	var who_names: Array = []
+	for m in mems:
+		if where == "" and m.where != null:
+			where = m.where.title
+		if m.who != null and not who_names.has(m.who.name):
+			who_names.append(m.who.name)
+	var summary := ""
+	for m in mems:
+		for line in m.script_lines:
+			if line != null and line.kind == "narr" and line.text != "":
+				summary = strip_tags(line.text)
+				break
+		if summary != "":
+			break
+	return {"where": where, "who": " · ".join(who_names), "sum": summary}
 
 
 func start_scene() -> String:
@@ -145,7 +226,7 @@ func ending_by_id(id: String) -> EndingDef:
 # ── 文本协议 ────────────────────────────────────────────────────────────
 
 func text_of(kind: String, id: String) -> String:
-	if kind == "loc" or kind == "scene":
+	if kind == "loc" or kind == "scene" or kind == "time":
 		var s := scene_of(id)
 		return strip_tags(s.content if s != null else "")
 	var it := item_of(id)
@@ -160,7 +241,7 @@ func strip_tags(raw: String) -> String:
 	var last := 0
 	for m in re.search_all(s):
 		out += s.substr(last, m.get_start() - last)
-		out += label_of(kind_of_ref(m.get_string(2)), m.get_string(2))
+		out += label_of(_tag_kind(m.get_string(1)), m.get_string(2))
 		last = m.get_end()
 	out += s.substr(last)
 	return out
@@ -176,5 +257,12 @@ func tags_of(raw: String) -> Array:
 		var id := m.get_string(2)
 		if not seen.has(id):
 			seen[id] = true
-			out.append({"kind": kind_of_ref(id), "id": id})
+			out.append({"kind": _tag_kind(m.get_string(1)), "id": id})
 	return out
+
+
+## 正文标签的前缀就是权威 kind（NPC_FB 这类 id 不带 CHARS_ 前缀，不能靠 id 猜）。
+static func _tag_kind(prefix: String) -> String:
+	if prefix == "scene":
+		return "loc"
+	return prefix

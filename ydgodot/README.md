@@ -3,12 +3,12 @@
 > 迁移根目录。**后续迁移的所有内容都在这里**：工程、资源、测试、烘焙产物、转换脚本、文档。
 > 计划与阶段目标见 [`GODOT_PORT_PLAN.md`](./GODOT_PORT_PLAN.md)。
 
-## 当前状态：P2.2 TEC 生态已完成，下一步 P2.3 回忆系统
+## 当前状态：P2.5 音乐与花园已完成，P2 收口；下一步 P3 视觉追平
 
 - **P0 垂直切片**：可跑（下面这条链路）
 - **P1.1 JSON → Resource 迁移**：✅ 数据全部落在 `cases/a001/**/*.tres`，运行时**不再读 JSON**
   - 逐字段对照回归 `test_migration.gd`：11 场景 / 36 物品 / 5 人物 / 20 线索 / 6 回忆 / 3 对话 / 5 结局，**全字段一致**
-  - 180 条字符串引用 → **类型化引用**（重命名/移动时引擎自动维护），悬空 0 条
+  - 182 条字符串引用 → **类型化引用**（重命名/移动时引擎自动维护），悬空 0 条
   - 迁移暴露了 2 条**数据自身的错字引用**（`ITEMS_0602`、`ITEMS_sxbj`），行为与 Web 版一致（永不触发），记在报告里待你决定是否修
 - **P1.2–P1.3**（图状态全量 / 六型命令）：✅ 已落地
   - 图状态：展开 / 折叠 / **收纳三态**（证物袋 BAG · 线索册 LEDGER · 推演桌布 MATRIX）/ 折叠后的隐藏重算（钉住的、跟场外有连线的都留在画布）/ 删节点连边一起走
@@ -47,6 +47,27 @@
   - 档案解读：场景按 `sceneTalks` 逐条读出，并捕获台词 / `hiddenClue` 里的线索；物品 / 人物走 reaction 表；线索节点拒绝分析；重复分析只补未读，读完提示「档案已经全部解读完毕」
   - 拖放：TEC 图标、窗口头像、助手卡片都能接节点；与案件停车卡片并存
   - 回归：`test_p22.gd` 84 项（对话游标 / 收起还原 / 分析进度 / 档案 / 反应表 / 拖放命中 / 撤销 / 重置清理）
+- **P2.3 回忆系统**：✅ 已落地
+  - 时间轴：`memoryScenes` 驱动三档（现在 / 6月2日 / 7月4日），档案窗倒序列出已知时刻、地点 / 人物 / 摘要和「当前 / 已回顾 / 新」状态
+  - 切档：改 `graph.time` 后重算可见性、带出 `debut == 该时刻` 的人物、保持原有卡片位置；首次进入自动放放映卡，已读档不重复自动播
+  - 放映卡 `MemCard`：暗纸 / 双线黑框、45ms/字打字机、点击补全或推进、整卡拖动、锚在发生地点上方且不压住节点
+  - 回忆小剧场：时刻 × 人物 × 地点命中 `memories` 后开演，旁白 + 带头像（缺图退首字）的多人台词；不捕获线索，失败给明确提示
+  - 登场门控：`debut`、`visible_node`、时间 × 空间 × 探索三重判定接入桌面显隐与收纳取回
+  - 回归：`test_p23.gd` 164 项（数据契约 / 时间图层 / debut / 快照 / 档案窗 / 放映卡 / 小剧场）
+- **P2.4 多人对话系统**：✅ 已落地
+  - `DialogueSystem` / `DialogueSession`：语境（when × where）先 fit 再 free，miss 不播；精确集合优先，三人剧本可由两人先命中，第三人后加入
+  - `ChatWindow`：右上角 390 宽、高度随内容伸缩、45ms/字打字机、点击补全/推进、旁白 + 带头像台词、贴底不裁末行
+  - 中途加入：有台词的人不在场时暂停并提示「把「X」拖进对话框」；拖对人续播，拖错提示「插不上话」；非人物提示「只有人物能加入这段对话」
+  - 独白：单参与者剧本按当前语境筛选；当前没有详情窗，入口暂用「双击人物卡」，P3 追平详情窗按钮
+  - 生命周期：切时刻 / 重置 / 切案 / 撤销恢复 / 重建运行时都会关窗，会话不跨时间
+  - 回归：`test_p24.gd` 102 项（语境匹配 / loose 选中 / fallback / 状态机 / 打字机 / 拖人 / 独白 / 生命周期）
+- **P2.5 音乐播放器 / 花园彩蛋**：✅ 已落地
+  - 解锁：唱针（`ITEMS_cz`）装到唱机（`ITEMS_changji`）后，左侧出现「播放器」图标；失去安装态（撤销 / 读档）时播放器、dock 一并收起
+  - 音乐：`MusicWin` 收录 `Air (Bach)`，支持播放 / 暂停 / 停止 / 点击进度跳转；关闭窗不打断，`–` 收成右下角 238×60 `MusicDock`，点图标或卡片还原
+  - 种子：TRUE_E「确认捕获」后发种子，只发一次且不覆盖已有旁白；矩阵窗种子气泡可拖到花园图标或已开的花园窗，种下前拍快照，拖株 / 开花只自动存档
+  - 花园：`GardenWin` 五阶段真实时间生长（0 / 45 / 90 / 135 / 180 秒：种子 / 嫩芽 / 展叶 / 舒叶 / 开花），落点与株位限定在花圃内；已种下的株可继续拖动
+  - 旁白：开花后点花株开正文，按句 / 逗号切段（约 150 字/段），点击补字或翻页，面板随内容伸缩；正文取 `TRUE_E.message`（371 字），旧档缺 `garden` 且有 TRUE_E 时自动补种子
+  - 回归：`test_p25.gd` 146 项（花园核心 / 老档迁移 / 播放器与 dock / 图标收放 / 种子投放 / 拖动 / 旁白 / 存档）
 
 一条完整链路已在 Godot 4.7 里跑通，其余系统尚未搬迁：
 
@@ -60,6 +81,10 @@
                   ├ 对话 / 档案解读；`–` 收成右下角助手卡片
                   └ 结局演出：分幕台词 + 真名遮罩
 ```
+
+另一条已接通的线：左侧「档案」→ 时间轴切档 → 首次进入自动放映 → 人物 × 地点凑齐时开回忆小剧场。
+第三条：人物 × 人物 → 多人对话（有剧本按语境播，没有给 fallback）→ 中途缺人可拖人物续播；双击有独白的人物开独白。
+第四条：唱针装唱机 → 播放器 / 右下角卡片；真结局种子 → 矩阵拖进花园 → 真实时间开花 → 分段旁白。
 
 ## 怎么跑
 
@@ -83,6 +108,9 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 "$GODOT" --headless --path ydgodot --script res://tests/headless/test_p16.gd
 "$GODOT" --headless --path ydgodot --script res://tests/headless/test_p21.gd
 "$GODOT" --headless --path ydgodot --script res://tests/headless/test_p22.gd
+"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p23.gd
+"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p24.gd
+"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p25.gd
 
 # 3.5) 重跑数据迁移（JSON → .tres；只在确认数据基准后跑）
 "$GODOT" --headless --path ydgodot --script res://tools/json_to_tres.gd
@@ -93,28 +121,28 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 # 4.5) 开场 / 调查员证截图（6 张，写到 docs/p1_1*.png）
 "$GODOT" --path ydgodot --resolution 1280x800 -- --shot --shot-intro
 
-# 4.6) 案件 / TEC 截图（9 张，写到 docs/p2_*.png）
+# 4.6) 案件 / TEC / 回忆 / 对话 / 音乐 / 花园截图（20 张，写到 docs/p2_*.png）
 "$GODOT" --path ydgodot --resolution 1280x800 -- --shot-p2
 ```
 
 - `--fast`：把「分析计时」「结局分幕延迟」压到 0（无头/测试旁路，见计划 §四.3）。
 - `--shot`：跑固定剧本并截图（`docs/p0_*.png`、`docs/p1_*.png`）。截图需要真实渲染，**不能加 `--headless`**。
-- `--shot-p2`：跑案件地图 / 收起 / 关闭 / 解锁 + TEC 对话 / 分析 / 助手卡片 / 档案共 9 张截图；使用临时进度档，退出时清理。
+- `--shot-p2`：跑案件地图 / 收起 / 关闭 / 解锁 + TEC 对话 / 分析 / 助手卡片 / 档案 + 档案窗 / 放映卡 / 回忆小剧场 + 多人对话 / 等待加入 / 独白 + 音乐播放器 / 右下角卡片 + 种子 / 花园 / 旁白共 20 张截图；使用临时进度档，退出时清理。
 - `--no-intro`：跳过开场适性测试（无证时也不弹）。
 
 ## 目录
 
 | 路径 | 内容 |
 |---|---|
-| `core/` | 纯逻辑（不挂场景树，可无头测）：`CaseLoader` / `GraphState` / `ComboSystem` / `SaveSystem` / `Investigator` / `CaseCatalog` |
+| `core/` | 纯逻辑（不挂场景树，可无头测）：`CaseLoader` / `GraphState` / `ComboSystem` / `SaveSystem` / `Investigator` / `CaseCatalog` / `DialogueSystem` / `DialogueSession` / `GardenSystem` |
 | `scenes/` | `Desktop.tscn` + `Desktop.gd`（壳与接线）、`cards/NodeCard.gd`、`windows/*` |
 | `ui/` | `TecTheme.gd`（配色/字体/StyleBox）、`shaders/surface.gdshader`（浮雕）、`shaders/paper.gdshader`（纸纹） |
 | `cases/a001/` | **内容数据（唯一形态）**：`case.tres` 索引 + `scenes/` `items/` `chars/` `clues/` `memories/` `dialogues/` `endings/`，一实体一文件 |
 | `core/defs/` | 25 个自定义 Resource 类（`SceneDef` / `ItemDef` / `CommandDef` 六子类 / `CharDef` …） |
 | `data/` | `case-a001.json` —— **已冻结为只读档案**（迁移输入 + 对照基准，运行时不再读它） |
 | `assets/raw/` | `src/assets/` 的拷贝（字体 / 头像 / OGG / 花园序列帧） |
-| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 32）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 14）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）—— **共 509 项** |
-| `docs/` | P0 切片 6 张 + P1 新特性 15 张 + P2 案件 / TEC 9 张截图（P3 对拍基线从这些图起步） |
+| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 32）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 15）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 102）、`test_p25.gd`（音乐 / 花园 146）—— **共 922 项** |
+| `docs/` | P0 切片 6 张 + P1 新特性 15 张 + P2 案件 / TEC / 回忆 / 对话 / 音乐 / 花园 20 张截图，共 41 张（P3 对拍基线从这些图起步） |
 | `tools/` | P1 的 `json_to_tres.gd` 与对拍工具（待建） |
 
 ## P0 已做 / 明确没做
@@ -130,12 +158,11 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 - 结局演出：分幕台词按 `delay` 落下、点击继续、遮罩收幕
 - 无头回归两层（逻辑 + 界面），全绿
 
-**没做（P2.3 起）**
+**没做（P3 起）**
 
 - 真实布局算法（现在是 4 列网格，无连线、无层级、无镜头聚焦/缩放）
-- 详情窗、人物名册、多人对话 / 打字机
-- 回忆/时间轴、人物登场门控、音乐播放器、花园彩蛋
-- 除案件窗 / TEC 外的系统窗最小化、系统窗层级与 z 序的完整规则
+- 详情窗、人物名册
+- 系统窗层级与 z 序的完整规则（音乐 / 花园已按各自场景接入最小化或固定按钮）
 
 ## 与 Web 版的已知偏差（P0 有意从简，P3 再追平）
 
@@ -148,6 +175,7 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 | 数据形态 | `data/case-a001.json` 直读 | `cases/a001/**/*.tres`（P1.1），JSON 冻结为档案 |
 | 结局触发 | 推演桌布命中配方 | 已接推演桌布；`--shot` 仍直接播放 `TRUE_E` 以保留 P0 对拍基线 |
 | 调查员头像库 | 常驻两人 + 已结识人物，领证后可再更换 | 常驻两人 + 画布上已出现的人物；回看证件已接，换头像 / 人名册属 P2 |
+| 独白入口 | 人物详情窗按钮 | P2.4 暂无详情窗，暂用「双击人物卡」；P3 追平 |
 | 字体回退 | VonwaonBitmap → SimSun → … | 全字形字体直导，**不配 fallback** |
 
 ## 约定

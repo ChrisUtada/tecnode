@@ -52,6 +52,9 @@ func _initialize() -> void:
 	check("config.nowLabel 一致", c.now_label == jd["config"]["nowLabel"])
 	check("config.reusableTools 一致",
 		_ids(c.reusable_tools) == jd["config"]["reusableTools"], str(_ids(c.reusable_tools)))
+	var want_mem = jd["config"].get("memoryScenes", ["SCENES_0602", "SCENES_0704"])
+	check("config.memoryScenes 一致（缺省回退两天）",
+		_ids(c.memory_scenes) == want_mem, str(_ids(c.memory_scenes)))
 
 	# ── 逐类整包比对 ──
 	var bad := 0

@@ -111,26 +111,38 @@ func set_title(t: String) -> void:
 		_title_label.text = t
 
 
+## 只改内高，宽度与顶边不动；对话窗按内容长高 / 缩回时用。
+func set_inner_height(h: float) -> void:
+	var ih := maxf(120.0, h)
+	var target := Vector2(size.x, ih + PAD * 2.0)
+	custom_minimum_size = target
+	size = target
+	body.size.y = ih - BAR_H - 22.0
+	if _mat != null:
+		_mat.set_shader_parameter("rect_size", size)
+
+
 func enable_case_controls() -> void:
 	enable_controls("收起：缩成桌面右下角的案件卡片（进度会保存）",
 		"关闭：放进左侧「案件地图」图标（进度会保存）")
 
 
-func enable_controls(min_tip: String, close_tip: String = "") -> void:
+func enable_controls(min_tip: String, close_tip: String = "", show_min := true) -> void:
 	_manual_close = true
 	if _close_btn == null:
 		return
 	var bar := _close_btn.get_parent()
-	var min_btn := TecTheme.button("–")
-	min_btn.name = "min"
-	min_btn.size = Vector2(26.0, 22.0)
-	min_btn.position = Vector2(_inner_w - 60.0, 6.0)
-	min_btn.add_theme_font_size_override("font_size", 12)
-	min_btn.tooltip_text = min_tip
+	if show_min:
+		var min_btn := TecTheme.button("–")
+		min_btn.name = "min"
+		min_btn.size = Vector2(26.0, 22.0)
+		min_btn.position = Vector2(_inner_w - 60.0, 6.0)
+		min_btn.add_theme_font_size_override("font_size", 12)
+		min_btn.tooltip_text = min_tip
+		min_btn.pressed.connect(func(): minimized.emit())
+		bar.add_child(min_btn)
+		_title_label.size = Vector2(_inner_w - 92.0, 22.0)
 	_close_btn.tooltip_text = close_tip
-	min_btn.pressed.connect(func(): minimized.emit())
-	bar.add_child(min_btn)
-	_title_label.size = Vector2(_inner_w - 92.0, 22.0)
 
 
 func _on_close_pressed() -> void:

@@ -437,6 +437,13 @@ func _write_all() -> void:
 	case_def.memories = mems
 	case_def.dialogues = dlgs
 	case_def.endings = ends
+	var memory_ids = cfg.get("memoryScenes", ["SCENES_0602", "SCENES_0704"])
+	var memory_refs: Array[SceneDef] = []
+	for mid in (memory_ids if memory_ids != null else []):
+		var ms := _ref(String(mid), "SceneDef") as SceneDef
+		if ms != null:
+			memory_refs.append(ms)
+	case_def.memory_scenes = memory_refs
 	type_counts = {
 		"SceneDef": scenes.size(), "ItemDef": items.size(), "CharDef": chars.size(),
 		"ClueDef": clues.size(), "MemoryDef": mems.size(), "DialogueDef": dlgs.size(),
