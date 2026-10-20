@@ -5,6 +5,7 @@ extends Control
 ## 内容统一塞进 `body`（一个 Control），子类/调用方只往里加东西。
 
 signal closed
+signal minimized
 
 const PAD := 14.0
 const BAR_H := 34.0
@@ -19,6 +20,9 @@ var _dragging := false
 var _press := Vector2.ZERO
 var _grab := Vector2.ZERO
 var _bar_nodes: Array[Control] = []
+var _manual_close := false
+var _inner_w := 0.0
+var _close_btn: Button
 
 
 func setup(p_title: String, w: float, h: float, radius: int = TecTheme.R_WIN) -> void:
@@ -47,6 +51,7 @@ func _build(radius: int) -> void:
 	add_child(bg)
 
 	var inner_w: float = size.x - PAD * 2.0
+	_inner_w = inner_w
 	var inner_h: float = size.y - PAD * 2.0
 
 	var bar := Control.new()
@@ -79,7 +84,8 @@ func _build(radius: int) -> void:
 	close.size = Vector2(26.0, 22.0)
 	close.position = Vector2(inner_w - 32.0, 6.0)
 	close.add_theme_font_size_override("font_size", 12)
-	close.pressed.connect(func(): closed.emit(); queue_free())
+	close.pressed.connect(_on_close_pressed)
+	_close_btn = close
 	bar.add_child(close)
 
 	bar.gui_input.connect(_on_bar_input)
@@ -103,6 +109,34 @@ func set_title(t: String) -> void:
 	title = t
 	if _title_label != null:
 		_title_label.text = t
+
+
+func enable_case_controls() -> void:
+	enable_controls("收起：缩成桌面右下角的案件卡片（进度会保存）",
+		"关闭：放进左侧「案件地图」图标（进度会保存）")
+
+
+func enable_controls(min_tip: String, close_tip: String = "") -> void:
+	_manual_close = true
+	if _close_btn == null:
+		return
+	var bar := _close_btn.get_parent()
+	var min_btn := TecTheme.button("–")
+	min_btn.name = "min"
+	min_btn.size = Vector2(26.0, 22.0)
+	min_btn.position = Vector2(_inner_w - 60.0, 6.0)
+	min_btn.add_theme_font_size_override("font_size", 12)
+	min_btn.tooltip_text = min_tip
+	_close_btn.tooltip_text = close_tip
+	min_btn.pressed.connect(func(): minimized.emit())
+	bar.add_child(min_btn)
+	_title_label.size = Vector2(_inner_w - 92.0, 22.0)
+
+
+func _on_close_pressed() -> void:
+	closed.emit()
+	if not _manual_close:
+		queue_free()
 
 
 func _on_bar_input(event: InputEvent) -> void:

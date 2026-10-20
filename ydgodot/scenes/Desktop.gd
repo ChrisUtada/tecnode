@@ -21,6 +21,11 @@ var _toast_label: Label
 var _toast_timer: SceneTreeTimer
 var _case_win: SysWindow
 var _tec: TecWindow
+var _tec_chip: TecChip
+var _tec_btn: Button
+var _tec_min := false
+var _tec_dot := false
+var _tec_before: Dictionary = {}
 var _narr: NarrCard
 var _ending: EndingOverlay
 var _cards: Dictionary = {}          # key -> NodeCard
@@ -41,20 +46,39 @@ var _inv_path := Investigator.PATH
 var _intro: IntroWin = null
 var _inv_chip: Button = null
 var _cert_win: SysWindow = null
+var _catalog: CaseCatalog = null
+var _active_case := CaseCatalog.DEFAULT_ID
+var _progress_path := CaseCatalog.PROGRESS_PATH
+var _progress_read_only := false
+var _case_open := true
+var _case_held := false
+var _case_docked := false
+var _map_win: CaseMapWin = null
+var _map_btn: Button = null
+var _map_badge: PanelContainer = null
+var _dock_card: Button = null
+var _dock_code: Label = null
+var _dock_title: Label = null
+var _dock_sub: Label = null
 
 
 func _ready() -> void:
 	theme = TecTheme.build()
-	case_def = CaseLoader.new()
+	_progress_path = "user://shot_progress.json" if _shot_mode() else CaseCatalog.PROGRESS_PATH
+	_progress_read_only = DisplayServer.get_name() == "headless" and not _shot_mode()
+	_catalog = CaseCatalog.new(_progress_path)
+	case_def = CaseLoader.new(CaseCatalog.path_of(_active_case))
 	if not case_def.load_case():
 		push_error("案件数据装载失败：" + case_def.load_error)
 		return
-	_save_enabled = not _has_arg("--shot") and DisplayServer.get_name() != "headless"
+	_save_enabled = not _shot_mode() and DisplayServer.get_name() != "headless"
 	_investigator = Investigator.load_from(_inv_path)
 	graph = GraphState.new(case_def)
 	combos = ComboSystem.new(case_def, graph)
 	_cmds = CommandSystem.new(case_def, graph)
 	_build_ui()
+	_update_case_chrome()
+	_update_case_park_ui()
 	_refresh_chip()
 	if _resume_allowed() and _resume_from_save():
 		_show_toast("已继续上次进度")
@@ -62,7 +86,9 @@ func _ready() -> void:
 		_start_slice()
 	if _intro_allowed() and _investigator.is_empty():
 		_open_intro()
-	if _has_arg("--shot"):
+	if _has_arg("--shot-p2"):
+		_shot_p2_flow.call_deferred()
+	elif _has_arg("--shot"):
 		if _has_arg("--shot-intro"):
 			_shot_intro_flow.call_deferred()
 		else:
@@ -78,6 +104,10 @@ func _notification(what: int) -> void:
 ## 命令行参数（`--` 之后的用户参数）
 func _has_arg(flag: String) -> bool:
 	return OS.get_cmdline_user_args().has(flag) or OS.get_cmdline_args().has(flag)
+
+
+func _shot_mode() -> bool:
+	return _has_arg("--shot") or _has_arg("--shot-p2")
 
 
 # ── 界面搭建 ────────────────────────────────────────────────────────────
@@ -107,13 +137,20 @@ func _build_ui() -> void:
 
 	_build_case_window()
 	_build_icons()
+	_build_case_park()
+	_build_tec_chip()
 
 	_tec = TecWindow.new()
 	_tec.name = "tec_win"
 	_tec.setup_tec()
-	_tec.position = Vector2(845, HEADER_H + 146)
+	_tec.position = Vector2(906, 264)
 	_tec.visible = false
+	_tec.closed.connect(_close_tec)
+	_tec.minimized.connect(_minimize_tec)
+	_tec.analysis_started.connect(_on_tec_analysis_started)
+	_tec.analysis_progress.connect(_on_tec_analysis_progress)
 	_tec.analysis_done.connect(_on_tec_analysis_done)
+	_tec.talk_requested.connect(_tec_talk)
 	_desk.add_child(_tec)
 
 	_narr = NarrCard.new()
@@ -155,7 +192,7 @@ func _build_header() -> void:
 	sub.size = Vector2(140, 28)
 	head.add_child(sub)
 
-	_crumb = TecTheme.label("案件 A-001", TecTheme.FS_BODY, TecTheme.LINE2)
+	_crumb = TecTheme.label(_case_label(), TecTheme.FS_BODY, TecTheme.LINE2)
 	_crumb.name = "crumb"
 	_crumb.position = Vector2(258, 12)
 	_crumb.size = Vector2(430, 28)
@@ -208,9 +245,12 @@ func _build_header() -> void:
 func _build_case_window() -> void:
 	_case_win = SysWindow.new()
 	_case_win.name = "case_win"
-	_case_win.setup("案件 A-001 // 植物学家的花园", 900, 596)
+	_case_win.setup(_case_window_title(), 900, 596)
 	_case_win.position = Vector2(150, 24)
 	_case_win.body.clip_contents = true
+	_case_win.enable_case_controls()
+	_case_win.closed.connect(func(): _park_case("icon"))
+	_case_win.minimized.connect(func(): _park_case("dock"))
 	_desk.add_child(_case_win)
 
 	_stage = Control.new()
@@ -245,11 +285,13 @@ func _build_icons() -> void:
 	col.position = Vector2(22, 30)
 	col.add_theme_constant_override("separation", 10)
 	_desk.add_child(col)
-	for pair in [["TEC", "tec"], ["证物袋", "bag"], ["线索册", "clue"], ["推演桌布", "infer"], ["档案袋", "goto"]]:
+	for pair in [["TEC", "tec"], ["证物袋", "bag"], ["线索册", "clue"], ["推演桌布", "infer"],
+			["档案袋", "goto"], ["案件地图", "map"]]:
 		var b := TecTheme.button(String(pair[0]))
 		b.custom_minimum_size = Vector2(96, 40)
 		b.name = "icon_" + String(pair[1])
 		if String(pair[1]) == "tec":
+			_tec_btn = b
 			b.pressed.connect(_toggle_tec)
 		elif String(pair[1]) == "bag":
 			b.pressed.connect(func(): _toggle_storage(GraphState.BAG))
@@ -257,9 +299,105 @@ func _build_icons() -> void:
 			b.pressed.connect(func(): _toggle_storage(GraphState.LEDGER))
 		elif String(pair[1]) == "infer":
 			b.pressed.connect(_toggle_matrix)
+		elif String(pair[1]) == "map":
+			_map_btn = b
+			b.pressed.connect(_toggle_case_map)
 		else:
-			b.pressed.connect(func(): _show_toast("这个东西还没搬过来（P1 再做）"))
+			b.pressed.connect(func(): _show_toast("这个东西还没搬过来（P2 再做）"))
 		col.add_child(b)
+	_build_map_badge()
+
+
+func _build_map_badge() -> void:
+	if _map_btn == null:
+		return
+	_map_badge = PanelContainer.new()
+	_map_badge.name = "map_badge"
+	_map_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := TecTheme.flat(TecTheme.LINE, 6, TecTheme.LINE)
+	sb.content_margin_left = 5
+	sb.content_margin_right = 5
+	sb.content_margin_top = 1
+	sb.content_margin_bottom = 1
+	_map_badge.add_theme_stylebox_override("panel", sb)
+	var l := TecTheme.label("已关闭", 9, TecTheme.CARD)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map_badge.add_child(l)
+	_map_badge.position = Vector2(58, -5)
+	_map_badge.visible = false
+	_map_btn.add_child(_map_badge)
+
+
+func _build_case_park() -> void:
+	_dock_card = Button.new()
+	_dock_card.name = "case_dock"
+	_dock_card.size = Vector2(170, 56)
+	_dock_card.position = Vector2(1094, 678)
+	_dock_card.focus_mode = Control.FOCUS_NONE
+	var normal := TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN)
+	normal.shadow_color = Color(0.306, 0.282, 0.212, 0.24)
+	normal.shadow_size = 8
+	normal.shadow_offset = Vector2(3, 5)
+	_dock_card.add_theme_stylebox_override("normal", normal)
+	_dock_card.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_WIN))
+	_dock_card.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, TecTheme.R_WIN))
+	_dock_card.pressed.connect(_reopen_case)
+	_dock_card.visible = false
+	_desk.add_child(_dock_card)
+
+	var row := HBoxContainer.new()
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 8
+	row.offset_top = 8
+	row.offset_right = -9
+	row.offset_bottom = -8
+	row.add_theme_constant_override("separation", 9)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_dock_card.add_child(row)
+
+	var glyph_box := PanelContainer.new()
+	glyph_box.custom_minimum_size = Vector2(32, 32)
+	glyph_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	glyph_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glyph_box.add_theme_stylebox_override("panel",
+		TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.EDGE))
+	row.add_child(glyph_box)
+	var glyph := TecTheme.label("▣", 15, TecTheme.MUTED)
+	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glyph_box.add_child(glyph)
+
+	var meta := VBoxContainer.new()
+	meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meta.alignment = BoxContainer.ALIGNMENT_CENTER
+	meta.add_theme_constant_override("separation", 1)
+	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(meta)
+
+	_dock_code = TecTheme.label("", 9, TecTheme.MUTED)
+	_dock_code.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meta.add_child(_dock_code)
+	_dock_title = TecTheme.label("", 11, TecTheme.TEXT)
+	_dock_title.clip_text = true
+	_dock_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_dock_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meta.add_child(_dock_title)
+	_dock_sub = TecTheme.label("进度已保存 · 点此展开", 9, TecTheme.FAINT)
+	_dock_sub.clip_text = true
+	_dock_sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_dock_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meta.add_child(_dock_sub)
+
+
+func _build_tec_chip() -> void:
+	_tec_chip = TecChip.new()
+	_tec_chip.setup_chip()
+	_tec_chip.position = Vector2(1068, 608)
+	_tec_chip.visible = false
+	_tec_chip.pressed.connect(_open_tec)
+	_desk.add_child(_tec_chip)
 
 
 func _build_toast() -> void:
@@ -289,6 +427,148 @@ func _case_id() -> String:
 	return case_def.case_def.id if case_def != null and case_def.case_def != null else ""
 
 
+func _case_label() -> String:
+	return "案件 " + CaseCatalog.code_of(_active_case).trim_prefix("CASE ")
+
+
+func _case_title() -> String:
+	if case_def != null and case_def.case_def != null and case_def.case_def.title != "":
+		return case_def.case_def.title
+	return CaseCatalog.title_of(_active_case)
+
+
+func _case_window_title() -> String:
+	return CaseCatalog.code_of(_active_case) + " // " + _case_title()
+
+
+func _update_case_chrome() -> void:
+	if _case_win != null:
+		_case_win.set_title(_case_window_title())
+	if _crumb != null and (graph == null or graph.last_scene == ""):
+		_crumb.text = _case_label()
+
+
+func _require_case() -> bool:
+	if _case_open:
+		return true
+	_show_toast("当前不在案件中，请先展开案件地图图标或右下角案件卡片", true)
+	return false
+
+
+func _toggle_case_map() -> void:
+	if _map_win != null and is_instance_valid(_map_win):
+		_map_win.queue_free()
+		_map_win = null
+		return
+	var w := CaseMapWin.new()
+	w.name = "case_map"
+	w.setup_map(_catalog, _active_case, _case_open)
+	w.position = Vector2(420, 72)
+	w.enter_requested.connect(_on_case_map_enter)
+	w.closed.connect(func(): _map_win = null)
+	_desk.add_child(w)
+	w.move_to_front()
+	_map_win = w
+
+
+func _on_case_map_enter(id: String) -> void:
+	if _map_win != null and is_instance_valid(_map_win):
+		_map_win.queue_free()
+		_map_win = null
+	_enter_case(id)
+
+
+func _enter_case(id: String) -> bool:
+	if not CaseCatalog.exists(id):
+		_show_toast("没有这个案件地址", true)
+		return false
+	if not _catalog.is_unlocked(id):
+		_show_toast("该案件地址尚未解密", true)
+		return false
+	if id == _active_case:
+		if not _case_open:
+			_reopen_case()
+		return true
+	if not CaseCatalog.data_ready(id):
+		_show_toast("案件 " + CaseCatalog.code_of(id) + " 的数据尚未装载", true)
+		return false
+	_autosave()
+	var loader := CaseLoader.new(CaseCatalog.path_of(id))
+	if not loader.load_case():
+		_show_toast("案件装载失败：" + loader.load_error, true)
+		return false
+	_active_case = id
+	case_def = loader
+	_catalog.last = id
+	if not _progress_read_only:
+		_catalog.save_progress()
+	_case_open = true
+	_case_held = false
+	_case_docked = false
+	_case_win.visible = true
+	if _resume_allowed() and _resume_from_save():
+		_show_toast("已加载上次进度")
+	else:
+		_start_slice()
+	_update_case_chrome()
+	_update_case_park_ui()
+	return true
+
+
+func _park_case(where: String) -> bool:
+	if not _case_open:
+		return false
+	_autosave()
+	_close_case_transients()
+	_case_open = false
+	_case_win.visible = false
+	_case_held = where != "dock"
+	_case_docked = where == "dock"
+	_update_case_park_ui()
+	return true
+
+
+func _reopen_case() -> void:
+	if _case_win == null:
+		return
+	_case_open = true
+	_case_held = false
+	_case_docked = false
+	_case_win.visible = true
+	_case_win.move_to_front()
+	if _tec != null and _tec.visible:
+		_tec.move_to_front()
+	_update_case_park_ui()
+
+
+func _close_case_transients() -> void:
+	if _pw_pop != null and is_instance_valid(_pw_pop):
+		_pw_pop.queue_free()
+	_pw_pop = null
+	_pw_ctx = {}
+	if _narr != null and is_instance_valid(_narr):
+		_narr.queue_free()
+	_narr = null
+	_hide_tec()
+	_selected = ""
+	if graph != null:
+		graph.selected = ""
+
+
+func _update_case_park_ui() -> void:
+	if _dock_card != null:
+		_dock_code.text = CaseCatalog.code_of(_active_case)
+		_dock_title.text = _case_title()
+		_dock_sub.text = "进度已保存 · 点此展开"
+		_dock_card.visible = _case_docked
+		if _case_docked:
+			_dock_card.move_to_front()
+	if _map_badge != null:
+		_map_badge.visible = _case_held
+	if _map_win != null and is_instance_valid(_map_win):
+		_map_win.set_case_state(_active_case, _case_open)
+
+
 func _resume_allowed() -> bool:
 	if not _save_enabled or _has_arg("--fresh"):
 		return false
@@ -312,9 +592,7 @@ func _new_runtime() -> void:
 	_storage_before = {}
 	if _ending != null:
 		_ending.visible = false
-	if _tec != null:
-		_tec.cancel_analysis()
-		_tec.visible = false
+	_hide_tec(true)
 	if _pw_pop != null and is_instance_valid(_pw_pop):
 		_pw_pop.queue_free()
 	_pw_pop = null
@@ -331,9 +609,14 @@ func _new_runtime() -> void:
 	if _ledger_win != null and is_instance_valid(_ledger_win):
 		_ledger_win.queue_free()
 	_ledger_win = null
+	if _map_win != null and is_instance_valid(_map_win):
+		_map_win.queue_free()
+	_map_win = null
 
 
 func _reset_case() -> void:
+	if not _require_case():
+		return
 	if _save != null:
 		_save.clear_save()
 	_start_slice()
@@ -346,7 +629,20 @@ func _resume_from_save() -> bool:
 		_save.clear_history()
 		return false
 	_rebuild_from_graph()
+	_sync_case_progress_from_graph()
 	return true
+
+
+func _sync_case_progress_from_graph() -> void:
+	if graph == null or case_def == null or _progress_read_only:
+		return
+	for e in case_def.endings:
+		if e == null or not e.is_true_capture or not graph.endings.has(e.id):
+			continue
+		_catalog.mark_completed(_active_case)
+		_catalog.unlock_next(_active_case)
+		_update_case_park_ui()
+		return
 
 
 func _start_slice() -> void:
@@ -367,7 +663,7 @@ func _start_slice() -> void:
 	_spawn_card(torch["key"])
 	_flash_supply_note = false
 
-	_set_crumb("案件 A-001 // " + case_def.scene_title(sid))
+	_set_crumb(_case_label() + " // " + case_def.scene_title(sid))
 	_show_toast("把「%s」拖到「手电筒」上试试" % case_def.scene_title(sid))
 	_relayout()
 
@@ -375,8 +671,6 @@ func _start_slice() -> void:
 func _set_crumb(text: String) -> void:
 	if _crumb != null:
 		_crumb.text = text
-	if _case_win != null:
-		_case_win.set_title(text)
 
 
 # ── 调查员 / 开场适性测试 ───────────────────────────────────────────────
@@ -384,7 +678,7 @@ func _set_crumb(text: String) -> void:
 func _intro_allowed() -> bool:
 	if DisplayServer.get_name() == "headless":
 		return false
-	return not _has_arg("--shot") and not _has_arg("--no-intro")
+	return not _shot_mode() and not _has_arg("--no-intro")
 
 
 func _refresh_chip() -> void:
@@ -560,6 +854,8 @@ func dbg_use_temp_save(p_path: String) -> void:
 
 
 func _undo() -> bool:
+	if not _require_case():
+		return false
 	if _save == null or not _save.can_undo():
 		_show_toast("没有可撤销的操作", true)
 		return false
@@ -592,14 +888,15 @@ func _rebuild_from_graph() -> void:
 	_ending.visible = false
 	if _tec != null:
 		_tec.cancel_analysis()
-		_tec.set_meta("selected_scene", "")
+		_sync_tec_chip()
 	for key in graph.nodes.keys():
 		_spawn_card(String(key))
 	_apply_hidden()
 	_refresh_matrix_views()
 	_last_ending_id = String(graph.endings.keys()[0]) if not graph.endings.is_empty() else ""
 	var sid := graph.last_scene
-	_set_crumb("案件 A-001 // " + case_def.scene_title(sid) if sid != "" else "案件 A-001")
+	_set_crumb(_case_label() + " // " + case_def.scene_title(sid) if sid != "" else _case_label())
+	_update_case_chrome()
 
 
 # ── 卡片 ────────────────────────────────────────────────────────────────
@@ -629,10 +926,6 @@ func _spawn_card(key: String) -> NodeCard:
 func _on_card_selected(key: String) -> void:
 	_selected = key
 	graph.selected = key
-	if _tec != null:
-		var n := graph.node(key)
-		if n.get("kind", "") == "loc":
-			_tec.set_meta("selected_scene", String(n["id"]))
 
 
 func _on_card_dragged(key: String) -> void:
@@ -642,10 +935,12 @@ func _on_card_dragged(key: String) -> void:
 
 ## 拖到推演桌布窗口上 = 归位（Web 版 overMatrixDrop 的画布侧入口）
 func _on_card_drag_released(key: String, at_global: Vector2) -> void:
-	if _matrix_win == null or not is_instance_valid(_matrix_win):
-		return
-	if _matrix_win.board_global_rect().has_point(at_global):
+	if _matrix_win != null and is_instance_valid(_matrix_win) \
+		and _matrix_win.board_global_rect().has_point(at_global):
 		_assign_to_matrix(key)
+		return
+	if _tec_drop_hit(at_global):
+		_start_tec_analysis(key)
 
 
 func _on_card_activated(key: String) -> void:
@@ -688,7 +983,7 @@ func _toggle_container(kind: String, id: String) -> void:
 	_relayout()
 	if kind == "loc":
 		_show_narr(id)
-		_set_crumb("案件 A-001 // " + case_def.scene_title(id))
+		_set_crumb(_case_label() + " // " + case_def.scene_title(id))
 	else:
 		_show_toast("展开了「%s」" % case_def.label_of(kind, id))
 	_commit(before)
@@ -726,13 +1021,15 @@ func _apply_outcome(res: Dictionary, node_key: String) -> void:
 		if flavor != "":
 			_show_toast(flavor)
 	if res.has("next_scene") and String(res.get("next_scene", "")) != "":
-		_set_crumb("案件 A-001 // " + case_def.scene_title(String(res["next_scene"])))
+		_set_crumb(_case_label() + " // " + case_def.scene_title(String(res["next_scene"])))
 	_relayout()
 
 
 # ── 收纳窗（证物袋 / 线索册）────────────────────────────────────────────
 
 func _toggle_storage(kind: String) -> void:
+	if not _require_case():
+		return
 	if kind == GraphState.BAG:
 		if _bag_win != null and is_instance_valid(_bag_win):
 			_bag_win.queue_free()
@@ -785,6 +1082,8 @@ func _on_storage_took(key: String) -> void:
 # ── 推演桌布（五感槽位 / 归位 / 长按推演）──────────────────────────────
 
 func _toggle_matrix() -> void:
+	if not _require_case():
+		return
 	if _matrix_win != null and is_instance_valid(_matrix_win):
 		_matrix_win.queue_free()
 		_matrix_win = null
@@ -875,6 +1174,10 @@ func _run_inference() -> void:
 	var before := _save.snapshot()
 	graph.mark_ending(hit.id)
 	_last_ending_id = hit.id
+	if hit.is_true_capture and not _progress_read_only:
+		_catalog.mark_completed(_active_case)
+		_catalog.unlock_next(_active_case)
+		_update_case_park_ui()
 	if _matrix_win != null and is_instance_valid(_matrix_win):
 		_matrix_win.play_shock()
 	_ending.play(hit)
@@ -997,7 +1300,7 @@ func _expand_scene(sid: String, show_narr: bool) -> void:
 	_relayout()
 	if show_narr:
 		_show_narr(sid)
-	_set_crumb("案件 A-001 // " + case_def.scene_title(sid))
+	_set_crumb(_case_label() + " // " + case_def.scene_title(sid))
 
 
 func _show_narr(sid: String) -> void:
@@ -1049,52 +1352,284 @@ func _relayout() -> void:
 
 # ── TEC ─────────────────────────────────────────────────────────────────
 
-func _toggle_tec() -> void:
-	_tec.visible = not _tec.visible
-	if _tec.visible:
-		_tec.move_to_front()
-		var n := graph.node(_selected)
-		if n.get("kind", "") == "loc":
-			_tec.set_meta("selected_scene", String(n["id"]))
+func _tec_key(target: String) -> String:
+	if target.contains(":"):
+		return target
+	return graph.key_of("loc", target)
 
 
-func _on_tec_analysis_done(scene_id: String) -> void:
-	var before := _save.snapshot()
-	graph.tec_prog[scene_id] = int(graph.tec_prog.get(scene_id, 0)) + 1
-	_capture_hidden_clue(scene_id)
-	_commit(before)
-
-
-## TEC 解读完成后捕获 hiddenClue（场景 / 物品同一套字段；当前先接场景分析链路）
-func _capture_hidden_clue(scene_id: String) -> void:
-	var s := case_def.scene_of(scene_id)
-	if s == null or s.hidden_clue == null:
+func _open_tec() -> void:
+	if not _require_case():
 		return
-	var host := graph.key_of("loc", scene_id)
+	if _tec == null:
+		return
+	_tec.visible = true
+	_tec.move_to_front()
+	_tec_min = false
+	_tec_dot = false
+	if _tec_chip != null:
+		_tec_chip.visible = false
+
+
+func _close_tec() -> void:
+	if _tec == null:
+		return
+	_tec.visible = false
+	_tec_min = false
+	if _tec_chip != null:
+		_tec_chip.visible = false
+
+
+func _minimize_tec() -> void:
+	if _tec == null or not _tec.visible:
+		return
+	_tec.visible = false
+	_tec_min = true
+	_sync_tec_chip()
+
+
+func _hide_tec(reset: bool = false) -> void:
+	if _tec == null:
+		return
+	_tec.cancel_analysis()
+	_tec.visible = false
+	if reset:
+		_tec.reset_tec()
+	_tec_min = false
+	_tec_dot = false
+	_tec_before = {}
+	if _tec_chip != null:
+		_tec_chip.visible = false
+
+
+func _toggle_tec() -> void:
+	if not _require_case():
+		return
+	if _tec.visible:
+		_close_tec()
+	else:
+		_open_tec()
+
+
+func _sync_tec_chip() -> void:
+	if _tec_chip == null:
+		return
+	if not _tec_min:
+		_tec_chip.visible = false
+		return
+	_tec_chip.visible = true
+	_tec_chip.move_to_front()
+	if _tec.is_analyzing():
+		_tec_chip.set_analyzing(_tec.target_label(), _tec.progress())
+	else:
+		_tec_chip.set_idle(_tec_dot)
+
+
+func _tec_drop_hit(at_global: Vector2) -> bool:
+	if _tec_btn != null and _tec_btn.get_global_rect().has_point(at_global):
+		return true
+	if _tec.visible and _tec.avatar_global_rect().has_point(at_global):
+		return true
+	if _tec_chip != null and _tec_chip.visible and _tec_chip.get_global_rect().has_point(at_global):
+		return true
+	return false
+
+
+func _start_tec_analysis(key: String) -> bool:
+	if not _require_case() or _tec == null:
+		return false
+	var n := graph.node(key)
+	if n.is_empty():
+		return false
+	if String(n["kind"]) == "clue":
+		_show_toast("线索节点不需要再让 TEC 分析", true)
+		return false
+	if _tec.is_analyzing():
+		_show_toast("TEC 正在分析中，请稍候…", true)
+		return false
+	if not _tec.visible and not _tec_min:
+		_open_tec()
+	return _tec.analyze(key, String(n.get("label", key)))
+
+
+func _on_tec_analysis_started(_target: String, _label: String) -> void:
+	_tec_before = _save.snapshot() if _save != null else {}
+	_tec_dot = false
+	if _tec_min:
+		_sync_tec_chip()
+
+
+func _on_tec_analysis_progress(ratio: float) -> void:
+	if _tec_min and _tec_chip != null:
+		_tec_chip.set_analyzing(_tec.target_label(), ratio)
+
+
+func _capture_text_clues(text: String, from_key: String = "") -> Array:
 	var got: Array = []
+	for tag in case_def.tags_of(text):
+		if tag["kind"] != "clue":
+			continue
+		var cid := String(tag["id"])
+		if graph.captured.has(cid):
+			continue
+		got.append(graph.capture_clue(cid, from_key))
+	return got
+
+
+func _refresh_clue_keys(keys: Array) -> void:
+	if keys.is_empty():
+		return
+	for key in keys:
+		_refresh_or_spawn_card(String(key))
+	_relayout()
+
+
+func _hidden_clue_of(kind: String, id: String) -> HiddenClueDef:
+	match kind:
+		"loc":
+			var s := case_def.scene_of(id)
+			return s.hidden_clue if s != null else null
+		"item":
+			var it := case_def.item_of(id)
+			return it.hidden_clue if it != null else null
+		"char":
+			var ch := case_def.char_of(id)
+			return ch.hidden_clue if ch != null else null
+	return null
+
+
+func _capture_node_hidden_clues(kind: String, id: String, host_key: String) -> Dictionary:
+	var hc := _hidden_clue_of(kind, id)
+	if hc == null:
+		return {"keys": [], "names": [], "text": ""}
+	var got: Array = []
+	var names: Array = []
 	var seen := {}
-	for clue in s.hidden_clue.clues:
+	for clue in hc.clues:
 		if clue == null or graph.captured.has(clue.id) or seen.has(clue.id):
 			continue
 		seen[clue.id] = true
-		got.append(graph.capture_clue(clue.id, host))
-	for tag in case_def.tags_of(s.hidden_clue.text):
+		got.append(graph.capture_clue(clue.id, host_key))
+		names.append(clue.label)
+	for tag in case_def.tags_of(hc.text):
 		var cid := String(tag["id"])
 		if tag["kind"] != "clue" or graph.captured.has(cid) or seen.has(cid):
 			continue
 		seen[cid] = true
-		got.append(graph.capture_clue(cid, host))
-	if got.is_empty():
+		got.append(graph.capture_clue(cid, host_key))
+		names.append(case_def.label_of("clue", cid))
+	_refresh_clue_keys(got)
+	return {"keys": got, "names": names, "text": case_def.strip_tags(hc.text)}
+
+
+## TEC 解读完成后捕获 hiddenClue（场景 / 物品同一套字段；当前先接场景分析链路）
+func _capture_hidden_clue(scene_id: String) -> void:
+	var host := graph.key_of("loc", scene_id)
+	var res := _capture_node_hidden_clues("loc", scene_id, host)
+	if res["keys"].is_empty():
 		return
-	for key in got:
-		_refresh_or_spawn_card(String(key))
-	_relayout()
-	var names: Array = []
-	for key in got:
-		var n := graph.node(String(key))
-		if not n.is_empty() and not names.has(String(n.get("label", ""))):
-			names.append(String(n.get("label", "")))
-	_show_toast("捕获线索：" + "、".join(names))
+	_show_toast("捕获线索：" + "、".join(res["names"]))
+
+
+func _tec_talk_lines(sid: String) -> Array:
+	var tec := case_def.char_of("CHARS_TEC")
+	if tec == null:
+		return []
+	for st in tec.scene_talks:
+		if st != null and st.scene != null and st.scene.id == sid:
+			return st.lines
+	return []
+
+
+func _tec_reaction(key: String) -> bool:
+	var n := graph.node(key)
+	if n.is_empty() or _tec == null:
+		return false
+	var tec := case_def.char_of("CHARS_TEC")
+	if tec == null:
+		return false
+	var id := String(n["id"])
+	var raw := ""
+	for r in tec.item_reactions:
+		if r != null and ((r.item != null and r.item.id == id) or r.trigger_id == id):
+			raw = r.text
+			break
+	if raw == "":
+		for r in tec.clue_reactions:
+			if r != null and ((r.clue != null and r.clue.id == id) or r.trigger_id == id):
+				raw = r.text
+				break
+	if raw == "":
+		_tec.append_line("关于「%s」，我暂时没有更多线索。试试把它和别的节点组合。" % String(n["label"]))
+		graph.tried[key + ">tec-dock"] = true
+		return false
+	_tec.append_line("（分析 %s）%s" % [String(n["label"]), case_def.strip_tags(raw)])
+	var got := _capture_text_clues(raw)
+	_refresh_clue_keys(got)
+	return true
+
+
+func _tec_talk() -> void:
+	if not _require_case() or _tec == null:
+		return
+	if not _tec.visible:
+		_open_tec()
+	var tec := case_def.char_of("CHARS_TEC")
+	var queue: Array = tec.talk_queue if tec != null else []
+	if queue.is_empty():
+		_tec.append_line("（把节点拖到我身上，我来分析）", TecTheme.MUTED)
+		return
+	var idx := int(graph.tec_prog.get("_def", 0))
+	if idx >= queue.size():
+		return
+	graph.tec_prog["_def"] = idx + 1
+	_tec.append_line(case_def.strip_tags(String(queue[idx])))
+	_autosave()
+
+
+func _on_tec_analysis_done(target: String) -> void:
+	var key := _tec_key(target)
+	var n := graph.node(key)
+	if n.is_empty():
+		_tec_before = {}
+		return
+	var kind := String(n["kind"])
+	var id := String(n["id"])
+	var label := String(n.get("label", id))
+	if kind == "loc":
+		var talks := _tec_talk_lines(id)
+		var prog := int(graph.tec_prog.get(id, 0))
+		var unread := talks.size() - prog
+		var hidden := _capture_node_hidden_clues(kind, id, key)
+		if not (hidden["keys"] as Array).is_empty():
+			_tec.append_line("分析完成：「%s」中提取到线索 —— %s。（已落到画布上，可自由拖动）"
+				% [label, "、".join(hidden["names"])])
+			if String(hidden["text"]) != "":
+				_tec.append_line(String(hidden["text"]))
+			_show_toast("捕获线索：" + "、".join(hidden["names"]))
+		elif unread <= 0:
+			_tec.append_line("分析完成：「%s」中没有可以捕获的线索。" % label)
+		if not talks.is_empty() and unread > 0:
+			var line := String(talks[prog])
+			graph.tec_prog[id] = prog + 1
+			_tec.append_line(case_def.strip_tags(line))
+			_refresh_clue_keys(_capture_text_clues(line))
+		elif not talks.is_empty():
+			_tec.append_line("「%s」的档案已经全部解读完毕。" % label)
+	else:
+		_tec_reaction(key)
+		var ent_hidden := _capture_node_hidden_clues(kind, id, key)
+		if not (ent_hidden["keys"] as Array).is_empty():
+			_tec.append_line("分析完成：「%s」中提取到线索 —— %s。（已落到画布上，可自由拖动）"
+				% [label, "、".join(ent_hidden["names"])])
+			if String(ent_hidden["text"]) != "":
+				_tec.append_line(String(ent_hidden["text"]))
+			_show_toast("捕获线索：" + "、".join(ent_hidden["names"]))
+	if _tec_min:
+		_tec_dot = true
+		_sync_tec_chip()
+	_commit(_tec_before)
+	_tec_before = {}
 
 
 # ── 测试钩子（与 Web 版 window.__* 同名，便于把操作脚本逐行翻译）──────────
@@ -1190,8 +1725,7 @@ func dbg_open_storage(kind: String) -> void:
 
 
 func dbg_tec_analyze(sid: String) -> void:
-	_tec.visible = true
-	_tec.analyze(sid)
+	_start_tec_analysis(_tec_key(sid))
 
 
 func dbg_tec_finish() -> int:
@@ -1201,6 +1735,63 @@ func dbg_tec_finish() -> int:
 func dbg_tec_complete() -> void:
 	if _tec != null:
 		_tec.finish_now()
+
+
+func dbg_tec_open() -> void:
+	_open_tec()
+
+
+func dbg_tec_close() -> void:
+	_close_tec()
+
+
+func dbg_tec_minimize() -> void:
+	_minimize_tec()
+
+
+func dbg_tec_win() -> TecWindow:
+	return _tec
+
+
+func dbg_tec_chip() -> TecChip:
+	return _tec_chip
+
+
+func dbg_tec_talk() -> void:
+	_tec_talk()
+
+
+func dbg_tec_analyze_key(key: String) -> bool:
+	return _start_tec_analysis(key)
+
+
+func dbg_tec_drop_hit(at_global: Vector2) -> bool:
+	return _tec_drop_hit(at_global)
+
+
+func dbg_tec_drop(key: String, at_global: Vector2) -> void:
+	_on_card_drag_released(key, at_global)
+
+
+func dbg_tec_icon_rect() -> Rect2:
+	return _tec_btn.get_global_rect() if _tec_btn != null else Rect2()
+
+
+func dbg_tec_info() -> Dictionary:
+	var win := {}
+	if _tec != null:
+		win = _tec.dbg_status()
+	var chip := {}
+	if _tec_chip != null:
+		chip = _tec_chip.dbg_state()
+	return {
+		"visible": _tec.visible if _tec != null else false,
+		"min": _tec_min,
+		"dot": _tec_dot,
+		"chip_visible": _tec_chip.visible if _tec_chip != null else false,
+		"win": win,
+		"chip": chip,
+	}
 
 
 # ── 推演桌布测试钩子（P1.4）────────────────────────────────────────────
@@ -1239,6 +1830,88 @@ func dbg_ending_id() -> String:
 func dbg_ending_finish() -> void:
 	if _ending != null:
 		_ending.finish_now()
+
+
+func dbg_confirm_ending() -> void:
+	if _ending == null or not _ending.visible:
+		return
+	_ending.visible = false
+	_ending.finished.emit()
+
+
+# ── 案件系统测试钩子（P2.1）────────────────────────────────────────────
+
+func dbg_use_temp_progress(path: String) -> void:
+	_progress_path = path
+	_progress_read_only = false
+	_catalog.clear_progress(path)
+	_catalog = CaseCatalog.new(path)
+	_update_case_park_ui()
+
+
+func dbg_case_info() -> Dictionary:
+	return {
+		"id": _active_case,
+		"open": _case_open,
+		"held": _case_held,
+		"dock": _case_docked,
+		"dock_visible": _dock_card != null and _dock_card.visible,
+		"badge_visible": _map_badge != null and _map_badge.visible,
+		"map_open": _map_win != null and is_instance_valid(_map_win),
+		"title": _case_win.title if _case_win != null else "",
+		"unlocked": _catalog.unlocked.duplicate(),
+		"completed": _catalog.completed.duplicate(),
+		"last": _catalog.last,
+		"progress_path": _progress_path,
+	}
+
+
+func dbg_park_case(where: String) -> bool:
+	return _park_case(where)
+
+
+func dbg_reopen_case() -> void:
+	_reopen_case()
+
+
+func dbg_open_case_map() -> CaseMapWin:
+	if _map_win == null or not is_instance_valid(_map_win):
+		_toggle_case_map()
+	return _map_win
+
+
+func dbg_case_map_win() -> CaseMapWin:
+	return _map_win if _map_win != null and is_instance_valid(_map_win) else null
+
+
+func dbg_case_map_click(id: String) -> bool:
+	var w := dbg_case_map_win()
+	return w.dbg_click(id) if w != null else false
+
+
+func dbg_case_map_state(id: String) -> String:
+	var w := dbg_case_map_win()
+	return w.dbg_row_state(id) if w != null else ""
+
+
+func dbg_enter_case(id: String) -> bool:
+	return _enter_case(id)
+
+
+func dbg_catalog_unlock(id: String) -> bool:
+	var ok := _catalog.unlock(id)
+	_update_case_park_ui()
+	return ok
+
+
+func dbg_catalog() -> CaseCatalog:
+	return _catalog
+
+
+func dbg_catalog_unlock_next(id: String) -> bool:
+	var ok := _catalog.unlock_next(id)
+	_update_case_park_ui()
+	return ok
 
 
 # ── 调查员测试钩子（P1.6）──────────────────────────────────────────────
@@ -1304,7 +1977,7 @@ func _shot_flow() -> void:
 	await _shot("res://docs/p0_3_body.png")
 
 	_toggle_tec()
-	_tec.analyze("SCENES_body")
+	_start_tec_analysis("loc:SCENES_body")
 	await _wait(1.1)                      # 分析进行中（真实 5–8 秒，这里取中段）
 	await _shot("res://docs/p0_4_tec.png")
 	_tec.finish_now()
@@ -1411,6 +2084,68 @@ func _shot_intro_flow() -> void:
 	quit_app()
 
 
+func _shot_p2_flow() -> void:
+	await _wait(0.5)
+	_catalog.clear_progress(_progress_path)
+	_catalog = CaseCatalog.new(_progress_path)
+	_update_case_park_ui()
+
+	dbg_open_case_map()
+	await _wait(0.35)
+	await _shot("res://docs/p2_1_case_map.png")
+	if _map_win != null and is_instance_valid(_map_win):
+		_map_win.queue_free()
+	_map_win = null
+
+	dbg_park_case("dock")
+	await _wait(0.35)
+	await _shot("res://docs/p2_2_case_dock.png")
+
+	dbg_reopen_case()
+	await _wait(0.25)
+	dbg_park_case("icon")
+	await _wait(0.35)
+	await _shot("res://docs/p2_3_case_closed.png")
+
+	dbg_catalog_unlock("A002")
+	dbg_open_case_map()
+	await _wait(0.35)
+	await _shot("res://docs/p2_4_case_unlocked.png")
+	if _map_win != null and is_instance_valid(_map_win):
+		_map_win.queue_free()
+	_map_win = null
+
+	_reopen_case()
+	_start_slice()
+	await _wait(0.3)
+	_expand_scene("SCENES_body", false)
+	_open_tec()
+	_tec_talk()
+	_tec_talk()
+	_hide_toast()
+	await _wait(0.35)
+	await _shot("res://docs/p2_5_tec_chat.png")
+
+	_start_tec_analysis("loc:SCENES_body")
+	await _wait(2.5)
+	await _shot("res://docs/p2_6_tec_analysis.png")
+
+	_minimize_tec()
+	await _wait(0.35)
+	await _shot("res://docs/p2_7_tec_chip.png")
+
+	_tec.finish_now()
+	await _wait(0.3)
+	_hide_toast()
+	await _wait(0.2)
+	await _shot("res://docs/p2_8_tec_chip_done.png")
+
+	_open_tec()
+	await _wait(0.35)
+	await _shot("res://docs/p2_9_tec_archive.png")
+	quit_app()
+
+
 func _ensure_card(kind: String, id: String) -> void:
 	var n := graph.add_node(kind, id)
 	_spawn_card(String(n["key"]))
@@ -1418,4 +2153,6 @@ func _ensure_card(kind: String, id: String) -> void:
 
 
 func quit_app() -> void:
+	if _shot_mode() and FileAccess.file_exists(_progress_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_progress_path))
 	get_tree().quit()

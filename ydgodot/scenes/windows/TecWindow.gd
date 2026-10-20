@@ -1,18 +1,19 @@
 class_name TecWindow
 extends SysWindow
-## TEC 助手窗（P0 只做「分析一处场景」这一件事）
-##
-## 对齐 Web 版：分析耗时 5–8 秒（`TEC_ANALYZE_MIN/MAX`），进度条推进，结束后吐一条解读。
-## **测试旁路**：命令行带 `--fast` 时耗时压到 0.05 秒（计划 §四.3 的无头要求）。
 
-signal analysis_done(scene_id: String)
+signal analysis_started(target: String, label: String)
+signal analysis_progress(ratio: float)
+signal analysis_done(target: String)
+signal talk_requested
 
 const MIN_SEC := 5.0
 const MAX_SEC := 8.0
 
-var _log: VBoxContainer
+var _scroll: ScrollContainer
+var _lines: VBoxContainer
+var _analysis: PanelContainer
+var _analysis_label: Label
 var _bar: ProgressBar
-var _btn: Button
 var _avatar: TextureRect
 var _hint: Label
 
@@ -20,44 +21,103 @@ var _analyzing := false
 var _elapsed := 0.0
 var _duration := 0.0
 var _target: String = ""
+var _target_label: String = ""
 var _fast := false
 var _done_count := 0
+var _line_count := 0
 
 
 func setup_tec() -> void:
 	_fast = OS.get_cmdline_args().has("--fast") or OS.get_cmdline_user_args().has("--fast")
-	setup("TEC // 助手", 360, 420)
+	setup("TEC // 对话", 332, 360)
+	enable_controls("收起：缩成桌面右下角的助手卡片", "关闭：收起对话窗（内容保留）")
 	_build_content()
 
 
 func _build_content() -> void:
-	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 8)
-	content.add_child(head)
+	content.add_theme_constant_override("separation", 0)
+	var row := HBoxContainer.new()
+	row.name = "tec_body"
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 10)
+	content.add_child(row)
+
+	var av_col := VBoxContainer.new()
+	av_col.custom_minimum_size = Vector2(74, 0)
+	av_col.alignment = BoxContainer.ALIGNMENT_BEGIN
+	av_col.add_theme_constant_override("separation", 5)
+	row.add_child(av_col)
+
+	var av_box := PanelContainer.new()
+	av_box.custom_minimum_size = Vector2(60, 60)
+	av_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	av_box.clip_contents = true
+	av_box.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.FACE_HI, 12, TecTheme.EDGE))
+	av_col.add_child(av_box)
 
 	_avatar = TextureRect.new()
+	_avatar.name = "tec_avatar"
 	_avatar.texture = load("res://assets/raw/tec-avatar.png")
-	_avatar.custom_minimum_size = Vector2(48, 48)
+	_avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	head.add_child(_avatar)
+	_avatar.custom_minimum_size = Vector2(60, 60)
+	_avatar.mouse_filter = Control.MOUSE_FILTER_STOP
+	_avatar.tooltip_text = "TEC 助手：拖节点到我身上分析，点对话窗任意位置闲聊"
+	_avatar.gui_input.connect(_on_talk_input)
+	av_box.add_child(_avatar)
 
-	var col := VBoxContainer.new()
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_theme_constant_override("separation", 2)
-	head.add_child(col)
-	col.add_child(TecTheme.label("TEC", 13, TecTheme.TEXT))
-	_hint = TecTheme.label("把展开过的场景拖到我这里，我替您看看。", 11, TecTheme.FAINT)
-	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(_hint)
+	var av_label := TecTheme.label("TEC", 10, TecTheme.MUTED)
+	av_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	av_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	av_col.add_child(av_label)
 
-	_log = VBoxContainer.new()
-	_log.name = "tec_log"
-	_log.add_theme_constant_override("separation", 8)
-	_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_log.custom_minimum_size = Vector2(0, 200)
-	content.add_child(_log)
-	append_line("您好，我是 TEC。有任何想不通的地方，都可以交给我。", TecTheme.MUTED)
+	var main := VBoxContainer.new()
+	main.name = "tec_main"
+	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main.mouse_filter = Control.MOUSE_FILTER_PASS
+	main.add_theme_constant_override("separation", 6)
+	row.add_child(main)
+
+	_scroll = ScrollContainer.new()
+	_scroll.name = "tec_scroll"
+	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	_scroll.gui_input.connect(_on_talk_input)
+	main.add_child(_scroll)
+
+	_lines = VBoxContainer.new()
+	_lines.name = "tec_lines"
+	_lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lines.add_theme_constant_override("separation", 0)
+	_lines.mouse_filter = Control.MOUSE_FILTER_PASS
+	_scroll.add_child(_lines)
+
+	_analysis = PanelContainer.new()
+	_analysis.name = "tec_analyzing"
+	_analysis.visible = false
+	_analysis.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var box := TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.EDGE_SOFT)
+	box.content_margin_left = 9
+	box.content_margin_right = 9
+	box.content_margin_top = 7
+	box.content_margin_bottom = 7
+	_analysis.add_theme_stylebox_override("panel", box)
+	main.add_child(_analysis)
+
+	var acol := VBoxContainer.new()
+	acol.add_theme_constant_override("separation", 6)
+	acol.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_analysis.add_child(acol)
+
+	_analysis_label = TecTheme.label("", 11, TecTheme.MUTED)
+	_analysis_label.name = "tec_analysis_label"
+	_analysis_label.clip_text = true
+	_analysis_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_analysis_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	acol.add_child(_analysis_label)
 
 	_bar = ProgressBar.new()
 	_bar.name = "tec_bar"
@@ -65,94 +125,171 @@ func _build_content() -> void:
 	_bar.max_value = 100
 	_bar.value = 0
 	_bar.show_percentage = false
-	_bar.custom_minimum_size = Vector2(0, 10)
-	_bar.add_theme_stylebox_override("background", TecTheme.flat(TecTheme.BG, 4, TecTheme.EDGE_SOFT, 1))
-	_bar.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 4, TecTheme.LINE, 1))
-	_bar.visible = false
-	content.add_child(_bar)
+	_bar.custom_minimum_size = Vector2(0, 6)
+	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := TecTheme.flat(TecTheme.FACE_LO, 4, TecTheme.FACE_LO, 0)
+	var fill := TecTheme.flat(TecTheme.LINE, 4, TecTheme.LINE, 0)
+	_bar.add_theme_stylebox_override("background", bg)
+	_bar.add_theme_stylebox_override("fill", fill)
+	acol.add_child(_bar)
 
-	_btn = TecTheme.button("分析选中的场景")
-	_btn.name = "tec_analyze_btn"
-	_btn.pressed.connect(func(): _on_analyze_pressed())
-	content.add_child(_btn)
+	_hint = TecTheme.label("拖节点到我身上分析 · 点框内任意位置闲聊", 10, TecTheme.FAINT)
+	_hint.name = "tec_hint"
+	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main.add_child(_hint)
+
+
+func _gui_input(event: InputEvent) -> void:
+	_on_talk_input(event)
+
+
+func _on_talk_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		talk_requested.emit()
 
 
 func append_line(text: String, color: Color = TecTheme.TEXT) -> void:
-	var l := TecTheme.label(text, 13, color)
+	if text == "":
+		return
+	var l := TecTheme.label(text, 12, color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_log.add_child(l)
-	_log.queue_sort()
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_lines.add_child(l)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 6)
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_lines.add_child(gap)
+	var sep := ColorRect.new()
+	sep.color = TecTheme.EDGE_SOFT
+	sep.custom_minimum_size = Vector2(0, 1)
+	sep.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_lines.add_child(sep)
+	_line_count += 1
+	_scroll_to_bottom()
+
+
+func _scroll_to_bottom() -> void:
+	if _scroll != null:
+		_scroll.set_deferred("scroll_vertical", 1_000_000)
 
 
 func is_analyzing() -> bool:
 	return _analyzing
 
 
-func analyze(scene_id: String) -> void:
+func analyze(target: String, label: String = "") -> bool:
 	if _analyzing:
-		return
-	if scene_id == "":
+		return false
+	if target == "":
 		append_line("先选一处展开过的场景，我才有东西可看。", TecTheme.MUTED)
-		return
-	_target = scene_id
+		return false
+	_target = target
+	_target_label = label if label != "" else target
 	_analyzing = true
 	_elapsed = 0.0
 	_duration = 0.05 if _fast else randf_range(MIN_SEC, MAX_SEC)
 	_bar.value = 0
-	_bar.visible = true
-	_btn.disabled = true
-	_hint.text = "正在分析……"
+	_analysis_label.text = "分析中 · " + _target_label
+	_analysis.visible = true
+	analysis_started.emit(_target, _target_label)
+	append_line("（接收「%s」，开始分析…）" % _target_label)
 	set_process(true)
-
-
-func _on_analyze_pressed() -> void:
-	var sel_scene: String = get_meta("selected_scene", "")
-	analyze(sel_scene)
+	return true
 
 
 func _process(delta: float) -> void:
 	if not _analyzing:
 		return
 	_elapsed += delta
-	_bar.value = clampf(_elapsed / maxf(_duration, 0.001) * 100.0, 0.0, 100.0)
+	var ratio := clampf(_elapsed / maxf(_duration, 0.001), 0.0, 1.0)
+	_bar.value = ratio * 100.0
+	analysis_progress.emit(ratio)
 	if _elapsed < _duration:
 		return
+	_finish_analysis()
+
+
+func _finish_analysis() -> void:
 	_analyzing = false
 	set_process(false)
-	_bar.visible = false
-	_btn.disabled = false
-	_hint.text = "还要再看点什么？"
+	_analysis.visible = false
 	_done_count += 1
-	append_line(_line_for(_target), TecTheme.TEXT)
 	analysis_done.emit(_target)
 
 
-func _line_for(scene_id: String) -> String:
-	if scene_id == "SCENES_body":
-		return "尸体的皮肤没有明显外伤，指缝里有细微的植物纤维。死亡时间不长——至少这具身体还「新鲜」。"
-	if scene_id == "SCENES_garden":
-		return "这个花园被人精心改造过：帘幕、光源、通风，都在把这里变成一个不见天日的容器。"
-	return "看过了。这处场景里还有我没想通的东西，先记下来。"
-
-
-## 立刻跳到分析结束（截图 / 测试用；真正的收尾仍走 _process 同一路径）
 func finish_now() -> void:
 	if _analyzing:
 		_elapsed = _duration
 		set_process(true)
 
 
-## 撤销 / 重开时把进行中的分析收掉（已写进日志的结果保留，不回收）
 func cancel_analysis() -> void:
 	if not _analyzing:
 		return
 	_analyzing = false
 	set_process(false)
-	_bar.visible = false
-	_btn.disabled = false
-	_hint.text = "还要再看点什么？"
+	_analysis.visible = false
+
+
+func reset_tec() -> void:
+	cancel_analysis()
+	for c in _lines.get_children():
+		_lines.remove_child(c)
+		c.queue_free()
+	_line_count = 0
+	_done_count = 0
+	_target = ""
+	_target_label = ""
+	_bar.value = 0
 
 
 func done_count() -> int:
 	return _done_count
+
+
+func line_count() -> int:
+	return _line_count
+
+
+func target() -> String:
+	return _target
+
+
+func target_label() -> String:
+	return _target_label
+
+
+func progress() -> float:
+	return _bar.value / 100.0 if _bar != null else 0.0
+
+
+func analysis_visible() -> bool:
+	return _analysis != null and _analysis.visible
+
+
+func avatar_global_rect() -> Rect2:
+	return _avatar.get_global_rect() if _avatar != null else Rect2()
+
+
+func dbg_lines() -> Array:
+	var out: Array = []
+	for c in _lines.get_children():
+		if c is Label:
+			out.append((c as Label).text)
+	return out
+
+
+func dbg_status() -> Dictionary:
+	return {
+		"analyzing": _analyzing,
+		"progress": progress(),
+		"target": _target,
+		"label": _target_label,
+		"lines": _line_count,
+		"done": _done_count,
+		"analysis_visible": analysis_visible(),
+	}

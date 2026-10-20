@@ -1,6 +1,6 @@
 # T.E.C-OS → Godot 4 移植计划
 
-> 状态：计划 v2（P0–P1 完成，P2 起待做） ｜ 目标引擎：Godot 4.x（GDScript，2D） ｜ 目标平台：桌面（Windows 优先）
+> 状态：计划 v2（P0–P1 完成，P2.1 / P2.2 完成，P2.3 起待做） ｜ 目标引擎：Godot 4.x（GDScript，2D） ｜ 目标平台：桌面（Windows 优先）
 > 前置阅读：`README.md`、`EDITOR_PLAN.md` ｜ 迁移基准：`data/case-a001.json`
 > **v2 变更**：内容创作确定迁入 Godot 编辑器，Web 编辑器（editor.html）弃用；数据层从「JSON 不动」改为「JSON → Resource（.tres）一次性迁移」，详见 §一.1 与 §二.5。
 > **迁移根目录（2026-10-20 定）**：`nodes-mvp/ydgodot/` —— **后续迁移的一切内容都放在这里**：Godot 工程（`project.godot` 直接位于 `ydgodot/` 根）、资源、测试、烘焙产物、转换脚本、文档。仓库其余部分（`src/`、`data/`、`index.html` 等 Web 版）在迁移验证通过前保持只读参考、不迁移、不改动。
@@ -172,11 +172,14 @@ ydgodot/                           # ← 迁移根目录（Godot project.godot �
 > - ✅ **P1.5 快照 / 撤销 / 存档**（`core/SaveSystem.gd`）：快照对齐 Web（nodes / edges / explored / captured / tried / talkProg / tecProg / lastScene / collapsed / time / cardSeen / debuted / matrix / endings / garden；节点含位置 / 点亮 / 钉住 / 零件 / 收纳去向），恢复为原地写回；撤销栈上限 60；磁盘存档 `user://tec_case_<id>.save`，有效操作自动写盘、正常启动续档、`重来` 清档；`--shot` 与无头测试不写盘。桌面新增「撤销」按钮，恢复后重建卡片 / 收纳窗 / 桌布。
 > - ✅ **P1.6 开场适性测试 / 调查员证**（`core/Investigator.gd` + `scenes/windows/IntroWin.gd`）：姓名 → 3 道五感题（多数决、平局取先达到）→ 头像 → 调查员证 → 确认领证；证件含 `TEC-XX-0000` 编号 / 签发日期 / 五感主导型与判词 / 像素头像 / 红色核准印章；`user://tec_investigator.json` 独立持久化，正常启动有证跳过开场，页眉证章可回看证件；`--shot` / 无头 / `--no-intro` 不弹。
 > - ✅ **回归 354 项全绿**：`test_p0` 20 · `test_ui` 32 · `test_migration` 14 · `test_commands` 49 · `test_p12` 37 · `test_p14` 56 · `test_p15` 85 · **`test_p16` 61**（本轮新增：五感判定 / 编号 / 证件读写 / 三步 UI / 页眉证章 / 回看 / 重来不清证）。
+> - ✅ **P2.1 案件系统**：`core/CaseCatalog.gd` 案件索引（A001 可玩 / A002 占位，UI id 与数据 id 解耦）+ 独立进度 `user://tec_progress.json`（`unlocked` / `completed` / `last`，损坏容错、未知 id 清洗）；`scenes/windows/CaseMapWin.gd` 案件地图（当前 / 进入 / 锁定 / 待接入 / 可进入）；案件窗 `×` 收进地图图标并打「已关闭」角标、`–` 收进右下角 170×56 案件卡片，两处先存盘、点落点原位展开；TRUE_E 标记完成并解锁 A002（A002 无数据时只提示待接入），旧存档里的 TRUE_E 在续档时补记。
+> - ✅ **P2.2 TEC 生态**：`scenes/windows/TecWindow.gd` 重写（对话历史 / 点窗闲聊 / 5–8 秒分析进度条 / 档案逐条解读）；新增 `scenes/windows/TecChip.gd`（右下角 196×56 助手卡片，分析中显示进度、完成后打未读圆点、点卡片还原）；场景按 `sceneTalks` 读出并捕获台词 / `hiddenClue` 线索，物品 / 人物走 reaction 表，线索节点拒绝、忙碌拒绝；拖放支持 TEC 图标 / 窗口头像 / 助手卡片；`graph.tec_prog` 同时保存档案游标与闲聊游标，随快照持久化；`--shot-p2` 扩到九张（四张案件 + 五张 TEC）。
+> - ✅ **回归 509 项全绿**：`test_p0` 20 · `test_ui` 32 · `test_migration` 14 · `test_commands` 49 · `test_p12` 37 · `test_p14` 56 · `test_p15` 85 · `test_p16` 61 · `test_p21` 71 · **`test_p22` 84**（本轮新增：对话游标 / 收起还原 / 分析进度 / 档案 / 反应表 / 拖放命中 / 撤销 / 重置清理）。
 
 ### P2 · 系统全量（1–2 周）——补齐桌面生态
 
-1. 案件系统：案件地图、收起/关闭两落点、切换与续档、角标体系。
-2. TEC 生态：对话窗、分析进度条、右下角助手卡片、档案解读。
+1. ✅ 案件系统：案件地图、收起/关闭两落点、切换与续档、角标体系（P2.1）。
+2. ✅ TEC 生态：对话窗、分析进度条、右下角助手卡片、档案解读（P2.2）。
 3. 回忆系统：时间轴切档、放映卡、人物登场门控（debut）、回忆小剧场。
 4. 多人对话系统：对话窗、打字机、中途加人等待/续播、独白。
 5. 音乐播放器（唱针装上后解锁）、花园彩蛋（种子/花坛真实时间生长）。
