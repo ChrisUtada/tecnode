@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EndingDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EndingLineDef.gd" id="1_n0nlr"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_64cnu"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_qsan.tres" id="3_n84qj"]
+[ext_resource type="Resource" path="res://cases/a001/clues/DATA_T_sun.tres" id="4_e5sgf"]
+[ext_resource type="Resource" path="res://cases/a001/clues/DATA_V_huij.tres" id="5_2p4yw"]
+[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="6_okevi"]
+
+[resource]
+script = ExtResource("6_okevi")
+id = "END_sun"
+name = "残存之躯"
+recipe = Array[ExtResource("2_64cnu")]([ExtResource("3_n84qj"), ExtResource("4_e5sgf"), ExtResource("5_2p4yw")])
+message = "铁栅栏被打开了，朱穗大口呼吸着，而后快步走向黑色的帘幕，将其缓缓拉开，阳光逐渐膨胀，充满了整个花园。在接触到阳光的一瞬间，朱穗立刻变为了灰烬，而后阳光蔓延至暗室之中，傅柏的身体先是如同土地皲裂一般，接着灰烬如同黑色的液体般涌出身体的裂缝，两人都被阳光焚尽，化为乌有。只有吊在花园中心的陆珩松，孤独着慢慢腐烂……"

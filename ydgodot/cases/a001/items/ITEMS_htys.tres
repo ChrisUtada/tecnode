@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_yjj2q"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_2kj13"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_08y2r"]
+
+[resource]
+script = ExtResource("3_08y2r")
+id = "ITEMS_htys"
+label = "黄铜钥匙"
+desc = "一把黄铜打造的钥匙。匙柄处刻着两个英文字母：JS。"
+can_be_picked = true

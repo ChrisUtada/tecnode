@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_a17re"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_fydja"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_a1h7o"]
+
+[resource]
+script = ExtResource("3_a1h7o")
+id = "ITEMS_tec"
+label = "T.E.C-OS"
+desc = "异动区域调查所使用的系统，完全模拟异动区域现场环境和数据，再小的细节也能被收录其中。T.E.C-OS对于因果的介入究竟到了什么程度？目前不得而知。"

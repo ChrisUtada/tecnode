@@ -61,3 +61,9 @@ node_modules/
 /assets/
 .DS_Store
 Thumbs.db
+
+# ─── Godot 迁移工程（ydgodot/）───────────────────────────────
+# 引擎缓存与导出产物不入库；project.godot / *.tres / *.tscn / *.import 正常入库
+ydgodot/.godot/
+ydgodot/build/
+ydgodot/export/

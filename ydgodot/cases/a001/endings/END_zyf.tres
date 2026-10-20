@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EndingDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EndingLineDef.gd" id="1_e3f2v"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_af8yh"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_yzs.tres" id="3_is8wm"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zs.tres" id="4_hdqbt"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_gcs.tres" id="5_04uu3"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_mgd.tres" id="6_rpk00"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_yjhds.tres" id="7_on0st"]
+[ext_resource type="Resource" path="res://cases/a001/clues/DATA_H_music.tres" id="8_p8eja"]
+[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="9_wyusc"]
+
+[resource]
+script = ExtResource("9_wyusc")
+id = "END_zyf"
+name = "罪与罚"
+recipe = Array[ExtResource("2_af8yh")]([ExtResource("3_is8wm"), ExtResource("4_hdqbt"), ExtResource("5_04uu3"), ExtResource("6_rpk00"), ExtResource("7_on0st"), ExtResource("8_p8eja")])
+message = "洋金花毒素的效果并没有持续很久，朱穗从昏迷中醒来，看到了手持注射器的陆珩松，慌乱之中，朱穗摸到了放在手写资料下的美工刀，将其捅进了陆珩松的下腹部。剧痛加之本就虚弱的身体，陆珩松昏倒在地。朱穗将美工刀藏入木盒之中，设置了一个只有自己知道的密码0321，逃离了花园。苏醒的陆珩松，忍着剧痛和逐渐飘散的意识爬向了绳索，并将自己吊了起来……"

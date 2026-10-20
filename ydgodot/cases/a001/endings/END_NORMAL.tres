@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EndingDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EndingLineDef.gd" id="1_kokb7"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_iruru"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_JS.tres" id="3_p2nc5"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_wmhj.tres" id="4_xmkje"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zhpt.tres" id="5_305p4"]
+[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="6_48l1k"]
+
+[resource]
+script = ExtResource("6_48l1k")
+id = "END_NORMAL"
+name = "重逢之时"
+recipe = Array[ExtResource("2_iruru")]([ExtResource("3_p2nc5"), ExtResource("4_xmkje"), ExtResource("5_305p4")])
+message = "槿杉按照录音的指引，达成了复活陆珩松的所有先决条件，其中最后一块拼图就是对抗呋喃香豆素的抑制素。抑制素的获取是一场毫无人性的折磨，陆珩松不断往自己体内注射呋喃香豆素以形成抗体，而后再抽取血液进行配置，多次实验之后，终于获得成熟的物质。槿杉将其注入已经形成的陆珩松的身体之中，静静等待，直到听见从树丛中传来的鸟鸣，而后逐渐变成低语。树叶被拨开，陆珩松的脚步有些飘忽，但这是再正常不过的现象，那个熟悉的声音越来越清晰：JS。两人再次于花园之中重逢。"

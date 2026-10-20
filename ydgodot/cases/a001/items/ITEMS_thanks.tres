@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_is3w0"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_fximj"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_hwrs1"]
+
+[resource]
+script = ExtResource("3_hwrs1")
+id = "ITEMS_thanks"
+label = "制作信息"
+desc = "<br>TEC行动组<br>制作/编剧：菠萝油多一点<br>网页制作：Trae、菠萝油多一点<br>特别感谢：哄哄、Ann、Kuma、Kalen<br><br>花魄故事的来源：婺源士人谢某，读书张公山。早起，闻树林鸟声啁啾，有似鹦哥。因近视之，乃一美女，长五寸许，赤身无毛，通体洁白如玉，眉目间有愁苦之状。遂携以归，女无惧色。乃畜笼中，以饭喂之。向人絮语，了不可辨。畜数日，为太阳所照，竟成枯腊而死。洪孝廉字麟闻之曰：\"此名花魄，凡树经三次人缢死者，其冤苦之气结成此物，沃以水，犹可活也。\" 试之果然。里人聚观者，如云而至。谢恐招摇，乃仍送之树上。须臾间，一大怪鸟衔之飞去。<br>——《子不语》卷二十四"

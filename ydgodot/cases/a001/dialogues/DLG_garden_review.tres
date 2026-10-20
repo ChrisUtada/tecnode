@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="DialogueDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="1_mln80"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_zs.tres" id="2_40cxa"]
+[ext_resource type="Resource" path="res://cases/a001/chars/NPC_FB.tres" id="3_rbck7"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_JS.tres" id="4_t8a8n"]
+[ext_resource type="Script" path="res://core/defs/DialogueDef.gd" id="5_xlo6k"]
+[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="6_j6prh"]
+
+[sub_resource type="Resource" id="Resource_4b34n"]
+script = ExtResource("6_j6prh")
+text = "清理残叶时，傅柏注意到朱穗停在一张旧标本前。"
+
+[sub_resource type="Resource" id="Resource_ua3t7"]
+script = ExtResource("6_j6prh")
+kind = "say"
+who = ExtResource("2_40cxa")
+text = "这页配比要留档吗？纸边已经发黑了。"
+
+[sub_resource type="Resource" id="Resource_lg2na"]
+script = ExtResource("6_j6prh")
+kind = "say"
+who = ExtResource("4_t8a8n")
+text = "先别碰那一页，背面的剂量才是陆师兄反复改的地方。"
+
+[sub_resource type="Resource" id="Resource_tjmmi"]
+script = ExtResource("6_j6prh")
+kind = "say"
+who = ExtResource("3_rbck7")
+text = "槿杉，你知道他们已经走到哪一步了，对吗？"
+
+[sub_resource type="Resource" id="Resource_rx7ry"]
+script = ExtResource("6_j6prh")
+kind = "say"
+who = ExtResource("4_t8a8n")
+text = "我只知道，再晚一步，花魄就再也拦不回去了。"
+
+[sub_resource type="Resource" id="Resource_0bwyy"]
+script = ExtResource("6_j6prh")
+kind = "say"
+who = ExtResource("2_40cxa")
+text = "那我把它单独收好，等你们决定怎么处理。"
+
+[resource]
+script = ExtResource("5_xlo6k")
+id = "DLG_garden_review"
+participants = Array[ExtResource("1_mln80")]([ExtResource("2_40cxa"), ExtResource("3_rbck7"), ExtResource("4_t8a8n")])
+script_lines = Array[ExtResource("6_j6prh")]([SubResource("Resource_4b34n"), SubResource("Resource_ua3t7"), SubResource("Resource_lg2na"), SubResource("Resource_tjmmi"), SubResource("Resource_rx7ry"), SubResource("Resource_0bwyy")])

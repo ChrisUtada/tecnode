@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_i0lad"]
+[ext_resource type="Script" path="res://core/defs/ConditionDef.gd" id="2_vyhmu"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_v4lky"]
+[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="4_njeom"]
+[ext_resource type="Script" path="res://core/defs/commands/ConditionalCommandDef.gd" id="5_cnn0e"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="6_6nydu"]
+
+[sub_resource type="Resource" id="Resource_2a3jt"]
+script = ExtResource("4_njeom")
+message = "朱穗快步朝花园中心走去。(请前往花园)"
+
+[sub_resource type="Resource" id="Resource_y05if"]
+script = ExtResource("5_cnn0e")
+success_message = "铁栅栏被打开了。"
+on_success = SubResource("Resource_2a3jt")
+label = "打开"
+
+[resource]
+script = ExtResource("3_v4lky")
+id = "ITEMS_tzl"
+label = "铁栅栏"
+desc = "一道铁栅栏。"
+commands = Array[ExtResource("1_i0lad")]([SubResource("Resource_y05if")])

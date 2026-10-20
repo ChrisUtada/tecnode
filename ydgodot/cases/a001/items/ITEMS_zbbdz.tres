@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_2bh6q"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_rjucf"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_6n32a"]
+
+[resource]
+script = ExtResource("3_6n32a")
+id = "ITEMS_zbbdz"
+label = "皱巴巴的纸"
+desc = "纸上写着：伞形科独活属多年生草本，有明显的暗紫红色斑点和白色硬毛。叶片为巨大的深裂复叶，顶生大型白色伞形花序。"
+can_be_picked = true

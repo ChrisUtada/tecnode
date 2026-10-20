@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_blf3u"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_0ock6"]
+[ext_resource type="Script" path="res://core/defs/commands/TextCommandDef.gd" id="3_u28f1"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="4_qqq15"]
+
+[sub_resource type="Resource" id="Resource_r0ms8"]
+script = ExtResource("3_u28f1")
+value = "咔哒一声，手电筒亮了起来。光柱扫过黑暗，尘埃在光晕里浮动。"
+label = "打开手电筒"
+
+[resource]
+script = ExtResource("2_0ock6")
+id = "ITEM_shoudiantong"
+label = "手电筒"
+desc = "还能使用的手电筒。要先打开它，才能照出黑暗里的东西。"
+can_be_picked = true
+toggle_light = true
+needs_lit_to_use = true
+lit_on_message = "打开了，一束苍白的光柱在黑暗里切出一道口子"
+lit_off_message = "关上了，光柱熄灭"
+lit_fail_message = "还没有打开，照不出任何东西。"
+commands = Array[ExtResource("1_blf3u")]([SubResource("Resource_r0ms8")])

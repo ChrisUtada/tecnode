@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_unc2f"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_yhkj7"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="3_lwy00"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_mgd.tres" id="4_utxmt"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="5_a48v2"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="6_07yes"]
+
+[sub_resource type="Resource" id="Resource_8yr0e"]
+script = ExtResource("5_a48v2")
+text = "获得线索：[clue:CLUES_mgd]"
+clues = Array[ExtResource("3_lwy00")]([ExtResource("4_utxmt")])
+
+[resource]
+script = ExtResource("6_07yes")
+id = "ITEMS_rxbs"
+label = "染血的美工刀"
+desc = "一把染血的美工刀，与陆珩松身上的伤口匹配，看来是正是凶器。"
+can_be_picked = true
+hidden_clue = SubResource("Resource_8yr0e")

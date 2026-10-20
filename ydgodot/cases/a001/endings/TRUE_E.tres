@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="EndingDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EndingLineDef.gd" id="1_o5x0w"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_mqxju"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_V_luheng.tres" id="3_0xvp0"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_nm.tres" id="4_lccu7"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_mc.tres" id="5_2pmu5"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_CBKW.tres" id="6_b88e5"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_xds.tres" id="7_oo51x"]
+[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="8_30axm"]
+
+[sub_resource type="Resource" id="Resource_potp0"]
+script = ExtResource("1_o5x0w")
+text = "献祭吊死之人的灵魂..."
+
+[sub_resource type="Resource" id="Resource_tocwu"]
+script = ExtResource("1_o5x0w")
+text = "打破阳光的诅咒...躯体将于灰烬之中重生。"
+delay_ms = 1500
+
+[sub_resource type="Resource" id="Resource_8kt7v"]
+script = ExtResource("1_o5x0w")
+text = "于鸟鸣之中重塑因果。"
+delay_ms = 2500
+
+[sub_resource type="Resource" id="Resource_regye"]
+script = ExtResource("1_o5x0w")
+text = "真名得以捕获。"
+delay_ms = 3500
+
+[resource]
+script = ExtResource("8_30axm")
+id = "TRUE_E"
+name = "真名捕获：花魄"
+truename = "花魄"
+recipe = Array[ExtResource("2_mqxju")]([ExtResource("3_0xvp0"), ExtResource("4_lccu7"), ExtResource("5_2pmu5"), ExtResource("6_b88e5"), ExtResource("7_oo51x")])
+is_true_capture = true
+lines = Array[ExtResource("1_o5x0w")]([SubResource("Resource_potp0"), SubResource("Resource_tocwu"), SubResource("Resource_8kt7v"), SubResource("Resource_regye")])
+message = "真名的形成需要生命献祭和物质捕获两个必要条件。此地被称为花魄的真名，需要通过吊颈的方式献祭生命，由此形成特殊物质，该物质含有巨量的呋喃香豆素，是最终形成人体的基础，为了制作出完整的人，陆珩松使用了多个实验体，它们有一些共同现象，实验体的成熟分成三个阶段，在第一阶段，实验体的身体非常小，呈现半透明状态，但已经拥有了完整的成人形态，大约三天左右，实验体开始变大，并且逐步恢复发音功能，发出类似鹦哥的鸟鸣，一些实验体在这个阶段就停止了成长并急速死亡，死亡的个体血液中带有浓烈的草本苦味。而存活下来的实验体会继续成长为完整的形态，与正常人类别无二致，但会丢失部分此前的记忆，不会认为自己曾经死亡。成熟的实验体此时面临的最大问题是，含有巨量呋喃香豆素的实验体一旦接触到阳光就会被烧成灰烬，陆珩松不得不反复实验，数个实验体就这样死亡、复活，不断循环……"

@@ -1,0 +1,108 @@
+[gd_resource type="Resource" script_class="CharDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ReactionDef.gd" id="1_cns6i"]
+[ext_resource type="Resource" path="res://cases/a001/clues/DATA_H_music.tres" id="2_ns45w"]
+[ext_resource type="Resource" path="res://cases/a001/clues/DATA_T_sun.tres" id="3_p84eg"]
+[ext_resource type="Resource" path="res://cases/a001/clues/DATA_V_huij.tres" id="4_sobm0"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_qsan.tres" id="5_nkmer"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0704.tres" id="6_xaiox"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="7_ancoo"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zs.tres" id="8_iknas"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="9_viu4f"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_changji.tres" id="10_cw0ek"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_hy.tres" id="11_ktg35"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_yjh.tres" id="12_cmkxf"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_rxbs.tres" id="13_qa4w2"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_ccss.tres" id="14_qukki"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_a4paper.tres" id="15_2bka6"]
+[ext_resource type="Script" path="res://core/defs/SceneTalkDef.gd" id="16_awbfv"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_mdhm.tres" id="17_cvyly"]
+[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="18_wvrdi"]
+
+[sub_resource type="Resource" id="Resource_22evp"]
+script = ExtResource("1_cns6i")
+trigger_id = "DATA_H_music"
+clue = ExtResource("2_ns45w")
+text = "每次听到这首古典乐都会让我觉得平静，巴赫真是一个伟大的音乐家。"
+
+[sub_resource type="Resource" id="Resource_sbw7e"]
+script = ExtResource("1_cns6i")
+trigger_id = "DATA_T_sun"
+clue = ExtResource("3_p84eg")
+text = "阳光会将一切罪恶化作灰烬。"
+
+[sub_resource type="Resource" id="Resource_ex3ui"]
+script = ExtResource("1_cns6i")
+trigger_id = "DATA_V_huij"
+clue = ExtResource("4_sobm0")
+text = "而灰烬是罪人最好的归宿。"
+
+[sub_resource type="Resource" id="Resource_4y46l"]
+script = ExtResource("1_cns6i")
+trigger_id = "CLUES_qsan"
+clue = ExtResource("5_nkmer")
+text = "只要按下按钮，一切就会结束。"
+
+[sub_resource type="Resource" id="Resource_s7ld1"]
+script = ExtResource("9_viu4f")
+text = "获得线索：[clue:CLUES_zs]"
+clues = Array[ExtResource("7_ancoo")]([ExtResource("8_iknas")])
+
+[sub_resource type="Resource" id="Resource_xr3we"]
+script = ExtResource("1_cns6i")
+trigger_id = "ITEMS_changji"
+item = ExtResource("10_cw0ek")
+text = "陆老师和槿老师知道我喜欢听音乐，特意为我准备了黑胶唱机。但两位老师似乎更喜欢安静的环境。"
+
+[sub_resource type="Resource" id="Resource_fxijx"]
+script = ExtResource("1_cns6i")
+trigger_id = "ITEMS_hy"
+item = ExtResource("11_ktg35")
+text = "6月，天气逐渐炎热了起来，槿老师却依然穿着长袖，偶尔会看到露出衣袖的……绷带？"
+
+[sub_resource type="Resource" id="Resource_glsr5"]
+script = ExtResource("1_cns6i")
+trigger_id = "ITEMS_yjh"
+item = ExtResource("12_cmkxf")
+text = "洋金花……原来如此……那天我忽然困倦得不行，伏在书桌上睡着了……"
+
+[sub_resource type="Resource" id="Resource_3knbn"]
+script = ExtResource("1_cns6i")
+trigger_id = "ITEMS_rxbs"
+item = ExtResource("13_qa4w2")
+text = "是我……将这把匕首插进了陆老师的腹部……"
+
+[sub_resource type="Resource" id="Resource_0y6xo"]
+script = ExtResource("1_cns6i")
+trigger_id = "ITEMS_ccss"
+item = ExtResource("14_qukki")
+text = "那根被血液浸透的绳索绕过我的脖子，粗糙的毛刺几乎马上扎进我的肉里，疼痛异常，就像一把锯子一样来回切割。"
+
+[sub_resource type="Resource" id="Resource_6ggx2"]
+script = ExtResource("1_cns6i")
+trigger_id = "ITEMS_a4paper"
+item = ExtResource("15_2bka6")
+text = "献祭……捕获……我不知道陆老师和槿老师在忙些什么……这些文字让我非常不安。"
+
+[sub_resource type="Resource" id="Resource_vtx1p"]
+script = ExtResource("16_awbfv")
+scene = ExtResource("17_cvyly")
+lines = Array[String](["“你是谁？”", "“请救救我们……”", "“陆老师……用绳子把我们勒住……醒来的时候我们就在这里了……”", "“那个人是植物所的所长傅柏。”", "“按钮……[clue:CLUES_qsan]，按下它我们就能出去了！”（TEC：在收集线索前请务必再次确认，此次选择有可能涉入过深，导致因果崩塌。）"])
+
+[sub_resource type="Resource" id="Resource_x5b0m"]
+script = ExtResource("16_awbfv")
+scene = ExtResource("6_xaiox")
+lines = Array[String](["“今天是槿老师的生日。和往常一样，我打开了唱机，在水杯里倒满了水，而后开始整理工作。”", "“奇怪，今天的花园里到处都是灰烬，像是好几天没有打扫了一样。”", "“突如其来的困倦……我想睡一会儿。”"])
+
+[resource]
+script = ExtResource("18_wvrdi")
+id = "CHARS_zs"
+name = "朱穗"
+desc = "陆珩松和槿杉的助手。"
+avatar = "images/avatar_CHARS_zs.png"
+debut = ExtResource("6_xaiox")
+talk_queue = Array[String](["“对于我而言，每日的任务有点单调，就是将散落的资料摆放好，而后将花园打扫干净，花卉和植物并不需要我来打理，陆老师和槿老师自会处理。”"])
+scene_talks = Array[ExtResource("16_awbfv")]([SubResource("Resource_vtx1p"), SubResource("Resource_x5b0m")])
+clue_reactions = Array[ExtResource("1_cns6i")]([SubResource("Resource_22evp"), SubResource("Resource_sbw7e"), SubResource("Resource_ex3ui"), SubResource("Resource_4y46l")])
+item_reactions = Array[ExtResource("1_cns6i")]([SubResource("Resource_xr3we"), SubResource("Resource_fxijx"), SubResource("Resource_glsr5"), SubResource("Resource_3knbn"), SubResource("Resource_0y6xo"), SubResource("Resource_6ggx2")])
+hidden_clue = SubResource("Resource_s7ld1")

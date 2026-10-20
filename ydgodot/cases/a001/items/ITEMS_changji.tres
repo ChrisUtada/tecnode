@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_txw30"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_wmhj.tres" id="2_glqgd"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_d0j66"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_cz.tres" id="4_mwhdx"]
+[ext_resource type="Script" path="res://core/defs/commands/UseItemCommandDef.gd" id="5_ug0ih"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_cjag.tres" id="6_byu8k"]
+[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="7_mk207"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_htys.tres" id="8_stsye"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="9_jfi71"]
+
+[sub_resource type="Resource" id="Resource_dlgj8"]
+script = ExtResource("5_ug0ih")
+required_item = ExtResource("2_glqgd")
+requires = Array[ExtResource("3_d0j66")]([ExtResource("4_mwhdx")])
+success_message = "几声沙沙响和类似[clue:CLUES_nm]的声响后，[clue:CLUES_wmhj]开始播放……"
+label = "放入黑胶"
+fail_message = "唱机上还没有装唱针，黑胶放上去也放不出声。"
+
+[sub_resource type="Resource" id="Resource_cac3u"]
+script = ExtResource("5_ug0ih")
+required_item = ExtResource("4_mwhdx")
+installs = true
+success_message = "把唱针装上唱机，唱机开始播放古典音乐，[clue:DATA_H_music]在花园中流淌。"
+label = "装上唱针"
+fail_message = "没有唱针，装不上。"
+
+[sub_resource type="Resource" id="Resource_oys13"]
+script = ExtResource("7_mk207")
+scene = ExtResource("6_byu8k")
+
+[sub_resource type="Resource" id="Resource_ox8f7"]
+script = ExtResource("5_ug0ih")
+required_item = ExtResource("8_stsye")
+success_message = "唱机隐藏的暗格被打开了。"
+on_success = SubResource("Resource_oys13")
+label = "打开暗格"
+
+[resource]
+script = ExtResource("3_d0j66")
+id = "ITEMS_changji"
+label = "唱机"
+desc = "唱机上的唱针不知所踪，一盘黑胶被安装在唱盘上。在唱机的底座上，有一个钥匙孔，如果有合适的钥匙，应该可以打开它。"
+can_be_picked = true
+commands = Array[ExtResource("1_txw30")]([SubResource("Resource_dlgj8"), SubResource("Resource_cac3u"), SubResource("Resource_ox8f7")])

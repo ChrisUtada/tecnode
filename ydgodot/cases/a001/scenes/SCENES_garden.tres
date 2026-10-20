@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="SceneDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/SceneDef.gd" id="1_ufs6j"]
+
+[resource]
+script = ExtResource("1_ufs6j")
+id = "SCENES_garden"
+title = "植物学家的花园"
+content = "时间：7月5日 地点：植物学家的花园<br><br>进入植物学家的花园的瞬间，你便踏入了黑暗之中，只感觉到扑面而来的闷热，空气仿佛被水浸透了一般。<br>双眼逐渐聚焦，你才发现花园的四周被厚重的[item:ITEM_lianmu]遮挡，透不进一丝阳光。<br>借着几盏昏暗的灯，你努力分辨着花园里的一切：随处可见的[item:ITEMS_zhiwu]，或是疯长，或是枯萎……杂乱无序,层层堆积。不知为何总觉得能听到虫鸣鸟叫。<br>在离你不远的地方，有一张木制的[item:ITEM_shuzhuo]。<br>摆放在花园角落的[item:ITEMS_changji]沉默着。<br>花园的正中，一个长长的[item:ITEM_something]从屋顶悬垂而下，摇摇晃晃……你的心中早已知晓眼前的究竟是何物……<br>在黑影之下，一根[item:ITEMS_zsq]掉在地上，针管中可见半管不知名的液体。<br><br>问问[char:CHARS_TEC]"
+desc = "进入植物学家的花园的瞬间，你便踏入了黑暗之中。只感觉到扑面而来的闷热，空气仿佛被水浸透了一般。双眼逐渐聚焦，你才发现花园的四周被厚重的黑色帘幕包围，透不进一丝阳光。你努力分辨着花园里的一切：随处可见的植物，或是疯长，或是枯萎……杂乱无序。在离你不远的地方，有一张木制的书桌。摆放在花园角落的唱机反复播放着古典乐，平静而舒适，与周遭的混乱格格不入。花园的正中，一道长长的黑影从屋顶悬垂而下，摇摇晃晃……"
+image = "images/test_garden_scene.svg"

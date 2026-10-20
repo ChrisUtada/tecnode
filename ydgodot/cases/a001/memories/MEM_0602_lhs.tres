@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="MemoryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/MemoryDef.gd" id="1_5edpk"]
+[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="2_frifx"]
+[ext_resource type="Resource" path="res://cases/a001/chars/NPC_FB.tres" id="3_fmyj2"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_luhengs.tres" id="4_wyx08"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_JS.tres" id="5_jvuy4"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="6_f6oeq"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="7_u7jh7"]
+
+[sub_resource type="Resource" id="Resource_024ke"]
+script = ExtResource("2_frifx")
+text = "花园里，槿杉把最后一盆标本摆回架上。傅柏举着相机，迟迟没有按下快门。"
+
+[sub_resource type="Resource" id="Resource_krh0w"]
+script = ExtResource("2_frifx")
+kind = "say"
+who = ExtResource("3_fmyj2")
+text = "已经是第三次为他们拍摄合影了。"
+
+[sub_resource type="Resource" id="Resource_jaml6"]
+script = ExtResource("2_frifx")
+kind = "say"
+who = ExtResource("4_wyx08")
+text = "我请求傅老师再帮我们拍一张合影，但傅老师的脸色一下就变得很难看。"
+
+[sub_resource type="Resource" id="Resource_cstj5"]
+script = ExtResource("2_frifx")
+kind = "say"
+who = ExtResource("4_wyx08")
+text = "他一言不发，举起了相机。"
+
+[sub_resource type="Resource" id="Resource_c83er"]
+script = ExtResource("2_frifx")
+kind = "say"
+who = ExtResource("5_jvuy4")
+text = "快要成功了，再试试吧。"
+
+[sub_resource type="Resource" id="Resource_xkece"]
+script = ExtResource("2_frifx")
+text = "快门落下的那一瞬，槿杉露出了笑容。那是陆珩松后来反复想起的画面。"
+
+[resource]
+script = ExtResource("1_5edpk")
+id = "MEM_0602_lhs"
+when = ExtResource("6_f6oeq")
+where = ExtResource("7_u7jh7")
+who = ExtResource("4_wyx08")
+title = "6月2日 · 陆珩松"
+script_lines = Array[ExtResource("2_frifx")]([SubResource("Resource_024ke"), SubResource("Resource_krh0w"), SubResource("Resource_jaml6"), SubResource("Resource_cstj5"), SubResource("Resource_c83er"), SubResource("Resource_xkece")])

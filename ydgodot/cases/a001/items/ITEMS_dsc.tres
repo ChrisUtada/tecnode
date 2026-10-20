@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_odxdk"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_zbbdz.tres" id="2_rlndn"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_gv1tk"]
+[ext_resource type="Script" path="res://core/defs/commands/UseItemCommandDef.gd" id="4_pdhfu"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="5_n0h78"]
+
+[sub_resource type="Resource" id="Resource_m3njp"]
+script = ExtResource("4_pdhfu")
+required_item = ExtResource("2_rlndn")
+success_message = "[clue:CLUES_xds]，一股湿青草气味。"
+label = "对照纸页"
+
+[resource]
+script = ExtResource("3_gv1tk")
+id = "ITEMS_dsc"
+label = "大豕草"
+desc = "伞形科独活属多年生草本植物。"
+can_be_picked = true
+commands = Array[ExtResource("1_odxdk")]([SubResource("Resource_m3njp")])

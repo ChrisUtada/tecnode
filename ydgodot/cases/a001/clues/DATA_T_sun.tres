@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ClueDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_jheal"]
+
+[resource]
+script = ExtResource("1_jheal")
+id = "DATA_T_sun"
+label = "阳光"
+sense = "touch"
+desc = "灼热的阳光穿透了玻璃窗。"

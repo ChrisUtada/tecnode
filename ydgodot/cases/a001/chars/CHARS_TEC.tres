@@ -1,0 +1,89 @@
+[gd_resource type="Resource" script_class="CharDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ReactionDef.gd" id="1_wbv6b"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_hy.tres" id="2_aydq0"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_jzmh.tres" id="3_kqcwc"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_turename.tres" id="4_wnppb"]
+[ext_resource type="Script" path="res://core/defs/SceneTalkDef.gd" id="5_fr7pr"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_body.tres" id="6_24uom"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="7_7kdd8"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_choutier.tres" id="8_q8880"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_mdhm.tres" id="9_whqk6"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="10_dodtm"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0704.tres" id="11_pqiv0"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_cjag.tres" id="12_krw44"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_lhsdst.tres" id="13_hopgx"]
+[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="14_3e7x8"]
+
+[sub_resource type="Resource" id="Resource_stib8"]
+script = ExtResource("1_wbv6b")
+trigger_id = "ITEMS_hy"
+item = ExtResource("2_aydq0")
+text = "三张合影似乎是不同时间拍的……6月2日，显然不是普通的一天！可以前往看看。"
+
+[sub_resource type="Resource" id="Resource_6wwno"]
+script = ExtResource("1_wbv6b")
+trigger_id = "ITEMS_jzmh"
+item = ExtResource("3_kqcwc")
+text = "密码是四个数字……等等，密码似乎被更改过一次！这次任务出现的数字组合并不多，如果实在猜不来就都试试吧。"
+
+[sub_resource type="Resource" id="Resource_01pqr"]
+script = ExtResource("1_wbv6b")
+trigger_id = "ITEMS_turename"
+item = ExtResource("4_wnppb")
+text = "就是真结局。"
+
+[sub_resource type="Resource" id="Resource_7po4p"]
+script = ExtResource("1_wbv6b")
+trigger_id = "ITEMS_sxbj"
+text = "我记得有一张纸，上面好像写了某种植物，找到那个植物，并出示给它试试。"
+
+[sub_resource type="Resource" id="Resource_rf7p0"]
+script = ExtResource("5_fr7pr")
+scene = ExtResource("6_24uom")
+lines = Array[String](["绷带是可以用剪刀剪开的。", "嗯……似乎有大量可以捕获的线索。"])
+
+[sub_resource type="Resource" id="Resource_7q1gj"]
+script = ExtResource("5_fr7pr")
+scene = ExtResource("7_7kdd8")
+lines = Array[String](["黑影，你应该已经知道是什么了，所以出示照明工具看看清楚吧。查询一下物品档案，看看是否有合适的工具。"])
+
+[sub_resource type="Resource" id="Resource_iji5q"]
+script = ExtResource("5_fr7pr")
+scene = ExtResource("8_q8880")
+lines = Array[String](["出示一下木盒让我看看。"])
+
+[sub_resource type="Resource" id="Resource_1rnt3"]
+script = ExtResource("5_fr7pr")
+scene = ExtResource("9_whqk6")
+lines = Array[String](["我想再次提醒你，对因果的过度干涉只会引来不必要的麻烦。"])
+
+[sub_resource type="Resource" id="Resource_b5lyr"]
+script = ExtResource("5_fr7pr")
+scene = ExtResource("10_dodtm")
+lines = Array[String](["已确认权限。以下是6月2日可解密档案。", "6月2日，傅柏在朱穗离开后，来到了花园。从三人的对话来看，傅柏似乎想要阻止陆珩松和槿杉的研究继续下去，但两人并未打算停止工作。", "某种被称为抑制素的物质，似乎马上就要制造成功，并且能够帮助两人最终完成研究。", "陆珩松希望傅柏能够帮两人拍摄一张合影。傅柏提到这是第三次拍摄类似的合影。", "傅柏的情绪看起来不佳，似乎没能阻止研究继续下去。", "之后，三人似乎进行了长时间的沟通交流。傅柏在18:13左右离开了花园。"])
+
+[sub_resource type="Resource" id="Resource_i76to"]
+script = ExtResource("5_fr7pr")
+scene = ExtResource("11_pqiv0")
+lines = Array[String](["已确认权限。以下是7月4日可解密档案。", "7月4日，朱穗喝下了被放入洋金花毒素的水，导致暂时昏迷。由于剂量上的失误，她很快就醒了过来。", "此时陆珩松正手持注射器，想要将某种液体注入朱穗体内。", "朱穗拼命挣扎，慌乱之中拿起桌上的美工刀，插入了陆珩松的腹部。而后逃离了花园。", "陆珩松因疼痛昏迷，再次醒来时，已经处于失血过多的状态，加之本身虚弱的身体，几乎处于濒死状态。", "陆珩松之后的行为极其古怪：没有进行任何自救，或报警，而是用一条绳子将自己吊在了花园之中。", "陆珩松最终是因为上吊而死，还是因为失血过多死亡，需要进一步鉴定。"])
+
+[sub_resource type="Resource" id="Resource_mohrn"]
+script = ExtResource("5_fr7pr")
+scene = ExtResource("12_krw44")
+lines = Array[String](["出示这张合影给我，我有一些想法。", "黑胶可以放入唱机中播放，或许有新的发现。"])
+
+[sub_resource type="Resource" id="Resource_c5m12"]
+script = ExtResource("5_fr7pr")
+scene = ExtResource("13_hopgx")
+lines = Array[String](["找到唱针了！还有一张奇怪的纸。"])
+
+[resource]
+script = ExtResource("14_3e7x8")
+id = "CHARS_TEC"
+name = "TEC"
+desc = "您忠实的AI助手！"
+avatar = "images/avatar_CHARS_TEC.png"
+talk_queue = Array[String](["我是您忠实的AI助手！祝您捕获顺利！", "我会出现在某些特定的场景中，帮助你获得更多的信息。", "像我“出示”一些物品，或许我会给你一些有用的提示。"])
+scene_talks = Array[ExtResource("5_fr7pr")]([SubResource("Resource_rf7p0"), SubResource("Resource_7q1gj"), SubResource("Resource_iji5q"), SubResource("Resource_1rnt3"), SubResource("Resource_b5lyr"), SubResource("Resource_i76to"), SubResource("Resource_mohrn"), SubResource("Resource_c5m12")])
+item_reactions = Array[ExtResource("1_wbv6b")]([SubResource("Resource_stib8"), SubResource("Resource_6wwno"), SubResource("Resource_01pqr"), SubResource("Resource_7po4p")])

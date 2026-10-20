@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ClueDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_1y518"]
+
+[resource]
+script = ExtResource("1_1y518")
+id = "CLUES_wmhj"
+label = "陆珩松的录音"
+sense = "hearing"
+desc = "JS，当你听到这个录音的时候，我距离解开了所有的秘密只有一步之遥了。但我的时间已经不够了……我留下了足够你理解的笔记，也只有你能完成最后的步骤。现在，我可以安静等待死亡，以及与你重逢了。另外，在万事俱备之前，无论如何都不要拉开帘幕。"

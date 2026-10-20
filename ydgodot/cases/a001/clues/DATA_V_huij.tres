@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ClueDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_f6cev"]
+
+[resource]
+script = ExtResource("1_f6cev")
+id = "DATA_V_huij"
+label = "灰烬"
+desc = "漫天灰烬"

@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ClueDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_n1ecp"]
+
+[resource]
+script = ExtResource("1_n1ecp")
+id = "CLUES_cjdcy"
+label = "初级调查员"
+desc = "初级调查员"

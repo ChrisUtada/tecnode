@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_d18f0"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_7ka10"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_body.tres" id="3_wsvhv"]
+[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="4_tger0"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEM_shoudiantong.tres" id="5_w0hfk"]
+[ext_resource type="Script" path="res://core/defs/commands/UseItemCommandDef.gd" id="6_5hixq"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="7_up08b"]
+
+[sub_resource type="Resource" id="Resource_oaa08"]
+script = ExtResource("4_tger0")
+scene = ExtResource("3_wsvhv")
+
+[sub_resource type="Resource" id="Resource_v7kmp"]
+script = ExtResource("6_5hixq")
+required_item = ExtResource("5_w0hfk")
+success_message = "黑影被照亮了，一具吊死的尸体赫然出现……"
+on_success = SubResource("Resource_oaa08")
+label = "照亮"
+
+[resource]
+script = ExtResource("2_7ka10")
+id = "ITEM_something"
+label = "黑影"
+desc = "摇摇晃晃，摇摇晃晃……打开手电筒照亮它，应该能看得更清楚。"
+can_be_picked = true
+commands = Array[ExtResource("1_d18f0")]([SubResource("Resource_v7kmp")])

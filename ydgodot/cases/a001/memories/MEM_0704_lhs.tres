@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="MemoryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/MemoryDef.gd" id="1_uu671"]
+[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="2_5gunv"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_luhengs.tres" id="3_6lp7r"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0704.tres" id="4_xq1yb"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="5_3toi0"]
+
+[sub_resource type="Resource" id="Resource_ejvaa"]
+script = ExtResource("2_5gunv")
+text = "花园之中，G弦的咏叹调反复播放着。朱穗伏在书桌之上，像是睡着了一般。"
+
+[sub_resource type="Resource" id="Resource_28swq"]
+script = ExtResource("2_5gunv")
+kind = "say"
+who = ExtResource("3_6lp7r")
+text = "这次一定能行了。"
+
+[sub_resource type="Resource" id="Resource_q5i4o"]
+script = ExtResource("2_5gunv")
+kind = "say"
+who = ExtResource("3_6lp7r")
+text = "只要将抑制剂注入体内，最后的一块拼图也就完成了。"
+
+[sub_resource type="Resource" id="Resource_jr3r0"]
+script = ExtResource("2_5gunv")
+kind = "say"
+who = ExtResource("3_6lp7r")
+text = "我能让所有人都活下来。"
+
+[sub_resource type="Resource" id="Resource_kwo4i"]
+script = ExtResource("2_5gunv")
+text = "他关掉唱机，握紧注射器，拖着沉重的脚步，慢慢靠近书桌。"
+
+[resource]
+script = ExtResource("1_uu671")
+id = "MEM_0704_lhs"
+when = ExtResource("4_xq1yb")
+where = ExtResource("5_3toi0")
+who = ExtResource("3_6lp7r")
+title = "7月4日 · 陆珩松"
+script_lines = Array[ExtResource("2_5gunv")]([SubResource("Resource_ejvaa"), SubResource("Resource_28swq"), SubResource("Resource_q5i4o"), SubResource("Resource_jr3r0"), SubResource("Resource_kwo4i")])

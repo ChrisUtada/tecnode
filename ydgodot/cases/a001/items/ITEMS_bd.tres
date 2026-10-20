@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_lwtxe"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_hj8va"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_lhsdst.tres" id="3_wcoio"]
+[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="4_kutnv"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_jd.tres" id="5_4uk73"]
+[ext_resource type="Script" path="res://core/defs/commands/UseItemCommandDef.gd" id="6_algu5"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="7_anbsb"]
+
+[sub_resource type="Resource" id="Resource_q2dkg"]
+script = ExtResource("4_kutnv")
+scene = ExtResource("3_wcoio")
+
+[sub_resource type="Resource" id="Resource_fg5o8"]
+script = ExtResource("6_algu5")
+required_item = ExtResource("5_4uk73")
+success_message = "剪刀一点点剪开缠绕整具尸体的绷带……"
+on_success = SubResource("Resource_q2dkg")
+label = "剪开绷带"
+
+[resource]
+script = ExtResource("2_hj8va")
+id = "ITEMS_bd"
+label = "绷带"
+desc = "缠绕住尸体的绷带。如果用剪刀就可以把它剪开。"
+can_be_picked = true
+commands = Array[ExtResource("1_lwtxe")]([SubResource("Resource_fg5o8")])

@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="MemoryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/MemoryDef.gd" id="1_t15ej"]
+[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="2_72qgq"]
+[ext_resource type="Resource" path="res://cases/a001/chars/NPC_FB.tres" id="3_ibfwm"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_JS.tres" id="4_su2qa"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="5_wocd5"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="6_qodc2"]
+
+[sub_resource type="Resource" id="Resource_umqkn"]
+script = ExtResource("2_72qgq")
+text = "每到 6月2日，傅柏都会带着相机来花园。这一天的光线，他记得比谁都清楚。"
+
+[sub_resource type="Resource" id="Resource_rpmgk"]
+script = ExtResource("2_72qgq")
+kind = "say"
+who = ExtResource("3_ibfwm")
+text = "已经是第三次为他们拍摄合影了。"
+
+[sub_resource type="Resource" id="Resource_yumb1"]
+script = ExtResource("2_72qgq")
+kind = "say"
+who = ExtResource("3_ibfwm")
+text = "我总觉得这样的研究不应该再继续下去了。"
+
+[sub_resource type="Resource" id="Resource_b6ykp"]
+script = ExtResource("2_72qgq")
+kind = "say"
+who = ExtResource("4_su2qa")
+text = "缺少的抑制素，这次有头绪了。"
+
+[sub_resource type="Resource" id="Resource_dktw7"]
+script = ExtResource("2_72qgq")
+kind = "say"
+who = ExtResource("3_ibfwm")
+text = "但槿杉却还是微笑着。"
+
+[sub_resource type="Resource" id="Resource_dh6rl"]
+script = ExtResource("2_72qgq")
+kind = "say"
+who = ExtResource("3_ibfwm")
+text = "那种痛苦，我无法承受。"
+
+[sub_resource type="Resource" id="Resource_l65nj"]
+script = ExtResource("2_72qgq")
+kind = "say"
+who = ExtResource("3_ibfwm")
+text = "有时候我常常跟珩松说，事情被重复十遍的时候，真相就会显现……我希望我是错的。"
+
+[resource]
+script = ExtResource("1_t15ej")
+id = "MEM_0602_fb"
+when = ExtResource("5_wocd5")
+where = ExtResource("6_qodc2")
+who = ExtResource("3_ibfwm")
+title = "6月2日 · 傅柏"
+script_lines = Array[ExtResource("2_72qgq")]([SubResource("Resource_umqkn"), SubResource("Resource_rpmgk"), SubResource("Resource_yumb1"), SubResource("Resource_b6ykp"), SubResource("Resource_dktw7"), SubResource("Resource_dh6rl"), SubResource("Resource_l65nj")])

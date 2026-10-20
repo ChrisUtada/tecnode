@@ -1,0 +1,1238 @@
+{
+  "config": {
+    "startScene": "SCENE_START",
+    "nowLabel": "7月5日",
+    "reusableTools": [
+      "ITEM_shoudiantong",
+      "ITEMS_htys",
+      "ITEMS_changji"
+    ]
+  },
+  "scenes": {
+    "SCENE_START": {
+      "title": "T.E.C-OS",
+      "content": "你好，[item:ITEMS_cjdcy]。<br>[item:ITEMS_ydqy]已被锁定。欢迎进入[item:ITEMS_tec]。<br>在你的权限范围内能够进入的区域，已经向你开放。<br>[char:CHARS_TEC]将协助你揭示异动区域的[item:ITEMS_turename]。<br><br>接下来你将学习如何使用T.E.C-OS的指令交互：<br>试试使用“查询 真名”命令看看会有什么效果？<br>接着使用“捕获 [item:ITEMS_cjdcy]”，你将获得你的第一个线索。<br>使用“出示 [item:ITEMS_turename] TEC”或“出示 TEC [item:ITEMS_turename]”，你将获得TEC的一些小小提示。<br>可在指令交互框中输入“查询 [item:ITEM_cmd]”获得更多帮助。<br><br>请务必注意安全，避免遭受因果污染。<br>一切就绪后，请点击进入[loc:SCENES_garden]，或者使用命令“前往 植物学家的花园”<br><br>祝你一切顺利。",
+      "desc": "你好，初级调查员，欢迎进入T.E.C-OS。",
+      "hiddenClue": {
+        "text": "尝到一股血腥的气味。",
+        "ids": []
+      }
+    },
+    "SCENES_choutiyi": {
+      "title": "左侧抽屉",
+      "content": "[item:ITEM_shuzhuo]的左侧抽屉中放着一把[item:ITEM_shoudiantong]，应该还能使用。",
+      "desc": "抽屉中放着一把老式手电筒，应该还能使用。"
+    },
+    "SCENES_body": {
+      "title": "尸体",
+      "content": "黑影被手电筒照亮，出现在眼前的是一具吊死的尸体。<br>死者修长的身体被绑带[item:ITEMS_bd]紧紧缠绕着。头部只露出了紧闭的双眼。<br>[item:ITEMS_xfbyc]流出的血液浸透了绷带。<br>[item:ITEMS_ccss]从屋顶垂下，绕过死者的脖颈，勒出了一条深深的[item:ITEMS_xh]。<br>尸体上散发而出的气味，并非腐臭，而是淡淡的湿青草气味。<br><br>问问[char:CHARS_TEC]<br>返回 [loc:SCENES_garden]",
+      "canBePicked": true,
+      "hiddenClue": {
+        "text": "死者身份：植物学家[clue:CLUES_V_luheng]",
+        "ids": [
+          "CLUES_V_luheng"
+        ]
+      },
+      "desc": "一具被吊死的尸体，你上前仔细查看。"
+    },
+    "SCENES_cjag": {
+      "title": "唱机暗格",
+      "content": "暗格之中摆放着一张[item:ITEMS_wmhj]和三张[item:ITEMS_hy]：虽然姿态各有不同，但照片中陆珩松与槿杉都身披白大褂，微笑着，手里捧着一盆植物，并肩站在书桌前。槿杉的脸色看起来不太好，白大褂的袖口处，隐隐能够看见绷带的样子。<br><br>问问[char:CHARS_TEC]<br>返回[loc:SCENES_garden]",
+      "desc": "暗格之中摆放着一张没有标签的黑胶、一张合影。",
+      "hiddenClue": {
+        "text": "",
+        "ids": []
+      }
+    },
+    "SCENES_choutier": {
+      "title": "右侧抽屉",
+      "content": "[item:ITEM_shuzhuo]右侧抽屉里摆放着一把锋利的[item:ITEMS_jd]和一个[item:ITEMS_jzmh]。<br><br>问问[char:CHARS_TEC]",
+      "desc": "右侧的抽屉里摆放着一把锋利的剪刀和一个精致的木盒。"
+    },
+    "SCENES_garden": {
+      "title": "植物学家的花园",
+      "image": "images/test_garden_scene.svg",
+      "content": "时间：7月5日 地点：植物学家的花园<br><br>进入植物学家的花园的瞬间，你便踏入了黑暗之中，只感觉到扑面而来的闷热，空气仿佛被水浸透了一般。<br>双眼逐渐聚焦，你才发现花园的四周被厚重的[item:ITEM_lianmu]遮挡，透不进一丝阳光。<br>借着几盏昏暗的灯，你努力分辨着花园里的一切：随处可见的[item:ITEMS_zhiwu]，或是疯长，或是枯萎……杂乱无序,层层堆积。不知为何总觉得能听到虫鸣鸟叫。<br>在离你不远的地方，有一张木制的[item:ITEM_shuzhuo]。<br>摆放在花园角落的[item:ITEMS_changji]沉默着。<br>花园的正中，一个长长的[item:ITEM_something]从屋顶悬垂而下，摇摇晃晃……你的心中早已知晓眼前的究竟是何物……<br>在黑影之下，一根[item:ITEMS_zsq]掉在地上，针管中可见半管不知名的液体。<br><br>问问[char:CHARS_TEC]",
+      "desc": "进入植物学家的花园的瞬间，你便踏入了黑暗之中。只感觉到扑面而来的闷热，空气仿佛被水浸透了一般。双眼逐渐聚焦，你才发现花园的四周被厚重的黑色帘幕包围，透不进一丝阳光。你努力分辨着花园里的一切：随处可见的植物，或是疯长，或是枯萎……杂乱无序。在离你不远的地方，有一张木制的书桌。摆放在花园角落的唱机反复播放着古典乐，平静而舒适，与周遭的混乱格格不入。花园的正中，一道长长的黑影从屋顶悬垂而下，摇摇晃晃……"
+    },
+    "SCENES_lhsdst": {
+      "title": "陆珩松的尸体",
+      "content": "绷带之下，[loc:SCENES_body]的状况惨不忍睹。死去的[char:CHARS_luhengs]披着白大褂，暴露在外的皮肤上布满溃烂和黑褐色的斑块，在毫无血色的皮肤上显得尤为刺眼。<br>一张[item:ITEMS_zbbdz]斜插在衣服的左侧袋里，而在右侧口袋里藏着一枚[item:ITEMS_cz]。<br><br>问问[char:CHARS_TEC]<br>返回[loc:SCENES_garden]",
+      "desc": "绷带之下，陆珩松的尸体惨不忍睹。"
+    },
+    "SCENES_fkjl": {
+      "title": "访客记录",
+      "content": "[loc:SCENES_0602] 9：00 - 10：30 [char:CHARS_zs]的清洁时间<br>6月2日 15：07 - 18：13 [char:NPC_FB]老师来访<br>………………<br>………………<br>………………<br>6月15日 9：00 - 10：30 朱穗的清洁时间<br>6月15日 17：03 傅柏老师来访<br>………………<br>………………<br>[loc:SCENES_0704]",
+      "desc": "记录了每日到访花园的客人。"
+    },
+    "SCENES_mdhm": {
+      "title": "门的后面",
+      "content": "撞击声从厚重的铁门后传来，只有靠得如此之近才能听到。你拉开了铁门，[char:CHARS_zs]惊恐地看着你，一道[item:ITEMS_tzl]挡在你们之间。<br>在离朱穗不远的地上，一个满头白发的人蜷缩着。<br><br>问问[char:CHARS_TEC]",
+      "desc": "撞击声从厚重的铁门后传来，只有靠得如此之近才能听到。你拉开了铁门，朱穗惊恐地看着你，一道铁栅栏挡在你们之间。<br>在离朱穗不远的地上，一个满头白发的人蜷缩着。"
+    },
+    "SCENES_0602": {
+      "title": "6月2日",
+      "content": "6月2日，8点，身为助手的[char:CHARS_zs]来到花园。与往常一样，朱穗需要将桌面上的文件整理归位，同时整理清洁整个花园。<br>10点，完成所有工作的朱穗离开了花园。<br>10点30分左右，植物所所长[char:NPC_FB]来访，并为[char:CHARS_luhengs]和[char:CHARS_JS]拍摄了合影。<br><br>问问[char:CHARS_TEC]<br>更多[loc:SCENES_fkjl]",
+      "desc": "平常的一天。"
+    },
+    "SCENES_0704": {
+      "title": "7月4日",
+      "content": "花园之中，G弦的咏叹调反复播放着，[char:CHARS_zs]伏在书桌之上，看起来像是睡着了一般。<br>全身包裹着绷带的[char:CHARS_luhengs]关掉了唱机，手中握着注射器，拖着沉重的脚步，慢慢靠近书桌……<br><br>问问[char:CHARS_TEC]<br>更多[loc:SCENES_fkjl]",
+      "desc": "一个特殊的日子。"
+    }
+  },
+  "items": {
+    "ITEM_cmd": {
+      "label": "命令帮助",
+      "desc": "<br>查询 物品：通过指令查询 物品 可以查询物品的描述信息<br>\n前往 场景：有的时候场景中没有出现导航帮助你离开，你可以使用该命令自由前往任意场景<br>\n捕获 物品/角色/场景：这是一个重要命令，你可以捕获隐藏的线索，请经常使用它。<br>\n出示 物品/线索 人物/物品：这也是一个常用的命令，能够帮助你找到一些隐藏的内容，以及和一些人物和物品互动<br>以上命令 请善加利用。"
+    },
+    "ITEM_taideng": {
+      "label": "台灯",
+      "desc": "花朵般的灯罩，木制的灯柱，一根铜线从灯罩中伸出，拉动它应该就能点亮台灯。",
+      "commands": [
+        {
+          "type": "text",
+          "label": "点亮台灯",
+          "value": "昏黄的灯光照亮了书桌，桌上的手写笔记都和各色植物有关。"
+        }
+      ],
+      "canBePicked": false,
+      "toggleLight": true,
+      "litOnMessage": "被点亮了，暖黄的光晕在画布上散开",
+      "litOffMessage": "熄灭了"
+    },
+    "ITEM_chouti": {
+      "label": "抽屉",
+      "desc": "书桌的两个抽屉紧闭着，但没有上锁。",
+      "commands": [
+        {
+          "type": "choice",
+          "label": "打开抽屉",
+          "title": "书桌抽屉",
+          "prompt": "要打开哪个抽屉？",
+          "options": [
+            {
+              "label": "打开左侧抽屉",
+              "results": {
+                "scene": "SCENES_choutiyi"
+              },
+              "message": ""
+            },
+            {
+              "label": "打开右侧抽屉",
+              "results": {
+                "scene": "SCENES_choutier"
+              },
+              "message": ""
+            }
+          ]
+        }
+      ]
+    },
+    "ITEM_shoudiantong": {
+      "label": "手电筒",
+      "desc": "还能使用的手电筒。要先打开它，才能照出黑暗里的东西。",
+      "canBePicked": true,
+      "toggleLight": true,
+      "needsLitToUse": true,
+      "litOnMessage": "打开了，一束苍白的光柱在黑暗里切出一道口子",
+      "litOffMessage": "关上了，光柱熄灭",
+      "litFailMessage": "还没有打开，照不出任何东西。",
+      "commands": [
+        {
+          "type": "text",
+          "label": "打开手电筒",
+          "value": "咔哒一声，手电筒亮了起来。光柱扫过黑暗，尘埃在光晕里浮动。"
+        }
+      ]
+    },
+    "ITEM_something": {
+      "label": "黑影",
+      "desc": "摇摇晃晃，摇摇晃晃……打开手电筒照亮它，应该能看得更清楚。",
+      "canBePicked": true,
+      "commands": [
+        {
+          "type": "useItem",
+          "label": "照亮",
+          "requiredItem": "ITEM_shoudiantong",
+          "successMessage": "黑影被照亮了，一具吊死的尸体赫然出现……",
+          "onSuccess": {
+            "scene": "SCENES_body"
+          }
+        }
+      ]
+    },
+    "ITEM_lianmu": {
+      "label": "黑色帘幕",
+      "desc": "遮住整个花园的帘幕，透不进一丝阳光。",
+      "commands": [
+        {
+          "type": "conditional",
+          "label": "拉开帘幕",
+          "successMessage": "阳光直射进入花园。",
+          "conditions": [
+            {
+              "clue": "CLUES_qsan",
+              "failMessage": "请不要拉开帘幕。"
+            }
+          ],
+          "onSuccess": {
+            "message": "[clue:DATA_V_huij]在[clue:DATA_T_sun]中狂舞。"
+          }
+        }
+      ]
+    },
+    "ITEMS_zhiwu": {
+      "label": "植物",
+      "desc": "常见或不常见的植物被放置在不同的地方，有的被打翻在地，有的甚至已经被踩烂。它们被遗落在此地，自生自灭。",
+      "canBePicked": false,
+      "commands": [
+        {
+          "type": "conditional",
+          "label": "仔细观察",
+          "successMessage": "",
+          "conditions": [
+            {
+              "clue": "CLUES_JS",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_wmhj",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_zhpt",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_V_luheng",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_nm",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_mc",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_CBKW",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_xds",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_yzs",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_zs",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_gcs",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_mgd",
+              "failMessage": "疯长的植物层层叠叠"
+            },
+            {
+              "clue": "CLUES_yjhds",
+              "failMessage": "疯长的植物层层叠叠"
+            }
+          ],
+          "onSuccess": {
+            "message": "你拨开了疯长的大豕草，一扇隐蔽的铁门出现在你的面前，门的后面隐约有声音传出。（如果你已做好准备，请在互动指令中输入“前往 门的后面”）"
+          }
+        }
+      ]
+    },
+    "ITEMS_changji": {
+      "label": "唱机",
+      "desc": "唱机上的唱针不知所踪，一盘黑胶被安装在唱盘上。在唱机的底座上，有一个钥匙孔，如果有合适的钥匙，应该可以打开它。",
+      "commands": [
+        {
+          "type": "useItem",
+          "label": "放入黑胶",
+          "requiredItem": "ITEMS_wmhj",
+          "requires": [
+            "ITEMS_cz"
+          ],
+          "successMessage": "几声沙沙响和类似[clue:CLUES_nm]的声响后，[clue:CLUES_wmhj]开始播放……",
+          "failMessage": "唱机上还没有装唱针，黑胶放上去也放不出声。"
+        },
+        {
+          "type": "useItem",
+          "label": "装上唱针",
+          "requiredItem": "ITEMS_cz",
+          "installs": true,
+          "successMessage": "把唱针装上唱机，唱机开始播放古典音乐，[clue:DATA_H_music]在花园中流淌。",
+          "failMessage": "没有唱针，装不上。"
+        },
+        {
+          "type": "useItem",
+          "label": "打开暗格",
+          "requiredItem": "ITEMS_htys",
+          "successMessage": "唱机隐藏的暗格被打开了。",
+          "onSuccess": {
+            "scene": "SCENES_cjag"
+          }
+        }
+      ],
+      "canBePicked": true
+    },
+    "ITEMS_xfbyc": {
+      "label": "下腹部右侧",
+      "desc": "裂开的绷带之下，是一道血淋淋的伤口，某种利器刺入其中，但现场似乎没有发现凶器。",
+      "hiddenClue": {
+        "text": "很明显是一道[clue:CLUES_gcs]",
+        "ids": [
+          "CLUES_gcs"
+        ]
+      }
+    },
+    "ITEMS_jd": {
+      "label": "剪刀",
+      "desc": "一把锋利的剪刀。",
+      "canBePicked": true
+    },
+    "ITEMS_bd": {
+      "label": "绷带",
+      "desc": "缠绕住尸体的绷带。如果用剪刀就可以把它剪开。",
+      "commands": [
+        {
+          "type": "useItem",
+          "label": "剪开绷带",
+          "requiredItem": "ITEMS_jd",
+          "successMessage": "剪刀一点点剪开缠绕整具尸体的绷带……",
+          "onSuccess": {
+            "scene": "SCENES_lhsdst"
+          }
+        }
+      ],
+      "canBePicked": true
+    },
+    "ITEMS_htys": {
+      "label": "黄铜钥匙",
+      "desc": "一把黄铜打造的钥匙。匙柄处刻着两个英文字母：JS。",
+      "canBePicked": true
+    },
+    "ITEMS_wmhj": {
+      "label": "没有标签的黑胶",
+      "desc": "一张没有任何标签的黑胶唱片，安静地躺在唱机的暗格之中。",
+      "canBePicked": true
+    },
+    "ITEMS_tec": {
+      "label": "T.E.C-OS",
+      "desc": "异动区域调查所使用的系统，完全模拟异动区域现场环境和数据，再小的细节也能被收录其中。T.E.C-OS对于因果的介入究竟到了什么程度？目前不得而知。"
+    },
+    "ITEMS_ydqy": {
+      "label": "异动区域",
+      "desc": "发生因果扰动的区域，某些特殊的存在导致了整个区域的异常。调查员的目标就是揭示特殊存在的真名，以便进行捕获。"
+    },
+    "ITEMS_turename": {
+      "label": "真名",
+      "desc": "导致区域发生异动的特殊存在的真实身份。异动区域的真名是多个因果链条得以存在的关键因素。真名的捕获需要五感归因。而非真名的结果，组成方式则并不受五感归因限制。当你捕获五感线索成功，并将其归入“逻辑阵列”后，请点击右下角的“SYNC_MATRIX_INFERENCE”按钮进行推演。"
+    },
+    "ITEMS_cz": {
+      "label": "唱针",
+      "desc": "安装上唱针，唱机就能播放黑胶唱片了。",
+      "canBePicked": true
+    },
+    "ITEMS_ccss": {
+      "label": "粗糙的绳索",
+      "desc": "粗大的绳索边缘因摩擦产生了大量的毛刺，黑红的血液已经渗入绳索之中。",
+      "canBePicked": true,
+      "hiddenClue": {
+        "text": "[clue:CLUES_mc]硬得如同针一般，轻易就扎破了手指。鲜血很快就被吸收了。",
+        "ids": [
+          "CLUES_mc"
+        ]
+      }
+    },
+    "ITEMS_jzmh": {
+      "label": "精致的木盒",
+      "desc": "带着精致花纹的木盒，需要密码才能打开。",
+      "canBePicked": true,
+      "commands": [
+        {
+          "type": "password",
+          "label": "打开木盒",
+          "value": "0321",
+          "onSuccess": {
+            "message": "木盒被打开了，你将放置在其中的黄铜钥匙取出，同时，一把染血的美工刀掉落下来。",
+            "items": [
+              "ITEMS_htys",
+              "ITEMS_rxbs"
+            ]
+          }
+        }
+      ]
+    },
+    "ITEMS_zbbdz": {
+      "label": "皱巴巴的纸",
+      "desc": "纸上写着：伞形科独活属多年生草本，有明显的暗紫红色斑点和白色硬毛。叶片为巨大的深裂复叶，顶生大型白色伞形花序。",
+      "canBePicked": true
+    },
+    "ITEMS_xh": {
+      "label": "血痕",
+      "desc": "被绳索的毛刺磨烂的脖颈上，出现一道深深的血痕。",
+      "hiddenClue": {
+        "text": "干硬的血迹有一股[clue:CLUES_CBKW]。",
+        "ids": [
+          "CLUES_CBKW"
+        ]
+      }
+    },
+    "ITEMS_dsc": {
+      "label": "大豕草",
+      "desc": "伞形科独活属多年生草本植物。",
+      "commands": [
+        {
+          "type": "useItem",
+          "label": "对照纸页",
+          "requiredItem": "ITEMS_zbbdz",
+          "successMessage": "[clue:CLUES_xds]，一股湿青草气味。"
+        }
+      ],
+      "canBePicked": true
+    },
+    "ITEMS_wbfs": {
+      "label": "未被焚烧干净的纸片",
+      "desc": "纸上用潦草的笔记写着：姓名：槿杉 生日：7月4日 症状：前臂出现边界清晰的鲜红色水肿，1分钟后形成鸡蛋大小的张力性大疱，触碰剧痛……",
+      "excerpts": [
+        { "text": "7月4日", "to": "loc:SCENES_0704" },
+        { "text": "槿杉", "to": "char:CHARS_JS" }
+      ],
+      "hiddenClue": {
+        "text": "获得线索：[clue:CLUES_JS]",
+        "ids": [
+          "CLUES_JS"
+        ]
+      },
+      "canBePicked": true
+    },
+    "ITEMS_hy": {
+      "label": "合影",
+      "desc": "三张陆珩松与槿杉不同姿态的合影，其中一张在合影的右下角用小字写着：6月2日。",
+      "canBePicked": true
+    },
+    "ITEMS_cjdcy": {
+      "label": "初级调查员",
+      "desc": "调查员分为初级、中级、高级三个等级，每一个等级能够介入的因果各有不同，获得的T.E.C-OS的权限也不同。",
+      "hiddenClue": {
+        "text": "获得线索：[clue:CLUES_cjdcy]",
+        "ids": [
+          "CLUES_cjdcy"
+        ]
+      }
+    },
+    "ITEMS_rxbs": {
+      "label": "染血的美工刀",
+      "desc": "一把染血的美工刀，与陆珩松身上的伤口匹配，看来是正是凶器。",
+      "canBePicked": true,
+      "hiddenClue": {
+        "text": "获得线索：[clue:CLUES_mgd]",
+        "ids": [
+          "CLUES_mgd"
+        ]
+      }
+    },
+    "ITEMS_yjh": {
+      "label": "洋金花",
+      "desc": "洋金花是茄科曼陀罗属一年生草本植物。",
+      "canBePicked": true,
+      "hiddenClue": {
+        "text": "获得线索：[clue:CLUES_yjhds]",
+        "ids": [
+          "CLUES_yjhds"
+        ]
+      }
+    },
+    "ITEMS_zsq": {
+      "label": "注射器",
+      "desc": "一根注射器，针筒内有半管透明的不知名液体。",
+      "commands": [
+        {
+          "type": "conditional",
+          "label": "查看内部",
+          "successMessage": "",
+          "conditions": [
+            {
+              "clue": "CLUES_xds",
+              "failMessage": "不知名的液体"
+            },
+            {
+              "clue": "CLUES_zhpt",
+              "failMessage": "不知名的液体"
+            }
+          ],
+          "onSuccess": {
+            "message": "获得线索：[clue:CLUES_yzs]"
+          }
+        }
+      ],
+      "canBePicked": true
+    },
+    "ITEMS_dlh": {
+      "label": "大丽花",
+      "desc": "大丽花，菊科大丽花属植物。",
+      "canBePicked": true
+    },
+    "ITEMS_bah": {
+      "label": "石蒜",
+      "desc": "石蒜是石蒜科石蒜属的多年生草本植物",
+      "canBePicked": true
+    },
+    "ITEMS_thanks": {
+      "label": "制作信息",
+      "desc": "<br>TEC行动组<br>制作/编剧：菠萝油多一点<br>网页制作：Trae、菠萝油多一点<br>特别感谢：哄哄、Ann、Kuma、Kalen<br><br>花魄故事的来源：婺源士人谢某，读书张公山。早起，闻树林鸟声啁啾，有似鹦哥。因近视之，乃一美女，长五寸许，赤身无毛，通体洁白如玉，眉目间有愁苦之状。遂携以归，女无惧色。乃畜笼中，以饭喂之。向人絮语，了不可辨。畜数日，为太阳所照，竟成枯腊而死。洪孝廉字麟闻之曰：\"此名花魄，凡树经三次人缢死者，其冤苦之气结成此物，沃以水，犹可活也。\" 试之果然。里人聚观者，如云而至。谢恐招摇，乃仍送之树上。须臾间，一大怪鸟衔之飞去。<br>——《子不语》卷二十四"
+    },
+    "ITEMS_a4paper": {
+      "label": "A4大小的纸",
+      "desc": "纸上写着：献祭捕获。",
+      "canBePicked": true,
+      "hiddenClue": {
+        "text": "获得线索：[clue:CLUES_a4]",
+        "ids": [
+          "CLUES_a4"
+        ]
+      }
+    },
+    "ITEMS_tzl": {
+      "label": "铁栅栏",
+      "desc": "一道铁栅栏。",
+      "commands": [
+        {
+          "type": "conditional",
+          "label": "打开",
+          "successMessage": "铁栅栏被打开了。",
+          "conditions": [],
+          "onSuccess": {
+            "message": "朱穗快步朝花园中心走去。(请前往花园)"
+          }
+        }
+      ]
+    },
+    "ITEM_sxbj": {
+      "label": "手写笔记",
+      "desc": "各式各样的手写植物笔记，堆满了书桌。纸页上密密麻麻写着植物的名字与习性；光线不足时，字迹便隐进昏暗里。",
+      "canBePicked": false,
+      "commands": [
+        {
+          "type": "reveal",
+          "label": "翻阅手写笔记",
+          "requiresLit": [
+            "ITEM_taideng",
+            "ITEM_shoudiantong"
+          ],
+          "value": "借着光翻开手写植物笔记：大丽花、洋金花、大豕草、石蒜……全是与植物有关的记录。在笔记的最下面，还压着一张A4大小的纸。",
+          "failMessage": "光线太暗，纸页上的字迹一片模糊。也许该点亮台灯，或者打开手电筒。",
+          "items": [
+            "ITEMS_dlh",
+            "ITEMS_yjh",
+            "ITEMS_dsc",
+            "ITEMS_bah",
+            "ITEMS_a4paper"
+          ]
+        }
+      ]
+    },
+    "ITEM_shuzhuo": {
+      "label": "书桌",
+      "desc": "木制的书桌上堆放着大量手写笔记，在靠近桌子的边缘，有一盏老式台灯，从灯罩中伸出一条黄铜的链子，拉动它似乎可以点亮台灯。书桌的两个抽屉闭合着，没有上锁。桌脚处摆着一个堆满灰烬的垃圾桶。\n",
+      "content": "木制的书桌上堆放着大量[item:ITEM_sxbj]，在靠近桌子的边缘，有一盏老式[item:ITEM_taideng]，从灯罩中伸出一条黄铜的链子，拉动它似乎可以点亮台灯。<br>书桌的两个[item:ITEM_chouti]闭合着，没有上锁。桌脚处摆着一个堆满灰烬的[item:ITEMS_ljt]。<br><br>返回 [loc:SCENES_garden]",
+      "hiddenClue": {
+        "text": "书桌、台灯、笔记……所有的一切都覆盖着一层薄薄的、不知从何而来的灰烬。",
+        "ids": []
+      }
+    },
+    "ITEMS_ljt": {
+      "label": "垃圾桶",
+      "desc": "书桌边的垃圾桶中堆积着不知从何而来的灰烬。",
+      "content": "[item:ITEM_shuzhuo]边的垃圾桶中堆积着不知从何而来的灰烬，像是焚烧什么留下的。数量多得让人不解。<br>在灰烬之中，有一片[item:ITEMS_wbfs]。"
+    }
+  },
+  "chars": {
+    "CHARS_JS": {"debut": "SCENES_0602",
+      "name": "槿杉",
+      "desc": "在植物领域颇有造诣的年轻植物学家。",
+      "talkQueue": [],
+      "reactions": {
+        "CLUES_yzs": {
+          "text": "抑制素是我和陆一直在寻找的解决方案的最后一块拼图。这种来自古代文献的方案，或者可以称之为黑魔法。它包含了两道必须执行的步骤：提取物质和献祭生命。在获得抑制素之前，我们一直没有提取到合适的物质以对抗呋喃香豆素。而为了得到这种抑制素，我们反复实验，不断往自己的身体里注射呋喃香豆素，以期望能够得到答案……"
+        },
+        "DATA_H_music": {
+          "text": "我不太懂音乐，大部分时间我都希望花园能够保持安静，不过朱穗似乎很喜欢这首古典乐。"
+        },
+        "CLUES_wmhj": {
+          "text": "辛苦了，陆。"
+        }
+      },
+      "sceneTalks": {
+        "SCENES_0602": [
+          {
+            "text": "“快要成功了，再试试吧。”"
+          },
+          {
+            "text": "“缺少的抑制素，这次有头绪了。”"
+          }
+        ]
+      },
+      "hiddenClue": {
+        "text": "获得线索：[clue:CLUES_JS]",
+        "ids": [
+          "CLUES_JS"
+        ]
+      },
+      "avatar": "images/avatar_CHARS_JS.png"
+    },
+    "CHARS_luhengs": {"debut": "SCENES_lhsdst",
+      "name": "陆珩松",
+      "desc": "年轻有为的植物学家。",
+      "talkQueue": [
+        {
+          "text": "“没有人会死去。”"
+        },
+        {
+          "text": "“没有人会死去。”"
+        },
+        {
+          "text": "“没有人会死去。”"
+        },
+        {
+          "text": "“没有人会死去。”"
+        },
+        {
+          "text": "“没有人会死去。”"
+        },
+        {
+          "text": "“没有人会死去。”"
+        },
+        {
+          "text": "“没有人会死去。”"
+        },
+        {
+          "text": "“没有人会死去。”"
+        },
+        {
+          "text": "“没有人会死去。”"
+        },
+        {
+          "text": "“没有人会死去。”"
+        },
+        {
+          "text": "“除了我……”"
+        }
+      ],
+      "reactions": {
+        "CLUES_wmhj": {
+          "text": "JS，当你听到这个录音的时候，我距离解开了所有的秘密只有一步之遥了。我相信这一次我一定能够治好你的病。但我的时间已经不够了……我留下了足够你理解的笔记，也只有你能完成最后的步骤。现在，我可以安静完成献祭，以及与你重逢了。另外，在万事俱备之前，无论如何都不要拉开帘幕。"
+        },
+        "CLUES_nm": {
+          "text": "JS，你听到鸟鸣声了吗？那不是错觉，从花卉与树丛之间传来，先是轻微的响动，再后来越来越大声，最终变成了低语……"
+        },
+        "CLUES_yzs": {
+          "text": "抑制素的剂量问题是最终的门槛，我必须增加实验的对象。很快我获得了不同的样本，有的个体如同一个空壳，只会发出类似鹦哥的叫声。有的个体具有一定的耐光性，但时间一长依然会被阳光烧成灰烬。所以我依然需要用帘幕遮盖掉花园的阳光。这些消失的实验样本，让我身负罪恶，我无数次觉得自己是一个无法被宽恕的恶魔，但只要JS能够醒过来……我相信我已经找到最终的答案了，这一次谁都不会死了。"
+        },
+        "CLUES_xds": {
+          "text": "样本在诞生之初，体内无一例外的存在着巨量的呋喃香豆素，如同JS之前的病症一样，它的存在导致个体无法接触阳光，一旦接触如此巨大的剂量将使得个体化为灰烬。"
+        },
+        "CLUES_mc": {
+          "text": "“黑魔法”对于献祭的要求极为严格，必须以吊死的方式献出生命。"
+        },
+        "CLUES_CBKW": {
+          "text": "包含呋喃香豆素的植物尝起来并没有什么特殊的气味，和普通的草本植物并无二致"
+        }
+      },
+      "itemReactions": {
+        "ITEMS_changji": {
+          "text": "花园的日常整理单调而无趣，或许一台唱机能带来一些活力。"
+        },
+        "ITEMS_jzmh": {
+          "text": "设置好的密码，槿杉会知道的。"
+        },
+        "ITEMS_0602": {
+          "text": "今天是6月2日，距离槿杉的生日没几天了，该做好的测试还要抓紧。"
+        },
+        "ITEMS_hy": {
+          "text": "傅柏老师为我们拍摄的合影，很久没有看到槿杉的笑容了……"
+        },
+        "ITEMS_a4paper": {
+          "text": "献祭与提取都有极为苛刻的限制和要求。"
+        }
+      },
+      "sceneTalks": {
+        "SCENES_0602": [
+          {
+            "text": "“我请求傅老师再帮我们拍一张合影，但傅老师的脸色一下就变得很难看。”"
+          },
+          {
+            "text": "“他一言不发，举起了相机。”"
+          },
+          {
+            "text": "“JS看起来很高兴。”"
+          }
+        ],
+        "SCENES_0704": [
+          {
+            "text": "“这次一定能行了。”"
+          },
+          {
+            "text": "“只要将抑制剂注入体内，[clue:CLUES_zhpt]也就完成了。”"
+          },
+          {
+            "text": "“我能让所有人都活下来。”"
+          }
+        ],
+        "SCENES_lhsdst": [
+          {
+            "text": "死去的人没有回应……"
+          }
+        ]
+      },
+      "hiddenClue": {
+        "text": "死者身份：[clue:CLUES_V_luheng]",
+        "ids": [
+          "CLUES_V_luheng"
+        ]
+      },
+      "avatar": "images/avatar_CHARS_luhengs.png"
+    },
+    "NPC_FB": {"debut": "SCENES_0602",
+      "name": "傅柏",
+      "desc": "植物研究所所长",
+      "talkQueue": [],
+      "hiddenClue": {
+        "text": "获得线索：[clue:CLUES_fb]",
+        "ids": [
+          "CLUES_fb"
+        ]
+      },
+      "sceneTalks": {
+        "SCENES_0602": [
+          {
+            "text": "“已经是第三次为他们拍摄合影了。”"
+          },
+          {
+            "text": "“我总觉得这样的研究不应该再继续下去了。”"
+          },
+          {
+            "text": "“但槿杉却还是微笑着。”"
+          },
+          {
+            "text": "“那种痛苦，我无法承受。”"
+          },
+          {
+            "text": "“有时候我常常跟珩松说，事情被重复十遍的时候，真相就会显现……我希望我是错的。”"
+          }
+        ]
+      },
+      "avatar": "images/avatar_NPC_FB.png"
+    },
+    "CHARS_zs": {"debut": "SCENES_0704",
+      "name": "朱穗",
+      "desc": "陆珩松和槿杉的助手。",
+      "talkQueue": [
+        {
+          "text": "“对于我而言，每日的任务有点单调，就是将散落的资料摆放好，而后将花园打扫干净，花卉和植物并不需要我来打理，陆老师和槿老师自会处理。”"
+        }
+      ],
+      "reactions": {
+        "DATA_H_music": {
+          "text": "每次听到这首古典乐都会让我觉得平静，巴赫真是一个伟大的音乐家。"
+        },
+        "DATA_T_sun": {
+          "text": "阳光会将一切罪恶化作灰烬。"
+        },
+        "DATA_V_huij": {
+          "text": "而灰烬是罪人最好的归宿。"
+        },
+        "CLUES_qsan": {
+          "text": "只要按下按钮，一切就会结束。"
+        }
+      },
+      "hiddenClue": {
+        "text": "获得线索：[clue:CLUES_zs]",
+        "ids": [
+          "CLUES_zs"
+        ]
+      },
+      "itemReactions": {
+        "ITEMS_changji": {
+          "text": "陆老师和槿老师知道我喜欢听音乐，特意为我准备了黑胶唱机。但两位老师似乎更喜欢安静的环境。"
+        },
+        "ITEMS_hy": {
+          "text": "6月，天气逐渐炎热了起来，槿老师却依然穿着长袖，偶尔会看到露出衣袖的……绷带？"
+        },
+        "ITEMS_yjh": {
+          "text": "洋金花……原来如此……那天我忽然困倦得不行，伏在书桌上睡着了……"
+        },
+        "ITEMS_rxbs": {
+          "text": "是我……将这把匕首插进了陆老师的腹部……"
+        },
+        "ITEMS_ccss": {
+          "text": "那根被血液浸透的绳索绕过我的脖子，粗糙的毛刺几乎马上扎进我的肉里，疼痛异常，就像一把锯子一样来回切割。"
+        },
+        "ITEMS_a4paper": {
+          "text": "献祭……捕获……我不知道陆老师和槿老师在忙些什么……这些文字让我非常不安。"
+        }
+      },
+      "sceneTalks": {
+        "SCENES_mdhm": [
+          {
+            "text": "“你是谁？”"
+          },
+          {
+            "text": "“请救救我们……”"
+          },
+          {
+            "text": "“陆老师……用绳子把我们勒住……醒来的时候我们就在这里了……”"
+          },
+          {
+            "text": "“那个人是植物所的所长傅柏。”"
+          },
+          {
+            "text": "“按钮……[clue:CLUES_qsan]，按下它我们就能出去了！”（TEC：在收集线索前请务必再次确认，此次选择有可能涉入过深，导致因果崩塌。）"
+          }
+        ],
+        "SCENES_0704": [
+          {
+            "text": "“今天是槿老师的生日。和往常一样，我打开了唱机，在水杯里倒满了水，而后开始整理工作。”"
+          },
+          {
+            "text": "“奇怪，今天的花园里到处都是灰烬，像是好几天没有打扫了一样。”"
+          },
+          {
+            "text": "“突如其来的困倦……我想睡一会儿。”"
+          }
+        ]
+      },
+      "avatar": "images/avatar_CHARS_zs.png"
+    },
+    "CHARS_TEC": {
+      "name": "TEC",
+      "desc": "您忠实的AI助手！",
+      "talkQueue": [
+        {
+          "text": "我是您忠实的AI助手！祝您捕获顺利！"
+        },
+        {
+          "text": "我会出现在某些特定的场景中，帮助你获得更多的信息。"
+        },
+        {
+          "text": "像我“出示”一些物品，或许我会给你一些有用的提示。"
+        }
+      ],
+      "reactions": {},
+      "sceneTalks": {
+        "SCENES_body": [
+          {
+            "text": "绷带是可以用剪刀剪开的。"
+          },
+          {
+            "text": "嗯……似乎有大量可以捕获的线索。"
+          }
+        ],
+        "SCENES_garden": [
+          {
+            "text": "黑影，你应该已经知道是什么了，所以出示照明工具看看清楚吧。查询一下物品档案，看看是否有合适的工具。"
+          }
+        ],
+        "SCENES_choutier": [
+          {
+            "text": "出示一下木盒让我看看。"
+          }
+        ],
+        "SCENES_mdhm": [
+          {
+            "text": "我想再次提醒你，对因果的过度干涉只会引来不必要的麻烦。"
+          }
+        ],
+        "SCENES_0602": [
+          {
+            "text": "已确认权限。以下是6月2日可解密档案。"
+          },
+          {
+            "text": "6月2日，傅柏在朱穗离开后，来到了花园。从三人的对话来看，傅柏似乎想要阻止陆珩松和槿杉的研究继续下去，但两人并未打算停止工作。"
+          },
+          {
+            "text": "某种被称为抑制素的物质，似乎马上就要制造成功，并且能够帮助两人最终完成研究。"
+          },
+          {
+            "text": "陆珩松希望傅柏能够帮两人拍摄一张合影。傅柏提到这是第三次拍摄类似的合影。"
+          },
+          {
+            "text": "傅柏的情绪看起来不佳，似乎没能阻止研究继续下去。"
+          },
+          {
+            "text": "之后，三人似乎进行了长时间的沟通交流。傅柏在18:13左右离开了花园。"
+          }
+        ],
+        "SCENES_0704": [
+          {
+            "text": "已确认权限。以下是7月4日可解密档案。"
+          },
+          {
+            "text": "7月4日，朱穗喝下了被放入洋金花毒素的水，导致暂时昏迷。由于剂量上的失误，她很快就醒了过来。"
+          },
+          {
+            "text": "此时陆珩松正手持注射器，想要将某种液体注入朱穗体内。"
+          },
+          {
+            "text": "朱穗拼命挣扎，慌乱之中拿起桌上的美工刀，插入了陆珩松的腹部。而后逃离了花园。"
+          },
+          {
+            "text": "陆珩松因疼痛昏迷，再次醒来时，已经处于失血过多的状态，加之本身虚弱的身体，几乎处于濒死状态。"
+          },
+          {
+            "text": "陆珩松之后的行为极其古怪：没有进行任何自救，或报警，而是用一条绳子将自己吊在了花园之中。"
+          },
+          {
+            "text": "陆珩松最终是因为上吊而死，还是因为失血过多死亡，需要进一步鉴定。"
+          }
+        ],
+        "SCENES_cjag": [
+          {
+            "text": "出示这张合影给我，我有一些想法。"
+          },
+          {
+            "text": "黑胶可以放入唱机中播放，或许有新的发现。"
+          }
+        ],
+        "SCENES_lhsdst": [
+          {
+            "text": "找到唱针了！还有一张奇怪的纸。"
+          }
+        ]
+      },
+      "itemReactions": {
+        "ITEMS_hy": {
+          "text": "三张合影似乎是不同时间拍的……6月2日，显然不是普通的一天！可以前往看看。"
+        },
+        "ITEMS_jzmh": {
+          "text": "密码是四个数字……等等，密码似乎被更改过一次！这次任务出现的数字组合并不多，如果实在猜不来就都试试吧。"
+        },
+        "ITEMS_turename": {
+          "text": "就是真结局。"
+        },
+        "ITEMS_sxbj": {
+          "text": "我记得有一张纸，上面好像写了某种植物，找到那个植物，并出示给它试试。"
+        }
+      },
+      "avatar": "images/avatar_CHARS_TEC.png"
+    }
+  },
+  "clues": {
+    "DATA_T_sun": {
+      "label": "阳光",
+      "type": "touch",
+      "desc": "灼热的阳光穿透了玻璃窗。"
+    },
+    "DATA_V_huij": {
+      "label": "灰烬",
+      "type": "vision",
+      "desc": "漫天灰烬"
+    },
+    "DATA_H_music": {
+      "label": "G弦上的咏叹调",
+      "type": "hearing",
+      "desc": "《G弦上的咏叹调》是德国作曲家巴赫（Johann Sebastian Bach 1685年3月21日—1750年7月28日）创作的《第三号管弦乐组曲》第二乐章主题。"
+    },
+    "CLUES_V_luheng": {
+      "label": "植物学家陆珩松",
+      "type": "vision",
+      "desc": "植物学家陆珩松。"
+    },
+    "CLUES_gcs": {
+      "label": "贯穿伤",
+      "type": "vision",
+      "desc": "被利器从下腹部插入，留下了一道深深的伤口。"
+    },
+    "CLUES_wmhj": {
+      "label": "陆珩松的录音",
+      "type": "hearing",
+      "desc": "JS，当你听到这个录音的时候，我距离解开了所有的秘密只有一步之遥了。但我的时间已经不够了……我留下了足够你理解的笔记，也只有你能完成最后的步骤。现在，我可以安静等待死亡，以及与你重逢了。另外，在万事俱备之前，无论如何都不要拉开帘幕。"
+    },
+    "CLUES_JS": {
+      "label": "植物学家槿杉",
+      "type": "vision",
+      "desc": "植物学家槿杉。"
+    },
+    "CLUES_nm": {
+      "label": "鸟鸣",
+      "type": "hearing",
+      "desc": "隐隐约约听到类似鹦哥的鸣叫。"
+    },
+    "CLUES_CBKW": {
+      "label": "草本的苦味",
+      "type": "taste",
+      "desc": "一股淡淡的苦味。"
+    },
+    "CLUES_mc": {
+      "label": "毛刺",
+      "type": "touch",
+      "desc": "绳索上坚硬的毛刺，如同一根根针。"
+    },
+    "CLUES_xds": {
+      "label": "呋喃香豆素",
+      "type": "smell",
+      "desc": "呋喃香豆素"
+    },
+    "CLUES_fb": {
+      "label": "植物研究所所长傅柏",
+      "type": "vision",
+      "desc": "植物研究所所长傅柏"
+    },
+    "CLUES_zs": {
+      "label": "朱穗",
+      "type": "vision",
+      "desc": "助手"
+    },
+    "CLUES_yzs": {
+      "label": "抑制素",
+      "type": "taste",
+      "desc": "从陆珩松体内提取出的特殊物质。"
+    },
+    "CLUES_qsan": {
+      "label": "墙上的按钮",
+      "type": "touch",
+      "desc": "按下墙上的按钮。"
+    },
+    "CLUES_zhpt": {
+      "label": "最后的一块拼图",
+      "type": "touch",
+      "desc": "距离成功只有一步之遥。"
+    },
+    "CLUES_mgd": {
+      "label": "染血的美工刀",
+      "type": "vision",
+      "desc": "一把染血的美工刀，被藏在带着密码锁的木盒之中。"
+    },
+    "CLUES_yjhds": {
+      "label": "洋金花毒素",
+      "type": "taste",
+      "desc": "全株有毒，毒性成分主要是东莨菪碱、阿托品和山莨菪碱等生物碱。"
+    },
+    "CLUES_a4": {
+      "label": "A4大小的纸",
+      "type": "vision",
+      "desc": "一张写着献祭与捕获的纸。"
+    },
+    "CLUES_cjdcy": {
+      "label": "初级调查员",
+      "type": "vision",
+      "desc": "初级调查员"
+    }
+  },
+  "memories": [
+    {
+      "id": "MEM_0602_lhs",
+      "when": "SCENES_0602",
+      "where": "SCENES_garden",
+      "who": "CHARS_luhengs",
+      "title": "6月2日 · 陆珩松",
+      "script": [
+        { "t": "narr", "text": "花园里，槿杉把最后一盆标本摆回架上。傅柏举着相机，迟迟没有按下快门。" },
+        { "t": "say", "who": "NPC_FB", "text": "已经是第三次为他们拍摄合影了。" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "我请求傅老师再帮我们拍一张合影，但傅老师的脸色一下就变得很难看。" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "他一言不发，举起了相机。" },
+        { "t": "say", "who": "CHARS_JS", "text": "快要成功了，再试试吧。" },
+        { "t": "narr", "text": "快门落下的那一瞬，槿杉露出了笑容。那是陆珩松后来反复想起的画面。" }
+      ]
+    },
+    {
+      "id": "MEM_0602_fb",
+      "when": "SCENES_0602",
+      "where": "SCENES_garden",
+      "who": "NPC_FB",
+      "title": "6月2日 · 傅柏",
+      "script": [
+        { "t": "narr", "text": "每到 6月2日，傅柏都会带着相机来花园。这一天的光线，他记得比谁都清楚。" },
+        { "t": "say", "who": "NPC_FB", "text": "已经是第三次为他们拍摄合影了。" },
+        { "t": "say", "who": "NPC_FB", "text": "我总觉得这样的研究不应该再继续下去了。" },
+        { "t": "say", "who": "CHARS_JS", "text": "缺少的抑制素，这次有头绪了。" },
+        { "t": "say", "who": "NPC_FB", "text": "但槿杉却还是微笑着。" },
+        { "t": "say", "who": "NPC_FB", "text": "那种痛苦，我无法承受。" },
+        { "t": "say", "who": "NPC_FB", "text": "有时候我常常跟珩松说，事情被重复十遍的时候，真相就会显现……我希望我是错的。" }
+      ]
+    },
+    {
+      "id": "MEM_0602_js",
+      "when": "SCENES_0602",
+      "where": "SCENES_garden",
+      "who": "CHARS_JS",
+      "title": "6月2日 · 槿杉",
+      "script": [
+        { "t": "narr", "text": "那天上午，槿杉在实验室与花园之间来回走了很多趟。她看起来比平时更轻快。" },
+        { "t": "say", "who": "CHARS_JS", "text": "快要成功了，再试试吧。" },
+        { "t": "say", "who": "CHARS_JS", "text": "缺少的抑制素，这次有头绪了。" },
+        { "t": "narr", "text": "她没有告诉任何人，这两句话她已经练习了很久。" }
+      ]
+    },
+    {
+      "id": "MEM_0602_zs",
+      "when": "SCENES_0602",
+      "where": "SCENES_garden",
+      "who": "CHARS_zs",
+      "title": "6月2日 · 朱穗",
+      "script": [
+        { "t": "narr", "text": "早上八点，朱穗抱着文件走进花园。灰尘比昨天多一些，她没有在意。" },
+        { "t": "narr", "text": "十点，清洁结束。她关上门，没有回头。" }
+      ]
+    },
+    {
+      "id": "MEM_0704_lhs",
+      "when": "SCENES_0704",
+      "where": "SCENES_garden",
+      "who": "CHARS_luhengs",
+      "title": "7月4日 · 陆珩松",
+      "script": [
+        { "t": "narr", "text": "花园之中，G弦的咏叹调反复播放着。朱穗伏在书桌之上，像是睡着了一般。" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "这次一定能行了。" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "只要将抑制剂注入体内，最后的一块拼图也就完成了。" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "我能让所有人都活下来。" },
+        { "t": "narr", "text": "他关掉唱机，握紧注射器，拖着沉重的脚步，慢慢靠近书桌。" }
+      ]
+    },
+    {
+      "id": "MEM_0704_zs",
+      "when": "SCENES_0704",
+      "where": "SCENES_garden",
+      "who": "CHARS_zs",
+      "title": "7月4日 · 朱穗",
+      "script": [
+        { "t": "narr", "text": "这一天是槿老师的生日。朱穗像往常一样走进花园。" },
+        { "t": "say", "who": "CHARS_zs", "text": "今天是槿老师的生日。和往常一样，我打开了唱机，在水杯里倒满了水，而后开始整理工作。" },
+        { "t": "say", "who": "CHARS_zs", "text": "奇怪，今天的花园里到处都是灰烬，像是好几天没有打扫了一样。" },
+        { "t": "say", "who": "CHARS_zs", "text": "突如其来的困倦……我想睡一会儿。" },
+        { "t": "narr", "text": "她伏在书桌上，再也没有抬起头。" }
+      ]
+    }
+  ],
+  "dialogues": [
+    {
+      "id": "DLG_garden_review",
+      "participants": ["CHARS_zs", "NPC_FB", "CHARS_JS"],
+      "script": [
+        { "t": "narr", "text": "清理残叶时，傅柏注意到朱穗停在一张旧标本前。" },
+        { "t": "say", "who": "CHARS_zs", "text": "这页配比要留档吗？纸边已经发黑了。" },
+        { "t": "say", "who": "CHARS_JS", "text": "先别碰那一页，背面的剂量才是陆师兄反复改的地方。" },
+        { "t": "say", "who": "NPC_FB", "text": "槿杉，你知道他们已经走到哪一步了，对吗？" },
+        { "t": "say", "who": "CHARS_JS", "text": "我只知道，再晚一步，花魄就再也拦不回去了。" },
+        { "t": "say", "who": "CHARS_zs", "text": "那我把它单独收好，等你们决定怎么处理。" }
+      ]
+    },
+    {
+      "id": "DLG_0704_zs_lhs",
+      "when": "SCENES_0704",
+      "where": "SCENES_garden",
+      "participants": ["CHARS_zs", "CHARS_luhengs"],
+      "script": [
+        { "t": "narr", "text": "花园里只剩G弦的咏叹调。朱穗伏在书桌上，呼吸浅得像是随时会断。" },
+        { "t": "say", "who": "CHARS_zs", "text": "陆老师……？我好像睡着了。" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "别动。很快就结束了。" },
+        { "t": "say", "who": "CHARS_zs", "text": "你手里拿的是什么？" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "抑制剂。只差最后一步，我就能让所有人都活下来。" },
+        { "t": "say", "who": "CHARS_zs", "text": "所有人……包括槿老师，也包括我吗？" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "朱穗，你只要再睡一会儿。" },
+        { "t": "narr", "text": "针尖逼近。朱穗猛地挣开，手在落满灰烬的桌面上胡乱摸索。" },
+        { "t": "say", "who": "CHARS_zs", "text": "别过来——！" },
+        { "t": "narr", "text": "慌乱之中，她握住了美工刀，向前刺出。陆珩松闷哼一声，松开了手。" },
+        { "t": "say", "who": "CHARS_zs", "text": "对不起……对不起……" },
+        { "t": "narr", "text": "她推开花园的门，逃进夜里。身后的唱机还在转。" }
+      ]
+    },
+    {
+      "id": "DLG_lhs_alone",
+      "participants": ["CHARS_luhengs"],
+      "script": [
+        { "t": "narr", "text": "陆珩松把录音针挪近了一点，像是怕惊动谁。" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "如果这段被听见，先记住，我没有把失败算在槿杉头上。" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "真正让我停不下来的，是每次都想再多救一个人。" },
+        { "t": "say", "who": "CHARS_luhengs", "text": "花魄若能留下一线生机，就值得我把这条路走完。" }
+      ]
+    }
+  ],
+  "endings": [
+    {
+      "id": "END_NORMAL",
+      "name": "重逢之时",
+      "recipe": [
+        "CLUES_JS",
+        "CLUES_wmhj",
+        "CLUES_zhpt"
+      ],
+      "isTrueCapture": false,
+      "message": "槿杉按照录音的指引，达成了复活陆珩松的所有先决条件，其中最后一块拼图就是对抗呋喃香豆素的抑制素。抑制素的获取是一场毫无人性的折磨，陆珩松不断往自己体内注射呋喃香豆素以形成抗体，而后再抽取血液进行配置，多次实验之后，终于获得成熟的物质。槿杉将其注入已经形成的陆珩松的身体之中，静静等待，直到听见从树丛中传来的鸟鸣，而后逐渐变成低语。树叶被拨开，陆珩松的脚步有些飘忽，但这是再正常不过的现象，那个熟悉的声音越来越清晰：JS。两人再次于花园之中重逢。"
+    },
+    {
+      "id": "TRUE_E",
+      "name": "真名捕获：花魄",
+      "truename": "花魄",
+      "recipe": [
+        "CLUES_V_luheng",
+        "CLUES_nm",
+        "CLUES_mc",
+        "CLUES_CBKW",
+        "CLUES_xds"
+      ],
+      "isTrueCapture": true,
+      "lines": [
+        {
+          "text": "献祭吊死之人的灵魂...",
+          "delay": 500
+        },
+        {
+          "text": "打破阳光的诅咒...躯体将于灰烬之中重生。",
+          "delay": 1500
+        },
+        {
+          "text": "于鸟鸣之中重塑因果。",
+          "delay": 2500
+        },
+        {
+          "text": "真名得以捕获。",
+          "delay": 3500
+        }
+      ],
+      "message": "真名的形成需要生命献祭和物质捕获两个必要条件。此地被称为花魄的真名，需要通过吊颈的方式献祭生命，由此形成特殊物质，该物质含有巨量的呋喃香豆素，是最终形成人体的基础，为了制作出完整的人，陆珩松使用了多个实验体，它们有一些共同现象，实验体的成熟分成三个阶段，在第一阶段，实验体的身体非常小，呈现半透明状态，但已经拥有了完整的成人形态，大约三天左右，实验体开始变大，并且逐步恢复发音功能，发出类似鹦哥的鸟鸣，一些实验体在这个阶段就停止了成长并急速死亡，死亡的个体血液中带有浓烈的草本苦味。而存活下来的实验体会继续成长为完整的形态，与正常人类别无二致，但会丢失部分此前的记忆，不会认为自己曾经死亡。成熟的实验体此时面临的最大问题是，含有巨量呋喃香豆素的实验体一旦接触到阳光就会被烧成灰烬，陆珩松不得不反复实验，数个实验体就这样死亡、复活，不断循环……"
+    },
+    {
+      "id": "END_sun",
+      "name": "残存之躯",
+      "recipe": [
+        "CLUES_qsan",
+        "DATA_T_sun",
+        "DATA_V_huij"
+      ],
+      "message": "铁栅栏被打开了，朱穗大口呼吸着，而后快步走向黑色的帘幕，将其缓缓拉开，阳光逐渐膨胀，充满了整个花园。在接触到阳光的一瞬间，朱穗立刻变为了灰烬，而后阳光蔓延至暗室之中，傅柏的身体先是如同土地皲裂一般，接着灰烬如同黑色的液体般涌出身体的裂缝，两人都被阳光焚尽，化为乌有。只有吊在花园中心的陆珩松，孤独着慢慢腐烂……"
+    },
+    {
+      "id": "END_zyf",
+      "name": "罪与罚",
+      "recipe": [
+        "CLUES_yzs",
+        "CLUES_zs",
+        "CLUES_gcs",
+        "CLUES_mgd",
+        "CLUES_yjhds",
+        "DATA_H_music"
+      ],
+      "message": "洋金花毒素的效果并没有持续很久，朱穗从昏迷中醒来，看到了手持注射器的陆珩松，慌乱之中，朱穗摸到了放在手写资料下的美工刀，将其捅进了陆珩松的下腹部。剧痛加之本就虚弱的身体，陆珩松昏倒在地。朱穗将美工刀藏入木盒之中，设置了一个只有自己知道的密码0321，逃离了花园。苏醒的陆珩松，忍着剧痛和逐渐飘散的意识爬向了绳索，并将自己吊了起来……"
+    },
+    {
+      "id": "END_xjbh",
+      "name": "献祭与捕获",
+      "recipe": [
+        "CLUES_a4",
+        "CLUES_fb"
+      ],
+      "message": "傅柏的自述：我只是无意之间提到，一种类似黑魔法的方式或许能够治愈槿杉的奇怪疾病，没想到两人都表现出极其浓厚的兴趣。于是我不得不将这种古老而邪恶的方式告诉了陆和槿，两人很快将其付诸实践。概括而言，就是献祭和捕获，献祭某些珍贵的东西，以捕获某些等价的事物，但别忘记了，世界上并无绝对的公平可言，古老的方式，总是伴随着未知的风险。代价往往大于所得。而人类一旦发现所得的事物正是自己梦寐以求的，很容易便会陷入偏执，完全忽视代价，等在前方的或许只有悲剧。真有趣。"
+    }
+  ]
+}

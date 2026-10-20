@@ -1,0 +1,103 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_drn6t"]
+[ext_resource type="Script" path="res://core/defs/ConditionDef.gd" id="2_8jja2"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_JS.tres" id="3_i13nu"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_wmhj.tres" id="4_bwhb6"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zhpt.tres" id="5_h665q"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_V_luheng.tres" id="6_8ksr6"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_nm.tres" id="7_uoahb"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_mc.tres" id="8_i6kdj"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_CBKW.tres" id="9_xpcde"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_xds.tres" id="10_fg1vv"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_yzs.tres" id="11_andme"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zs.tres" id="12_6tq4b"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_gcs.tres" id="13_8g8nx"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_mgd.tres" id="14_yu5l5"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_yjhds.tres" id="15_00g08"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="16_c7kt0"]
+[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="17_hhwqr"]
+[ext_resource type="Script" path="res://core/defs/commands/ConditionalCommandDef.gd" id="18_umswc"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="19_c8qb6"]
+
+[sub_resource type="Resource" id="Resource_0uc8v"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("3_i13nu")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_elxh3"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("4_bwhb6")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_qc3gc"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("5_h665q")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_44dj7"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("6_8ksr6")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_p1l51"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("7_uoahb")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_tgw60"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("8_i6kdj")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_hyuqh"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("9_xpcde")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_mq716"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("10_fg1vv")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_61du5"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("11_andme")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_e0p4i"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("12_6tq4b")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_72y6x"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("13_8g8nx")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_vq7to"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("14_yu5l5")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_6tgkj"]
+script = ExtResource("2_8jja2")
+clue = ExtResource("15_00g08")
+fail_message = "疯长的植物层层叠叠"
+
+[sub_resource type="Resource" id="Resource_gnb8l"]
+script = ExtResource("17_hhwqr")
+message = "你拨开了疯长的大豕草，一扇隐蔽的铁门出现在你的面前，门的后面隐约有声音传出。（如果你已做好准备，请在互动指令中输入“前往 门的后面”）"
+
+[sub_resource type="Resource" id="Resource_kaqga"]
+script = ExtResource("18_umswc")
+conditions = Array[ExtResource("2_8jja2")]([SubResource("Resource_0uc8v"), SubResource("Resource_elxh3"), SubResource("Resource_qc3gc"), SubResource("Resource_44dj7"), SubResource("Resource_p1l51"), SubResource("Resource_tgw60"), SubResource("Resource_hyuqh"), SubResource("Resource_mq716"), SubResource("Resource_61du5"), SubResource("Resource_e0p4i"), SubResource("Resource_72y6x"), SubResource("Resource_vq7to"), SubResource("Resource_6tgkj")])
+on_success = SubResource("Resource_gnb8l")
+label = "仔细观察"
+
+[resource]
+script = ExtResource("16_c7kt0")
+id = "ITEMS_zhiwu"
+label = "植物"
+desc = "常见或不常见的植物被放置在不同的地方，有的被打翻在地，有的甚至已经被踩烂。它们被遗落在此地，自生自灭。"
+commands = Array[ExtResource("1_drn6t")]([SubResource("Resource_kaqga")])

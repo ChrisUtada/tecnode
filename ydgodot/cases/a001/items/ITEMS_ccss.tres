@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_ljlx5"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_2h1kp"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="3_ikslc"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_mc.tres" id="4_ce506"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="5_5wcn4"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="6_upcah"]
+
+[sub_resource type="Resource" id="Resource_4on64"]
+script = ExtResource("5_5wcn4")
+text = "[clue:CLUES_mc]硬得如同针一般，轻易就扎破了手指。鲜血很快就被吸收了。"
+clues = Array[ExtResource("3_ikslc")]([ExtResource("4_ce506")])
+
+[resource]
+script = ExtResource("6_upcah")
+id = "ITEMS_ccss"
+label = "粗糙的绳索"
+desc = "粗大的绳索边缘因摩擦产生了大量的毛刺，黑红的血液已经渗入绳索之中。"
+can_be_picked = true
+hidden_clue = SubResource("Resource_4on64")

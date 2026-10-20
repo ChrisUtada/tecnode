@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_s6b48"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_y4upp"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="3_2ebrt"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_cjdcy.tres" id="4_jsb7b"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="5_dur3o"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="6_1yk3f"]
+
+[sub_resource type="Resource" id="Resource_75dod"]
+script = ExtResource("5_dur3o")
+text = "获得线索：[clue:CLUES_cjdcy]"
+clues = Array[ExtResource("3_2ebrt")]([ExtResource("4_jsb7b")])
+
+[resource]
+script = ExtResource("6_1yk3f")
+id = "ITEMS_cjdcy"
+label = "初级调查员"
+desc = "调查员分为初级、中级、高级三个等级，每一个等级能够介入的因果各有不同，获得的T.E.C-OS的权限也不同。"
+hidden_clue = SubResource("Resource_75dod")

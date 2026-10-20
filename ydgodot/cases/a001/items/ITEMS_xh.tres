@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_p82t2"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_n5pog"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="3_a1kqr"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_CBKW.tres" id="4_hg0ny"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="5_dlp85"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="6_1t7cx"]
+
+[sub_resource type="Resource" id="Resource_tvx1c"]
+script = ExtResource("5_dlp85")
+text = "干硬的血迹有一股[clue:CLUES_CBKW]。"
+clues = Array[ExtResource("3_a1kqr")]([ExtResource("4_hg0ny")])
+
+[resource]
+script = ExtResource("6_1t7cx")
+id = "ITEMS_xh"
+label = "血痕"
+desc = "被绳索的毛刺磨烂的脖颈上，出现一道深深的血痕。"
+hidden_clue = SubResource("Resource_tvx1c")

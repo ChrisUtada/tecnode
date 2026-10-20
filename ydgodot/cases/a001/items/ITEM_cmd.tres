@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_8tfvx"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_j5puk"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_42iyu"]
+
+[resource]
+script = ExtResource("3_42iyu")
+id = "ITEM_cmd"
+label = "命令帮助"
+desc = "<br>查询 物品：通过指令查询 物品 可以查询物品的描述信息<br>
+前往 场景：有的时候场景中没有出现导航帮助你离开，你可以使用该命令自由前往任意场景<br>
+捕获 物品/角色/场景：这是一个重要命令，你可以捕获隐藏的线索，请经常使用它。<br>
+出示 物品/线索 人物/物品：这也是一个常用的命令，能够帮助你找到一些隐藏的内容，以及和一些人物和物品互动<br>以上命令 请善加利用。"

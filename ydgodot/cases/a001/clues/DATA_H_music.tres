@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ClueDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_mj4ga"]
+
+[resource]
+script = ExtResource("1_mj4ga")
+id = "DATA_H_music"
+label = "G弦上的咏叹调"
+sense = "hearing"
+desc = "《G弦上的咏叹调》是德国作曲家巴赫（Johann Sebastian Bach 1685年3月21日—1750年7月28日）创作的《第三号管弦乐组曲》第二乐章主题。"

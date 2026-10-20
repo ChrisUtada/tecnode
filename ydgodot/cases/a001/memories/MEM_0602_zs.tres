@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="MemoryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/MemoryDef.gd" id="1_4eein"]
+[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="2_v0dwy"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="3_acu88"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="4_cm7jp"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_zs.tres" id="5_t8f1h"]
+
+[sub_resource type="Resource" id="Resource_yupyr"]
+script = ExtResource("2_v0dwy")
+text = "早上八点，朱穗抱着文件走进花园。灰尘比昨天多一些，她没有在意。"
+
+[sub_resource type="Resource" id="Resource_28o0d"]
+script = ExtResource("2_v0dwy")
+text = "十点，清洁结束。她关上门，没有回头。"
+
+[resource]
+script = ExtResource("1_4eein")
+id = "MEM_0602_zs"
+when = ExtResource("3_acu88")
+where = ExtResource("4_cm7jp")
+who = ExtResource("5_t8f1h")
+title = "6月2日 · 朱穗"
+script_lines = Array[ExtResource("2_v0dwy")]([SubResource("Resource_yupyr"), SubResource("Resource_28o0d")])

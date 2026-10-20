@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_cbnn1"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_mbyf7"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_ri33h"]
+
+[resource]
+script = ExtResource("3_ri33h")
+id = "ITEMS_cz"
+label = "唱针"
+desc = "安装上唱针，唱机就能播放黑胶唱片了。"
+can_be_picked = true

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ClueDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_ctsyx"]
+
+[resource]
+script = ExtResource("1_ctsyx")
+id = "CLUES_zhpt"
+label = "最后的一块拼图"
+sense = "touch"
+desc = "距离成功只有一步之遥。"

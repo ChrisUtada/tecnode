@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ClueDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_1h0md"]
+
+[resource]
+script = ExtResource("1_1h0md")
+id = "CLUES_zs"
+label = "朱穗"
+desc = "助手"

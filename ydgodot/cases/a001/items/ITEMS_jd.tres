@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_rqb2e"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_r1w5i"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_cbjo4"]
+
+[resource]
+script = ExtResource("3_cbjo4")
+id = "ITEMS_jd"
+label = "剪刀"
+desc = "一把锋利的剪刀。"
+can_be_picked = true

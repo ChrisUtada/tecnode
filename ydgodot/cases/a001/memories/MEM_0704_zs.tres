@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="MemoryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/MemoryDef.gd" id="1_y8nsm"]
+[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="2_nqoum"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_zs.tres" id="3_4rh26"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0704.tres" id="4_mq812"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="5_fsxd2"]
+
+[sub_resource type="Resource" id="Resource_g5jr1"]
+script = ExtResource("2_nqoum")
+text = "这一天是槿老师的生日。朱穗像往常一样走进花园。"
+
+[sub_resource type="Resource" id="Resource_ydou0"]
+script = ExtResource("2_nqoum")
+kind = "say"
+who = ExtResource("3_4rh26")
+text = "今天是槿老师的生日。和往常一样，我打开了唱机，在水杯里倒满了水，而后开始整理工作。"
+
+[sub_resource type="Resource" id="Resource_u4lvm"]
+script = ExtResource("2_nqoum")
+kind = "say"
+who = ExtResource("3_4rh26")
+text = "奇怪，今天的花园里到处都是灰烬，像是好几天没有打扫了一样。"
+
+[sub_resource type="Resource" id="Resource_rvwqp"]
+script = ExtResource("2_nqoum")
+kind = "say"
+who = ExtResource("3_4rh26")
+text = "突如其来的困倦……我想睡一会儿。"
+
+[sub_resource type="Resource" id="Resource_mci8c"]
+script = ExtResource("2_nqoum")
+text = "她伏在书桌上，再也没有抬起头。"
+
+[resource]
+script = ExtResource("1_y8nsm")
+id = "MEM_0704_zs"
+when = ExtResource("4_mq812")
+where = ExtResource("5_fsxd2")
+who = ExtResource("3_4rh26")
+title = "7月4日 · 朱穗"
+script_lines = Array[ExtResource("2_nqoum")]([SubResource("Resource_g5jr1"), SubResource("Resource_ydou0"), SubResource("Resource_u4lvm"), SubResource("Resource_rvwqp"), SubResource("Resource_mci8c")])

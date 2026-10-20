@@ -1,0 +1,373 @@
+class_name GraphState
+extends RefCounted
+## 画布图状态（纯逻辑，不依赖场景树 —— 无头测试可直接 new）
+##
+## 与 Web 版 `02-state.js` 的最小同构子集：节点表 / 边表 / 已探索 / 已捕获 / 点亮 / 分析进度。
+## P0 只保留切片需要的字段；P1 补齐快照、撤销栈、收纳、时间档等。
+
+const SCENE_W := 152.0
+const SCENE_H := 54.0
+const ENT_W := 130.0
+const ENT_H := 46.0
+
+var case_def: CaseLoader
+var nodes: Dictionary = {}        # key -> {key, kind, id, label, x, y, lit, home_scene, pinned, bag_from}
+var edges: Array = []             # {a: key, b: key, rel: "entity"|"move"|"cond"}
+var explored: Dictionary = {}     # 容器 id -> true（场景与容器物品共用）
+var captured: Dictionary = {}     # clue id -> true
+var tec_prog: Dictionary = {}     # scene id -> 已分析条数
+var collapsed: Dictionary = {}    # 容器 id -> true（展开过又收起）
+var stored: Dictionary = {}       # node key -> 收纳去向（"BAG" / "LEDGER" / "MATRIX" / 场景 id）
+var hidden: Dictionary = {}       # node key -> true（被更高层级的动作隐藏）
+var selected: String = ""
+var last_scene: String = ""
+
+## 三个收纳落点（与 Web 版 06-storage.js / 12-panels.js / 13-matrix.js 同名）
+const BAG := "BAG"                # 证物袋：什么都收
+const LEDGER := "LEDGER"          # 线索册：只有线索能进
+const MATRIX := "MATRIX"          # 推演桌布：归位的线索
+
+
+func _init(p_case: CaseLoader) -> void:
+	case_def = p_case
+
+
+func key_of(kind: String, id: String) -> String:
+	return "%s:%s" % [kind, id]
+
+
+func has(kind: String, id: String) -> bool:
+	return nodes.has(key_of(kind, id))
+
+
+func node(key: String) -> Dictionary:
+	return nodes.get(key, {})
+
+
+func add_node(kind: String, id: String) -> Dictionary:
+	var key := key_of(kind, id)
+	if nodes.has(key):
+		return nodes[key]
+	var n := {
+		"key": key,
+		"kind": kind,
+		"id": id,
+		"label": case_def.label_of(kind, id),
+		"x": 0.0,
+		"y": 0.0,
+		"lit": false,
+		"home_scene": "",
+		"pinned": false,     # 钉住：折叠容器时不跟着藏（Web 版右键钉住）
+		"bag_from": "",      # 进袋前的来源容器 id（袋清单标注「来自 ×××」）
+		"installed": {},      # 装在本节点上的零件（item id -> true）
+	}
+	nodes[key] = n
+	return n
+
+
+func link(a: String, b: String, rel: String) -> void:
+	if a == b:
+		return
+	for e in edges:
+		if e["rel"] == rel and ((e["a"] == a and e["b"] == b) or (e["a"] == b and e["b"] == a)):
+			return
+	edges.append({"a": a, "b": b, "rel": rel})
+
+
+func has_edge(a: String, b: String, rel: String = "") -> bool:
+	for e in edges:
+		if rel != "" and e["rel"] != rel:
+			continue
+		if (e["a"] == a and e["b"] == b) or (e["a"] == b and e["b"] == a):
+			return true
+	return false
+
+
+## 删节点（连同它的边）—— 对齐 Web 的 deleteNode
+func delete_node(key: String) -> bool:
+	if not nodes.has(key):
+		return false
+	nodes.erase(key)
+	hidden.erase(key)
+	stored.erase(key)
+	var kept: Array = []
+	for e in edges:
+		if e["a"] != key and e["b"] != key:
+			kept.append(e)
+	edges = kept
+	return true
+
+
+## 工具是不是「可复用」（config.reusableTools）—— 可复用的工具用完不消失
+func is_reusable_tool(id: String) -> bool:
+	if case_def == null or case_def.case_def == null:
+		return false
+	for it in case_def.case_def.reusable_tools:
+		if it != null and it.id == id:
+			return true
+	return false
+
+
+func neighbors(key: String) -> Array:
+	var out: Array = []
+	for e in edges:
+		if e["a"] == key:
+			out.append(e["b"])
+		elif e["b"] == key:
+			out.append(e["a"])
+	return out
+
+
+## 展开一个场景：建容器节点 + 正文里点名的实体（item / char / clue / 互通的 loc）。
+## 幂等；返回本次新建的 key 列表。
+func reveal_scene(sid: String) -> Array:
+	var s := case_def.scene_of(sid)
+	if s == null:
+		return []
+	var fresh: Array = []
+	var sn := add_node("loc", sid)
+	if not explored.has(sid):
+		fresh.append(sn["key"])
+	explored[sid] = true
+	last_scene = sid
+
+	for tag in case_def.tags_of(s.content):
+		var kind: String = tag["kind"]
+		var id: String = tag["id"]
+		if kind == "char" and id == "CHARS_TEC":
+			continue                      # TEC 常驻，不上画布（与 Web 版 sceneTags 同口径）
+		var existed := has(kind, id)
+		var n := add_node(kind, id)
+		if String(n.get("home_scene", "")) == "":
+			n["home_scene"] = sid
+		if not existed:
+			fresh.append(n["key"])
+		link(sn["key"], n["key"], "move" if kind == "loc" else "entity")
+	return fresh
+
+
+# ── 容器（场景 / 书桌这类带 content 的物品）────────────────────────────
+
+## 是不是「容器」：场景，或 content 里带标签的物品（书桌 / 抽屉 / 垃圾桶）
+func is_container(kind: String, id: String) -> bool:
+	if kind == "loc":
+		return case_def.scene_of(id) != null
+	if kind != "item":
+		return false
+	var it := case_def.item_of(id)
+	return it != null and case_def.tags_of(it.content).size() > 0
+
+
+func container_content(kind: String, id: String) -> String:
+	if kind == "loc":
+		var s := case_def.scene_of(id)
+		return s.content if s != null else ""
+	var it := case_def.item_of(id)
+	return it.content if it != null else ""
+
+
+## 展开任意容器（场景或容器物品）：长出它 content 里点名的实体，连 entity 边。
+## 与 reveal_scene 的唯一区别：容器本身不一定是 loc。幂等，返回新 key 列表。
+func reveal_container(kind: String, id: String) -> Array:
+	if not is_container(kind, id):
+		return []
+	var fresh: Array = []
+	var host_key := key_of(kind, id)
+	var host := add_node(kind, id)
+	if not explored.has(id):
+		fresh.append(host["key"])
+	explored[id] = true
+	collapsed.erase(id)
+
+	for tag in case_def.tags_of(container_content(kind, id)):
+		var k: String = tag["kind"]
+		var cid: String = tag["id"]
+		if k == "char" and cid == "CHARS_TEC":
+			continue
+		var existed := has(k, cid)
+		var n := add_node(k, cid)
+		if String(n.get("home_scene", "")) == "":
+			n["home_scene"] = id
+		if not existed:
+			fresh.append(n["key"])
+		link(host_key, n["key"], "move" if k == "loc" else "entity")
+	return fresh
+
+
+## 折叠：把容器自己标记为「已收起」（画面上保留节点，内容不再展开）
+func collapse(id: String) -> void:
+	collapsed[id] = true
+	recompute_hidden()
+
+
+func uncollapse(id: String) -> void:
+	collapsed.erase(id)
+	recompute_hidden()
+
+
+func is_collapsed(id: String) -> bool:
+	return collapsed.has(id)
+
+
+# ── 收纳 / 隐藏 ────────────────────────────────────────────────────────
+
+func store(key: String, where: String) -> void:
+	stored[key] = where
+
+
+func take(key: String) -> String:
+	var where := String(stored.get(key, ""))
+	stored.erase(key)
+	hidden.erase(key)
+	return where
+
+
+func set_hidden(key: String, on: bool) -> void:
+	if on:
+		hidden[key] = true
+	else:
+		hidden.erase(key)
+
+
+func is_visible(key: String) -> bool:
+	return not hidden.has(key) and not stored.has(key) and nodes.has(key)
+
+
+## 节点是不是「容器」—— 容器（场景 / 书桌 / 抽屉 / 垃圾桶）是不可收纳的落脚点
+## （对齐 Web 的 isContainerNode：容器进不了袋，也进不了册）
+func is_container_node(key: String) -> bool:
+	var n := node(key)
+	if n.is_empty():
+		return false
+	return is_container(String(n["kind"]), String(n["id"]))
+
+
+## 收进证物袋：什么都收（容器除外）。记下来源，供袋清单标注「来自 ×××」。
+func bag_store(key: String) -> bool:
+	var n := node(key)
+	if n.is_empty() or is_container_node(key) or stored.has(key):
+		return false
+	n["bag_from"] = String(n.get("home_scene", ""))
+	n["pinned"] = false
+	stored[key] = BAG
+	recompute_hidden()
+	return true
+
+
+## 收进线索册：只有线索能进
+func ledger_store(key: String) -> bool:
+	var n := node(key)
+	if n.is_empty() or stored.has(key):
+		return false
+	if String(n["kind"]) != "clue":
+		return false
+	n["pinned"] = false
+	stored[key] = LEDGER
+	recompute_hidden()
+	return true
+
+
+## 取回画布：从任一收纳处取回。落点可选（拖出来时给落点）。
+func take_back(key: String, x: float = -1.0, y: float = -1.0) -> bool:
+	if not stored.has(key):
+		return false
+	var n := node(key)
+	stored.erase(key)
+	hidden.erase(key)
+	n["pinned"] = false
+	if x >= 0.0 and y >= 0.0:
+		n["x"] = x
+		n["y"] = y
+	recompute_hidden()
+	return true
+
+
+## 两扇收纳窗之间搬运（证物袋 ↔ 线索册）：只改去向，不重排
+func restash(key: String, from: String, to: String) -> bool:
+	if not stored.has(key) or String(stored[key]) != from or from == to:
+		return false
+	var n := node(key)
+	n["pinned"] = false
+	if to == BAG:
+		n["bag_from"] = String(n.get("home_scene", ""))
+	else:
+		n["bag_from"] = ""
+	stored[key] = to
+	return true
+
+
+## 归位到推演桌布（线索 → 某感官槽位）
+func matrix_assign(key: String, sense: String) -> bool:
+	var n := node(key)
+	if n.is_empty() or String(n["kind"]) != "clue":
+		return false
+	var cl := case_def.clue_of(String(n["id"]))
+	if cl == null or cl.sense != sense:
+		return false
+	stored[key] = MATRIX
+	n["pinned"] = false
+	return true
+
+
+## 从推演桌布取回画布（桌布 → 线索册是 restash，那条走上面）
+func matrix_take(key: String, x: float = -1.0, y: float = -1.0) -> bool:
+	if String(stored.get(key, "")) != MATRIX:
+		return false
+	return take_back(key, x, y)
+
+
+## 折叠后的隐藏重算（对齐 Web 的 recomputeHidden）：
+##   折叠的容器住着的节点默认藏起来，但
+##   · 钉住的（pinned）不藏；
+##   · 与场外还有连线的（被用到别处）不藏。
+## 反复迭代到稳定（Web 版同款 while(changed) 写法）。
+func recompute_hidden() -> void:
+	for key in nodes.keys():
+		hidden.erase(key)
+	var changed := true
+	while changed:
+		changed = false
+		for cid in collapsed.keys():
+			var container_key := key_of("loc", String(cid))
+			if not nodes.has(container_key):
+				container_key = key_of("item", String(cid))
+			for key in nodes.keys():
+				var n: Dictionary = nodes[key]
+				if stored.has(key) or hidden.has(key) or bool(n.get("pinned", false)):
+					continue
+				if key == container_key:
+					continue
+				if String(n.get("home_scene", "")) != String(cid):
+					continue
+				# 与「保持可见」的节点还有边 → 不藏
+				var exported := false
+				for e in edges:
+					if e["a"] != key and e["b"] != key:
+						continue
+					var other_key: String = String(e["a"]) if e["a"] != key else String(e["b"])
+					if other_key == container_key:
+						continue
+					var other := node(other_key)
+					if other.is_empty():
+						continue
+					if hidden.has(other_key) or stored.has(other_key):
+						continue
+					if String(other.get("home_scene", "")) == String(cid):
+						continue
+					exported = true
+					break
+				if not exported:
+					hidden[key] = true
+					changed = true
+
+
+## 场景正文里列出的其他地点（[loc:X]）—— 拖场景到场景 = 前往的通路
+func scene_locs(sid: String) -> Array:
+	var out: Array = []
+	var s := case_def.scene_of(sid)
+	if s == null:
+		return out
+	for tag in case_def.tags_of(s.content):
+		if tag["kind"] == "loc":
+			out.append(tag["id"])
+	return out

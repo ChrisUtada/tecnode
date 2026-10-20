@@ -1,0 +1,81 @@
+[gd_resource type="Resource" script_class="DialogueDef" format=3]
+
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0704.tres" id="1_u3w02"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="2_jd7nq"]
+[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="3_r66df"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_zs.tres" id="4_iw4nm"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_luhengs.tres" id="5_l6b0j"]
+[ext_resource type="Script" path="res://core/defs/DialogueDef.gd" id="6_2dsyb"]
+[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="7_golp7"]
+
+[sub_resource type="Resource" id="Resource_fs36s"]
+script = ExtResource("7_golp7")
+text = "花园里只剩G弦的咏叹调。朱穗伏在书桌上，呼吸浅得像是随时会断。"
+
+[sub_resource type="Resource" id="Resource_6kuh1"]
+script = ExtResource("7_golp7")
+kind = "say"
+who = ExtResource("4_iw4nm")
+text = "陆老师……？我好像睡着了。"
+
+[sub_resource type="Resource" id="Resource_6lmrm"]
+script = ExtResource("7_golp7")
+kind = "say"
+who = ExtResource("5_l6b0j")
+text = "别动。很快就结束了。"
+
+[sub_resource type="Resource" id="Resource_3lm42"]
+script = ExtResource("7_golp7")
+kind = "say"
+who = ExtResource("4_iw4nm")
+text = "你手里拿的是什么？"
+
+[sub_resource type="Resource" id="Resource_e384v"]
+script = ExtResource("7_golp7")
+kind = "say"
+who = ExtResource("5_l6b0j")
+text = "抑制剂。只差最后一步，我就能让所有人都活下来。"
+
+[sub_resource type="Resource" id="Resource_wrbkv"]
+script = ExtResource("7_golp7")
+kind = "say"
+who = ExtResource("4_iw4nm")
+text = "所有人……包括槿老师，也包括我吗？"
+
+[sub_resource type="Resource" id="Resource_6f1nv"]
+script = ExtResource("7_golp7")
+kind = "say"
+who = ExtResource("5_l6b0j")
+text = "朱穗，你只要再睡一会儿。"
+
+[sub_resource type="Resource" id="Resource_gvad5"]
+script = ExtResource("7_golp7")
+text = "针尖逼近。朱穗猛地挣开，手在落满灰烬的桌面上胡乱摸索。"
+
+[sub_resource type="Resource" id="Resource_xyek5"]
+script = ExtResource("7_golp7")
+kind = "say"
+who = ExtResource("4_iw4nm")
+text = "别过来——！"
+
+[sub_resource type="Resource" id="Resource_7nbem"]
+script = ExtResource("7_golp7")
+text = "慌乱之中，她握住了美工刀，向前刺出。陆珩松闷哼一声，松开了手。"
+
+[sub_resource type="Resource" id="Resource_w72tr"]
+script = ExtResource("7_golp7")
+kind = "say"
+who = ExtResource("4_iw4nm")
+text = "对不起……对不起……"
+
+[sub_resource type="Resource" id="Resource_dh56e"]
+script = ExtResource("7_golp7")
+text = "她推开花园的门，逃进夜里。身后的唱机还在转。"
+
+[resource]
+script = ExtResource("6_2dsyb")
+id = "DLG_0704_zs_lhs"
+participants = Array[ExtResource("3_r66df")]([ExtResource("4_iw4nm"), ExtResource("5_l6b0j")])
+context_when = ExtResource("1_u3w02")
+context_where = ExtResource("2_jd7nq")
+script_lines = Array[ExtResource("7_golp7")]([SubResource("Resource_fs36s"), SubResource("Resource_6kuh1"), SubResource("Resource_6lmrm"), SubResource("Resource_3lm42"), SubResource("Resource_e384v"), SubResource("Resource_wrbkv"), SubResource("Resource_6f1nv"), SubResource("Resource_gvad5"), SubResource("Resource_xyek5"), SubResource("Resource_7nbem"), SubResource("Resource_w72tr"), SubResource("Resource_dh56e")])

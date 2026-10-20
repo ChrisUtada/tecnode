@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="MemoryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/MemoryDef.gd" id="1_r20ic"]
+[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="2_rrhfx"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_JS.tres" id="3_7rwc4"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="4_pk43r"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="5_wegnl"]
+
+[sub_resource type="Resource" id="Resource_sjm74"]
+script = ExtResource("2_rrhfx")
+text = "那天上午，槿杉在实验室与花园之间来回走了很多趟。她看起来比平时更轻快。"
+
+[sub_resource type="Resource" id="Resource_x0gqd"]
+script = ExtResource("2_rrhfx")
+kind = "say"
+who = ExtResource("3_7rwc4")
+text = "快要成功了，再试试吧。"
+
+[sub_resource type="Resource" id="Resource_vqno7"]
+script = ExtResource("2_rrhfx")
+kind = "say"
+who = ExtResource("3_7rwc4")
+text = "缺少的抑制素，这次有头绪了。"
+
+[sub_resource type="Resource" id="Resource_05ax7"]
+script = ExtResource("2_rrhfx")
+text = "她没有告诉任何人，这两句话她已经练习了很久。"
+
+[resource]
+script = ExtResource("1_r20ic")
+id = "MEM_0602_js"
+when = ExtResource("4_pk43r")
+where = ExtResource("5_wegnl")
+who = ExtResource("3_7rwc4")
+title = "6月2日 · 槿杉"
+script_lines = Array[ExtResource("2_rrhfx")]([SubResource("Resource_sjm74"), SubResource("Resource_x0gqd"), SubResource("Resource_vqno7"), SubResource("Resource_05ax7")])

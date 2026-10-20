@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_jimvq"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_y8sp4"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_y2tra"]
+
+[resource]
+script = ExtResource("3_y2tra")
+id = "ITEMS_turename"
+label = "真名"
+desc = "导致区域发生异动的特殊存在的真实身份。异动区域的真名是多个因果链条得以存在的关键因素。真名的捕获需要五感归因。而非真名的结果，组成方式则并不受五感归因限制。当你捕获五感线索成功，并将其归入“逻辑阵列”后，请点击右下角的“SYNC_MATRIX_INFERENCE”按钮进行推演。"

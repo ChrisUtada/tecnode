@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_ahf4b"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_r44i0"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_q878l"]
+
+[resource]
+script = ExtResource("3_q878l")
+id = "ITEMS_bah"
+label = "石蒜"
+desc = "石蒜是石蒜科石蒜属的多年生草本植物"
+can_be_picked = true

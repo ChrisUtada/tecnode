@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_mbwo5"]
+[ext_resource type="Script" path="res://core/defs/ConditionDef.gd" id="2_8ynu0"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_xds.tres" id="3_uqgr1"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zhpt.tres" id="4_qib0t"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="5_x5bvh"]
+[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="6_ulajk"]
+[ext_resource type="Script" path="res://core/defs/commands/ConditionalCommandDef.gd" id="7_wteae"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="8_14ji1"]
+
+[sub_resource type="Resource" id="Resource_qpge6"]
+script = ExtResource("2_8ynu0")
+clue = ExtResource("3_uqgr1")
+fail_message = "不知名的液体"
+
+[sub_resource type="Resource" id="Resource_tbge5"]
+script = ExtResource("2_8ynu0")
+clue = ExtResource("4_qib0t")
+fail_message = "不知名的液体"
+
+[sub_resource type="Resource" id="Resource_nw55k"]
+script = ExtResource("6_ulajk")
+message = "获得线索：[clue:CLUES_yzs]"
+
+[sub_resource type="Resource" id="Resource_8a7sn"]
+script = ExtResource("7_wteae")
+conditions = Array[ExtResource("2_8ynu0")]([SubResource("Resource_qpge6"), SubResource("Resource_tbge5")])
+on_success = SubResource("Resource_nw55k")
+label = "查看内部"
+
+[resource]
+script = ExtResource("5_x5bvh")
+id = "ITEMS_zsq"
+label = "注射器"
+desc = "一根注射器，针筒内有半管透明的不知名液体。"
+can_be_picked = true
+commands = Array[ExtResource("1_mbwo5")]([SubResource("Resource_8a7sn")])

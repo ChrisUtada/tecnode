@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_3mu1c"]
+[ext_resource type="Script" path="res://core/defs/ConditionDef.gd" id="2_tfumb"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_qsan.tres" id="3_ukpxy"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="4_sd5m1"]
+[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="5_s7uud"]
+[ext_resource type="Script" path="res://core/defs/commands/ConditionalCommandDef.gd" id="6_7xidx"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="7_gln2g"]
+
+[sub_resource type="Resource" id="Resource_g0yh5"]
+script = ExtResource("2_tfumb")
+clue = ExtResource("3_ukpxy")
+fail_message = "请不要拉开帘幕。"
+
+[sub_resource type="Resource" id="Resource_8g2b1"]
+script = ExtResource("5_s7uud")
+message = "[clue:DATA_V_huij]在[clue:DATA_T_sun]中狂舞。"
+
+[sub_resource type="Resource" id="Resource_q3d3o"]
+script = ExtResource("6_7xidx")
+conditions = Array[ExtResource("2_tfumb")]([SubResource("Resource_g0yh5")])
+success_message = "阳光直射进入花园。"
+on_success = SubResource("Resource_8g2b1")
+label = "拉开帘幕"
+
+[resource]
+script = ExtResource("4_sd5m1")
+id = "ITEM_lianmu"
+label = "黑色帘幕"
+desc = "遮住整个花园的帘幕，透不进一丝阳光。"
+commands = Array[ExtResource("1_3mu1c")]([SubResource("Resource_q3d3o")])

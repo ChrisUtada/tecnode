@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_ly2og"]
+[ext_resource type="Script" path="res://core/defs/ChoiceOptionDef.gd" id="2_i4iou"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_moej5"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_choutiyi.tres" id="4_66vs6"]
+[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="5_qa4r7"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_choutier.tres" id="6_ue5hu"]
+[ext_resource type="Script" path="res://core/defs/commands/ChoiceCommandDef.gd" id="7_1immc"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="8_5bt6u"]
+
+[sub_resource type="Resource" id="Resource_ms3yw"]
+script = ExtResource("5_qa4r7")
+scene = ExtResource("4_66vs6")
+
+[sub_resource type="Resource" id="Resource_6rog4"]
+script = ExtResource("2_i4iou")
+label = "打开左侧抽屉"
+payload = SubResource("Resource_ms3yw")
+
+[sub_resource type="Resource" id="Resource_wscg5"]
+script = ExtResource("5_qa4r7")
+scene = ExtResource("6_ue5hu")
+
+[sub_resource type="Resource" id="Resource_hbdli"]
+script = ExtResource("2_i4iou")
+label = "打开右侧抽屉"
+payload = SubResource("Resource_wscg5")
+
+[sub_resource type="Resource" id="Resource_56t56"]
+script = ExtResource("7_1immc")
+title = "书桌抽屉"
+prompt = "要打开哪个抽屉？"
+options = Array[ExtResource("2_i4iou")]([SubResource("Resource_6rog4"), SubResource("Resource_hbdli")])
+label = "打开抽屉"
+
+[resource]
+script = ExtResource("3_moej5")
+id = "ITEM_chouti"
+label = "抽屉"
+desc = "书桌的两个抽屉紧闭着，但没有上锁。"
+commands = Array[ExtResource("1_ly2og")]([SubResource("Resource_56t56")])

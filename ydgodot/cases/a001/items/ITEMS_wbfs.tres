@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_amsrs"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_wte6e"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0704.tres" id="3_xxo2v"]
+[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_JS.tres" id="4_jqchf"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="5_va8ov"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_JS.tres" id="6_7vf7y"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="7_vfueq"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="8_5nwk1"]
+
+[sub_resource type="Resource" id="Resource_ob2bn"]
+script = ExtResource("2_wte6e")
+text = "7月4日"
+target_scene = ExtResource("3_xxo2v")
+
+[sub_resource type="Resource" id="Resource_5padp"]
+script = ExtResource("2_wte6e")
+text = "槿杉"
+target_char = ExtResource("4_jqchf")
+
+[sub_resource type="Resource" id="Resource_2a062"]
+script = ExtResource("7_vfueq")
+text = "获得线索：[clue:CLUES_JS]"
+clues = Array[ExtResource("5_va8ov")]([ExtResource("6_7vf7y")])
+
+[resource]
+script = ExtResource("8_5nwk1")
+id = "ITEMS_wbfs"
+label = "未被焚烧干净的纸片"
+desc = "纸上用潦草的笔记写着：姓名：槿杉 生日：7月4日 症状：前臂出现边界清晰的鲜红色水肿，1分钟后形成鸡蛋大小的张力性大疱，触碰剧痛……"
+can_be_picked = true
+excerpts = Array[ExtResource("2_wte6e")]([SubResource("Resource_ob2bn"), SubResource("Resource_5padp")])
+hidden_clue = SubResource("Resource_2a062")

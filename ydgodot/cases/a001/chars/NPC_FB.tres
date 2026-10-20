@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="CharDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ReactionDef.gd" id="1_uvc4b"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="2_235sb"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="3_pntgt"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_fb.tres" id="4_sapxa"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="5_fxuao"]
+[ext_resource type="Script" path="res://core/defs/SceneTalkDef.gd" id="6_ao4tr"]
+[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="7_hnpqm"]
+
+[sub_resource type="Resource" id="Resource_lrqc5"]
+script = ExtResource("5_fxuao")
+text = "获得线索：[clue:CLUES_fb]"
+clues = Array[ExtResource("3_pntgt")]([ExtResource("4_sapxa")])
+
+[sub_resource type="Resource" id="Resource_6a3oj"]
+script = ExtResource("6_ao4tr")
+scene = ExtResource("2_235sb")
+lines = Array[String](["“已经是第三次为他们拍摄合影了。”", "“我总觉得这样的研究不应该再继续下去了。”", "“但槿杉却还是微笑着。”", "“那种痛苦，我无法承受。”", "“有时候我常常跟珩松说，事情被重复十遍的时候，真相就会显现……我希望我是错的。”"])
+
+[resource]
+script = ExtResource("7_hnpqm")
+id = "NPC_FB"
+name = "傅柏"
+desc = "植物研究所所长"
+avatar = "images/avatar_NPC_FB.png"
+debut = ExtResource("2_235sb")
+scene_talks = Array[ExtResource("6_ao4tr")]([SubResource("Resource_6a3oj")])
+hidden_clue = SubResource("Resource_lrqc5")

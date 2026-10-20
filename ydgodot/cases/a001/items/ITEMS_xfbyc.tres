@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_ermbk"]
+[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_26wme"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="3_2kcli"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_gcs.tres" id="4_dn40h"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="5_lid06"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="6_5v0af"]
+
+[sub_resource type="Resource" id="Resource_yvsjb"]
+script = ExtResource("5_lid06")
+text = "很明显是一道[clue:CLUES_gcs]"
+clues = Array[ExtResource("3_2kcli")]([ExtResource("4_dn40h")])
+
+[resource]
+script = ExtResource("6_5v0af")
+id = "ITEMS_xfbyc"
+label = "下腹部右侧"
+desc = "裂开的绷带之下，是一道血淋淋的伤口，某种利器刺入其中，但现场似乎没有发现凶器。"
+hidden_clue = SubResource("Resource_yvsjb")

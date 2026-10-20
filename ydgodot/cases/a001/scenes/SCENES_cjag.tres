@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="SceneDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_enalv"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="2_indwj"]
+[ext_resource type="Script" path="res://core/defs/SceneDef.gd" id="3_3dy16"]
+
+[sub_resource type="Resource" id="Resource_30l7s"]
+script = ExtResource("2_indwj")
+
+[resource]
+script = ExtResource("3_3dy16")
+id = "SCENES_cjag"
+title = "唱机暗格"
+content = "暗格之中摆放着一张[item:ITEMS_wmhj]和三张[item:ITEMS_hy]：虽然姿态各有不同，但照片中陆珩松与槿杉都身披白大褂，微笑着，手里捧着一盆植物，并肩站在书桌前。槿杉的脸色看起来不太好，白大褂的袖口处，隐隐能够看见绷带的样子。<br><br>问问[char:CHARS_TEC]<br>返回[loc:SCENES_garden]"
+desc = "暗格之中摆放着一张没有标签的黑胶、一张合影。"
+hidden_clue = SubResource("Resource_30l7s")

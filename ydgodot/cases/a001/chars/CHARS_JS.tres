@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="CharDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ReactionDef.gd" id="1_sy1vv"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_yzs.tres" id="2_qrmrn"]
+[ext_resource type="Resource" path="res://cases/a001/clues/DATA_H_music.tres" id="3_qaao8"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_wmhj.tres" id="4_lnyjp"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="5_dq1n5"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="6_0imy8"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_JS.tres" id="7_jo4i7"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="8_wvwr2"]
+[ext_resource type="Script" path="res://core/defs/SceneTalkDef.gd" id="9_y7v84"]
+[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="10_ylb56"]
+
+[sub_resource type="Resource" id="Resource_ysga8"]
+script = ExtResource("1_sy1vv")
+trigger_id = "CLUES_yzs"
+clue = ExtResource("2_qrmrn")
+text = "抑制素是我和陆一直在寻找的解决方案的最后一块拼图。这种来自古代文献的方案，或者可以称之为黑魔法。它包含了两道必须执行的步骤：提取物质和献祭生命。在获得抑制素之前，我们一直没有提取到合适的物质以对抗呋喃香豆素。而为了得到这种抑制素，我们反复实验，不断往自己的身体里注射呋喃香豆素，以期望能够得到答案……"
+
+[sub_resource type="Resource" id="Resource_3lunj"]
+script = ExtResource("1_sy1vv")
+trigger_id = "DATA_H_music"
+clue = ExtResource("3_qaao8")
+text = "我不太懂音乐，大部分时间我都希望花园能够保持安静，不过朱穗似乎很喜欢这首古典乐。"
+
+[sub_resource type="Resource" id="Resource_xejol"]
+script = ExtResource("1_sy1vv")
+trigger_id = "CLUES_wmhj"
+clue = ExtResource("4_lnyjp")
+text = "辛苦了，陆。"
+
+[sub_resource type="Resource" id="Resource_3vhmo"]
+script = ExtResource("8_wvwr2")
+text = "获得线索：[clue:CLUES_JS]"
+clues = Array[ExtResource("6_0imy8")]([ExtResource("7_jo4i7")])
+
+[sub_resource type="Resource" id="Resource_aepsf"]
+script = ExtResource("9_y7v84")
+scene = ExtResource("5_dq1n5")
+lines = Array[String](["“快要成功了，再试试吧。”", "“缺少的抑制素，这次有头绪了。”"])
+
+[resource]
+script = ExtResource("10_ylb56")
+id = "CHARS_JS"
+name = "槿杉"
+desc = "在植物领域颇有造诣的年轻植物学家。"
+avatar = "images/avatar_CHARS_JS.png"
+debut = ExtResource("5_dq1n5")
+scene_talks = Array[ExtResource("9_y7v84")]([SubResource("Resource_aepsf")])
+clue_reactions = Array[ExtResource("1_sy1vv")]([SubResource("Resource_ysga8"), SubResource("Resource_3lunj"), SubResource("Resource_xejol")])
+hidden_clue = SubResource("Resource_3vhmo")
