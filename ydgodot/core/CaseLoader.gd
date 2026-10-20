@@ -233,6 +233,15 @@ func text_of(kind: String, id: String) -> String:
 	return strip_tags(it.desc if it != null else "")
 
 
+## 带标签的原文（容器扫描要按 `[char:x]` 之类找它的内容物，不能用 strip_tags 的版本）
+func raw_text_of(kind: String, id: String) -> String:
+	if kind == "loc" or kind == "scene" or kind == "time":
+		var s := scene_of(id)
+		return s.content if s != null else ""
+	var it := item_of(id)
+	return it.desc if it != null else ""
+
+
 func strip_tags(raw: String) -> String:
 	var s := raw.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
 	var re := RegEx.new()

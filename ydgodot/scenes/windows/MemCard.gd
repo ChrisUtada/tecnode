@@ -80,6 +80,11 @@ func _setup_lines(p_title: String, p_lines: Array, w: float, h: float, play_mode
 	_play_next()
 
 
+## 暗纸是另一套皮，不走烘焙九切片（那张是米白卡面）
+func _uses_baked_frame() -> bool:
+	return false
+
+
 func _apply_memory_skin() -> void:
 	var bg := get_node_or_null("bg") as ColorRect
 	if bg != null and bg.material is ShaderMaterial:

@@ -8,6 +8,24 @@ const HEADER_H := 52.0
 const SLICE_SCENE := "SCENES_garden"
 const CARD_PAD := 8.0
 const MEM_CARD_MIN_X := 132.0
+## 画布世界尺寸（对齐 Web `#world{width:2000px;height:1300px}`）。
+## 卡片坐标存在 world 空间里；`_card_layer` 只做「平移 + 缩放」的视口变换。
+const WORLD_W := 2000.0
+const WORLD_H := 1300.0
+
+## 页眉几何 —— 逐项来自 Web 的计算布局（tools/pixeldiff/probe_web_rects.cjs 量的
+## getBoundingClientRect），不是凭感觉的间距。改文案长度要同步改宽度，否则右侧按钮组会错位。
+const HDR_SUB := "节点原型 v2 · 案件 A-001"
+const HDR_X_BRAND := 14.0
+const HDR_X_SUB := 110.0
+const HDR_X_CHIP := 318.0
+const HDR_W_CHIP := 190.0
+const HDR_X_CRUMB := 522.0
+const HDR_W_CRUMB := 134.0
+const HDR_BTN_Y := 11.5
+const HDR_BTN_H := 27.0
+const HDR_TOG_Y := 12.5
+const HDR_TOG_H := 25.0
 
 var case_def: CaseLoader
 var graph: GraphState
@@ -16,7 +34,16 @@ var combos: ComboSystem
 var _desk: Control
 var _stage: Control
 var _card_layer: Control
+var _edge_layer: EdgeLayer
+var _view_k := 1.0
+var _view_pos := Vector2.ZERO
+var _panning := false
+var _pan_from := Vector2.ZERO
+var _pan_origin := Vector2.ZERO
+var _opt_focus := true          # 页眉「聚焦选中」
+var _opt_reveal := true         # 页眉「新节点自动居中」
 var _crumb: Label
+var _hdr_sized: Array = []      # [Control, Vector2]：页眉控件的目标尺寸，见 _sync_header_sizes()
 var _toast: PanelContainer
 var _toast_label: Label
 var _toast_timer: SceneTreeTimer
@@ -31,6 +58,21 @@ var _narr: NarrCard
 var _ending: EndingOverlay
 var _cards: Dictionary = {}          # key -> NodeCard
 var _selected: String = ""
+## 拖动中的悬停落点（落点 id / 被高亮的控件 / 被高亮的目标卡）
+var _drop_over_id := ""
+var _drop_over_node: Node = null
+var _drag_over_card := ""
+## 收纳行拖拽会话（见 _process）
+var _sdrag_key := ""
+var _sdrag_from := ""
+var _sdrag_origin := Vector2.ZERO
+var _sdrag_started := false
+var _sdrag_ghost: PanelContainer = null
+var _sdrag_label := ""
+## 桌面图标的单击/双击（双击才开窗）
+var _icon_sel: DeskIcon = null
+var _icon_last_app := ""
+var _icon_last_ms := -100000
 var _cmds: CommandSystem
 var _pw_pop: PasswordPop = null
 var _pw_ctx: Dictionary = {}
@@ -40,6 +82,7 @@ var _matrix_win: MatrixWin = null
 var _archive_win: ArchiveWin = null
 var _mem_card: MemCard = null
 var _chat_win: ChatWindow = null
+var _detail_win: DetailWin = null
 var dialogues: DialogueSystem = null
 var _archive_btn: Button = null
 var _archive_badge: PanelContainer = null
@@ -104,6 +147,8 @@ func _ready() -> void:
 		_open_intro()
 	if _has_arg("--shot-p2"):
 		_shot_p2_flow.call_deferred()
+	elif _has_arg("--shot-p3"):
+		_shot_p3_flow.call_deferred()
 	elif _has_arg("--shot"):
 		if _has_arg("--shot-intro"):
 			_shot_intro_flow.call_deferred()
@@ -117,13 +162,153 @@ func _notification(what: int) -> void:
 		get_tree().quit()
 
 
+## 收纳行拖拽会话（Web `06-storage.js` / `12-panels.js` 的行拖拽）：
+## 行按下时开一个会话，桌面每帧跟手 + 刷新落点高亮，松左键时结算。
+## 为什么不用 Control 的 drag&drop：那套只搬数据、画不了跟手的幽灵；
+## 而画布拖动本来就是我们自己算的指针手势，两边口径要一致。
+func _process(_dt: float) -> void:
+	if _sdrag_key == "":
+		return
+	var at := _desk.get_global_mouse_position()
+	if not _sdrag_started:
+		if at.distance_to(_sdrag_origin) < 5.0:
+			if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+				var clicked := _sdrag_key
+				_sdrag_cancel()
+				# 没移动就松手 = 单击这一行 = 取回（Web 的行单击口径）
+				_take_from_store(clicked, "")
+			return
+		_sdrag_started = true
+		_sdrag_ghost = _make_drag_ghost(_sdrag_label)
+	else:
+		_sdrag_ghost.position = at + Vector2(12, 10)
+	_update_drop_over(at)
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_finish_sdrag(at)
+
+
+func _take_from_store(key: String, _unused: String) -> void:
+	if key == "":
+		return
+	var win := _storage_win_of(key)
+	if win != null:
+		(win as StorageWin)._take(key)
+
+
+func _storage_win_of(key: String) -> Control:
+	if _bag_win != null and is_instance_valid(_bag_win) and (_bag_win as StorageWin).items().has(key):
+		return _bag_win
+	if _ledger_win != null and is_instance_valid(_ledger_win) and (_ledger_win as StorageWin).items().has(key):
+		return _ledger_win
+	return null
+
+
+## 收纳窗里按住一行（StorageWin.row_pressed）→ 开启拖拽会话
+func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void:
+	_sdrag_key = key
+	_sdrag_from = from_kind
+	_sdrag_origin = at_global
+	_sdrag_started = false
+	_sdrag_label = String(graph.node(key).get("label", key))
+
+
+func _make_drag_ghost(text: String) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.name = "drag_ghost"
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := TecTheme.flat(TecTheme.LINE, 6, TecTheme.LINE, 1)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	p.add_theme_stylebox_override("panel", sb)
+	var l := TecTheme.label(text, TecTheme.FS_SMALL, TecTheme.CARD)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(l)
+	_desk.add_child(p)
+	p.z_index = 40
+	p.position = _sdrag_origin + Vector2(12, 10)
+	return p
+
+
+func _sdrag_cancel() -> void:
+	_sdrag_key = ""
+	_sdrag_from = ""
+	_sdrag_started = false
+	_sdrag_label = ""
+	if _sdrag_ghost != null and is_instance_valid(_sdrag_ghost):
+		_sdrag_ghost.queue_free()
+	_sdrag_ghost = null
+	_clear_drop_over()
+
+
+## 松手结算：另一个收纳窗 → 推演桌布 / 推演器图标 → 画布（落在松手那一点）→ 都不中：回去
+func _finish_sdrag(at: Vector2) -> void:
+	var key := _sdrag_key
+	var from := _sdrag_from
+	_sdrag_cancel()
+	if key == "" or graph == null or not graph.stored.has(key):
+		return
+	var n := graph.node(key)
+	var before := _save.snapshot()
+	var to := ""
+	if _bag_win != null and is_instance_valid(_bag_win) and _bag_win.is_visible_in_tree() \
+		and _bag_win.get_global_rect().has_point(at):
+		to = GraphState.BAG
+	elif _ledger_win != null and is_instance_valid(_ledger_win) and _ledger_win.is_visible_in_tree() \
+		and _ledger_win.get_global_rect().has_point(at):
+		to = GraphState.LEDGER
+	if to != "" and to != from:
+		if to == GraphState.LEDGER and String(n["kind"]) != "clue":
+			_show_toast("只有线索能进线索册", true)
+			return
+		if graph.restash(key, from, to):
+			_refresh_storage_wins()
+			_refresh_matrix_views()
+			_apply_hidden()
+			_show_toast("「%s」搬到%s" % [String(n["label"]), "证物袋" if to == GraphState.BAG else "线索册"])
+			_commit(before)
+		return
+	if _drop_on_matrix_icon(at) and String(n["kind"]) == "clue":
+		_assign_to_matrix(key)
+		_refresh_storage_wins()
+		return
+	if _matrix_win != null and is_instance_valid(_matrix_win) \
+		and _matrix_win.board_global_rect().has_point(at) and String(n["kind"]) == "clue":
+		_assign_to_matrix(key)
+		_refresh_storage_wins()
+		return
+	if not _stage.get_global_rect().has_point(at):
+		# 落在画布之外：什么都不做，东西留在原处（不吞节点）
+		return
+	var world := (at - _stage.get_global_position() - _view_pos) / maxf(_view_k, 0.01)
+	graph.take_back(key, world.x, world.y)
+	_apply_hidden()
+	_refresh_storage_wins()
+	var card := _cards.get(key, null) as NodeCard
+	if card != null:
+		card.position = world
+		card.set_home(world)
+	_selected = key
+	graph.selected = key
+	_apply_focus()
+	_refresh_detail()
+	_repaint_edges()
+	_commit(before)
+
+
+func _drop_on_matrix_icon(at: Vector2) -> bool:
+	var ic: Control = _desk.get_node_or_null("icons/icon_infer") as Control
+	return ic != null and ic.is_visible_in_tree() and ic.get_global_rect().has_point(at)
+
+
 ## 命令行参数（`--` 之后的用户参数）
 func _has_arg(flag: String) -> bool:
 	return OS.get_cmdline_user_args().has(flag) or OS.get_cmdline_args().has(flag)
 
 
 func _shot_mode() -> bool:
-	return _has_arg("--shot") or _has_arg("--shot-p2")
+	return _has_arg("--shot") or _has_arg("--shot-p2") or _has_arg("--shot-p3")
 
 
 # ── 界面搭建 ────────────────────────────────────────────────────────────
@@ -131,13 +316,20 @@ func _shot_mode() -> bool:
 func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	var bg := ColorRect.new()
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 0.46, 1.0])
+	grad.colors = PackedColorArray([Color("efece0"), Color("e9e5d6"), Color("e2ddca")])
+	var grad_tex := GradientTexture2D.new()
+	grad_tex.gradient = grad
+	grad_tex.fill_from = Vector2(0, 0)
+	grad_tex.fill_to = Vector2(0, 1)
+	grad_tex.width = 1
+	grad_tex.height = 256
+	var bg := TextureRect.new()
 	bg.name = "desk_bg"
-	var bg_mat := ShaderMaterial.new()
-	bg_mat.shader = load("res://ui/shaders/paper.gdshader")
-	bg_mat.set_shader_parameter("area", Vector2(1280, 800))
-	bg.material = bg_mat
-	bg.color = Color.WHITE
+	bg.texture = grad_tex
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
@@ -149,6 +341,9 @@ func _build_ui() -> void:
 	_desk.position = Vector2(0, HEADER_H)
 	_desk.size = Vector2(1280, 800 - HEADER_H)
 	_desk.mouse_filter = Control.MOUSE_FILTER_PASS
+	## 对齐 Web `#desktop{overflow:hidden}`：窗框的九切片会往外撑 32px 画投影，
+	## 桌面必须裁掉溢到页眉上的那一段，否则页眉底下会多一圈影。
+	_desk.clip_contents = true
 	add_child(_desk)
 
 	_build_case_window()
@@ -200,37 +395,38 @@ func _build_header() -> void:
 	head.add_theme_stylebox_override("panel", sb)
 	add_child(head)
 
-	var brand := TecTheme.label("T.E.C-OS", 14, TecTheme.CARD)
-	brand.position = Vector2(14, 12)
-	brand.size = Vector2(110, 28)
+	# 品牌：`.brand` 14px + 字距 2；副题是它的 `<small>`（11px，间距 6px）
+	var brand := TecTheme.brand_label("T.E.C-OS", 14, TecTheme.CARD)
+	brand.name = "brand"
+	brand.position = Vector2(HDR_X_BRAND, -1.0)
+	brand.size = Vector2(92.0, HEADER_H + 2.0)
+	brand.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	head.add_child(brand)
 
-	var sub := TecTheme.label("CASE FILE SYSTEM", 10, TecTheme.LINE2)
-	sub.position = Vector2(112, 12)
-	sub.size = Vector2(140, 28)
+	var sub := TecTheme.label(HDR_SUB, 11, TecTheme.LINE2)
+	sub.name = "brand_sub"
+	sub.position = Vector2(HDR_X_SUB, 0.0)
+	sub.size = Vector2(206.0, HEADER_H)
+	sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	head.add_child(sub)
 
-	_crumb = TecTheme.label(_case_label(), TecTheme.FS_BODY, TecTheme.LINE2)
-	_crumb.name = "crumb"
-	_crumb.position = Vector2(258, 12)
-	_crumb.size = Vector2(430, 28)
-	head.add_child(_crumb)
-
+	# 调查员证章（`#inv-chip`）：11px、奶油 1px 描边、**无圆角**、内边距 4/8
 	_inv_chip = TecTheme.button("")
 	_inv_chip.name = "inv_chip"
-	_inv_chip.position = Vector2(700, 11)
-	_inv_chip.size = Vector2(214, 30)
+	_inv_chip.position = Vector2(HDR_X_CHIP, 13.5)
+	_inv_chip.size = Vector2(HDR_W_CHIP, 23.0)
 	_inv_chip.clip_text = true
 	_inv_chip.add_theme_font_size_override("font_size", 11)
 	_inv_chip.add_theme_color_override("font_color", TecTheme.CARD)
 	_inv_chip.add_theme_color_override("font_hover_color", TecTheme.TEXT)
 	_inv_chip.add_theme_color_override("font_pressed_color", TecTheme.TEXT)
-	var chip_normal := TecTheme.flat(Color(0, 0, 0, 0), TecTheme.R_BTN, TecTheme.CARD)
-	var chip_hover := TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.CARD)
-	chip_normal.content_margin_left = 8
-	chip_normal.content_margin_right = 8
-	chip_hover.content_margin_left = 8
-	chip_hover.content_margin_right = 8
+	var chip_normal := TecTheme.flat(Color(0, 0, 0, 0), 0, TecTheme.CARD)
+	var chip_hover := TecTheme.flat(TecTheme.CARD, 0, TecTheme.CARD)
+	for csb in [chip_normal, chip_hover]:
+		csb.content_margin_left = 8
+		csb.content_margin_right = 8
+		csb.content_margin_top = 4
+		csb.content_margin_bottom = 4
 	_inv_chip.add_theme_stylebox_override("normal", chip_normal)
 	_inv_chip.add_theme_stylebox_override("hover", chip_hover)
 	_inv_chip.add_theme_stylebox_override("pressed", chip_hover)
@@ -238,33 +434,195 @@ func _build_header() -> void:
 	_inv_chip.pressed.connect(_open_cert_review)
 	head.add_child(_inv_chip)
 
-	var undo_btn := TecTheme.button("撤销")
-	undo_btn.name = "btn_undo"
-	undo_btn.position = Vector2(930, 11)
-	undo_btn.size = Vector2(84, 30)
-	undo_btn.pressed.connect(_undo)
-	head.add_child(undo_btn)
+	# 面包屑：12px、超宽截断（Web 是 `overflow:hidden; text-overflow:ellipsis`）
+	_crumb = TecTheme.label("", TecTheme.FS_BODY, TecTheme.LINE2)
+	_crumb.name = "crumb"
+	_crumb.position = Vector2(HDR_X_CRUMB, 0.0)
+	_crumb.size = Vector2(HDR_W_CRUMB, HEADER_H)
+	_crumb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_crumb.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_crumb.clip_text = true
+	head.add_child(_crumb)
 
-	var reset_btn := TecTheme.button("重来")
-	reset_btn.name = "btn_reset"
-	reset_btn.position = Vector2(1022, 11)
-	reset_btn.size = Vector2(90, 30)
-	reset_btn.pressed.connect(_reset_case)
-	head.add_child(reset_btn)
+	# 工具组：三个开关 + 四个按钮，x / 宽度全部按量出来的坐标摆
+	var togs := [["合成消耗", 670.0, 86.0], ["聚焦选中", 763.0, 86.0], ["新节点自动居中", 856.0, 122.0]]
+	for item in togs:
+		var b := _make_toggle(String(item[0]))
+		head.add_child(b)
+		_place_hdr(b, Vector2(float(item[1]), HDR_TOG_Y), Vector2(float(item[2]), HDR_TOG_H))
+	var btns := [["适应窗口", 985.0, 74.0, false], ["撤销", 1066.0, 50.0, false],
+		["重置", 1123.0, 50.0, false], ["检查可达性", 1180.0, 86.0, true]]
+	for item in btns:
+		var b := TecTheme.header_button(String(item[0]), bool(item[3]))
+		b.name = "btn_" + String(item[0])
+		head.add_child(b)
+		_place_hdr(b, Vector2(float(item[1]), HDR_BTN_Y), Vector2(float(item[2]), HDR_BTN_H))
+		var label := String(item[0])
+		if label == "适应窗口":
+			b.pressed.connect(_fit_view)
+		elif label == "撤销":
+			b.pressed.connect(_undo)
+		elif label == "重置":
+			b.pressed.connect(_reset_case)
+		else:
+			b.pressed.connect(_check_reachability)
+	_refresh_crumbs()
+	call_deferred("_sync_header_sizes")
 
-	var tec_btn := TecTheme.button("TEC")
-	tec_btn.name = "btn_tec"
-	tec_btn.position = Vector2(1130, 11)
-	tec_btn.size = Vector2(80, 30)
-	tec_btn.pressed.connect(_toggle_tec)
-	head.add_child(tec_btn)
+
+## 页眉开关：奶油描边的胶囊 + 13×13 勾选框 + 文案，与 Web 的 `.tog` 同尺寸（25 高）。
+## 位置 / 尺寸由调用方经 `_place_hdr()` 摆（Button 的 size 要等入树后再赋一遍才压得住）。
+func _make_toggle(text: String) -> Button:
+	var b := TecTheme.header_button(text)
+	b.name = "tog_" + text
+	b.toggle_mode = true
+	b.button_pressed = true
+	b.add_theme_constant_override("h_separation", 4)
+	b.icon = _check_tex(true)
+	# 开关的「按下」就是常态：底保持透明，字必须一直是奶油色
+	b.add_theme_color_override("font_pressed_color", TecTheme.CARD)
+	b.add_theme_color_override("font_hover_pressed_color", TecTheme.CARD)
+	var sb := TecTheme.flat(Color(0, 0, 0, 0), TecTheme.R_BTN, TecTheme.CARD)
+	# 左 10 / 右 9 / 上下 6.5：左内边距对上 Web `.tog` 的 `padding-left:10px`
+	# （勾选框左边线正好落在 680）；上下 6.5 让最小高度 = 12 + 13 = 25，不会顶开 25 的目标高度。
+	sb.content_margin_left = 10
+	sb.content_margin_right = 9
+	sb.content_margin_top = 6.5
+	sb.content_margin_bottom = 6.5
+	b.add_theme_stylebox_override("normal", sb)
+	b.add_theme_stylebox_override("hover", sb)
+	b.add_theme_stylebox_override("pressed", sb)
+	b.toggled.connect(func(on: bool): b.icon = _check_tex(on); _on_header_toggle(text, on))
+	return b
+
+
+## 摆页眉控件并记下目标尺寸。
+## ⚠ Button 的 `size` 会被「最小尺寸」反顶：控件还没进场景树时，`get_theme_font_size()`
+## 取不到我们的 12px 覆盖、退回主题默认 16px，算出来的最小高度是 31 ——
+## 于是 `size = 25` 当场被抬成 31，而等入树后最小尺寸掉回 24/20，控件也不会自己缩回去。
+## 症状是页眉所有按钮都比 Web 高 6px、文字整体下沉 3px（P3 对拍里 tools 区 17.7% 差异的主因）。
+## 解法：目标尺寸记在这里，入树之后再赋一遍（`_sync_header_sizes`）。
+func _place_hdr(c: Control, pos: Vector2, sz: Vector2) -> void:
+	c.position = pos
+	c.size = sz
+	_hdr_sized.append([c, sz])
+
+
+func _sync_header_sizes() -> void:
+	for pair in _hdr_sized:
+		var c: Control = pair[0]
+		if is_instance_valid(c) and c.size != pair[1]:
+			c.size = pair[1]
+
+
+## 13×13 勾选框：奶油底 + 墨色勾（Web 的 `accent-color:#e6e3d2` 渲染出来就是这个样子）。
+## 现画而不是切图：勾是 2px 阶梯，缩放后比切图更稳。
+func _check_tex(on: bool) -> ImageTexture:
+	var img := Image.create(13, 13, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	if on:
+		img.fill_rect(Rect2i(0, 0, 13, 13), Color("eeeada"))
+		var steps := [[3, 6], [4, 7], [5, 8], [6, 9], [7, 8], [8, 7], [9, 6], [10, 5]]
+		for s in steps:
+			img.set_pixel(int(s[0]), int(s[1]), TecTheme.LINE)
+			img.set_pixel(int(s[0]), int(s[1]) + 1, TecTheme.LINE)
+	else:
+		img.fill_rect(Rect2i(0, 0, 13, 13), Color(0, 0, 0, 0))
+		img.fill_rect(Rect2i(0, 0, 13, 1), TecTheme.CARD)
+		img.fill_rect(Rect2i(0, 12, 13, 1), TecTheme.CARD)
+		img.fill_rect(Rect2i(0, 0, 1, 13), TecTheme.CARD)
+		img.fill_rect(Rect2i(12, 0, 1, 13), TecTheme.CARD)
+	return ImageTexture.create_from_image(img)
+
+
+func _on_header_toggle(text: String, on: bool) -> void:
+	match text:
+		"合成消耗":
+			if _cmds != null:
+				_cmds.consume_tools = on
+		"聚焦选中":
+			_opt_focus = on
+			_apply_focus()
+		"新节点自动居中":
+			_opt_reveal = on
+			if on:
+				_relayout()
+
+
+## 面包屑计数：与 Web `updateCrumbs()` 同口径（可见/总数 · 已探索场景 · 已试组合 · 线索 · 结局）
+func _refresh_crumbs() -> void:
+	if _crumb == null or graph == null:
+		return
+	var total := graph.nodes.size()
+	var vis := 0
+	for key in graph.nodes.keys():
+		if graph.visible_node(graph.nodes[key]):
+			vis += 1
+	var scene_n := 0
+	var ending_n := 0
+	if case_def != null:
+		scene_n = case_def.scenes.size()
+		ending_n = case_def.endings.size()
+	_crumb.text = "节点 %d/%d · 已探索场景 %d/%d · 已试组合 %d · 捕获线索 %d · 结局 %d/%d" % [
+		vis, total, graph.explored.size(), scene_n, graph.tried.size(),
+		graph.captured.size(), graph.endings.size(), ending_n]
+
+
+## 「适应窗口」：按内容包围盒重新缩放居中。**不跑布局** —— 那会把玩家摆的位置全收回去。
+func _fit_view() -> void:
+	_fit_cards()
+
+
+## 「检查可达性」：从当前切片场景出发沿连线走一遍，把走不到的画布节点报出来。
+## Web 同名按钮是开发期自查；Godot 侧一样只提示、不改状态。
+func _check_reachability() -> void:
+	if graph == null:
+		return
+	var start := graph.scene_key(SLICE_SCENE)
+	var seen := {start: true}
+	var queue: Array = [start]
+	while queue.size() > 0:
+		var cur: String = queue.pop_front()
+		for nb in graph.neighbors(cur):
+			var nk := String(nb)
+			if not seen.has(nk):
+				seen[nk] = true
+				queue.append(nk)
+	var orphan: Array = []
+	for key in graph.nodes.keys():
+		if not seen.has(String(key)):
+			orphan.append(String(key))
+	if orphan.is_empty():
+		_show_toast("可达性：全部 %d 个节点都能从当前场景走到" % graph.nodes.size())
+	else:
+		_show_toast("可达性：%d 个节点走不到 —— %s" % [orphan.size(), ", ".join(orphan.slice(0, 3))], true)
+
+
+## 选中即聚焦：与选中卡既不相同、也没有连线的卡淡化（Web `applyFocus`）
+func _apply_focus() -> void:
+	if _cards == null:
+		return
+	var sel := _selected
+	var live := _opt_focus and sel != "" and graph != null and graph.nodes.has(sel)
+	var near := {}
+	if live:
+		near[sel] = true
+		for nb in graph.neighbors(sel):
+			near[String(nb)] = true
+	for key in _cards.keys():
+		var card: NodeCard = _cards[key]
+		if card != null:
+			card.set_dim(live and not near.has(String(key)))
+	_repaint_edges()
 
 
 func _build_case_window() -> void:
 	_case_win = SysWindow.new()
 	_case_win.name = "case_win"
-	_case_win.setup(_case_window_title(), 900, 596)
-	_case_win.position = Vector2(150, 24)
+	_case_win.setup(_case_window_title(), 1164, 718)
+	_case_win.position = Vector2(86, 0)
+	_case_win.body.position = Vector2(SysWindow.PAD + 1, SysWindow.PAD + 1 + SysWindow.BAR_H)
+	_case_win.body.size = Vector2(1162, 718 - 2 - SysWindow.BAR_H)
 	_case_win.body.clip_contents = true
 	_case_win.enable_case_controls()
 	_case_win.closed.connect(func(): _park_case("icon"))
@@ -276,71 +634,70 @@ func _build_case_window() -> void:
 	_stage.size = _case_win.body.size
 	_stage.clip_contents = true
 	_stage.mouse_filter = Control.MOUSE_FILTER_PASS
+	_stage.gui_input.connect(_on_stage_input)
 	_case_win.body.add_child(_stage)
 
-	var stage_bg := ColorRect.new()
+	var stage_bg := TextureRect.new()
 	stage_bg.name = "stage_bg"
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://ui/shaders/paper.gdshader")
-	mat.set_shader_parameter("area", _stage.size)
-	mat.set_shader_parameter("blotch", 0.06)
-	stage_bg.material = mat
-	stage_bg.color = Color.WHITE
+	stage_bg.texture = load("res://assets/baked/stage_paper.png")
+	stage_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	stage_bg.stretch_mode = TextureRect.STRETCH_SCALE
+	stage_bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	stage_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	stage_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stage.add_child(stage_bg)
 
 	_card_layer = Control.new()
 	_card_layer.name = "cards"
-	_card_layer.size = _stage.size
+	_card_layer.size = Vector2(WORLD_W, WORLD_H)
 	_card_layer.mouse_filter = Control.MOUSE_FILTER_PASS
 	_stage.add_child(_card_layer)
+
+	# 连线层排在卡片之前（同一坐标系，跟着一起平移 / 缩放）
+	_edge_layer = EdgeLayer.new()
+	_edge_layer.name = "edges"
+	_card_layer.add_child(_edge_layer)
 
 
 func _build_icons() -> void:
 	var col := VBoxContainer.new()
 	col.name = "icons"
-	col.position = Vector2(22, 30)
-	col.add_theme_constant_override("separation", 10)
+	col.position = Vector2(18, 16)
+	col.add_theme_constant_override("separation", 21)
 	_desk.add_child(col)
-	for pair in [["TEC", "tec"], ["证物袋", "bag"], ["线索册", "clue"], ["推演桌布", "infer"],
-			["档案袋", "goto"], ["案件地图", "map"]]:
-		var b := TecTheme.button(String(pair[0]))
-		b.custom_minimum_size = Vector2(96, 40)
+	for pair in [["推演器", "infer", "star"], ["档案", "goto", "archive"], ["线索册", "clue", "notebook"],
+			["证物袋", "bag", "briefcase"], ["TEC", "tec", "tec"], ["案件地图", "map", "map"]]:
+		var b := DeskIcon.new()
 		b.name = "icon_" + String(pair[1])
-		if String(pair[1]) == "tec":
+		b.setup(String(pair[0]), "res://assets/icons/%s.svg" % String(pair[2]))
+		var app := String(pair[1])
+		if app == "tec":
 			_tec_btn = b
-			b.pressed.connect(_toggle_tec)
-		elif String(pair[1]) == "bag":
-			b.pressed.connect(func(): _toggle_storage(GraphState.BAG))
-		elif String(pair[1]) == "clue":
-			b.pressed.connect(func(): _toggle_storage(GraphState.LEDGER))
-		elif String(pair[1]) == "infer":
-			b.pressed.connect(_toggle_matrix)
-		elif String(pair[1]) == "map":
+		elif app == "map":
 			_map_btn = b
-			b.pressed.connect(_toggle_case_map)
-		else:
+		elif app == "goto":
 			_archive_btn = b
-			b.pressed.connect(_toggle_archive)
+		# 桌面图标：单击只选中，双击才打开（全桌一致，除播放器外 —— 见 Web attachIcon(onQuick)）
+		b.pressed.connect(func(): _on_icon_pressed(app, b))
 		col.add_child(b)
 	_build_map_badge()
 	_build_archive_badge()
 
-	_music_btn = TecTheme.button("播放器")
+	_music_btn = DeskIcon.new()
 	_music_btn.name = "icon_music"
-	_music_btn.custom_minimum_size = Vector2(96, 40)
+	_music_btn.setup("播放器", "res://assets/icons/music.svg")
 	_music_btn.tooltip_text = "打开音乐播放器（唱针已装上唱机）"
 	_music_btn.visible = false
-	_music_btn.pressed.connect(_toggle_music_win)
+	# 播放器是唯一「单击即开」的图标（Web 里 onQuick），用户明确要求过
+	_music_btn.pressed.connect(func(): _on_icon_pressed("music", _music_btn))
 	col.add_child(_music_btn)
 
-	_garden_btn = TecTheme.button("花园")
+	_garden_btn = DeskIcon.new()
 	_garden_btn.name = "icon_garden"
-	_garden_btn.custom_minimum_size = Vector2(96, 40)
+	_garden_btn.setup("花园", "res://assets/icons/leaf.svg")
 	_garden_btn.tooltip_text = "去花园看看真名留下的种子"
 	_garden_btn.visible = false
-	_garden_btn.pressed.connect(_open_garden)
+	_garden_btn.pressed.connect(func(): _on_icon_pressed("garden", _garden_btn))
 	col.add_child(_garden_btn)
 
 	_garden_badge = PanelContainer.new()
@@ -357,9 +714,53 @@ func _build_icons() -> void:
 	gl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	gl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_garden_badge.add_child(gl)
-	_garden_badge.position = Vector2(50, -5)
+	_garden_badge.position = Vector2(44, -6)
 	_garden_badge.visible = false
 	_garden_btn.add_child(_garden_badge)
+
+
+## 桌面图标：单击 = 选中（`.desk-icon.sel`），双击 = 打开（对齐 Web `attachIcon`）。
+## 播放器是唯一例外（Web 里传了 onQuick，单击即开）。
+func _on_icon_pressed(app: String, icon: DeskIcon) -> void:
+	if app == "music":
+		_select_icon(icon)
+		_toggle_music_win()
+		return
+	var now := Time.get_ticks_msec()
+	if _icon_last_app == app and now - _icon_last_ms <= 300:
+		_icon_last_app = ""
+		_icon_last_ms = -100000
+		_open_icon_app(app)
+		return
+	_icon_last_app = app
+	_icon_last_ms = now
+	_select_icon(icon)
+
+
+func _select_icon(icon: DeskIcon) -> void:
+	if _icon_sel != null and is_instance_valid(_icon_sel) and _icon_sel != icon:
+		_icon_sel.set_selected(false)
+	_icon_sel = icon
+	if icon != null and is_instance_valid(icon):
+		icon.set_selected(true)
+
+
+func _open_icon_app(app: String) -> void:
+	match app:
+		"infer":
+			_toggle_matrix()
+		"goto":
+			_toggle_archive()
+		"clue":
+			_toggle_storage(GraphState.LEDGER)
+		"bag":
+			_toggle_storage(GraphState.BAG)
+		"tec":
+			_toggle_tec()
+		"map":
+			_toggle_case_map()
+		"garden":
+			_open_garden()
 
 
 func _build_map_badge() -> void:
@@ -378,7 +779,7 @@ func _build_map_badge() -> void:
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_map_badge.add_child(l)
-	_map_badge.position = Vector2(58, -5)
+	_map_badge.position = Vector2(44, -6)
 	_map_badge.visible = false
 	_map_btn.add_child(_map_badge)
 
@@ -399,7 +800,7 @@ func _build_archive_badge() -> void:
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_archive_badge.add_child(l)
-	_archive_badge.position = Vector2(58, -5)
+	_archive_badge.position = Vector2(44, -6)
 	_archive_badge.visible = false
 	_archive_btn.add_child(_archive_badge)
 
@@ -756,8 +1157,7 @@ func _case_window_title() -> String:
 func _update_case_chrome() -> void:
 	if _case_win != null:
 		_case_win.set_title(_case_window_title())
-	if _crumb != null and (graph == null or graph.last_scene == ""):
-		_crumb.text = _case_label()
+	_refresh_crumbs()
 
 
 func _require_case() -> bool:
@@ -987,6 +1387,7 @@ func _start_slice() -> void:
 	var loc := graph.add_node("loc", sid)
 	loc["x"] = 40.0
 	loc["y"] = 30.0
+	graph.mark_fresh(String(loc["key"]))
 	_spawn_card(loc["key"])
 
 	# P0：抽屉链路（书桌 → 左侧抽屉 → 手电筒）不在切片内，直接把点亮的工具放到桌上
@@ -1002,9 +1403,10 @@ func _start_slice() -> void:
 	_relayout()
 
 
-func _set_crumb(text: String) -> void:
-	if _crumb != null:
-		_crumb.text = text
+## 面包屑不再显示「案件 + 场景名」——那是**案件窗标题栏**的职责（Web 也是这样分工）。
+## 仍保留这个函数名，是因为各处收尾（展开 / 换时刻 / 重置）都调它；现在统一刷计数。
+func _set_crumb(_text: String) -> void:
+	_refresh_crumbs()
 
 
 # ── 调查员 / 开场适性测试 ───────────────────────────────────────────────
@@ -1152,6 +1554,7 @@ func _commit(before: Dictionary) -> void:
 	_save.push_history(before)
 	_autosave()
 	_refresh_app_icons()
+	_refresh_detail()
 
 
 func dbg_undo() -> bool:
@@ -1253,6 +1656,57 @@ func _rebuild_from_graph() -> void:
 	_refresh_app_icons()
 
 
+# ── 画布手势（Web `15-desktop.js`）────────────────────────────────────────
+# 点空白 = 清选中；拖空白 = 平移；滚轮 = 以光标为锚缩放（0.35~1.8）。
+# 卡片自己 `MOUSE_FILTER_STOP` + `accept_event()`，所以拖节点不会漏成平移。
+
+func _on_stage_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			if not mb.pressed:
+				return
+			var mp := mb.position
+			var step := 1.12 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.12
+			var k2 := clampf(_view_k * step, 0.35, 1.8)
+			if absf(k2 - _view_k) > 0.0001:
+				_view_pos = mp - (mp - _view_pos) * (k2 / _view_k)
+				_view_k = k2
+				_apply_view()
+			accept_event()
+			return
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if mb.pressed:
+			_panning = true
+			_pan_from = mb.position
+			_pan_origin = _view_pos
+			_clear_selection()
+		else:
+			_panning = false
+		return
+	if event is InputEventMouseMotion and _panning:
+		_view_pos = _pan_origin + ((event as InputEventMouseMotion).position - _pan_from)
+		_apply_view()
+
+
+func _apply_view() -> void:
+	if _card_layer == null:
+		return
+	_card_layer.position = _view_pos
+	_card_layer.scale = Vector2(_view_k, _view_k)
+
+
+func _clear_selection() -> void:
+	if _selected == "":
+		return
+	_selected = ""
+	if graph != null:
+		graph.selected = ""
+	_apply_focus()
+	_refresh_detail()
+
+
 # ── 卡片 ────────────────────────────────────────────────────────────────
 
 func _spawn_card(key: String) -> NodeCard:
@@ -1270,39 +1724,404 @@ func _spawn_card(key: String) -> NodeCard:
 	var card := NodeCard.new()
 	card.name = "card_" + key.replace(":", "_")
 	card.setup(key, String(n["kind"]), n, w, h)
+	_sync_card_shell(card)
+	_seed_one(key)
 	card.position = Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
+	card.drop_sink = Callable(self, "_handle_card_drop")
+	card.world_rect = Rect2(Vector2.ZERO, Vector2(WORLD_W, WORLD_H))
 	card.selected.connect(_on_card_selected)
 	card.activated.connect(_on_card_activated)
 	card.dragged.connect(_on_card_dragged)
-	card.drag_released.connect(_on_card_drag_released)
+	card.drag_moved.connect(_on_card_drag_moved)
+	card.drag_finished.connect(_on_card_drag_finished)
 	card.combo_requested.connect(_on_card_combo)
+	card.pin_toggled.connect(_on_card_pin_toggled)
 	_card_layer.add_child(card)
 	_cards[key] = card
 	return card
 
 
+## 播种：**只给还没落过位的节点**（x/y < 0）一个初始坐标，已落位的原样保留。
+## 容器（场景 / 书桌）按 5 列网格，实体围在画布中央 —— 与 Web `layout()` 的 seed 同口径。
+func _seed_one(key: String) -> void:
+	var n := graph.node(key)
+	if n.is_empty() or (float(n.get("x", -1.0)) >= 0.0 and float(n.get("y", -1.0)) >= 0.0):
+		return
+	var cidx := 0
+	for k in graph.nodes.keys():
+		var kk := String(k)
+		if not graph.is_container_node(kk):
+			continue
+		var m := graph.node(kk)
+		if kk == key or float(m.get("x", -1.0)) < 0.0:
+			cidx += 1
+	if graph.is_container_node(key):
+		var i := maxi(cidx - 1, 0)
+		n["x"] = 200.0 + float(i % 5) * 380.0
+		n["y"] = 160.0 + float(i / 5) * 300.0
+	else:
+		# 实体：按 key 哈希撒在中央（确定性 —— 同一份存档每次开都落在同一处）
+		var h := float(abs(key.hash()) % 1000) / 1000.0
+		var h2 := float(abs(key.hash() * 31) % 1000) / 1000.0
+		n["x"] = 700.0 + (h - 0.5) * 420.0
+		n["y"] = 560.0 + (h2 - 0.5) * 420.0
+
+
 func _on_card_selected(key: String) -> void:
 	_selected = key
 	graph.selected = key
+	if graph.has_unread(key):
+		graph.clear_fresh(key)
+		_sync_card_shell(_cards.get(key, null))
+	_apply_focus()
+	_refresh_detail()
 
 
 func _on_card_dragged(key: String) -> void:
+	# Web 的拖动不改选中；但这里选中一下能让「聚焦选中」不把正在拖的卡淡化掉，
+	# 属于报告 §3.1 ② 里点名的有意偏离。
 	_selected = key
 	graph.selected = key
+	_apply_focus()
 
 
-## 拖到推演桌布窗口上 = 归位（Web 版 overMatrixDrop 的画布侧入口）
+## 拖动中：落点悬停高亮（Web 的 `.over`），每帧按指针重算一次
+func _on_card_drag_moved(_key: String, at_global: Vector2) -> void:
+	_update_drop_over(at_global)
+	_repaint_edges()
+
+
+## 松手：落点由 `_handle_card_drop` 分派；没命中就停在松手处并把坐标写回数据
+func _on_card_drag_finished(key: String, pos: Vector2, handled: bool) -> void:
+	_clear_drop_over()
+	var n := graph.node(key)
+	if n.is_empty():
+		return
+	if handled:
+		return
+	var before := _save.snapshot()
+	n["x"] = pos.x
+	n["y"] = pos.y
+	_refresh_crumbs()
+	_commit(before)
+
+
+## 重画连线（Web `paintEdges()`）：端点取 `visual_center()`，四种边各自配色 / 线宽 / 虚线。
+## 聚焦选中开着时，与选中节点无关的边降到 12% 不透明（Web 的 `opacity .12`）。
+func _repaint_edges() -> void:
+	if _edge_layer == null or graph == null:
+		return
+	var focus_sel := _selected if (_opt_focus and _selected != "" and graph.nodes.has(_selected)) else ""
+	var segs: Array = []
+	for e in graph.edges:
+		var a := String(e.get("a", ""))
+		var b := String(e.get("b", ""))
+		var ca: NodeCard = _cards.get(a, null)
+		var cb: NodeCard = _cards.get(b, null)
+		if ca == null or cb == null or not ca.visible or not cb.visible:
+			continue
+		segs.append({
+			"a": ca.visual_center(), "b": cb.visual_center(),
+			"kind": String(e.get("rel", "entity")),
+			"dim": focus_sel != "" and a != focus_sel and b != focus_sel,
+		})
+	# 「试过但没成」的边：Web 把它们当 kind=tried 的边画（`graph.tried` 里是 a>b 的字符串键）
+	for raw in graph.tried.keys():
+		var pair := String(raw).split(">", false, 1)
+		if pair.size() != 2:
+			continue
+		var ca: NodeCard = _cards.get(pair[0], null)
+		var cb: NodeCard = _cards.get(pair[1], null)
+		if ca == null or cb == null or not ca.visible or not cb.visible:
+			continue
+		segs.append({
+			"a": ca.visual_center(), "b": cb.visual_center(), "kind": "tried",
+			"dim": focus_sel != "" and pair[0] != focus_sel and pair[1] != focus_sel,
+		})
+	_edge_layer.set_segments(segs)
+
+
+## 兼容旧入口（无头测试与 dbg 钩子还在调）：等价于「卡片松手落在 at_global」的完整分派。
+## 真实交互走 NodeCard → drop_sink → `_handle_card_drop`，这里只是给测试用的一次性封装。
 func _on_card_drag_released(key: String, at_global: Vector2) -> void:
-	if _chat_drop_hit(at_global):
-		_chat_drop(key)
+	if _handle_card_drop(key, at_global):
+		if _cards.has(key):
+			(_cards[key] as NodeCard).spring_back()
+		return
+	var target := _card_key_at(at_global)
+	if target != "" and target != key:
+		if _cards.has(key):
+			(_cards[key] as NodeCard).spring_back()
+		_on_card_combo(key, target)
+
+
+## 右键 = 钉住 / 取消钉住（Web 里这是唯一入口，拖动不再顺手钉住）
+func _on_card_pin_toggled(key: String) -> void:
+	var n := graph.node(key)
+	if n.is_empty():
+		return
+	var before := _save.snapshot()
+	n["pinned"] = not bool(n.get("pinned", false))
+	_sync_card_shell(_cards.get(key, null))
+	_commit(before)
+
+
+# ── 落点（对齐 Web `nodeDropTargets()`，顺序即优先级）──────────────────────
+
+## 单一的落点表。**禁止**在别处再堆 `if 命中某某图标` —— 加落点只改这里。
+## 顺序：对话窗 → 两扇收纳窗 → 五个桌面图标 → TEC 头像 / 收起卡 → 推演桌布。
+## 窗口排在图标之前：窗开着时通常盖在图标列上，此时归属窗口。
+func _drop_targets() -> Array:
+	var out: Array = []
+	if _chat_win != null and is_instance_valid(_chat_win) and _chat_win.is_visible_in_tree():
+		out.append({"id": "chat-win", "rect": _chat_win.get_global_rect()})
+	if _bag_win != null and is_instance_valid(_bag_win) and _bag_win.is_visible_in_tree():
+		out.append({"id": "bag-win", "rect": _bag_win.get_global_rect()})
+	if _ledger_win != null and is_instance_valid(_ledger_win) and _ledger_win.is_visible_in_tree():
+		out.append({"id": "clue-win", "rect": _ledger_win.get_global_rect()})
+	for pair in [["bag-dock", "icon_bag"], ["clue-icon", "icon_clue"], ["tec-dock", "icon_tec"],
+			["infer-icon", "icon_infer"], ["goto-icon", "icon_goto"]]:
+		var ic: Control = _desk.get_node_or_null("icons/" + String(pair[1])) as Control
+		if ic != null and ic.is_visible_in_tree():
+			out.append({"id": String(pair[0]), "rect": ic.get_global_rect()})
+	if _tec != null and is_instance_valid(_tec) and _tec.visible:
+		out.append({"id": "tec-avatar", "rect": _tec.avatar_global_rect()})
+	if _tec_chip != null and is_instance_valid(_tec_chip) and _tec_chip.visible:
+		out.append({"id": "tec-chip", "rect": _tec_chip.get_global_rect()})
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		out.append({"id": "mx-board", "rect": _matrix_win.board_global_rect()})
+	return out
+
+
+## 节点详情窗（Web `#detail-win`）：选中即显示，点空白即收起
+func _ensure_detail() -> DetailWin:
+	if _detail_win != null and is_instance_valid(_detail_win):
+		return _detail_win
+	_detail_win = DetailWin.new()
+	_detail_win.name = "detail_win"
+	_detail_win.setup_detail(graph, case_def)
+	_detail_win.renarr_scene.connect(func(id: String): _show_narr(id))
+	_detail_win.renarr_talk.connect(_replay_talk)
+	_detail_win.play_monologue.connect(func(id: String): _open_monologue(id))
+	_detail_win.play_music.connect(_open_music)
+	_desk.add_child(_detail_win)
+	_detail_win.z_index = 24
+	return _detail_win
+
+
+func _refresh_detail() -> void:
+	if _detail_win == null or not is_instance_valid(_detail_win):
+		if _selected == "" or graph == null or not graph.nodes.has(_selected):
+			return
+		_ensure_detail()
+	if _selected == "" or graph == null or not graph.nodes.has(_selected):
+		_detail_win.hide()
+		return
+	_detail_win.show_node(_selected)
+
+
+## 「重看对话」：把这个人已经说过的台词整段重放进对话窗（Web `renarrTalk`）
+func _replay_talk(key: String) -> bool:
+	var n := graph.node(key)
+	if n.is_empty() or _chat_win != null and is_instance_valid(_chat_win):
+		return false
+	if String(n["kind"]) != "char":
+		return false
+	var ch := case_def.char_of(String(n["id"]))
+	if ch == null:
+		return false
+	var prog := mini(int(graph.talk_prog.get(key, 0)), ch.talk_queue.size())
+	if prog <= 0:
+		return false
+	var d := DialogueDef.new()
+	d.id = "replay_" + String(ch.id)
+	var parts: Array[CharDef] = [ch]
+	d.participants = parts
+	for i in prog:
+		var line := DialogueLineDef.new()
+		line.kind = "say"
+		line.who = ch
+		line.text = ch.talk_queue[i]
+		d.script_lines.append(line)
+	return _open_chat(d, [String(ch.id)])
+
+
+## 拖动中用：命中的落点加 `.over`（图标反白 / 窗与桌布虚线框 / 目标节点反白）
+func _update_drop_over(at_global: Vector2) -> void:
+	var hit_id := ""
+	for t in _drop_targets():
+		if (t["rect"] as Rect2).has_point(at_global):
+			hit_id = String(t["id"])
+			break
+	if hit_id != _drop_over_id:
+		_clear_drop_over()
+		_drop_over_id = hit_id
+		if hit_id != "":
+			_drop_over_node = _node_of_drop(hit_id)
+			_set_over(_drop_over_node, true)
+	# 目标节点（组合）：只在没有图标 / 窗口命中时高亮
+	var under := ""
+	if hit_id == "":
+		under = _card_key_at(at_global)
+	if under != _drag_over_card:
+		if _drag_over_card != "" and _cards.has(_drag_over_card):
+			(_cards[_drag_over_card] as NodeCard).set_over(false)
+		_drag_over_card = under
+		if under != "":
+			(_cards[under] as NodeCard).set_over(true)
+
+
+func _clear_drop_over() -> void:
+	_set_over(_drop_over_node, false)
+	_drop_over_node = null
+	_drop_over_id = ""
+	if _drag_over_card != "" and _cards.has(_drag_over_card):
+		(_cards[_drag_over_card] as NodeCard).set_over(false)
+	_drag_over_card = ""
+
+
+## 落点悬停高亮的统一入口（TecChip 之类没实现 set_over 的控件自动跳过）
+func _set_over(node: Node, on: bool) -> void:
+	if node != null and is_instance_valid(node) and node.has_method("set_over"):
+		node.call("set_over", on)
+
+
+## 落点 id → 可着色的控件（图标 / 窗口 / 桌布）
+func _node_of_drop(id: String) -> Node:
+	match id:
+		"chat-win":
+			return _chat_win
+		"bag-win":
+			return _bag_win
+		"clue-win":
+			return _ledger_win
+		"bag-dock":
+			return _desk.get_node_or_null("icons/icon_bag")
+		"clue-icon":
+			return _desk.get_node_or_null("icons/icon_clue")
+		"tec-dock":
+			return _tec_btn
+		"infer-icon":
+			return _desk.get_node_or_null("icons/icon_infer")
+		"goto-icon":
+			return _desk.get_node_or_null("icons/icon_goto")
+		"tec-avatar":
+			return _tec if _tec != null and _tec.visible else null
+		"tec-chip":
+			return _tec_chip
+		"mx-board":
+			return _matrix_win
+	return null
+
+
+## 松手分派：命中落点即消费（卡片回原位）。返回 true 表示已被落点接管。
+func _handle_card_drop(key: String, at_global: Vector2) -> bool:
+	for t in _drop_targets():
+		if (t["rect"] as Rect2).has_point(at_global):
+			_apply_drop(String(t["id"]), key)
+			return true
+	return false
+
+
+func _apply_drop(id: String, key: String) -> void:
+	var n := graph.node(key)
+	if n.is_empty():
+		return
+	match id:
+		"chat-win":
+			_chat_drop(key)
+		"bag-win", "bag-dock":
+			_store_into(GraphState.BAG, key)
+		"clue-win", "clue-icon":
+			_store_into(GraphState.LEDGER, key)
+		"tec-dock", "tec-avatar", "tec-chip":
+			_start_tec_analysis(key)
+		"infer-icon", "mx-board":
+			if String(n["kind"]) == "clue":
+				_assign_to_matrix(key)
+			else:
+				_show_toast("只有线索能进推演器" if id == "infer-icon" else "只有线索能上桌布", true)
+		"goto-icon":
+			if GraphState.is_scene_kind(String(n["kind"])):
+				_goto_scene(String(n["id"]))
+			else:
+				_show_toast("只有场景能进档案", true)
+
+
+## 收进证物袋 / 线索册（拒收时给一句人话，别让玩家以为是坏了）
+func _store_into(where: String, key: String) -> void:
+	var n := graph.node(key)
+	if n.is_empty():
+		return
+	if graph.stored.has(key):
+		_show_toast("它已经在收纳里了", true)
+		return
+	if graph.is_container_node(key):
+		_show_toast("场景与容器收不进收纳袋", true)
+		return
+	if where == GraphState.LEDGER and String(n["kind"]) != "clue":
+		_show_toast("只有线索能进线索册", true)
+		return
+	var before := _save.snapshot()
+	var ok := graph.bag_store(key) if where == GraphState.BAG else graph.ledger_store(key)
+	if not ok:
+		return
+	_apply_hidden()
+	_refresh_storage_wins()
+	_refresh_matrix_views()
+	_show_toast("「%s」收进%s" % [String(n.get("label", "")),
+		"证物袋" if where == GraphState.BAG else "线索册"])
+	_commit(before)
+
+
+func _refresh_storage_wins() -> void:
+	if _bag_win != null and is_instance_valid(_bag_win):
+		_bag_win.refresh_store()
+	if _ledger_win != null and is_instance_valid(_ledger_win):
+		_ledger_win.refresh_store()
+
+
+## 「前往」（Web gotoScene）：确保场景卡在画布上，镜头平移居中并选中它
+func _goto_scene(id: String) -> void:
+	if case_def == null or case_def.scene_of(id) == null:
+		return
+	var key := graph.scene_key(id)
+	var before := _save.snapshot()
+	if not graph.nodes.has(key):
+		graph.add_node("loc", id)
+		_spawn_card(key)
+		_apply_hidden()
 		_relayout()
+	var card: NodeCard = _cards.get(key, null)
+	if card == null:
 		return
-	if _matrix_win != null and is_instance_valid(_matrix_win) \
-		and _matrix_win.board_global_rect().has_point(at_global):
-		_assign_to_matrix(key)
+	_selected = key
+	graph.selected = key
+	_center_on(card)
+	_apply_focus()
+	_refresh_crumbs()
+	_show_toast("前往「%s」" % case_def.scene_title(id))
+	_commit(before)
+
+
+## 把镜头平移到某张卡（只平移，不替玩家改缩放 —— 与 Web 的 focusOn 同口径）
+func _center_on(card: NodeCard) -> void:
+	if _stage == null or _card_layer == null:
 		return
-	if _tec_drop_hit(at_global):
-		_start_tec_analysis(key)
+	var c := card.visual_center()
+	_view_pos = _stage.size * 0.5 - c * _view_k
+	_card_layer.position = _view_pos
+
+
+## 指针下面是哪张卡（world 顺序里最上面那张：从后往前找）
+func _card_key_at(at_global: Vector2) -> String:
+	for i in range(_card_layer.get_child_count() - 1, -1, -1):
+		var card := _card_layer.get_child(i) as NodeCard
+		if card == null or not card.visible:
+			continue
+		if card.get_global_rect().grow(-NodeCard.PAD * 0.5).has_point(at_global):
+			return card.card_key
+	return ""
 
 
 func _on_card_activated(key: String) -> void:
@@ -1344,6 +2163,7 @@ func _toggle_container(kind: String, id: String) -> void:
 		_spawn_card(String(k))
 	if _cards.has(graph.key_of(kind, id)):
 		_cards[graph.key_of(kind, id)].refresh()
+		_sync_card_shell(_cards[graph.key_of(kind, id)])
 	_relayout()
 	if kind == "loc":
 		_show_narr(id)
@@ -1358,6 +2178,8 @@ func _apply_hidden() -> void:
 	graph.recompute_hidden()
 	for key in _cards.keys():
 		(_cards[key] as NodeCard).visible = graph.visible_node(graph.node(String(key)))
+	_repaint_edges()
+	_refresh_detail()
 
 
 ## 统一落地一次命令结果：提示 / 长卡片 / 刷新 / 重排
@@ -1381,6 +2203,7 @@ func _apply_outcome(res: Dictionary, node_key: String) -> void:
 	if bool(res.get("lit_changed", false)):
 		if _cards.has(node_key):
 			_cards[node_key].refresh()
+			_sync_card_shell(_cards[node_key])
 		var flavor := String(res.get("flavor", ""))
 		if flavor != "":
 			_show_toast(flavor)
@@ -1405,6 +2228,7 @@ func _toggle_storage(kind: String) -> void:
 		_bag_win.position = Vector2(150, 300)
 		_bag_win.will_take.connect(_on_storage_will_take)
 		_bag_win.took.connect(_on_storage_took)
+		_bag_win.row_pressed.connect(_on_row_pressed)
 		_bag_win.closed.connect(func(): _bag_win = null)
 		_desk.add_child(_bag_win)
 		_bag_win.move_to_front()
@@ -1420,6 +2244,7 @@ func _toggle_storage(kind: String) -> void:
 	_ledger_win.will_take.connect(_on_storage_will_take)
 	_ledger_win.took.connect(_on_storage_took)
 	_ledger_win.to_matrix.connect(_on_ledger_to_matrix)
+	_ledger_win.row_pressed.connect(_on_row_pressed)
 	_ledger_win.closed.connect(func(): _ledger_win = null)
 	_desk.add_child(_ledger_win)
 	_ledger_win.move_to_front()
@@ -1557,9 +2382,39 @@ func _refresh_or_spawn_card(key: String) -> void:
 	if card != null:
 		card.visible = graph.visible_node(graph.node(key))
 		card.refresh()
+		_sync_card_shell(card)
+
+
+func _sync_card_shell(card: NodeCard) -> void:
+	if card == null or graph == null:
+		return
+	var n := graph.node(card.card_key)
+	var id := String(n.get("id", ""))
+	card.set_shell_state(graph.is_container_node(card.card_key),
+		graph.explored.has(id), graph.is_collapsed(id), bool(n.get("unread", false)),
+		graph.is_hub(String(n.get("kind", "")), id))
 
 
 ## 供测试钩子 / 后续接线用：把当前选中的节点收进某个收纳处
+## 无头钩子：模拟「把收纳窗里的一行拖到 at_global」（跳过 _process 的指针轮询）
+func dbg_storage_drag(key: String, at_global: Vector2) -> void:
+	if not graph.stored.has(key):
+		return
+	_on_row_pressed(key, String(graph.stored.get(key, "")), at_global)
+	_sdrag_started = true
+	_finish_sdrag(at_global)
+
+
+## 探针：当前落点表的 id 列表（保持顺序）。
+## 单一入口的意义就在这里 —— 以后加落点只改 `_drop_targets()` 与 `_apply_drop()`，
+## 悬停高亮、松手分派共用同一份，不可能出现"高亮了但不生效"。
+func dbg_drop_target_ids() -> Array:
+	var out: Array = []
+	for t in _drop_targets():
+		out.append(String(t["id"]))
+	return out
+
+
 func dbg_store(kind: String) -> bool:
 	if _selected == "":
 		return false
@@ -1603,7 +2458,9 @@ func _open_password(node_key: String) -> void:
 	_pw_pop.setup_password(it.label, cmd.label)
 	var base := Vector2(300, 300)
 	if card != null:
-		base = card.position + _stage.get_global_rect().position - _desk.get_global_rect().position + Vector2(0, 80)
+		var r := card.get_global_rect()
+		base = Vector2(r.position.x - _desk.get_global_rect().position.x,
+			r.end.y - _desk.get_global_rect().position.y + 10.0)
 	_pw_pop.position = base
 	_pw_pop.submitted.connect(_submit_password)
 	_desk.add_child(_pw_pop)
@@ -1630,6 +2487,12 @@ func _submit_password(text: String) -> void:
 
 
 func _on_card_combo(tool_key: String, target_key: String) -> void:
+	# 折叠的容器（场景 / 书桌 / 垃圾桶）既不收纳也不组合：里面的东西看不见，隔空命中的结果没有着力点
+	var tn := graph.node(target_key)
+	if not tn.is_empty() and graph.is_container_node(target_key) \
+		and graph.collapsed.has(String(tn.get("id", ""))):
+		_show_toast("「%s」已折叠：先双击展开，或把节点拖到证物袋" % String(tn.get("label", "")), true)
+		return
 	var before := _save.snapshot()
 	if _try_memory_combo(tool_key, target_key, before):
 		return
@@ -1638,7 +2501,6 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 	var res := combos.use_item(tool_key, target_key)
 	if res.has("blocked") and res["blocked"]:
 		_show_toast(String(res.get("message", "")), true)     # 发光门：不记 tried、不进撤销
-		_relayout()
 		return
 	if res.get("ok", false):
 		_show_toast(String(res.get("message", "")))
@@ -1655,7 +2517,8 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 		var msg := String(res.get("message", ""))
 		if msg != "":
 			_show_toast(msg, true)
-		_relayout()
+		# 失败只多一条「试过」虚线，**不动坐标**（以前这里跑 _relayout，等于每次失败都把全场归位）
+		_repaint_edges()
 
 
 func _expand_scene(sid: String, show_narr: bool) -> void:
@@ -1668,6 +2531,7 @@ func _expand_scene(sid: String, show_narr: bool) -> void:
 		_spawn_card(key)
 	if _cards.has(key):
 		_cards[key].refresh()
+		_sync_card_shell(_cards[key])
 	_relayout()
 	if show_narr:
 		_show_narr(sid)
@@ -1799,6 +2663,7 @@ func _sync_cards_for_time() -> void:
 			continue
 		if _cards.has(String(key)):
 			(_cards[String(key)] as NodeCard).refresh()
+			_sync_card_shell(_cards[String(key)])
 		else:
 			_spawn_card(String(key))
 
@@ -2011,31 +2876,162 @@ func _clear_archive_new() -> void:
 		_archive_badge.visible = false
 
 
-## 极简布局：场景卡在前，实体随后，四列网格（P1 换成真正的分层排布 + 连线）
+## 布局（对齐 Web `layout()`）：**松弛一次**，不是重新排版。
+##   - 只给「从没落过位」的节点播种（x/y < 0）；已落位的保留；
+##   - 右键钉住的节点在松弛中完全不动（这是「把摆位留住」的唯一手段）；
+##   - 纯状态变化（点亮 / 捕获 / 选中）**不要**调这里 —— 那些只需要 `_apply_hidden()` / `refresh()`。
 func _relayout() -> void:
-	var order: Array = []
-	# 1) 当前切片场景的 loc 卡最先
-	var first_loc := graph.scene_key(SLICE_SCENE)
-	if _cards.has(first_loc):
-		order.append(first_loc)
-	# 2) 其余 loc 卡
-	for key in _cards.keys():
-		var n := graph.node(key)
-		if n.get("kind", "") == "loc" and key != first_loc:
-			order.append(key)
-	# 3) 实体（物品 / 人物 / 线索），按 key 稳定排序
-	var ents: Array = []
-	for key in _cards.keys():
-		if not order.has(key):
-			ents.append(key)
-	ents.sort()
-	order.append_array(ents)
+	_layout_force()
+	if _opt_reveal:
+		_fit_cards()
+	_refresh_crumbs()
+	_sync_header_sizes()
+	_repaint_edges()
 
-	for i in order.size():
-		var card: NodeCard = _cards[order[i]]
-		var col := i % 4
-		var row := int(i / 4)
-		card.position = Vector2(26.0 + col * 178.0, 20.0 + row * 78.0)
+
+## 力导向：斥力 30000/d²、最小间距 R_a+R_b+14、弹簧 rest 185/300/150、向心 0.0022，260 轮。
+## 参数照抄 `src/js/07-render.js`；R 用视觉半径（半对角线），与 Web 的 80 / 68 同口径。
+func _layout_force() -> void:
+	var list: Array = []
+	for key in _cards.keys():
+		if (_cards[key] as NodeCard).visible:
+			list.append(String(key))
+	if list.is_empty():
+		return
+	# 1) 播种：容器（场景 / 书桌）按 5 列网格，实体围在画布中央撒开
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 0x5EED
+	var ci := 0
+	for key in list:
+		var n := graph.node(key)
+		if float(n.get("x", -1.0)) >= 0.0 and float(n.get("y", -1.0)) >= 0.0:
+			ci += 1
+			continue
+		if graph.is_container_node(key):
+			n["x"] = 200.0 + float(ci % 5) * 380.0
+			n["y"] = 160.0 + float((ci / 5) as int) * 300.0
+		else:
+			n["x"] = 700.0 + (rng.randf() - 0.5) * 420.0
+			n["y"] = 560.0 + (rng.randf() - 0.5) * 420.0
+		ci += 1
+	var pos := {}
+	for key in list:
+		var n := graph.node(key)
+		pos[key] = Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
+	var free := {}
+	for key in list:
+		free[key] = not bool(graph.node(key).get("pinned", false))
+	var radius := {}
+	for key in list:
+		var r := 68.0
+		if graph.is_container_node(key):
+			r = 80.0
+		radius[key] = r
+
+	for _it in 260:
+		for i in list.size():
+			var a: String = list[i]
+			for j in range(i + 1, list.size()):
+				var b: String = list[j]
+				var pa: Vector2 = pos[a]
+				var pb: Vector2 = pos[b]
+				var delta: Vector2 = pb - pa
+				var d2 := delta.length_squared()
+				if d2 < 1.0:
+					delta = Vector2(rng.randf() - 0.5, rng.randf() - 0.5)
+					d2 = 1.0
+				var d := sqrt(d2)
+				var u := delta / d
+				var rep := 30000.0 / d2
+				if free[a]:
+					pa -= u * rep
+				if free[b]:
+					pb += u * rep
+				var min_d: float = float(radius[a]) + float(radius[b]) + 14.0
+				if d < min_d:
+					var push := (min_d - d) * 0.5
+					if free[a]:
+						pa -= u * push
+					if free[b]:
+						pb += u * push
+				pos[a] = pa
+				pos[b] = pb
+		for e in graph.edges:
+			var a := String(e.get("a", ""))
+			var b := String(e.get("b", ""))
+			if not pos.has(a) or not pos.has(b):
+				continue
+			var pa: Vector2 = pos[a]
+			var pb: Vector2 = pos[b]
+			var delta: Vector2 = pb - pa
+			var d := delta.length()
+			if d < 0.001:
+				continue
+			var u := delta / d
+			var rest := 185.0
+			if String(e.get("rel", "entity")) == "move":
+				rest = 300.0
+			elif String(e.get("rel", "entity")) == "cond":
+				rest = 150.0
+			var f := (d - rest) * 0.014
+			if free[a]:
+				pa += u * f
+			if free[b]:
+				pb -= u * f
+			pos[a] = pa
+			pos[b] = pb
+		for key in list:
+			if not free[key]:
+				continue
+			var p: Vector2 = pos[key]
+			p += Vector2(WORLD_W * 0.5 - p.x, WORLD_H * 0.5 - p.y) * 0.0022
+			pos[key] = p
+
+	for key in list:
+		var n := graph.node(key)
+		var card: NodeCard = _cards[key]
+		var p: Vector2 = pos[key]
+		if not free[key]:
+			n["x"] = p.x
+			n["y"] = p.y
+			continue
+		p = Vector2(clampf(p.x, 60.0, WORLD_W - 220.0), clampf(p.y, 50.0, WORLD_H - 120.0))
+		n["x"] = p.x
+		n["y"] = p.y
+		card.position = p
+		card.set_home(p)
+
+
+func _fit_cards() -> void:
+	if _card_layer == null:
+		return
+	var bounds := Rect2()
+	var has_card := false
+	for c in _card_layer.get_children():
+		var card := c as NodeCard
+		if card == null or not card.visible:
+			continue
+		var r := Rect2(card.position + Vector2(NodeCard.PAD, NodeCard.PAD),
+			card.size - Vector2(NodeCard.PAD * 2.0, NodeCard.PAD * 2.0))
+		if has_card:
+			bounds = bounds.merge(r)
+		else:
+			bounds = r
+			has_card = true
+	if not has_card or bounds.size.x <= 0.0 or bounds.size.y <= 0.0:
+		_view_k = 1.0
+		_view_pos = Vector2.ZERO
+		_card_layer.position = Vector2.ZERO
+		_card_layer.scale = Vector2.ONE
+		return
+	var pad := 60.0
+	var k := minf((_stage.size.x - pad * 2.0) / bounds.size.x,
+		(_stage.size.y - pad * 2.0) / bounds.size.y)
+	k = clampf(k, 0.35, 1.3)
+	_view_k = k
+	_view_pos = (_stage.size - bounds.size * k) * 0.5 - bounds.position * k
+	_card_layer.position = _view_pos
+	_card_layer.scale = Vector2(k, k)
 
 
 # ── TEC ─────────────────────────────────────────────────────────────────
@@ -2616,6 +3612,21 @@ func dbg_mem_pos() -> Vector2:
 	return _mem_card.position if _mem_card != null and is_instance_valid(_mem_card) else Vector2.ZERO
 
 
+## 屏幕坐标里的视觉矩形 —— 画布有缩放 / 平移之后，「谁压住谁」只能在同一个空间里比，
+## 拿 world 坐标去和桌面坐标比必然误判（2026-10-21 世界层上线的副产物）。
+func dbg_card_global(key: String) -> Rect2:
+	var card: NodeCard = _cards.get(key, null)
+	if card == null or not is_instance_valid(card) or not card.visible:
+		return Rect2()
+	return card.get_global_rect()
+
+
+func dbg_mem_global() -> Rect2:
+	if _mem_card == null or not is_instance_valid(_mem_card):
+		return Rect2()
+	return _mem_card.get_global_rect()
+
+
 func dbg_combo_ui(tool_id: String, target_id: String) -> void:
 	if graph == null:
 		return
@@ -2934,6 +3945,7 @@ func _shot_flow() -> void:
 	combos.toggle_light("item:ITEM_shoudiantong")
 	if _cards.has("item:ITEM_shoudiantong"):
 		_cards["item:ITEM_shoudiantong"].refresh()
+		_sync_card_shell(_cards["item:ITEM_shoudiantong"])
 	_on_card_combo("item:ITEM_shoudiantong", "item:ITEM_something")
 	await _wait(0.5)
 	await _shot("res://docs/p0_3_body.png")
@@ -3206,6 +4218,25 @@ func _shot_p2_flow() -> void:
 		_hide_toast()
 		await _wait(0.45)
 		await _shot("res://docs/p2_20_garden_narr.png")
+	quit_app()
+
+
+func _shot_p3_flow() -> void:
+	await _wait(0.5)
+	_new_runtime()
+	## 与 Web 侧对拍脚本对齐：那边走完开场适性测试（姓名「陈调整」），页眉才有证章。
+	## 证号写死成 TEC-GD-2160，两边的证章文字才逐字相同。
+	_investigator = {"name": "陈调整", "id": "TEC-GD-2160", "sense": ["vision"], "avatarId": "CHARS_EXEC"}
+	_refresh_chip()
+	var loc := graph.add_node("loc", SLICE_SCENE)
+	loc["x"] = 40.0
+	loc["y"] = 30.0
+	graph.mark_fresh(String(loc["key"]))
+	_spawn_card(loc["key"])
+	_relayout()
+	_hide_toast()
+	await _wait(0.5)
+	await _shot("res://docs/p3/godot/start.png")
 	quit_app()
 
 

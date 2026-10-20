@@ -9,6 +9,8 @@ extends SysWindow
 signal will_take(key: String)
 signal took(key: String)
 signal to_matrix(key: String)
+## 行被按住（Web：按住一行拖走 = 三个落点；单击 = 取回）。桌面侧接管后续手势。
+signal row_pressed(key: String, from_kind: String, at_global: Vector2)
 
 var store_kind: String = GraphState.BAG
 var graph: GraphState
@@ -56,18 +58,22 @@ func refresh_store() -> void:
 		_rows.add_child(_make_row(String(key)))
 
 
-## 一行：标签 + 「取回」按钮
+## 一行：标签 + 「取回」按钮；**整行可按住拖走**（Web `06-storage.js` 的行拖拽）
 func _make_row(key: String) -> Control:
 	var n := graph.node(key)
 	var row := PanelContainer.new()
+	row.name = "row_" + key.replace(":", "_")
 	row.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.CARD, 6, TecTheme.EDGE, 1))
+	row.mouse_filter = Control.MOUSE_FILTER_STOP
+	row.gui_input.connect(func(ev: InputEvent): _on_row_input(ev, key))
 	var hb := HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 6)
+	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(hb)
 
 	var label := TecTheme.label(String(n.get("label", key)), TecTheme.FS_SMALL, TecTheme.TEXT)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.clip_text = true
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hb.add_child(label)
 
 	# 袋清单标注来源（Web 版 bagFrom 口径）
@@ -75,6 +81,7 @@ func _make_row(key: String) -> Control:
 		var from_id := String(n.get("bag_from", ""))
 		if from_id != "":
 			var src := TecTheme.label("来自 " + case_def.label_of("item", from_id), TecTheme.FS_SMALL, TecTheme.FAINT)
+			src.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			hb.add_child(src)
 
 	if store_kind == GraphState.LEDGER:
@@ -90,6 +97,14 @@ func _make_row(key: String) -> Control:
 	btn.pressed.connect(func(): _take(key))
 	hb.add_child(btn)
 	return row
+
+
+func _on_row_input(ev: InputEvent, key: String) -> void:
+	if ev is InputEventMouseButton:
+		var mb := ev as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+			row_pressed.emit(key, store_kind, mb.global_position)
+			accept_event()
 
 
 func _take(key: String) -> void:

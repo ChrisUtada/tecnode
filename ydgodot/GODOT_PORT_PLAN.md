@@ -1,7 +1,8 @@
 # T.E.C-OS → Godot 4 移植计划
 
-> 状态：计划 v2（P0–P2 完成，P3 视觉追平待做） ｜ 目标引擎：Godot 4.x（GDScript，2D） ｜ 目标平台：桌面（Windows 优先）
-> 前置阅读：`README.md`、`EDITOR_PLAN.md` ｜ 迁移基准：`data/case-a001.json`
+> 状态：计划 v2（P0–P2 完成，P3 视觉追平已对拍 2.30%；**交互层 P0 八项已落地**） ｜ 目标引擎：Godot 4.x（GDScript，2D） ｜ 目标平台：桌面（Windows 优先）
+> 前置阅读：`README.md`、`docs/INTERACTION_GAP_REPORT.md`（交互层差距与 P0 执行状态见其 §0.1） ｜ 迁移基准：`data/case-a001.json`
+> **最近更新（2026-10-21 夜）**：交互层 P0 八项（世界层/连线/单击双击分离/位置写回/力导向/右键钉住/落点表/反应表/详情窗）全部落地，全套无头断言 **957 项 0 失败**；连线层上线前后 P3 起始页**逐像素 `max diff = 0`**，2.30% 基线不变。剩余缺口见差距报告 §7。
 > **v2 变更**：内容创作确定迁入 Godot 编辑器，Web 编辑器（editor.html）弃用；数据层从「JSON 不动」改为「JSON → Resource（.tres）一次性迁移」，详见 §一.1 与 §二.5。
 > **迁移根目录（2026-10-20 定）**：`nodes-mvp/ydgodot/` —— **后续迁移的一切内容都放在这里**：Godot 工程（`project.godot` 直接位于 `ydgodot/` 根）、资源、测试、烘焙产物、转换脚本、文档。仓库其余部分（`src/`、`data/`、`index.html` 等 Web 版）在迁移验证通过前保持只读参考、不迁移、不改动。
 
@@ -199,6 +200,14 @@ ydgodot/                           # ← 迁移根目录（Godot project.godot �
 3. 断行规则对齐（§5.4），CJK 标点避让自实现。
 
 **验收**：关键场景对拍 diff 率低于约定阈值（建议 < 0.5% 像素差异，且文字区外为零）。
+
+> **P3 进度（2026-10-21，本地进行中）**
+> - ✅ **对拍流水线建成**（§5.5）：`tools/pixeldiff/capture_web.cjs`（CDP 无头 Edge，走完开场适性测试后抓 `start/garden/paper` 三态 + 关键 rects）→ `Desktop.gd --shot-p3`（`_shot_p3_flow()`）→ `tools/pixeldiff/compare.py`（阈值 8/16，分区统计 + `_diff/_mask/_pair` 三联图 + `start.json`）。
+> - ✅ **量尺先校准**：Web 侧必须关 LCD 次像素（`--disable-lcd-text --disable-font-subpixel-positioning --force-color-profile=srgb`），否则 Chromium 的彩边会被当成实现差异；`--font-render-hinting` 对这个构建无效。**文字 AA 无法逐像素一致**（Godot 是 `antialiasing=NONE` 的硬边，Web 是 Skia 灰度覆盖率），实测打开灰度 AA 反而更差 ⇒ 按本文 §七「接受 AA 微小差异」处理，验收看「文字区外为零」。
+> - ✅ **全屏 diff：7.00% → 2.30%**（1280×800 / 阈值 8）。分区：页眉 7146 px · 图标栏 9419 · 命令条 2069 · 画布 4960 · **窗框外沿 0**（烘焙九切片）。
+> - ✅ 已消灭：窗框（烘焙 `win_frame.png` 九切片，`patch_margin=46`）、页眉几何（品牌/副题/证章/面包屑/七件套逐坐标对齐，七件套 x = 670/763/856/985/1066/1123/1180）、**页眉控件高 31 → 25/27**（Button 的最小尺寸会反顶 `set_size`，见 `_sync_header_sizes`）、枢纽场景双线框（`GraphState.is_hub` + `DashBorder.double_line`）、图标块（渐变 150deg、描边 alpha、字形垂直位移 10px、标签 4px、**阴影衰减跨边缘对称** —— CSS 高斯在边界恰好 50%，原式 `-1→soft` 等于沿块边描深影）。
+> - ⏳ 剩余：图标栏缺「人物」「日志」两扇窗（两个空槽 = **0.54 pt**，功能缺口）、各处文字 AA（页眉 0.70 + 命令条 0.20 + 画布 0.48 + 图标标签 ~0.25 = 约 1.6 pt，不可消）。
+> - 详细账目见 `.workbuddy/memory/2026-10-21.md`。
 
 ### P4 · 工程体系重建 + 创作管线迁移（与 P1–P3 并行）
 

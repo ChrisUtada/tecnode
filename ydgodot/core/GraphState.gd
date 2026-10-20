@@ -99,8 +99,10 @@ func add_node(kind: String, id: String) -> Dictionary:
 		"kind": kind,
 		"id": id,
 		"label": case_def.label_of(kind, id),
-		"x": 0.0,
-		"y": 0.0,
+		# -1 = **还没落过位**。布局只给「未落位」的节点播种，已落位的一律保留
+		# （Web 用 `x == null` 判同一件事；Godot 的 Dictionary 没法存 null 语义的 float）
+		"x": -1.0,
+		"y": -1.0,
 		"lit": false,
 		"home_scene": "",
 		"pinned": false,     # 钉住：折叠容器时不跟着藏（Web 版右键钉住）
@@ -699,6 +701,39 @@ func recompute_hidden() -> void:
 				if not exported:
 					hidden[key] = true
 					changed = true
+
+
+## 枢纽场景：入边 + 出边 >= 5（对齐 Web `isHub`）。
+## 容器物品正文里的 [loc:X] 也算一条入边 —— 否则把书桌改成物品后，花园会因为
+## 「承载通路的东西换了身份」平白丢掉枢纽身份，画布上的双线框也会跟着消失。
+var _hub_degree: Dictionary = {}
+
+
+func is_hub(kind: String, id: String) -> bool:
+	if kind != "loc":
+		return false
+	if _hub_degree.is_empty():
+		_build_hub_degree()
+	return int(_hub_degree.get(id, 0)) >= 5
+
+
+func _build_hub_degree() -> void:
+	_hub_degree.clear()
+	if case_def == null:
+		return
+	for sid in case_def.scenes.keys():
+		var sid_s := String(sid)
+		_hub_degree[sid_s] = int(_hub_degree.get(sid_s, 0))
+		for loc in scene_locs(sid_s):
+			_hub_degree[sid_s] = int(_hub_degree[sid_s]) + 1
+			_hub_degree[String(loc)] = int(_hub_degree.get(String(loc), 0)) + 1
+	for iid in case_def.items.keys():
+		var it := case_def.item_of(String(iid))
+		if it == null or it.content == "":
+			continue
+		for tag in case_def.tags_of(it.content):
+			if tag["kind"] == "loc":
+				_hub_degree[String(tag["id"])] = int(_hub_degree.get(String(tag["id"]), 0)) + 1
 
 
 ## 场景正文里列出的其他地点（[loc:X]）—— 拖场景到场景 = 前往的通路

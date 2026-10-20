@@ -18,6 +18,13 @@ uniform float shade_soft = 7.0;
 uniform float gradient_mix = 1.0;
 uniform bool flat_fill = false;
 
+// CSS 的 box-shadow 是「两盏」：左上暖白高光 + 右下暖墨软影。
+// 默认关掉（alpha 0）：节点卡的 pad 只有 8px，7px 模糊的高光会被画布边界裁成硬边，
+// 反而比不画更糟（实测 stage 区 +1991 px）。图标块的余量够，那边显式打开。
+uniform vec4 glow_col : source_color = vec4(1.0, 0.988, 0.945, 0.0);
+uniform vec2 glow_offset = vec2(-2.0, -3.0);
+uniform float glow_soft = 7.0;
+
 float sd_rbox(vec2 p, vec2 b, float r) {
 	vec2 q = abs(p) - b + vec2(r);
 	return min(max(q.x, q.y), 0.0) + length(max(q, vec2(0.0))) - r;
@@ -27,10 +34,16 @@ void fragment() {
 	vec2 px = (UV - 0.5) * rect_size;
 	vec2 half_size = rect_size * 0.5 - vec2(pad);
 
-	// 外投影：SDF 的柔性衰减近似 box-shadow 的模糊
+	// 外投影：近似 box-shadow 的模糊。
+	// ⚠ 衰减必须**跨着边缘对称**（-soft → +soft）：CSS 的 box-shadow 是一圈高斯，
+	// 在盒子边界上恰好衰减到一半（50% alpha）。原先写成 `-1 → soft` 是「边界上还近乎满值、
+	// 出去以后陡降」，看着就像沿着块边描了一圈深影 —— 图标栏每格 800 多像素差异全在这。
+	// 实测改成对称后全屏 2.70% → 2.30%。
 	float d_sh = sd_rbox(px - shade_offset, half_size, radius);
-	float sh = 1.0 - smoothstep(-1.0, shade_soft, d_sh);
-	float sh_a = shade_col.a * sh;
+	float sh_a = shade_col.a * (1.0 - smoothstep(-shade_soft, shade_soft, d_sh));
+
+	float d_gl = sd_rbox(px - glow_offset, half_size, radius);
+	float gl_a = glow_col.a * (1.0 - smoothstep(-1.0, glow_soft, d_gl));
 
 	// 卡面
 	float d = sd_rbox(px, half_size, radius);
@@ -38,9 +51,14 @@ void fragment() {
 
 	vec3 base = col_mid.rgb;
 	if (!flat_fill) {
-		float t = clamp((px.y + half_size.y) / max(half_size.y * 2.0, 1.0), 0.0, 1.0);
-		base = mix(col_hi.rgb, col_mid.rgb, smoothstep(0.0, 0.5, t));
-		base = mix(base, col_lo.rgb, smoothstep(0.5, 1.0, t) * gradient_mix);
+		// Web 全线是 `linear-gradient(150deg, hi 0%, card ~52~55%, lo 100%)`。
+		// 150deg 的方向向量 = (sin150, -cos150) = (0.5, 0.866)：右下走向，不是纯竖直。
+		// 按竖直插值整块卡的下半部会偏亮（实测差 492 px / 屏，全在图标块与节点卡上）。
+		vec2 gdir = vec2(0.5, 0.866);
+		float glen = abs(half_size.x * 2.0 * gdir.x) + abs(half_size.y * 2.0 * gdir.y);
+		float t = clamp((dot(px, gdir) + glen * 0.5) / max(glen, 1.0), 0.0, 1.0);
+		base = mix(col_hi.rgb, col_mid.rgb, smoothstep(0.0, 0.52, t));
+		base = mix(base, col_lo.rgb, smoothstep(0.52, 1.0, t) * gradient_mix);
 	}
 
 	// 内侧左上高光 / 右下阴影（对应 --raise 的两侧明暗）
@@ -52,11 +70,16 @@ void fragment() {
 	float dark = clamp(0.5 + 0.5 * (n.x + n.y), 0.0, 1.0);
 	base = mix(base, shade_col.rgb, inner * shade_col.a * dark * 0.9);
 
-	// 1px 描边
+	// 1px 描边 = `border:1px solid var(--edge)`。ring 梯度铺开约 1.4px（比 CSS 那条真 1px
+	// 边界软），按 edge 的 alpha 打七折会太淡、乘 3 倍又成了实墨黑边；1.4 是对拍扫出来的档位。
 	float ring = smoothstep(-1.6, -0.2, d) * body;
-	base = mix(base, edge_col.rgb, ring * clamp(edge_col.a * 3.0, 0.0, 1.0));
+	base = mix(base, edge_col.rgb, ring * clamp(edge_col.a * 1.4, 0.0, 1.0));
 
-	vec4 outc = vec4(base, body);
-	outc = vec4(mix(shade_col.rgb, outc.rgb, body), max(sh_a, body));
-	COLOR = outc;
+	// 影子合成：CSS 里先画高光再画暗影，所以暗影压在上面
+	float sa = 1.0 - (1.0 - sh_a) * (1.0 - gl_a);
+	vec3 srgb = shade_col.rgb;
+	if (sa > 0.0001) {
+		srgb = (shade_col.rgb * sh_a + glow_col.rgb * gl_a * (1.0 - sh_a)) / sa;
+	}
+	COLOR = vec4(mix(srgb, base, body), max(sa, body));
 }

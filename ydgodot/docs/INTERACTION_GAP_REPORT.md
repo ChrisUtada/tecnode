@@ -1,0 +1,509 @@
+# 交互与节点层：Web ↔ Godot 差距检查报告
+
+> 检查日期：2026-10-21 · 范围：画布节点（渲染 / 连线 / 展开 / 拖动 / 落点 / 组合 / 视角 / 反馈）
+> 方法：两侧源码逐函数对照（`src/js/*.js` ↔ `ydgodot/**/*.gd`），每条差异附文件与行号，可复查。
+> 结论口径：**P0 = 阻断核心玩法或让玩家判定"坏了"**；P1 = 明显缺失，玩得下去但味道不对；P2 = 细节/口径漂移。
+
+---
+
+## 0. 一句话结论
+
+**渲染层（P3）已经追到像素级，交互层基本没复刻。**
+
+上一轮把窗框、页眉、图标块、纸纹压到全屏 2.30% 差异（窗框外沿 0），但那是**静态截图的对齐**。
+一旦动手，两侧就是两套东西：Web 的画布是"有连线的网 + 可钉住的自由摆位 + 六类落点"，Godot 现在
+是"一堆按网格排好的卡片，点一下就展开"。
+
+统计：**50 项差异，P0 10 项 / P1 23 项 / P2 17 项**。其中 6 项是数据层已就绪、只差 UI 通道
+（反应表 14 条、tried 边、pinned 字段、bag/ledger 收纳 API），属于"接上就活"；其余需要重写画布层。
+
+**落点（拖到图标 / 窗口）单项复核结论**（2026-10-21 补检，详见 §6）：Web 有 **11 个落点元素**，
+Godot 命中 **5 个**、动作只有 **3/6**；反向「从收纳窗拖出」8 条路径只实现 2.5 条，
+且"落在松手那一点"**一条都没有**。最糟的是拖到未接线的图标上：实测卡片被拖到
+`position.x ≈ -193 ~ -263`，而画布从 `x=101` 起且 `clip_contents=true` ⇒ **只剩 23% 露出，
+抓得靠右时 0%（整张消失）**，玩家看到的是"拖一下就丢了"。
+
+---
+
+### 0.1 执行状态（2026-10-21 夜 · P0 八项已落地）
+
+§3.1 的 8 项全部做完。验收口径：
+
+- **全套无头断言 957 项 0 失败**（13 个脚本：`49/15/20/37/56/85/61/71/84/164/102/146/67`，其中 `test_ui` 41 → 67）。
+- **P3 静态对拍不退化**：连线层上线后与上线前逐像素对照 **`max diff = 0`**，对 Web 的 2.30% 基线原样有效。
+
+| # | 项 | 落地位置 | 与本节原方案的区别 |
+|---|---|---|---|
+| ① | 世界层 / 边层 / 手势层 | `scenes/canvas/EdgeLayer.gd` 新增；世界层复用 `_card_layer`（`2000×1300`）；手势在 `Desktop._on_stage_input` | **没有拆出 `CanvasWorld.gd` / `CanvasInput.gd`**：`_card_layer` 本身就是世界层、`_on_stage_input` 本身就是手势层，再包一层只是多一跳间接。连线端点一律走 `NodeCard.visual_rect()`（§4.1），无手算 |
+| ② | 单击/双击分离 | `NodeCard._click()`：280ms 窗口 + 6px 邻近判定（`DBL_MS`） | 窗口取 **280ms**（本节写 250ms）。**拖动开始也选中** —— 本节标了"需你拍板"，按建议做 |
+| ③ | 位置写回 + 撤销 | `NodeCard._release_drop()` 写 `n["x"]/n["y"]` 并夹回 world 边界；`Desktop._on_card_drag_finished()` → `_commit()` | |
+| ④ | 力导向布局 | `Desktop._layout_force()`，斥力 / 最小间距 / 弹簧 / 向心 / 260 轮全部照抄 `07-render.js` | 播种按"容器 5 列网格、实体围中心"，且**只播 `x < 0`（从没落过位）的节点**；`pinned` 的节点全程 `free=false` 不动 |
+| ⑤ | 右键钉住 + 角标 | `NodeCard` 右键 → `pin_toggled`；钉住时左上「已固定」药丸，拖动不再自动钉住 | |
+| ⑥ | 拖进证物袋 / 线索册 | `Desktop._drop_targets() -> [{id, rect}]`（11 项单一表）+ `_apply_drop()`；悬停高亮与松手分派共用同一份 | **推演桌布并进了同一张表**：Web 的 `nodeDropTargets()` 是 **10** 项，桌布在松手处单独判一遍；Godot 合成一条 ⇒ 表里是 **11** 项（id 白名单已在 `test_ui` 里锁住） |
+| ⑦ | 反应表通道 | `ComboSystem.use_item()` 五段：目标反应表 → 工具反应表 → `useItem` 命令 → 容器扫描 → 记 `tried` | 比分节写的四段多一段「记 tried」——失败也要留下淡虚线，这是 E4 的前提。**反应表实测 27 条**（物品触发 14 + 线索触发 13），全为纯文本；`results.scene` / `results.items` / `onSuccess.items` 三条产出来源**未接**（数据不触发，接了也无从验证，已在代码注释里标成已知缺口） |
+| ⑧ | 节点详情窗 | `scenes/windows/DetailWin.gd` 新增，只列简介 / 状态 / 来源 + 底部四个重看按钮 | |
+
+**§6.7 断言表的落地情况**：`dbg_drop_target_ids()` 已加，「落点 11 项白名单」与「五个图标落点都在」两条断言已进 `test_ui`。
+`dbg_drop_at()` 没有实现 —— 改为**端到端真拖拽**（`_press`/`_motion`/`_release` 打到真实图标矩形），断言的是"卡片真的收进袋了 / 真的弹回原位了"，
+比直接调分派函数更严格。
+
+**P0 之外仍未做**（属 §3.2 P1，不在本批）：
+- 图标栏脱离 `VBoxContainer` 可自由拖动、补 `people` / `log` 两个图标与 `bag` / `clue` 角标；
+- **拖动幽灵线**（§6.4 四件附带事的第四件：Web 从原点拉一条虚线到指针）—— 其余三件（悬停高亮 / 弹回原位 / 边界夹回）都已做；
+- **桌布 chip → 画布（带坐标）**：反向 8 条路径里唯一还缺的一条（`MatrixWin` 的 chip 只有「取下」按钮，没有拖拽手势）。
+
+---
+
+## 1. 差异总表
+
+### 1.1 节点语义（N）
+
+| # | 差异项 | Web | Godot 现状 | 级别 | 证据 |
+|---|---|---|---|---|---|
+| N1 | **单击 = 激活** | 单击只选中并刷详情窗；`dblclick` 才展开/跑命令 | 松手未位移就直接 `activated.emit()` ⇒ **单击场景即展开** | **P0** | `08-interact.js:128,192` / `NodeCard.gd:232` |
+| N2 | 选中时机 | `pointerup` 且未移动才 `selectNode` | `pointerdown` 当刻就 `selected.emit()` ⇒ 拖动中全场已淡化 | P1 | `08-interact.js:33,128` / `NodeCard.gd:219` |
+| N3 | 右键钉住 | 右键 = 唯一钉住入口，节点挂「已固定」角标，钉住后自动布局不挪它、折叠不收它 | 无右键处理；`pinned` 字段在 `add_node` 里、`recompute_hidden` 也读，但**没有任何 UI 能置位** | **P0** | `08-interact.js:209`、`07-render.js:140` / `NodeCard.gd:210`、`GraphState.gd:106` |
+| N4 | 节点详情窗 | 常驻 `detail-win`：简介 / 状态 / 来源 + 「重看叙事」「重看对话」「播放独白」「播放音乐」 | **完全没有**。单击只留下一个 `_selected`，玩家读不到任何文本 | **P0** | `14-detail.js:18` / 全工程 grep `detail` 无命中 |
+| N5 | 线索双击 | 捕获：`captured.add` + 日志 + 重绘 | `activate()` 只认 `kind=="item"`，线索双击无反应 | P1 | `08-interact.js:346` / `ComboSystem.gd:73` |
+| N6 | 人物双击 | 说下一句（`showCharLine`，推进 talkQueue） | 只尝试播独白；无独白则什么都不发生 | P1 | `08-interact.js:353` / `Desktop.gd:1522` |
+| N7 | 场景命令 | 有 `commands` 先跑第一条，没有才展开 | 直接 `_toggle_container`，跳过 commands（当前数据 0/11 场景有命令，暂无症状） | P2 | `08-interact.js:196` / `Desktop.gd:1512` |
+| N8 | 悬停 / 光标 | `:hover` 阴影放大一档；`cursor:grab/grabbing` | `set_hover_state()` **定义了但从未被调用**；无 cursor 设置 | P2 | `04-nodes.css:9` / `NodeCard.gd:269` |
+
+### 1.2 连线（E）
+
+| # | 差异项 | Web | Godot 现状 | 级别 | 证据 |
+|---|---|---|---|---|---|
+| E1 | **画布连线** | SVG 二次贝塞尔，中点抬升 `min(70, |dx|×0.16)`；四种边各有样式：entity 1.3px `#8a8672` / move 1.6px 墨 / cond 1.6px 虚线 5-4 / tried 1px `#b8b49e` 虚线 3-4 半透明 | **一条都不画**。`edges` 只活在数据层（存档、hub 统计、聚焦淡化用），画布上一个像素都没有 | **P0** | `07-render.js:179-200` / 全工程 grep `draw_line` `Line2D` 无命中 |
+| E2 | 拖动幽灵线 | 拖起即画一条虚线（6-5，2px，`.85`）从中心追到光标 | 无 | P1 | `08-interact.js:63` |
+| E3 | 连线跟随 | 节点有位移动画时每 40ms 重画，回弹时同一帧重画，避免"线断开" | 无所谓（无连线） | — | `07-render.js:203`、`212` |
+| E4 | 聚焦淡化连线 | 与选中无关的边 `opacity .12` | 无 | P1 | `07-render.js:196` |
+| E5 | 辉光层 | `#glow` 560×560 径向渐变，点亮光源时挂在节点上 | 无（`lit` 状态只有副标题一个词） | P1 | `04-nodes.css:46` |
+
+### 1.3 拖动与落点（D）
+
+| # | 差异项 | Web | Godot 现状 | 级别 | 证据 |
+|---|---|---|---|---|---|
+| D1 | **桌面图标落点** | **11 个元素**（10 个 id + 桌布，详见 §6.2）：对话窗 / 袋窗 / 册窗 / 袋图标 / 册图标 / TEC 图标 / 推演器图标 / 档案图标 / TEC 头像 / TEC 收起卡片 / 推演桌布 | 元素 **5/11**、动作 **3/6**：对话窗 / 桌布 / TEC（图标+头像+收起卡共用一个判定）。**「拖节点进证物袋 / 线索册 / 推演器图标 / 档案图标」四个动作全缺**（`bag_store` 只有 `dbg_store` 会调） | **P0** | `08-interact.js:117-145` / `Desktop.gd:1494-1505` / **§6** |
+| D2 | 拖进收纳窗 | 袋窗 / 册窗开着时本身也是落点 | `StorageWin` 只有 `take`（取回）按钮，**不接受拖入**（无 `_can_drop_data` / 无指针手势） | **P0** | `11-dialog.js:508` / `StorageWin.gd:60-92` |
+| D3 | 拖到折叠容器 | 明确提示「场景已折叠：先双击展开，或把节点拖到证物袋」 | 落在 loc 上什么都不说 | P2 | `08-interact.js:167` |
+| D4 | 松手回原位 | `springBack` 300ms 三次缓出，节点带线一起弹回 | 停在目标位置上，紧接着 `_relayout()` 又跳走 | P1 | `08-interact.js:132,163` |
+| D5 | 落点高亮 | 目标节点 `.over` 反白 + `scale(1.06)` + 墨色描边；图标 `.over` | 无 | P1 | `04-nodes.css:19` |
+| D6 | 拖动镜像 | 复制一份到顶层 `#drag-layer`，避免被窗口压住 | 只 `move_to_front()`，拖到案件窗外仍会被裁 | P2 | `07-render.js:271` |
+| D7 | 边界夹回 | `x∈[60,1780]`、`y∈[50,1180]` | 无夹回；`_stage.clip_contents=true` ⇒ **拖出去就看不见了** | P1 | `08-interact.js:178` / `Desktop.gd:471` |
+| D8 | 命中排除隐藏卡 | `hitTest` 排除自身；`visibleNode` 过滤 | `_card_under` 遍历全部子节点，**不检查 `visible`** ⇒ 可能拖到看不见的卡上 | P1（bug） | `NodeCard.gd:249` |
+| D9 | 落点互斥 | 图标命中 → `return`，不再判组合 | 先 `drag_released`（对话/桌布/TEC）再 `combo_requested`，**两件事都会做** | P2 | `NodeCard.gd:225-229` |
+| D10 | **位置写回数据** | 松手写 `n.x/n.y`，进快照、进存档 | **从不写回**。`graph.nodes[key].x/y` 永远是 `add_node` 给的 `0.0`；拖动只改 `card.position` | **P0** | `08-interact.js:177` / `GraphState.gd:102-103` |
+| D11 | 拖动进撤销栈 | Web 拖动本身不入栈（只改位置） | 同样不入栈（与 Web 一致），但配合 D10 等于"什么都没留" | — | — |
+
+### 1.4 布局与视角（L）
+
+| # | 差异项 | Web | Godot 现状 | 级别 | 证据 |
+|---|---|---|---|---|---|
+| L1 | **布局算法** | 力导向：斥力 `30000/d²`、最小间距 `R_a+R_b+14`、弹簧 rest 185/300/150、向心 0.0022，260 轮；容器按网格播种 | **固定网格**：`x = 26 + (i%4)×178`、`y = 20 + (i/4)×78`，17 处调用点每次都全量归位 ⇒ **玩家摆好的位置必然被推翻** | **P0** | `07-render.js:3-60` / `Desktop.gd:2231-2258` |
+| L2 | 「适应窗口」 | 只动镜头（`fit()`） | `_relayout()` + `_fit_cards()` ⇒ **按一下就把所有节点重排** | P1 | `15-desktop.js:157` / `Desktop.gd:408` |
+| L3 | 滚轮缩放 | 0.35~1.8，以光标为锚，窗口上滚轮例外 | 无 | **P0** | `15-desktop.js:18-31` / `_stage` 无 `_gui_input` |
+| L4 | 拖空白平移 | `stage.pointerdown` → 平移，`grabbing` 光标 | 无 | **P0** | `15-desktop.js:4-16` |
+| L5 | 点空白 | 清选中（详情窗回占位） | 不清 | P2 | `15-desktop.js:9` |
+| L6 | 新节点聚焦 | `focusFresh`：只把**新节点**带到视野中央，不改缩放 | `_fit_cards()`：缩到装下**全部**节点。开关语义 = 是否 fit 全图 | P1 | `08-interact.js:320` / `Desktop.gd:2255` |
+| L7 | 世界边界 | 2000×1300 有界工作区 | 无 world 概念，`_card_layer` 就是视口大小 | P2 | `07-render.js:6` |
+
+### 1.5 视觉状态（V）
+
+| # | 差异项 | Web | Godot 现状 | 级别 | 证据 |
+|---|---|---|---|---|---|
+| V1 | 选中态 | `.sel{outline:2px #2b2b26; offset 2px; z-index 5}` | 无；只能靠"别的卡变淡"反推 | P1 | `04-nodes.css:13` / `NodeCard.gd` 无 sel |
+| V2 | 点亮态 | `.lit` 金色边框 `#e3b341` + 双层辉光 + `#glow` 光斑 | 副标题写「物品 · 亮着」，视觉无变化 | P1 | `04-nodes.css:45` / `NodeCard.gd:166` |
+| V3 | 已捕获线索 | `.got` 深色反白（`#38372f` 渐变 + inset 阴影） | 副标题写「线索 · 已捕获」 | P1 | `04-nodes.css:42` / `NodeCard.gd:168` |
+| V4 | 新节点入场 | `.pop` 0.45s：`scale .4 → 1.12 → 1` | 无动画，直接出现 | P2 | `04-nodes.css:15` |
+| V5 | 「无文本入口」角标 | 未探索 + 零入边 + 无条件路由 + 无出口 ⇒ 挂 warn 药丸 | 无 | P2 | `07-render.js:134` |
+| V6 | 淡化强度 | `.dim{opacity:.32}` | `modulate.a = 0.25` | P2 | `04-nodes.css:14` / `NodeCard.gd:279` |
+
+### 1.6 组合逻辑（C）
+
+| # | 差异项 | Web | Godot 现状 | 级别 | 证据 |
+|---|---|---|---|---|---|
+| C1 | **反应表** | `lookupReaction` 先查目标、再反向查工具；命中即出文本 + 结果 | `ComboSystem.use_item` 只查 `useItem` 命令。数据里 **14 条反应（朱穗 6 / 陆珩松 4 / TEC 4）全部不可达** —— 把物品拖给人只会得到「没有发生任何事」 | **P0** | `05-combine.js:52-59` / `ComboSystem.gd:46-67`、`CaseLoader` 不读 reaction |
+| C2 | 反向 owner | 工具自身是反应表宿主时也算命中 | 无 | P1 | `05-combine.js:56` |
+| C3 | 容器内扫描 | 目标是容器时，扫它装着的对象有没有反应 | 无 | P1 | `05-combine.js:81-92` |
+| C4 | 场景⇄场景 | 文本里有 `[loc:X]` 即"前往"；没有通路则明说「这两个场景之间没有直接通路」 | 两条都没有。拖场景到场景 = 「没有发生任何事」 | P1 | `05-combine.js:15,39` |
+| C5 | 失败留痕 | `G.tried.add` + 画 `tried` 虚线边（"试过了"看得见） | 不记、不画 ⇒ 面包屑「已试组合」几乎不动 | P1 | `05-combine.js:95-97` / `Desktop.gd:1868` |
+| C6 | 成功后聚焦 | `settle()` 把新长出的节点带进视野 | 只 `_relayout()` | P1 | `05-combine.js:164` |
+| C7 | 消耗范围 | 工具（非可复用）+ 目标 / owner 都可能被消耗 | 只消耗工具（`_run_use_item`） | P1 | `05-combine.js:143-151` / `CommandSystem.gd:150` |
+| C8 | 成功不弹提示 | 刻意不弹 toast，结果只进日志 —— 画面自证 | 每次都弹 toast ⇒ 屏幕被"已知信息"打断 | P2 | `05-combine.js:155-160` / `Desktop.gd:1858` |
+
+### 1.7 信息反馈（I）
+
+| # | 差异项 | Web | Godot 现状 | 级别 | 证据 |
+|---|---|---|---|---|---|
+| I1 | 因果追踪窗 | `#log-win`「SYS_LOGS // 因果追踪」，组合结果 / 失败原因全在里面 | 无。所有信息只 flash 一下 toast，转身就没了 | P1 | `shell.html` / 无 log 窗 |
+| I2 | 人物名册 | `people-win`：`ROSTER_PINNED` + 登场门控 + 进度 + 首字方块 | 无 | P1 | `12-panels.js` / 无 |
+| I3 | 图标栏 | 8 个（推演/档案/线索册/人物/证物袋/TEC/日志/地图），**双击打开**、单击选中、可拖动 | 6 个（缺人物、日志），`VBoxContainer` 固定竖排，**单击即开** | P1 | `15-desktop.js:106,100` / `Desktop.gd:492,516` |
+| I4 | 叙事卡位置 | 锚在节点上方/下方，按当前视口做防裁钳制 | 固定 `(700, 290)` | P2 | `08-interact.js` / `Desktop.gd:1902` |
+
+---
+
+## 2. 这几条最伤体验（按"玩家第一次上手会怎么想"排序）
+
+1. **点一下就展开了**（N1）——玩家的预期是"点一下看看这是什么"。现在点一下场景就直接摊开、
+   点一下手电筒就开关灯，想只选中都没门。这是所有别扭感的源头。
+2. **摆好的位置每次都被收走**（L1 + D10）——拖到哪里，下一次任何操作（展开、组合、收纳、
+   撤销、甚至按"适应窗口"）就全部回到 4 列网格。玩家会得出"这游戏不让我摆"。
+3. **什么都看不见关系**（E1）——Web 里一眼能看出"花园连着树、树连着尸体、这根虚线是我试过的"；
+   Godot 里是 33 张孤立卡片。**整个案件的空间结构信息为零**。
+4. **没有详情窗**（N4）——单击得不到任何文字。物品描述、线索内容、人物状态、重看入口，
+   全在 Web 的 `detail-win` 里，Godot 一个字都没搬。
+5. **把东西给人看没人理**（C1）——14 条反应表在数据里躺着，引擎不查。这是"拖放玩法"的主干。
+6. **装不进袋子**（D1/D2）——证物袋 / 线索册只能开窗看，收不进去也拿不出来（`take` 需要行上有内容）。
+
+---
+
+## 3. 建议方案
+
+### 3.1 P0 批次：让画布"能用"（8 项改动，必须先做）
+
+**① 画布重构：世界层 + 边层 + 手势层**（新文件，约 500 行）
+
+```
+ydgodot/scenes/canvas/CanvasWorld.gd   # 世界坐标容器（2000×1300），含 card_layer + edge_layer
+ydgodot/scenes/canvas/EdgeLayer.gd     # 连线绘制（Node2D._draw，贝塞尔 + 四种样式）
+ydgodot/scenes/canvas/CanvasInput.gd   # 平移 / 滚轮缩放 / 点空白清选中
+```
+
+- `EdgeLayer` 用 `draw_polyline` 采样 24 段二次贝塞尔（Godot 无 SVG path）；端点取
+  `card.position + Vector2(PAD, PAD) + card.inner_size/2`（**注意坐标基准，见 §4.1**）。
+- 样式表照抄 `04-nodes.css` 的四种边：颜色、线宽、虚线节奏 `5-4` / `3-4`。
+- 缩放范围 0.35~1.8、以光标为锚（`view.x = mx - (mx-view.x)*(k2/k)` 同一公式）；
+  平移用 `_card_layer` 的 `position`，不要动 `global_position`。
+- 触发重绘的时机：节点移动（每帧）/ 图结构变化 / 缩放平移 / 淡化变化。
+  Godot 里没有 CSS 过渡，节点位置是离散的，不需要 Web 那套 40ms 补画与同帧 springBack，
+  但**拖动过程中**必须每帧重画（`_process` 里 `if _dragging: edge_layer.queue_redraw()`）。
+
+**② 单击/双击分离**（`NodeCard._gui_input`，约 30 行）
+
+- 按下：只记 `_press`、`move_to_front()`，**不 emit selected**。
+- 松手且未位移：`selected.emit()`（选中 + 刷详情），并启动 250ms 双击窗口。
+- 250ms 内第二次按下：`activated.emit()`，取消第一下。
+- 位移超阈值：进入拖动，`selected.emit()` 放在**拖动开始时**（Web 拖动不改选中，但拖动中
+  目标节点需要可读，建议拖动开始也选中，这一点与 Web 有意偏离，需你拍板）。
+
+**③ 位置写回 + 撤销**（`Desktop._on_card_drag_*`，约 20 行）
+
+- 松手：`n["x"] = card.position.x`、`n["y"] = ...`，夹回 world 边界，`_commit()`。
+- 拖动起点位置要单独存一份，供 D4 的回弹用。
+
+**④ 力导向布局替代网格**（`Desktop._relayout` 重写，约 80 行）
+
+照搬 `07-render.js` 的参数表，但**每张卡的外框比视觉框大 16px**（`PAD*2`），
+碰撞半径要用 `R = 视觉半径 + 8`，否则间距会比 Web 紧。
+
+关键：`seed()` 只对"从没有过坐标"的节点赋值（`x == null`），已有坐标保留；
+力导向只在**结构变化**时跑，玩家拖动后不跑全量。
+
+**⑤ 右键钉住 + 角标**（约 25 行）
+
+`NodeCard` 加 `_gui_input` 的 `MOUSE_BUTTON_RIGHT` → `pinned.toggled`；`_apply_shell` 在
+`_pinned` 时把右上角 badge 换成「已固定」（Web 是独立 `.badge.pin` 药丸，位置在左上角，
+两枚角标不共存时按 Web 处理：pin 左上、new 右上）。
+
+**⑥ 拖进证物袋 / 线索册**（`Desktop._on_card_drag_released` + `StorageWin`，约 60 行）
+
+- 图标命中：`icon_bag` / `icon_clue` / `icon_goto` / `icon_infer` 四个矩形。
+- 窗口命中：`_bag_win.get_global_rect().has_point(at)` → `graph.bag_store(key)`。
+- 线索册拒收非线索时要有反馈（Web 是 toast「只有线索能进线索册」）。
+
+**⑦ 反应表通道**（`ComboSystem.use_item` 扩展，约 70 行）
+
+按 Web 的四段顺序重写：
+`目标反应表 → 工具反应表 → useItem 命令 → 容器内扫描`，命中结果统一成
+`{ok, message, reveal, captured, consumed, owner}`，让 `Desktop._on_card_combo` 只有一条收尾路径。
+
+`CaseLoader` 需要把 `ReactionDef` 读进 `CharDef.item_reactions`（目前 `.tres` 里已有数据，
+只是没有 getter）。
+
+**⑧ 节点详情窗**（新文件 `DetailWin.gd`，约 180 行）
+
+按 `14-detail.js` 的三种内容做：简介 / 状态 / 来源，**刻意不列**"装着什么""谁指向它""它跟谁有反应"。
+状态行要照抄那套组合规则（光线、点亮、已装零件、待装零件、已捕获 + 感官、已聊完、来源）。
+底部按钮：重看叙事 / 重看对话 / 播放独白 / 播放音乐。
+
+### 3.2 P1 批次：把"手感"补齐
+
+| 项 | 做法 | 改动面 |
+|---|---|---|
+| N2 选中时机 | 随 ② 一起改 | NodeCard |
+| N5 线索双击捕获 | `activated` 分支加 `kind=="clue"` → `graph.capture_clue` + 日志 | Desktop 10 行 |
+| N6 人物双击说话 | 接 `DialogueSystem.talk_next()`（talkQueue 已有数据） | Desktop 20 行 |
+| D3 折叠容器提示 | 落点在折叠容器上先判 `is_collapsed` | Desktop 8 行 |
+| D4 回弹 | 拖动起点的 tween 回弹，边层同步 | NodeCard + EdgeLayer |
+| D5 落点高亮 | `_card_under` 命中时给目标卡 `set_over(true)`（反白 + 1.06 缩放） | NodeCard 20 行 |
+| D7 边界夹回 | 松手 clamp 到 world 矩形 | Desktop 6 行 |
+| D8 隐藏卡排除 | `_card_under` 加 `if not c.visible: continue` | 1 行（bug fix） |
+| L2 适应窗口只 fit | `_fit_view` 去掉 `_relayout()` | 1 行 |
+| L6 新节点聚焦 | `_relayout` 收尾改成"只平移镜头到新节点包围盒中心"，不缩放 | Desktop 40 行 |
+| C2/C3 反向 + 容器扫描 | 属 ⑦ 的一部分 | ComboSystem |
+| C4 场景通路 | `scene_locs()` 已有，补"前往"分支 + "没有直接通路"提示 | ComboSystem 25 行 |
+| C5 tried 留痕 | 失败时 `graph.tried[k]=true` + `link(...,"tried")` | 3 行 |
+| C6 成功后聚焦 | 复用 L6 | — |
+| C7 消耗范围 | 补 target / owner 消耗，`is_reusable_tool` 已有 | 20 行 |
+| V1 选中描边 | `DashBorder` 加 `sel_line` 模式（外扩 2px 的 2px 实线） | NodeCard 15 行 |
+| V2/V3 lit/got | `_apply_shell` 加两套配色（金框 + 辉光 / 深反白） | NodeCard 40 行 |
+| E2/E4 幽灵线 + 淡化 | EdgeLayer 加 `ghost` 与 `dim_keys` | EdgeLayer 40 行 |
+| I1 日志窗 | `LogWin.gd` + `graph.logs` 数组（进快照） | 新文件 150 行 |
+| I2 人物名册 | `PeopleWin.gd`，48×48 头像（沿用 P3 已定的名册规格） | 新文件 200 行 |
+| I3 图标栏补齐 | 补 2 个图标 + 双击开 + 选中态；`VBox` 改自由摆放 | Desktop 60 行 |
+
+### 3.3 P2 批次：口径与细节
+
+N7 场景命令、N8 hover/cursor、D6 镜像层、D9 落点互斥、E5 glow、L5 点空白清选中、
+L7 world 边界、V4 pop 动画、V5 warn 角标、V6 dim 改 0.32、C8 成功不弹 toast、
+I4 叙事卡锚定。
+
+---
+
+## 4. 落地前必须先统一的三件事
+
+### 4.1 坐标基准（最容易埋雷）
+
+- **Web**：`n.x/n.y` = 卡片**视觉框**左上角；`NODE_W.loc = 152`。
+- **Godot**：`card.position` = **含 8px 阴影余量的外框**左上角，视觉框在 `+PAD`；
+  `card.size = 视觉尺寸 + 16`。
+
+⇒ 力导向、连线端点、聚焦包围盒、落点命中，**四处都必须用同一套换算**：
+`visual_rect = Rect2(card.position + Vector2(PAD, PAD), card.size - Vector2(PAD*2, PAD*2))`。
+建议在 `NodeCard` 上加 `func visual_rect() -> Rect2`，全工程只调它，禁止各自手算。
+
+（P3 对拍能对齐，正是因为两侧视觉框落在同一像素上；换成"算布局"就会差 8px。）
+
+### 4.2 「重排」这件事的语义
+
+Web 里 `layout()` 是**松弛一次**，不是在重新排版；玩家拖过的位置大体保留。
+Godot 现在 17 处 `_relayout()` 等于 17 个"全部归位"按钮。改造原则：
+
+- 结构变化（展开 / 组合产出 / 收纳取回）→ 跑力导向；
+- 纯状态变化（点亮 / 捕获 / 选中 / 缩放）→ **只重绘，不动坐标**；
+- 玩家手动拖动 → 不跑布局（除非该节点被"新节点自动居中"带着一起）。
+
+### 4.3 数据层已就绪、只差通道的清单（性价比最高）
+
+| 数据 | 位置 | 缺什么 |
+|---|---|---|
+| 14 条反应表 | `cases/a001/chars/*.tres` 的 `item_reactions` | `CaseLoader` 读取 + `ComboSystem` 查询 |
+| tried 边 | `GraphState.tried` / `edges{rel:"tried"}` | 失败时写 + 画（画布目前不画线） |
+| pinned | `GraphState.add_node` + `recompute_hidden` | 右键入口 + 角标 |
+| 收纳 API | `bag_store` / `ledger_store` / `take_back` / `restash` | 拖放落点 |
+| 场景通路 | `scene_locs()` | "前往"分支 |
+
+---
+
+## 5. 建议的验收方式
+
+不要再用"肉眼看对不对"，这批都应该落成**无头断言**（现有 13 个测试脚本 931 项的模式）：
+
+1. **语义断言**：`dbg_click_once(key)` 后场景**未**展开、`dbg_double_click(key)` 后才 `explored`；
+2. **位置断言**：拖动 `card.position` 后 `graph.node(key).x` 变了，且下一次 `_relayout` 后
+   位移不超过 40px（力导向松弛量），而不是回到网格点；
+3. **连线断言**：`edge_layer.segment_count()` 与 `graph.edges` 中可见节点对的数量一致；
+   拖两个节点上再松手，`tried` 边 +1；
+4. **反应表断言**：`dbg_combo("ITEMS_changji","CHARS_zs")` 返回文本非空（当前是「没有发生任何事」）；
+5. **收纳断言**：`dbg_drag_to_icon(key, "bag")` 后 `stored[key] == "BAG"`；
+6. **视角断言**：`dbg_zoom(1.2)` 后 `_view_k == 1.2` 且锚点世界坐标不变。
+
+对拍（P3 那套）继续只用来守"静态构图"，交互层用上面这组断言守行为 —— 两者的 ROI 差得很远。
+
+---
+
+## 6. 附录 · 落点专项（2026-10-21 补检）
+
+> 触发：用户指出「拖动节点到各个图标和弹窗的功能目前也是缺失」。逐行复核后确认属实，
+> 且比 §1.3 记的更严重 —— §1.3 把 Web 落点写成「6 个」，实际是 **10 个元素 + 桌布**。
+
+### 6.1 数据层其实全都在，缺的只是入口
+
+`GraphState` 的四件套是完整且与 Web 同口径的（连注释都对齐了）：
+
+| 方法 | 行 | 语义 | 谁在调 |
+|---|---|---|---|
+| `bag_store(key)` | `GraphState.gd:484` | 什么都收（容器除外），记 `bag_from` | **只有 `dbg_store`** |
+| `ledger_store(key)` | `:496` | 只收 clue | **只有 `dbg_store`** |
+| `take_back(key, x, y)` | `:509` | 取回，**坐标可选** | `StorageWin._take`（不带坐标） |
+| `restash(key, from, to)` | `:526` | 袋↔册搬运 | `_on_matrix_dropped`（只 matrix→ledger） |
+| `matrix_assign(key, sense)` | `:548` | 归位桌布 | `_assign_to_matrix` ✅ |
+
+⇒ 结论：**这批活不需要写业务逻辑，只需要把 UI 手势接到已有方法上。**
+（`dbg_store` 是测试钩子，`Desktop.gd:1775` 注释写着「供测试钩子 / 后续接线用」—— 一直没接。）
+
+#### 由此推出的一个硬结论：两扇收纳窗在正常游玩里几乎是空的
+
+`stored` 字典的全部写入点只有四处：`bag_store` / `ledger_store`（**只有 `dbg_store` 调**）、
+`matrix_assign`（`_assign_to_matrix` 调）、`restash`（`_on_matrix_dropped` 调）、`store()`（无调用者）。
+于是实际能装进去的东西只有：
+
+- **证物袋：永远是空的** —— 没有任何手势能走到 `bag_store`；
+- **线索册：只能收到「从推演桌布拖过来的线索」** —— 这是唯一入口（`_on_matrix_dropped`）；
+  从画布直接拖线索到册图标 / 册窗都不认。
+
+玩家点开这两扇窗看到「（空）」，会直接判定「这两个功能没做」。
+
+### 6.2 正向：节点 → 落点（11 个元素）
+
+Web 的清单在 `11-dialog.js:505-513`，**数组顺序即命中优先级**；
+桌布另在 `08-interact.js:148` 独立判定。Godot 只有一个 `_on_card_drag_released`（`Desktop.gd:1494`）。
+
+| # | Web 落点 id | 松手动作 | Web 行 | Godot | 备注 |
+|---|---|---|---|---|---|
+| 1 | `chat-win` | `chatDrop` → 人物加入对话 | `08:133` | ✅ `_chat_drop_hit` | 对话窗开着才算 |
+| 2 | `bag-win` | `bagStore` | `08:134` | ❌ | 袋窗开着才算 |
+| 3 | `clue-win` | `ledgerStore` | `08:135` | ❌ | 册窗开着才算 |
+| 4 | `bag-dock` | `bagStore` | `08:134` | ❌ | 证物袋图标 |
+| 5 | `clue-icon` | `ledgerStore` | `08:135` | ❌ | 线索册图标 |
+| 6 | `tec-dock` | `tecAnalyze` | `08:136` | ✅ `_tec_drop_hit` | |
+| 7 | `infer-icon` | `assignClue`（仅 clue） | `08:137` | ❌ | **桌布能收、图标不能** |
+| 8 | `goto-icon` | `gotoScene`（仅场景） | `08:140` | ❌ | 前往并居中选中 |
+| 9 | `tec-avatar` | `tecAnalyze` | `08:136` | ✅ 同一函数 | |
+| 10 | `tec-chip` | `tecAnalyze` | `08:136` | ✅ 同一函数 | `tecChipOn` 才在表里 |
+| 11 | `mx-board` | `assignClue` | `08:148` | ✅ `board_global_rect` | |
+
+**得分：元素 5/11，动作 3/6**（bag / ledger / infer-icon / goto 四个动作全缺）。
+其中 `infer-icon` 特别刺眼：桌布开着能收线索，桌布关着拖到图标就什么都不发生 —— 玩家会认为是 bug。
+
+### 6.3 反向：从收纳处拖出（8 条路径）
+
+Web 两侧各行都做成了**可拖**，落点三选一（顺序即优先级：另一个收纳窗 → 桌布 → 画布）：
+
+| 起点 | 落点 | Web 动作 | 行 |
+|---|---|---|---|
+| 袋行 | 册窗 / 册图标 | `bagToLedger`（restash） | `06-storage.js:266` |
+| 袋行 | 桌布 / 推演器图标 | `bagToMatrix` | `:267` |
+| 袋行 | 画布 | `bagTake(key, x, y)` **跟手落点** | `:268` |
+| 册行 | 袋窗 / 袋图标 | `ledgerToBag` | `12-panels.js:365` |
+| 册行 | 桌布 / 推演器图标 | `ledgerToMatrix` | 同上 |
+| 册行 | 画布 | `ledgerTake(key, x, y)` | 同上 |
+| 桌布 chip | 册窗 / 册图标 | `restash` | `13-matrix.js:37` |
+| 桌布 chip | 画布 | `boardTake(key, x, y)` | 同上 |
+
+Godot 现状：
+
+- **袋行**：`StorageWin._make_row`（`StorageWin.gd:60`）只有两个 Button（「取回」，册行多个「上桌布」）。
+  行本身**没有任何指针手势** ⇒ 拖不出来。
+- **取回不带坐标**：`_take()` 调 `graph.take_back(key)` → 节点回 `add_node` 的默认位，
+  而 Web 是「落在松手那一点」。`take_back` 的 `x/y` 参数从未被 UI 用过。
+- **唯一的拖出路径**：桌布 chip → 册**窗**（`_on_matrix_dropped`，`Desktop.gd:1701`）。
+  拖到册**图标**不认；拖出到画布走 `_on_matrix_took` → `matrix_take(key)`，**同样不带坐标**。
+
+**得分：2.5/8，且「落在松手那一点」这条路一条都没有实现。**
+
+### 6.4 落点附带的四件事（全缺）
+
+| 项 | Web | Godot |
+|---|---|---|
+| 悬停高亮 | 图标 / 窗 / 桌布 / 节点都加 `.over`（反白 + 描边，`04-nodes.css:19`），`pointermove` 每帧刷 | **无**。`dragged` 信号不带坐标，连判都没判 |
+| 幽灵线 | 拖动时从原点画一条虚线到指针 | **无**（与 E1「一根连线都没有」同源） |
+| 弹回原位 | `springBack(el, ox, oy)` 300ms 三次缓出 | **无**。`NodeCard` 里没有任何回位逻辑 |
+| 边界夹回 | `x∈[60,1780]`、`y∈[50,1180]` | **无**（§1.3 D7） |
+
+### 6.5 四个由此衍生的真 bug（Godot 独有，已实测）
+
+**实测方法**：无头跑 `Desktop.tscn`，展开花园，用 `test_ui.gd` 同款的 `_press/_motion/_release`
+真事件序列拖 `ITEM_shoudiantong` 到图标中心（`cards.scale = 1.3`，`stage = (101,90) 1162×693 clip=true`，
+`bag = (18,323) 64×64`，`tec = (18,408) 64×64`）：
+
+| 落点 / 抓点 | 松手后 `card.position` | 与 stage 相交比例 |
+|---|---|---|
+| 袋图标 / 抓卡片中部 | `(-193.2, -3.7)` | **23%** |
+| 袋图标 / 抓卡片右缘 | `(-263.1, -3.7)` | **0%（完全看不见）** |
+| TEC 图标 / 抓中部 | `(-193.2, 61.7)` | **23%** |
+| TEC 图标 / 抓右缘 | `(-263.1, 61.7)` | **0%（完全看不见）** |
+
+**B1 · 拖到 TEC 图标 ⇒ 节点消失在画布左缘外。**
+`_tec_drop_hit` 命中后走 `_start_tec_analysis`，它**不调 `_relayout`**，`_commit()` 也不调（`Desktop.gd:1340`）。
+而拖动时 `card.position = _grab + delta / s`（`NodeCard.gd:244`）**无夹回**，
+`_stage.clip_contents = true`（`:471`）⇒ 卡片被拖到负坐标就再也看不见。
+玩家看到的是「TEC 冒出一句『接收…』，节点不见了」。
+
+**B2 · 拖到证物袋 / 线索册 / 档案图标 ⇒ 节点同样消失，且零提示、`stored` 不变。**
+`_on_card_drag_released` 三个 `if` 全不命中 → 函数直接结束，既不执行动作也不回位。
+实测 `stored` 始终为空 ⇒ 玩家会认为「拖拽坏了」，而且**丢的那张卡找不回来**（除了触发一次重排）。
+
+**B3 · 图标命中与组合不互斥。**
+`NodeCard._gui_input` 先 `drag_released.emit()`，再 `_card_under()` 判组合（`NodeCard.gd:225-229`），
+两者都会执行 ⇒ 拖到 TEC 图标、而图标下面压着一张卡时，会**同时**开始分析和触发组合。（§1.3 D9）
+
+**B4 · 拖到画布空白处松手 —— 位置留住了，但没写回数据。**
+实测 `(460.7, 184.8)` 确实留在原地（这点是对的），但 `graph.node(key).x/y` 没变，
+下一次任意 `_relayout()`（17 处调用点）就会把它拽回网格。（§1.3 D10）
+
+### 6.6 改造清单（按依赖顺序，6 步）
+
+1. **建单一落点表**（对齐 `nodeDropTargets()` 的顺序语义）：
+   `Desktop._drop_targets() -> Array[{id, rect: Rect2, act: Callable}]`，
+   窗口在表中排最前（`bag-win`/`clue-win` 盖住左侧图标时归属窗口）。
+   画布侧只调这一处，禁止在 `_on_card_drag_released` 里继续堆 `if`。
+2. **给落点加可视状态**：`DeskIcon.set_over(bool)`、`SysWindow.set_over(bool)`、
+   `NodeCard.set_over(bool)`；`dragged` 信号改为带 `at_global` 参数，`Desktop` 每帧算一次命中。
+3. **重写松手分派**：命中 → 执行 `act` + `NodeCard.spring_back()`（300ms Tween）；
+   未命中 → 夹回 + 写回 `n.x/n.y`（依赖 §4.1 `visual_rect()`、§4.2 布局语义）。
+4. **`NodeCard` 加 `spring_back()`**：记住按下时的 `_grab`，`create_tween()` 三次缓出；
+   这条同时修 B1/B2（拖到任何落点都回原位，不会留在裁剪区外）。
+5. **`StorageWin._make_row` 加拖出**：镜像用 `mx-chip` 观感 + `#drag-layer` 等价物（顶层 `Control`），
+   落点三选一 → `restash` / `matrix_assign` / `take_back(x, y)`（**带坐标**）。
+6. **图标栏脱离 `VBoxContainer`**：Web 图标可自由拖动（`15-desktop.js:75-101`，位置不进撤销栈）；
+   顺手补 `people` / `log` 两个图标与 `bag` / `clue` 角标（`updateBagBadge` / `updateLedgerBadge`）。
+
+### 6.7 验收断言（可直接接进 `tests/headless/`）
+
+```gdscript
+# 落点表完整性：11 个 id 与 Web 的 nodeDropTargets() 一一对应
+check("落点表 11 项", d.dbg_drop_target_ids().size() == 11)
+# 正向：四个缺失动作
+check("拖到袋图标",   d.dbg_drop_at("bag-dock", "loc:SCENES_garden") == "bag_store")
+check("拖到册图标(non-clue)", d.dbg_drop_at("clue-icon", "loc:SCENES_garden") == "reject")
+check("拖到推演器图标", d.dbg_drop_at("infer-icon", "clue:CLUES_x") == "matrix_assign")
+check("拖到档案图标",  d.dbg_drop_at("goto-icon", "loc:SCENES_body") == "goto_scene")
+# 弹回：拖到图标后卡片回到原位，且没被裁出画布
+check("拖到图标后位置不变", abs(card.position.x - 0) < 1.0)
+# 反向：带坐标取回
+check("袋行拖到画布落在松手点", abs(d.graph.node(k).x - 640.0) < 2.0)
+```
+
+---
+
+## 7. 功能完整度记分板（只列复核过的）
+
+> 口径：**已接通** = 玩家在界面上能用出这个动作，且落到正确的数据变更。
+> 只验证"数据层有方法"不算接通。
+> **「现在」列 = P0 落地后（同日夜里）的复核值**，判据见 §0.1 与 `tests/headless/` 的 957 项断言。
+
+| 模块 | 检查时 | 现在 | 备注 |
+|---|---|---|---|
+| 窗口渲染 | 🟢 16 个类 | 🟢 17 个类 | +`DetailWin` |
+| 窗口种类 | 🟡 缺 3 类 | 🟡 缺 2 类 | 详情窗已补；仍缺**人物名册 / 因果追踪** |
+| 画布静态构图 | 🟢 P3 2.30% | 🟢 2.30% | 连线层上线前后逐像素 `max diff = 0` |
+| 画布行为（缩放 / 平移 / 位置写回 / 力导向） | 🔴 **0 / 4** | 🟢 **4 / 4** | `_on_stage_input` + `_layout_force()` |
+| 连线 | 🔴 **0 / 4** | 🟢 **4 / 4** | 四种样式齐；`cond` 只在运行时长出线索时生成 |
+| 节点交互（单击选择 / 双击激活 / 右键钉住） | 🔴 **1 / 3** | 🟢 **3 / 3** | |
+| 落点（正向） | 🟡 元素 5/11、动作 3/6 | 🟢 **11 / 11** | 表里 11 项（含推演桌布） |
+| 落点（反向拖出） | 🔴 **2.5 / 8**，带坐标 0 | 🟡 **7 / 8** | 缺**桌布 chip → 画布（带坐标）**：chip 仍只有「取下」按钮，没有拖拽手势 |
+| 收纳窗内容 | 🔴 空窗 | 🟢 可拖入 / 可拖出 | 袋与册都成了真清单 |
+| 组合 / 反应表 | 🔴 反应 **0 / 14** | 🟢 **27 / 27** | 实测 27 条（物品触发 14 + 线索触发 13） |
+| 图标栏 | 🟡 6/8；不可拖动；**单击即开** | 🟡 6/8；不可拖动；**双击才开已修** | 拖动 + 补两个图标属 P1 |
+| 角标 | 🟡 缺 2 个 | 🟡 缺 2 个 | 同上，P1 |
+
+**§6.4 那四件附带的事**：悬停高亮 ✅ / 弹回原位 ✅ / 边界夹回 ✅ / **拖动幽灵线 ❌**
+（Web 从原点拉一条虚线到指针；Godot 没有，`NodeCard` 拖动时只有卡片本身跟着走）。
+
+**读法**：渲染（"看起来对"）大致齐了；凡是"手一碰"的地方基本都在 0~1/3 之间徘徊。
+这解释了为什么截图能过 P3、真机一玩就觉得"很不完整" —— **P3 量的正是静态那一层。**
+（这段是检查当时的结论，保留原文；P0 之后"手一碰"的那些行已经补到 4/4 与 11/11。）
+
+---
+
+## 8. 如果要开工，我建议的顺序（依赖驱动）
+
+1. **地基**：`NodeCard.visual_rect()` 统一坐标基准（§4.1）+ 布局语义改"松弛一次"（§4.2）
+   —— 这两件不做，后面每一条都会返工。
+2. **止损**：`NodeCard.spring_back()` + 拖出边界夹回 —— 先让"拖一下不会丢节点"（修 B1/B2）。
+3. **落点表**：`_drop_targets()` 单一清单 + `.over` 高亮 + 重写松手分派（§6.6 第 1–3 步）。
+4. **收纳**：两扇窗接受拖入 + 行可拖出（带坐标）—— 一次把 8 条路径补齐。
+5. **单击/双击分离 + 详情窗** —— 节点从"开关"变成"可读"。
+6. **连线** —— 放在最后：它依赖坐标基准、依赖 4 类边的数据写入（tried / cond / move / entity）。
+7. 补 3 类窗口（名册 / 日志 / 详情）+ 2 个图标 + 2 个角标。

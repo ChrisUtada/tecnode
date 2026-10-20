@@ -8,7 +8,13 @@ signal closed
 signal minimized
 
 const PAD := 14.0
-const BAR_H := 34.0
+const BAR_H := 23.0
+## P3 烘焙九切片：卡面 + 1px 发丝边 + 13px 圆角 + 四层 --win-shadow，由
+## tools/pixeldiff/bake_win_frame.cjs（白/黑双底片）+ solve_alpha.py 反解 alpha 得到。
+## 为什么不用 shader 近似：--win-shadow 是四条 box-shadow 叠加（含 22px 模糊与顶部 inset
+## 高光），单层 SDF 永远差一口气，测下来窗框上下各有 3px / 17px 的整条横带对不上。
+const FRAME_TEX := "res://assets/baked/win_frame.png"
+const BLEED := 46.0   # 九切片四角尺寸 = 圆角 13 + 投影 22 + 余量；烘的那张就按这个外边距裁的
 
 var title: String = "WINDOW"
 var body: Control          # 定位容器（子类往里放东西时自己管坐标，比如画布）
@@ -23,6 +29,8 @@ var _bar_nodes: Array[Control] = []
 var _manual_close := false
 var _inner_w := 0.0
 var _close_btn: Button
+var _over := false
+var _over_ring: Control = null
 
 
 func setup(p_title: String, w: float, h: float, radius: int = TecTheme.R_WIN) -> void:
@@ -33,7 +41,30 @@ func setup(p_title: String, w: float, h: float, radius: int = TecTheme.R_WIN) ->
 	_build(radius)
 
 
-func _build(radius: int) -> void:
+## 是否用烘焙九切片当底板。暗纸血统的窗口（放映卡 / 回忆小剧场）自己改 shader 参数，
+## 覆盖成 false 即可继续走程序生成，不必为每种纸各烘一张。
+func _uses_baked_frame() -> bool:
+	return true
+
+
+## 烘焙底板：九切片往外撑出 BLEED，框线正好落在原来 shader 画的 PAD 位置，
+## 所以**调用方的坐标一个都不用改**（窗框仍在 PAD 处，只是投影终于有地方画了）。
+func _build_baked_frame() -> void:
+	var frame := NinePatchRect.new()
+	frame.name = "frame"
+	frame.texture = load(FRAME_TEX)
+	frame.patch_margin_left = int(BLEED)
+	frame.patch_margin_right = int(BLEED)
+	frame.patch_margin_top = int(BLEED)
+	frame.patch_margin_bottom = int(BLEED)
+	frame.position = Vector2(PAD - BLEED, PAD - BLEED)
+	frame.size = Vector2(size.x - PAD * 2.0 + BLEED * 2.0, size.y - PAD * 2.0 + BLEED * 2.0)
+	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(frame)
+
+
+func _build_shader_bg(radius: int) -> void:
 	_mat = ShaderMaterial.new()
 	_mat.shader = load("res://ui/shaders/surface.gdshader")
 	_mat.set_shader_parameter("rect_size", size)
@@ -41,6 +72,9 @@ func _build(radius: int) -> void:
 	_mat.set_shader_parameter("radius", float(radius))
 	_mat.set_shader_parameter("shade_soft", 12.0)
 	_mat.set_shader_parameter("shade_offset", Vector2(5.0, 7.0))
+	_mat.set_shader_parameter("flat_fill", true)
+	_mat.set_shader_parameter("col_mid", TecTheme.CARD)
+	_mat.set_shader_parameter("edge_col", Color(0.290, 0.271, 0.204, 0.10))
 
 	var bg := ColorRect.new()
 	bg.name = "bg"
@@ -50,40 +84,79 @@ func _build(radius: int) -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
+
+func _build(radius: int) -> void:
 	var inner_w: float = size.x - PAD * 2.0
 	_inner_w = inner_w
 	var inner_h: float = size.y - PAD * 2.0
 
+	if _uses_baked_frame() and ResourceLoader.exists(FRAME_TEX):
+		_build_baked_frame()
+	else:
+		_build_shader_bg(radius)
+
 	var bar := Control.new()
 	bar.name = "bar"
-	bar.position = Vector2(PAD, PAD)
-	bar.size = Vector2(inner_w, BAR_H)
+	bar.position = Vector2(PAD, PAD + 1.0)
+	bar.size = Vector2(inner_w, BAR_H - 1.0)
 	bar.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(bar)
 	_bar_nodes.append(bar)
 
-	_title_label = TecTheme.label(title, 12, TecTheme.TEXT)
+	var shade := TextureRect.new()
+	shade.name = "bar_shade"
+	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	shade.texture = _bar_gradient()
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(shade)
+
+	var title_row := HBoxContainer.new()
+	title_row.name = "title_row"
+	title_row.position = Vector2(10.0, 0.0)
+	title_row.size = Vector2(inner_w - 20.0, BAR_H - 1.0)
+	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	title_row.add_theme_constant_override("separation", 8)
+	title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(title_row)
+
+	var left_rule := _title_rule()
+	title_row.add_child(left_rule)
+	_title_label = TecTheme.label(title, 10, TecTheme.TEXT)
 	_title_label.name = "win_title"
-	_title_label.position = Vector2(12.0, 6.0)
-	_title_label.size = Vector2(inner_w - 60.0, 22.0)
+	var spaced := FontVariation.new()
+	spaced.base_font = TecTheme.font()
+	spaced.set_spacing(TextServer.SPACING_GLYPH, 2)
+	_title_label.add_theme_font_override("font", spaced)
+	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title_label.clip_text = true
 	_title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_title_label.custom_minimum_size = Vector2(240, 0)
+	_title_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.add_child(_title_label)
+	title_row.add_child(_title_label)
+	title_row.add_child(_title_rule())
+
+	var top_hl := ColorRect.new()
+	top_hl.name = "top_hl"
+	top_hl.color = Color(1.0, 0.992, 0.965, 0.9)
+	top_hl.position = Vector2(0, 0)
+	top_hl.size = Vector2(inner_w, 1.0)
+	top_hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(top_hl)
 
 	var sep := ColorRect.new()
 	sep.name = "sep"
-	sep.color = TecTheme.EDGE_SOFT
-	sep.position = Vector2(PAD + 10.0, PAD + BAR_H)
-	sep.size = Vector2(inner_w - 20.0, 1.0)
+	sep.color = Color(0.290, 0.271, 0.204, 0.15)
+	sep.position = Vector2(PAD, PAD + BAR_H)
+	sep.size = Vector2(inner_w, 1.0)
 	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(sep)
 
-	var close := TecTheme.button("×")
+	var close := _mini_button("×")
 	close.name = "close"
-	close.size = Vector2(26.0, 22.0)
-	close.position = Vector2(inner_w - 32.0, 6.0)
-	close.add_theme_font_size_override("font_size", 12)
+	close.position = Vector2(inner_w - 23.0, (BAR_H - 1.0 - 18.0) * 0.5)
 	close.pressed.connect(_on_close_pressed)
 	_close_btn = close
 	bar.add_child(close)
@@ -92,8 +165,8 @@ func _build(radius: int) -> void:
 
 	body = Control.new()
 	body.name = "body"
-	body.position = Vector2(PAD + 10.0, PAD + BAR_H + 10.0)
-	body.size = Vector2(inner_w - 20.0, inner_h - BAR_H - 22.0)
+	body.position = Vector2(PAD + 12.0, PAD + BAR_H + 10.0)
+	body.size = Vector2(inner_w - 24.0, inner_h - BAR_H - 20.0)
 	body.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(body)
 
@@ -103,6 +176,101 @@ func _build(radius: int) -> void:
 	content.add_theme_constant_override("separation", 7)
 	content.mouse_filter = Control.MOUSE_FILTER_PASS
 	body.add_child(content)
+
+
+func _bar_gradient() -> GradientTexture2D:
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 1.0])
+	grad.colors = PackedColorArray([Color(1.0, 0.988, 0.945, 0.6), Color(1.0, 0.988, 0.945, 0.0)])
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.width = 4
+	tex.height = 32
+	tex.fill_from = Vector2(0, 0)
+	tex.fill_to = Vector2(0, 1)
+	return tex
+
+
+func _title_rule() -> Control:
+	var wrap := Control.new()
+	wrap.custom_minimum_size = Vector2(12.0, BAR_H - 1.0)
+	wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rule := ColorRect.new()
+	rule.color = TecTheme.EDGE
+	rule.anchor_left = 0.0
+	rule.anchor_right = 1.0
+	rule.anchor_top = 0.0
+	rule.anchor_bottom = 0.0
+	rule.offset_left = 0.0
+	rule.offset_right = 0.0
+	rule.offset_top = 11.0
+	rule.offset_bottom = 12.0
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(rule)
+	return wrap
+
+
+func _mini_button(text: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.size = Vector2(18.0, 18.0)
+	b.custom_minimum_size = b.size
+	b.add_theme_font_override("font", TecTheme.font())
+	b.add_theme_font_size_override("font_size", 11)
+	b.add_theme_color_override("font_color", TecTheme.TEXT)
+	b.add_theme_color_override("font_hover_color", TecTheme.CARD)
+	b.add_theme_color_override("font_pressed_color", TecTheme.TEXT)
+	var normal := TecTheme.flat(TecTheme.FACE_HI, 7)
+	normal.shadow_color = TecTheme.BEVEL_LO
+	normal.shadow_size = 3
+	normal.shadow_offset = Vector2(1, 2)
+	normal.content_margin_left = 0
+	normal.content_margin_right = 0
+	normal.content_margin_top = 0
+	normal.content_margin_bottom = 0
+	b.add_theme_stylebox_override("normal", normal)
+	b.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.LINE, 7))
+	b.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, 7))
+	return b
+
+
+## 拖动中悬停 = 落点：Web `.bag-win.over / .clue-win.over{outline:2px dashed var(--text);outline-offset:3px}`
+func set_over(on: bool) -> void:
+	if _over == on:
+		return
+	_over = on
+	if on:
+		if _over_ring == null or not is_instance_valid(_over_ring):
+			_over_ring = OverRing.new()
+			_over_ring.name = "over_ring"
+			_over_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_over_ring.set_anchors_preset(Control.PRESET_FULL_RECT)
+			_over_ring.inset = PAD - 3.0 - 1.0
+			add_child(_over_ring)
+		_over_ring.visible = true
+		_over_ring.queue_redraw()
+	elif _over_ring != null and is_instance_valid(_over_ring):
+		_over_ring.visible = false
+
+
+class OverRing extends Control:
+	var inset := 10.0
+
+	func _draw() -> void:
+		var r := Rect2(Vector2(inset, inset), size - Vector2(inset, inset) * 2.0)
+		var rad := float(TecTheme.R_WIN)
+		var dash := 5.0
+		draw_dashed_line(Vector2(r.position.x + rad, r.position.y),
+			Vector2(r.end.x - rad, r.position.y), TecTheme.LINE, 2.0, dash, true, false)
+		draw_dashed_line(Vector2(r.position.x + rad, r.end.y),
+			Vector2(r.end.x - rad, r.end.y), TecTheme.LINE, 2.0, dash, true, false)
+		draw_dashed_line(Vector2(r.position.x, r.position.y + rad),
+			Vector2(r.position.x, r.end.y - rad), TecTheme.LINE, 2.0, dash, true, false)
+		draw_dashed_line(Vector2(r.end.x, r.position.y + rad),
+			Vector2(r.end.x, r.end.y - rad), TecTheme.LINE, 2.0, dash, true, false)
 
 
 func set_title(t: String) -> void:
@@ -117,7 +285,7 @@ func set_inner_height(h: float) -> void:
 	var target := Vector2(size.x, ih + PAD * 2.0)
 	custom_minimum_size = target
 	size = target
-	body.size.y = ih - BAR_H - 22.0
+	body.size.y = ih - BAR_H - 20.0
 	if _mat != null:
 		_mat.set_shader_parameter("rect_size", size)
 
@@ -133,15 +301,12 @@ func enable_controls(min_tip: String, close_tip: String = "", show_min := true) 
 		return
 	var bar := _close_btn.get_parent()
 	if show_min:
-		var min_btn := TecTheme.button("–")
+		var min_btn := _mini_button("–")
 		min_btn.name = "min"
-		min_btn.size = Vector2(26.0, 22.0)
-		min_btn.position = Vector2(_inner_w - 60.0, 6.0)
-		min_btn.add_theme_font_size_override("font_size", 12)
+		min_btn.position = Vector2(_inner_w - 46.0, (BAR_H - 1.0 - 18.0) * 0.5)
 		min_btn.tooltip_text = min_tip
 		min_btn.pressed.connect(func(): minimized.emit())
 		bar.add_child(min_btn)
-		_title_label.size = Vector2(_inner_w - 92.0, 22.0)
 	_close_btn.tooltip_text = close_tip
 
 

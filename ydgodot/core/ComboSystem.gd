@@ -41,29 +41,125 @@ func toggle_light(node_key: String) -> Dictionary:
 
 
 ## 把一个节点拖到另一个节点上。返回：
-##   {ok, blocked, message, reveal:Array, next_scene:String}
+##   {ok, blocked, message, reveal:Array, next_scene:String, tried:String}
 ## blocked = 被规则拦下（不执行、不记 tried）
+##
+## 顺序照抄 Web `attemptCombo`：
+##   ① 目标自己的反应表 → ② 反向（工具是反应表主人）→ ③ 目标的 useItem 命令
+##   → ④ 容器扫描（它收着的东西对工具有反应）→ ⑤ 都不中：记 tried + 说原因
+## `tried` 只进字典、不写进 `graph.edges` —— 连线层单独读 `graph.tried` 画虚线，
+## 若混进 edges 会污染力导向的弹簧与枢纽度数。
 func use_item(tool_key: String, target_key: String) -> Dictionary:
 	var tool := graph.node(tool_key)
 	var target := graph.node(target_key)
 	if tool.is_empty() or target.is_empty() or tool_key == target_key:
 		return {"ok": false, "message": ""}
+	var tool_id := String(tool["id"])
+	var target_id := String(target["id"])
 
-	var target_it := case_def.item_of(String(target["id"]))
+	# ① 目标自己有反应表（人物对「你手上的东西」说一句话）
+	var hit := lookup_reaction(String(target["kind"]), target_id, tool_id)
+	var owner_key := target_key
+	# ② 反向：工具自己是反应表的所有者（把人拖到东西上）
+	if hit.is_empty():
+		var rev := lookup_reaction(String(tool["kind"]), tool_id, target_id)
+		if not rev.is_empty():
+			hit = rev
+			owner_key = tool_key
+	if not hit.is_empty():
+		return _apply_reaction(hit, owner_key)
+
+	# ③ 目标的 useItem 命令正好需要这个工具（发光门 / 零件门 / 装零件都在 CommandSystem 里）
+	var target_it := case_def.item_of(target_id)
 	if target_it != null:
 		for cmd in target_it.commands:
 			if not (cmd is UseItemCommandDef):
 				continue
 			var uc := cmd as UseItemCommandDef
-			if uc.required_item == null or uc.required_item.id != String(tool["id"]):
+			if uc.required_item == null or uc.required_item.id != tool_id:
 				continue
-			# 发光门 / 零件门 / 装零件 / onSuccess，全在 CommandSystem 里一处实现
 			var res := cmd_sys.execute(target_key, uc)
 			res["matched"] = true
 			return res
+
+	# ④ 容器扫描：它收着的东西对工具有反应（也反过来扫一次工具）
+	var scan := _scan_container_reaction(target_key, tool_id)
+	var scan_owner := target_key
+	if scan.is_empty():
+		scan = _scan_container_reaction(tool_key, target_id)
+		scan_owner = tool_key
+	if not scan.is_empty():
+		return _apply_reaction(scan, scan_owner)
+
+	# ⑤ 都不中：记一笔「试过」（画布上画一条淡虚线），并说明原因
+	var tried := tool_key + ">" + target_key
+	graph.tried[tried] = true
 	return {
 		"ok": false,
-		"message": "「%s」与「%s」之间没有发生任何事。" % [tool["label"], target["label"]],
+		"tried": tried,
+		"message": "「%s」对「%s」没有反应" % [target["label"], tool["label"]],
+	}
+
+
+## 反应表查询（Web `lookupReaction`）：先 item_reactions、再 clue_reactions。
+## A-001 共 27 条，全是人物带的：物品触发 14 条（朱穗 6 / 陆珩松 4 / TEC 4）、
+## 线索触发 13 条（朱穗 4 / 陆珩松 6 / 槿杉 3）。全部是纯文本，没有 `results` / `onSuccess`，
+## 所以「长出场景 / 长出新物品」这两条产出来源目前用不上（见 `_apply_reaction` 注释）。
+func lookup_reaction(kind: String, owner_id: String, tool_id: String) -> Dictionary:
+	if kind != "char":
+		return {}
+	var ch := case_def.char_of(owner_id)
+	if ch == null:
+		return {}
+	for r in ch.item_reactions:
+		if r != null and r.trigger_id == tool_id:
+			return {"text": r.text, "field": "itemReactions"}
+	for r in ch.clue_reactions:
+		if r != null and r.trigger_id == tool_id:
+			return {"text": r.text, "field": "reactions"}
+	return {}
+
+
+## 容器扫描：读**带标签的原文**（`raw_text_of`），逐个内容物查反应表
+func _scan_container_reaction(container_key: String, other_id: String) -> Dictionary:
+	var n := graph.node(container_key)
+	if n.is_empty() or not graph.is_container_node(container_key):
+		return {}
+	for tag in case_def.tags_of(case_def.raw_text_of(String(n["kind"]), String(n["id"]))):
+		var h := lookup_reaction(String(tag["kind"]), String(tag["id"]), other_id)
+		if not h.is_empty():
+			h["via"] = container_key
+			return h
+	return {}
+
+
+## 命中后的统一落地：正文 → 提示语；正文里的 [clue:x] → 建线索节点并连给反应表主人；
+## 所有出现的线索同时计入「已捕获」（与 runCommand 的 gotClues 同口径）。
+##
+## ⚠ 未接的三条产出来源（Web `05-combine.js:112-123` 有，A-001 的数据不触发）：
+##   `react.results.scene`  → 新场景节点 + `cond` 边
+##   `react.results.items` / `react.onSuccess.items` → spawnItems（从容器边长出物品）
+## 现在 27 条反应全是纯文本，接上也无从验证；等有带 results 的剧本再补，别当成已完成的通道。
+func _apply_reaction(hit: Dictionary, owner_key: String) -> Dictionary:
+	var raw := String(hit.get("text", ""))
+	var captured := graph.capture_clues(raw)
+	var reveal: Array = []
+	for tag in case_def.tags_of(raw):
+		if String(tag["kind"]) != "clue":
+			continue
+		var id := String(tag["id"])
+		if graph.has("clue", id):
+			continue
+		graph.add_node("clue", id)
+		var ck := graph.key_of("clue", id)
+		graph.link(owner_key, ck, "entity")
+		reveal.append(ck)
+	return {
+		"ok": true,
+		"matched": true,
+		"message": case_def.strip_tags(raw),
+		"captured": captured,
+		"reveal": reveal,
 	}
 
 

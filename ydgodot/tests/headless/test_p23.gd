@@ -243,8 +243,13 @@ func _test_ui() -> void:
 	await process_frame
 	check("graph.time 切到 6/2", scene.dbg_time() == "SCENES_0602", scene.dbg_time())
 	check("当前档标签 = 6月2日", scene.dbg_time_label() == "6月2日", scene.dbg_time_label())
+	## 页眉面包屑在 P3 改回 Web 口径：显示「节点 / 已探索 / 组合 / 线索 / 结局」计数，
+	## 不再兼任场景名（场景与时刻显示在档案窗与案件窗标题栏）。所以这里查计数格式，
+	## 「换档」本身由上面 `dbg_time()` / 档案窗当前档两条钉住。
 	var crumb := scene.get_node_or_null("header/crumb") as Label
-	check("页眉跟着换档", crumb != null and crumb.text.contains("6月2日"),
+	check("页眉面包屑是计数口径（不再是场景名）",
+		crumb != null and crumb.text.contains("节点") and crumb.text.contains("已探索场景")
+		and not crumb.text.contains("6月2日"),
 		crumb.text if crumb != null else "null")
 	check("6/2 档：花园可见", scene.dbg_card_visible("loc:SCENES_garden"))
 	check("6/2 档：现在档的物品隐藏", not scene.dbg_card_visible("item:ITEM_shoudiantong"))
@@ -264,9 +269,9 @@ func _test_ui() -> void:
 			if card.line_at(i).begins_with("——"):
 				has_talk = true
 	check("正文带当天角色台词", has_talk)
-	var garden_rect := Rect2(scene.dbg_card_pos("loc:SCENES_garden"),
-		Vector2(GraphState.SCENE_W, GraphState.SCENE_H))
-	var mem_rect := Rect2(scene.dbg_mem_pos(), card.size if card != null else Vector2.ZERO)
+	# 画布有缩放 / 平移 ⇒ 「谁压住谁」只能在屏幕空间里比（world 坐标比必然误判）
+	var garden_rect: Rect2 = scene.dbg_card_global("loc:SCENES_garden")
+	var mem_rect: Rect2 = scene.dbg_mem_global()
 	check("放映卡锚在地点旁且不压住节点", card != null and not garden_rect.intersects(mem_rect),
 		str(garden_rect) + " / " + str(mem_rect))
 	check("首行在打字", card != null and card.is_typing())
@@ -339,9 +344,8 @@ func _test_ui() -> void:
 		play.line_at(1) if play != null and play.line_count() > 1 else "")
 	check("小剧场有 tried 痕迹",
 		bool(scene.graph.tried.get("char:NPC_FB>loc:SCENES_garden", false)))
-	var play_garden := Rect2(scene.dbg_card_pos("loc:SCENES_garden"),
-		Vector2(GraphState.SCENE_W, GraphState.SCENE_H))
-	var play_rect := Rect2(scene.dbg_mem_pos(), play.size if play != null else Vector2.ZERO)
+	var play_garden: Rect2 = scene.dbg_card_global("loc:SCENES_garden")
+	var play_rect: Rect2 = scene.dbg_mem_global()
 	check("小剧场锚在地点旁且不压住节点", play != null and not play_garden.intersects(play_rect),
 		str(play_garden) + " / " + str(play_rect))
 	var rail := Rect2(Vector2(22, 30), Vector2(96, 290))
