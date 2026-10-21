@@ -468,6 +468,15 @@ func set_home(p: Vector2) -> void:
 	position = p
 
 
+## 只把「停靠点」改到 p（顺带杀掉弹簧），不动 position —— 配合 Desktop 的位置过渡：
+## 补间把卡搬过去的过程中，锚点先就位，收尾再 set_home 校准。
+func set_home_silent(p: Vector2) -> void:
+	if _spring != null and _spring.is_valid():
+		_spring.kill()
+	_spring = null
+	_home = p
+
+
 ## 视觉框（world 坐标，不含 8px 阴影余量）—— 布局 / 连线 / 命中判定的唯一来源
 func visual_rect() -> Rect2:
 	return Rect2(position + Vector2(PAD, PAD), Vector2(_w, _h))

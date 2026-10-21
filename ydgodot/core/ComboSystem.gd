@@ -123,7 +123,8 @@ func use_item(tool_key: String, target_key: String) -> Dictionary:
 ## 反应表查询（Web `lookupReaction`）：先 item_reactions、再 clue_reactions。
 ## A-001 共 27 条，全是人物带的：物品触发 14 条（朱穗 6 / 陆珩松 4 / TEC 4）、
 ## 线索触发 13 条（朱穗 4 / 陆珩松 6 / 槿杉 3）。全部是纯文本，没有 `results` / `onSuccess`，
-## 所以「长出场景 / 长出新物品」这两条产出来源目前用不上（见 `_apply_reaction` 注释）。
+## 所以 reactions 的产出通道目前数据上不为空（`_apply_reaction` 的结果公式已在运行时打开，
+## 小盘上用注入的带 results 的反应来验）。
 func lookup_reaction(kind: String, owner_id: String, tool_id: String) -> Dictionary:
 	if kind != "char":
 		return {}
@@ -132,10 +133,10 @@ func lookup_reaction(kind: String, owner_id: String, tool_id: String) -> Diction
 		return {}
 	for r in ch.item_reactions:
 		if r != null and r.trigger_id == tool_id:
-			return {"text": r.text, "field": "itemReactions"}
+			return {"text": r.text, "results": r.results, "field": "itemReactions"}
 	for r in ch.clue_reactions:
 		if r != null and r.trigger_id == tool_id:
-			return {"text": r.text, "field": "reactions"}
+			return {"text": r.text, "results": r.results, "field": "reactions"}
 	return {}
 
 
@@ -155,10 +156,12 @@ func _scan_container_reaction(container_key: String, other_id: String) -> Dictio
 ## 命中后的统一落地：正文 → 提示语；正文里的 [clue:x] → 建线索节点并连给反应表主人；
 ## 所有出现的线索同时计入「已捕获」（与 runCommand 的 gotClues 同口径）。
 ##
-## ⚠ 未接的三条产出来源（Web `05-combine.js:112-123` 有，A-001 的数据不触发）：
-##   `react.results.scene`  → 新场景节点 + `cond` 边
-##   `react.results.items` / `react.onSuccess.items` → spawnItems（从容器边长出物品）
-## 现在 27 条反应全是纯文本，接上也无从验证；等有带 results 的剧本再补，别当成已完成的通道。
+## 三条产出来源（Web `05-combine.js:112-123`，A-001 的 27 条反应全是纯文本，
+## 通道在运行时直接按 Web 的同一公式走，小盘上用注入反应表来验）：
+##   `react.results.scene`              → 新场景节点（fresh=「新」）+ `cond` 边
+##   `react.results.items` + `onSuccess.items`（同一批合并）→ spawnItems：
+##     新物品 洒在主人右下 (from + 60 + i*26)，已上画的旧物品不 fresh/不挪位；
+##   `results.scene` 若是时刻 id → 走档案开口径（Web announceTimeCollected） here handled by DESKTOP toast.
 func _apply_reaction(hit: Dictionary, owner_key: String) -> Dictionary:
 	var raw := String(hit.get("text", ""))
 	var captured := graph.capture_clues(raw)
@@ -173,6 +176,42 @@ func _apply_reaction(hit: Dictionary, owner_key: String) -> Dictionary:
 		var ck := graph.key_of("clue", id)
 		graph.link(owner_key, ck, "entity")
 		reveal.append(ck)
+
+	# results.scene：新场景 + `cond` 边（Web：ensureSceneNode + markFresh + isNew 才连边）
+	var results: Dictionary = hit.get("results", {})
+	var scene_id := String(results.get("scene", ""))
+	if scene_id != "" and case_def.scene_of(scene_id) != null:
+		var scene_existed := graph.has("loc", scene_id)   # normalize 会把时刻 id 归到 time
+		var sn := graph.add_node("loc", scene_id)
+		graph.mark_fresh(String(sn["key"]))
+		if not scene_existed:
+			graph.link(owner_key, String(sn["key"]), "cond")
+		reveal.append(String(sn["key"]))
+
+	# results.items + onSuccess.items 合并 → spawnItems（Web 04-graph.js:127 同一公式）
+	var new_items: Array = []
+	new_items.append_array(results.get("items", []))
+	if hit.has("on_success_items"):
+		new_items.append_array(hit["on_success_items"])
+	if not new_items.is_empty():
+		var src := graph.node(owner_key)
+		var sx := 900.0 if float(src.get("x", -1.0)) < 0.0 else float(src["x"])
+		var sy := 600.0 if float(src.get("x", -1.0)) < 0.0 else float(src["y"])
+		var home := String(src.get("home_scene", ""))
+		for i in new_items.size():
+			var iid := String(new_items[i])
+			var existed_item := graph.has("item", iid)
+			var iv := graph.add_node("item", iid)
+			if String(iv.get("home_scene", "")) == "":
+				iv["home_scene"] = home
+			if existed_item:
+				iv["fresh"] = false        # 本来就在画布上：不抢镜头、不重挂「新」
+			else:
+				graph.mark_fresh(String(iv["key"]))
+				iv["x"] = sx + 60.0 + float(i) * 26.0
+				iv["y"] = sy + 60.0 + float(i) * 26.0
+				reveal.append(String(iv["key"]))
+
 	return {
 		"ok": true,
 		"matched": true,

@@ -104,6 +104,11 @@
   - 场景命令（N7）：`SceneDef.commands` 字段进迁移；双击带命令的场景**先跑 `commands[0]` 再说**，无命令才展开折叠；a001 数据 0/11 场景用到，断言走运行时注入
   - 拖动镜像（D6 / Web `#drag-layer`）：拖起整卡「假身」浮到所有窗之上、原卡隐藏，松手换身回来；被拖卡的连线照常续画（`_drag_key` 豁免）
   - 回归：全套无头 **14 个脚本 1086 项 0 失败**；`test_ui.gd` 79 → 110（批 3 新增 31：warn 7 · pop 6 · hover 3 · dim 2 · 场景命令 5 · 镜像 8）
+- **交互层 · 批 4（残余三项收口）**：✅ 已落地（差距报告 §0.5）
+  - 反应表产出（R1 / Web `05-combine.js:112-123`）：`ReactionDef.results` 进迁移；`ComboSystem._apply_reaction` 三通道——`results.scene` 建场景 + fresh/unread + **新建才连** `cond` 边；`results.items` 与 `onSuccess.items` 同批走 spawnItems 公式（已上画的旧物品不重 fresh 不挪位，新物品在主人右下 `60 + i*26` + 继承 `home_scene`）；正文 `[clue:]` 照旧。命令侧 payload 通路更早已由 `CommandSystem._apply_payload` 接通
+  - 重排位置过渡（R2 / Web `.node{transition: left/top .34s cubic-bezier(.4,0,.2,1)}`）：`_relayout(animated)` —— **折叠 / 展开触发的重排**才播 0.34s cubic 过渡 + 连线逐帧跟着画（`paintEdgesFor(420)` 同口径）；普通重排保持秒到（无头回归与坐标语义都依赖「重排=即刻就位」）；新节点 / 截图流水线直接落位
+  - 系统窗 z 序（R3 / Web `05-apps.css`+`06-shell.css` z-index 表）：`ZR_*` 十二档 + `_place_z()`（插到第一个更高 rank 之前、同级按打开顺序）——`case_win(1)` → pw(15)/narr(16) → log(21)/detail(22)/dock(23) → icons(24) → 普通窗(25) → chat(26) → TEC(28) → toast(30) → 镜像(40)；mouse_to_front 全部替换为 rank 插队
+  - 回归：全套无头 **14 个脚本 1119 项 0 失败**；`test_ui.gd` 110 → 143（批 4 新增 33：过渡 7 · 反应表 19 · z 序 7）
 - **P3 视觉追平**：🔧 进行中，**全屏 diff 7.00% → 2.30%**（1280×800 / 阈值 8，计划目标 < 0.5% 且文字区外为零）
   - 对拍流水线：`tools/pixeldiff/capture_web.cjs`（CDP 无头 Edge，关 LCD 次像素）→ `--shot-p3` → `compare.py`（分区统计 + 差异图 + `start.json`）
   - 已消灭：窗框九切片烘焙（`assets/baked/win_frame.png`，`patch_margin=46`，外沿差异 **0**）、页眉几何逐坐标对齐、**页眉控件高 31 → 25/27**（Button 最小尺寸反顶 `set_size`，见 `_sync_header_sizes`）、枢纽场景双线框、图标块（渐变 150°、描边 alpha、字形高 10px、标签 4px、阴影软度）
@@ -185,7 +190,7 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 | `core/defs/` | 25 个自定义 Resource 类（`SceneDef` / `ItemDef` / `CommandDef` 六子类 / `CharDef` …） |
 | `data/` | `case-a001.json` —— **已冻结为只读档案**（迁移输入 + 对照基准，运行时不再读它） |
 | `assets/raw/` | `src/assets/` 的拷贝（字体 / 头像 / OGG / 花园序列帧） |
-| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 110）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 15）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 103）、`test_p25.gd`（音乐 / 花园 146）、`test_p26.gd`（名册 / 日志 / 图标栏 85）—— **共 1086 项** |
+| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 143）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 15）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 103）、`test_p25.gd`（音乐 / 花园 146）、`test_p26.gd`（名册 / 日志 / 图标栏 85）—— **共 1119 项** |
 | `docs/` | P0 切片 6 张 + P1 新特性 15 张 + P2 案件 / TEC / 回忆 / 对话 / 音乐 / 花园 / 名册 / 日志 22 张截图，共 43 张（P3 对拍基线从这些图起步） |
 | `tools/` | P1 的 `json_to_tres.gd` 与对拍工具（待建） |
 
@@ -205,20 +210,18 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 - 详情窗：简介 / 状态 / 来源 + 四个重看按钮
 - TEC 对话 / 分析：5–8 秒进度条 + `--fast` 旁路 + 闲聊 + 档案解读 + 右下角助手卡片
 - 结局演出：分幕台词按 `delay` 落下、点击继续、遮罩收幕
-- 无头回归 **14 个脚本 1086 项**，全绿
+- 无头回归 **14 个脚本 1119 项**，全绿
 
 **没做（P4 / 后续）**
 
-- 反应表三条产出来源（`results.scene` / `results.items` / `onSuccess.items`）—— 数据不触发，接了也无从验证（已知缺口）
-- 折叠 / 展开的位置过渡动画（Web 是 CSS 过渡，Godot 目前瞬时换位）
-- 系统窗层级与 z 序的完整规则（音乐 / 花园已按各自场景接入最小化或固定按钮）
+- 无 —— README 以前列的三条（反应表产物 / 折叠过渡 / 系统窗 z 序）已随批 4 全部落地（差距报告 §0.5）。
 
 ## 与 Web 版的已知偏差
 
 | 项 | Web 版 | Godot 现状 |
 |---|---|---|
 | 纸纹 / 浮雕 | 内联 SVG 噪波 + 多层 box-shadow | **shader 程序生成**（`paper.gdshader` / `surface.gdshader`）——P3 若换烘焙 PNG，只替换材质 |
-| 节点布局 | 力导向 + 折叠/展开过渡动画 + 镜头自动平移 | 力导向参数**逐条照抄**（斥力/间距/弹簧/向心/260 轮）；缺过渡动画，镜头平移只有「前往」一处 |
+| 节点布局 | 力导向 + 折叠/展开过渡动画 + 镜头自动平移 | 力导向参数**逐条照抄**（斥力/间距/弹簧/向心/260 轮）；折叠/展开重排跑 0.34s 过渡（批 4，普通重排保持瞬时——无头回归依赖即刻落位）；镜头平移只有「前往」一处 |
 | 叙事卡 | 锚在触发节点上方、可拖 | 已锚定（`anchorAboveOrBelow`）且可拖，锚定前先落第一行再量高 |
 | 手电筒来源 | 书桌 → 左侧抽屉 → 手电筒 | `--shot` 剧本开局直接放在画布上；正常游玩走书桌链路 |
 | 数据形态 | `data/case-a001.json` 直读 | `cases/a001/**/*.tres`（P1.1），JSON 冻结为档案 |

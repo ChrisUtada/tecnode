@@ -184,6 +184,9 @@ func _notification(what: int) -> void:
 ## 为什么不用 Control 的 drag&drop：那套只搬数据、画不了跟手的幽灵；
 ## 而画布拖动本来就是我们自己算的指针手势，两边口径要一致。
 func _process(_dt: float) -> void:
+	if _follow_frames > 0:
+		_follow_frames -= 1
+		_repaint_edges()
 	if _sdrag_key == "":
 		return
 	var at := _desk.get_global_mouse_position()
@@ -380,11 +383,13 @@ func _build_ui() -> void:
 	_tec.analysis_done.connect(_on_tec_analysis_done)
 	_tec.talk_requested.connect(_tec_talk)
 	_desk.add_child(_tec)
+	_place_z(_tec, ZR_TEC)
 
 	_narr = NarrCard.new()
 	_narr.name = "narr_card"
 	_narr.visible = false
 	_desk.add_child(_narr)
+	_place_z(_narr, ZR_NARR)
 
 	_ending = EndingOverlay.new()
 	_ending.name = "ending"
@@ -647,6 +652,7 @@ func _build_case_window() -> void:
 	_case_win.closed.connect(func(): _park_case("icon"))
 	_case_win.minimized.connect(func(): _park_case("dock"))
 	_desk.add_child(_case_win)
+	_place_z(_case_win, ZR_CASE)
 
 	_stage = Control.new()
 	_stage.name = "stage"
@@ -698,6 +704,40 @@ const ICON_DEFS := [
 	["案件地图", "map", "map"],
 ]
 
+# ── z 序（Web 静态 z-index 表，05-apps.css / 06-shell.css / 03-desktop.css 抄录）──
+# Web 没有点击置顶：层序只由「每类窗口的固定 z 值 + 同级打开顺序（后来者在上）」决定。
+# 同 rank 依旧按打开顺序，高一档的窗永远盖低一档的 —— 日志(21)、详情(22) 开得再晚也压不过 TEC(28)。
+const ZR_CASE := 1        # #case-win：永远在最底
+const ZR_PW := 15         # .pw-pop：压过卡片、被诗行/叙事卡和其它窗口压住
+const ZR_NARR := 16       # .narr-card / .bubble：回放叙事小卡
+const ZR_LOG := 21        # .log-win
+const ZR_DETAIL := 22     # .detail-win
+const ZR_DOCK := 23       # #music-dock / #case-dock / #tec-chip
+const ZR_ICONS := 24      # #icons：窗开着会被任何系统窗盖住（11-dialog.js:501 注释）
+const ZR_WIN := 25        # .bag/.clue/.cert/.map/.music/.goto/.infer/.garden/.people-win
+const ZR_CHAT := 26       # .chat-win / .avatar-win
+const ZR_TEC := 28        # .tec-win / .dlg-win
+const ZR_TOAST := 30      # #toast / #verdict
+const ZR_MIRROR := 40     # #drag-layer：桌面最高层（批 3 的拖动镜像也用这档）
+
+
+## 把一个桌面直系子控件排到 Web 同款的层序位置：插到**第一个更高 rank 的孩子**之前，
+## 同 rank 的相对顺序保持不变（等价于后来者在上）。`ctrl` 本来就在名单里，若它排在
+## 插入点之前，`move_child` 的目标下标要扣掉它自己占的 1 位。
+func _place_z(ctrl: Control, rank: int) -> void:
+	ctrl.set_meta("zrank", rank)
+	var kids := _desk.get_children()
+	var at := kids.size() - 1
+	var self_idx := kids.find(ctrl)
+	for i in kids.size():
+		if i == self_idx:
+			continue
+		var c := kids[i] as Control
+		if int(c.get_meta("zrank", ZR_CASE)) > rank:
+			at = i - 1 if i > self_idx else i
+			break
+	_desk.move_child(ctrl, at)
+
 
 func _build_icons() -> void:
 	# 容器只做「分组 + 树路径」用（`desk/icons/icon_bag` 是测试与落点表的公共锚点），
@@ -708,6 +748,7 @@ func _build_icons() -> void:
 	col.position = Vector2.ZERO
 	col.size = _desk.size
 	_desk.add_child(col)
+	_place_z(col, ZR_ICONS)
 	for d in ICON_DEFS:
 		var app := String(d[1])
 		var b := DeskIcon.new()
@@ -1004,8 +1045,8 @@ func _open_music() -> void:
 		_music_win.minimized.connect(_minimize_music)
 		_music_win.progress_changed.connect(_on_music_progress)
 		_desk.add_child(_music_win)
+	_place_z(_music_win, ZR_WIN)
 	_music_win.visible = true
-	_music_win.move_to_front()
 	if _music_dock != null:
 		_music_dock.visible = false
 
@@ -1032,7 +1073,7 @@ func _minimize_music() -> void:
 	var dock := _ensure_music_dock()
 	dock.update_state(_music_win.state())
 	dock.visible = true
-	dock.move_to_front()
+	_place_z(dock, ZR_DOCK)
 
 
 func _restore_music() -> void:
@@ -1042,7 +1083,7 @@ func _restore_music() -> void:
 			_music_dock.visible = false
 		return
 	_music_win.visible = true
-	_music_win.move_to_front()
+	_place_z(_music_win, ZR_WIN)
 	if _music_dock != null:
 		_music_dock.visible = false
 
@@ -1094,7 +1135,7 @@ func _open_garden() -> void:
 	_garden_win.garden_changed.connect(_on_garden_changed)
 	_garden_win.plot_bloomed.connect(_on_garden_bloomed)
 	_desk.add_child(_garden_win)
-	_garden_win.move_to_front()
+	_place_z(_garden_win, ZR_WIN)
 
 
 func _on_garden_changed() -> void:
@@ -1134,7 +1175,7 @@ func _drop_seed(at_global: Vector2) -> bool:
 	if _garden_win != null and is_instance_valid(_garden_win):
 		_garden_win.refresh()
 		if over_icon:
-			_garden_win.move_to_front()
+			_place_z(_garden_win, ZR_WIN)
 	else:
 		_open_garden()
 	_refresh_app_icons()
@@ -1178,6 +1219,7 @@ func _build_case_park() -> void:
 	_dock_card.pressed.connect(_reopen_case)
 	_dock_card.visible = false
 	_desk.add_child(_dock_card)
+	_place_z(_dock_card, ZR_DOCK)
 
 	var row := HBoxContainer.new()
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1231,6 +1273,7 @@ func _build_tec_chip() -> void:
 	_tec_chip.visible = false
 	_tec_chip.pressed.connect(_open_tec)
 	_desk.add_child(_tec_chip)
+	_place_z(_tec_chip, ZR_DOCK)
 
 
 func _build_toast() -> void:
@@ -1252,6 +1295,7 @@ func _build_toast() -> void:
 	_toast_label = TecTheme.label("", TecTheme.FS_BODY, TecTheme.CARD)
 	_toast.add_child(_toast_label)
 	_desk.add_child(_toast)
+	_place_z(_toast, ZR_TOAST)
 
 
 # ── 切片 ────────────────────────────────────────────────────────────────
@@ -1299,7 +1343,7 @@ func _toggle_case_map() -> void:
 	w.enter_requested.connect(_on_case_map_enter)
 	w.closed.connect(func(): _map_win = null)
 	_desk.add_child(w)
-	w.move_to_front()
+	_place_z(w, ZR_WIN)
 	_map_win = w
 
 
@@ -1380,9 +1424,9 @@ func _reopen_case() -> void:
 	_case_held = false
 	_case_docked = false
 	_case_win.visible = true
-	_case_win.move_to_front()
+	_place_z(_case_win, ZR_CASE)
 	if _tec != null and _tec.visible:
-		_tec.move_to_front()
+		_place_z(_tec, ZR_TEC)
 	_update_case_park_ui()
 
 
@@ -1412,7 +1456,7 @@ func _update_case_park_ui() -> void:
 		_dock_sub.text = "进度已保存 · 点此展开"
 		_dock_card.visible = _case_docked
 		if _case_docked:
-			_dock_card.move_to_front()
+			_place_z(_dock_card, ZR_DOCK)
 	if _map_badge != null:
 		_map_badge.visible = _case_held
 	if _map_win != null and is_instance_valid(_map_win):
@@ -1645,6 +1689,7 @@ func _open_cert_review() -> void:
 	w.setup("INVESTIGATOR // 调查员证", 340, 540)
 	w.position = Vector2(470, 40)
 	_desk.add_child(w)
+	_place_z(w, ZR_WIN)
 	w.content.add_child(IntroWin.build_cert(_investigator))
 	w.tree_exited.connect(func(): _cert_win = null)
 	_cert_win = w
@@ -1940,6 +1985,7 @@ func _on_card_selected(key: String) -> void:
 
 
 func _on_card_dragged(key: String) -> void:
+	_kill_move(key)
 	# Web 的拖动不改选中；但这里选中一下能让「聚焦选中」不把正在拖的卡淡化掉，
 	# 属于报告 §3.1 ② 里点名的有意偏离。
 	_selected = key
@@ -1980,6 +2026,7 @@ func _mount_card_mirror(card: NodeCard) -> void:
 	if mirror == null:
 		return
 	_desk.add_child(mirror)
+	_place_z(mirror, ZR_MIRROR)
 	mirror.scale = card.get_global_transform().get_scale()
 	mirror.global_position = card.get_global_position()
 	_card_mirror = mirror
@@ -2126,7 +2173,7 @@ func _ensure_detail() -> DetailWin:
 	_detail_win.play_monologue.connect(func(id: String): _open_monologue(id))
 	_detail_win.play_music.connect(_open_music)
 	_desk.add_child(_detail_win)
-	_detail_win.z_index = 24
+	_place_z(_detail_win, ZR_DETAIL)
 	return _detail_win
 
 
@@ -2428,7 +2475,7 @@ func _toggle_container(kind: String, id: String) -> void:
 			_log("「%s」另有 %d 个节点留在画布上（已固定 / 与场外相连）"
 				% [case_def.label_of(kind, id), left], "sys")
 		_show_toast("收起了「%s」" % case_def.label_of(kind, id))
-		_relayout()
+		_relayout(true)
 		_commit(before)
 		return
 	var fresh := graph.reveal_container(kind, id)
@@ -2439,7 +2486,7 @@ func _toggle_container(kind: String, id: String) -> void:
 	if _cards.has(graph.key_of(kind, id)):
 		_cards[graph.key_of(kind, id)].refresh()
 		_sync_card_shell(_cards[graph.key_of(kind, id)])
-	_relayout()
+	_relayout(true)
 	if kind == "loc":
 		_show_narr(id)
 		_set_crumb(_case_label() + " // " + case_def.scene_title(id))
@@ -2508,7 +2555,7 @@ func _toggle_storage(kind: String) -> void:
 		_bag_win.row_pressed.connect(_on_row_pressed)
 		_bag_win.closed.connect(func(): _bag_win = null)
 		_desk.add_child(_bag_win)
-		_bag_win.move_to_front()
+		_place_z(_bag_win, ZR_WIN)
 		return
 	if _ledger_win != null and is_instance_valid(_ledger_win):
 		_ledger_win.queue_free()
@@ -2524,7 +2571,7 @@ func _toggle_storage(kind: String) -> void:
 	_ledger_win.row_pressed.connect(_on_row_pressed)
 	_ledger_win.closed.connect(func(): _ledger_win = null)
 	_desk.add_child(_ledger_win)
-	_ledger_win.move_to_front()
+	_place_z(_ledger_win, ZR_WIN)
 
 
 ## 收纳窗取出前先拍快照（StorageWin 自己改图，Desktop 只能从信号里抢在它前面）
@@ -2564,7 +2611,7 @@ func _toggle_people() -> void:
 	_people_win.row_clicked.connect(_on_people_row)
 	_people_win.closed.connect(func(): _people_win = null)
 	_desk.add_child(_people_win)
-	_people_win.move_to_front()
+	_place_z(_people_win, ZR_WIN)
 
 
 func _refresh_people_win() -> void:
@@ -2679,7 +2726,7 @@ func _toggle_log() -> void:
 		_desk.size.y - 96.0 - _log_win.size.y + SysWindow.PAD)
 	_log_win.closed.connect(func(): _log_win = null)
 	_desk.add_child(_log_win)
-	_log_win.move_to_front()
+	_place_z(_log_win, ZR_LOG)
 	_log_unread = 0
 	_set_badge(_log_badge, "")
 
@@ -2719,7 +2766,7 @@ func _toggle_matrix() -> void:
 	_matrix_win.inference_requested.connect(_run_inference)
 	_matrix_win.seed_dropped.connect(_on_seed_dropped)
 	_desk.add_child(_matrix_win)
-	_matrix_win.move_to_front()
+	_place_z(_matrix_win, ZR_WIN)
 
 
 ## 画布 / 册子 → 桌布。感官自动取线索自身的 sense（与 Web 的 assignClue 一致）。
@@ -2916,7 +2963,7 @@ func _open_password(node_key: String) -> void:
 	_pw_pop.position = base
 	_pw_pop.submitted.connect(_submit_password)
 	_desk.add_child(_pw_pop)
-	_pw_pop.move_to_front()
+	_place_z(_pw_pop, ZR_PW)
 	_pw_ctx = {"node_key": node_key, "cmd": cmd}
 
 
@@ -3049,7 +3096,7 @@ func _show_narr(sid: String) -> void:
 	_narr.position = Vector2(700, 290)
 	_narr.closed.connect(_on_narr_closed)
 	_desk.add_child(_narr)
-	_narr.move_to_front()
+	_place_z(_narr, ZR_NARR)
 
 
 func _on_narr_closed() -> void:
@@ -3072,7 +3119,7 @@ func _toggle_archive() -> void:
 	_archive_win.time_selected.connect(_on_archive_time)
 	_archive_win.closed.connect(func(): _archive_win = null)
 	_desk.add_child(_archive_win)
-	_archive_win.move_to_front()
+	_place_z(_archive_win, ZR_WIN)
 	_clear_archive_new()
 	for sid in graph.timeline_known():
 		graph.clear_fresh(graph.scene_key(String(sid)))
@@ -3198,7 +3245,7 @@ func _open_time_card(tid: String) -> void:
 	_mem_card.closed.connect(_on_mem_closed)
 	_desk.add_child(_mem_card)
 	_anchor_memory_card(_mem_card, tid)
-	_mem_card.move_to_front()
+	_place_z(_mem_card, ZR_NARR)
 
 
 ## 放映卡正文 = 日期场景正文（按行拆）+ 该场景里各角色当天的 sceneTalks。
@@ -3258,7 +3305,7 @@ func _open_memory_play(mem: MemoryDef, where_key: String) -> void:
 	_mem_card.closed.connect(_on_mem_closed)
 	_desk.add_child(_mem_card)
 	_anchor_card_to(_mem_card, where_key)
-	_mem_card.move_to_front()
+	_place_z(_mem_card, ZR_NARR)
 
 
 ## 锚在该时刻的发生地点上方；上方放不下就放下面，再整体钳进桌面。
@@ -3318,8 +3365,7 @@ func _open_chat(entry: DialogueDef, ids: Array) -> bool:
 	_chat_win.closed.connect(_on_chat_closed)
 	_desk.add_child(_chat_win)
 	_chat_win.position = Vector2(858, 58)
-	_chat_win.z_index = 30
-	_chat_win.move_to_front()
+	_place_z(_chat_win, ZR_CHAT)
 	return true
 
 
@@ -3379,8 +3425,8 @@ func _clear_archive_new() -> void:
 ##   - 只给「从没落过位」的节点播种（x/y < 0）；已落位的保留；
 ##   - 右键钉住的节点在松弛中完全不动（这是「把摆位留住」的唯一手段）；
 ##   - 纯状态变化（点亮 / 捕获 / 选中）**不要**调这里 —— 那些只需要 `_apply_hidden()` / `refresh()`。
-func _relayout() -> void:
-	_layout_force()
+func _relayout(animated := false) -> void:
+	_layout_force(animated)
 	if _opt_reveal:
 		_fit_cards()
 	_refresh_crumbs()
@@ -3390,7 +3436,7 @@ func _relayout() -> void:
 
 ## 力导向：斥力 30000/d²、最小间距 R_a+R_b+14、弹簧 rest 185/300/150、向心 0.0022，260 轮。
 ## 参数照抄 `src/js/07-render.js`；R 用视觉半径（半对角线），与 Web 的 80 / 68 同口径。
-func _layout_force() -> void:
+func _layout_force(animated: bool = false) -> void:
 	var list: Array = []
 	for key in _cards.keys():
 		if (_cards[key] as NodeCard).visible:
@@ -3401,7 +3447,10 @@ func _layout_force() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 0x5EED
 	var ci := 0
+	var first_place: Dictionary = {}
 	for key in list:
+		# 播种（可能写 n.x/n.y）之前先记录「这个节点还没落过位」—— x<0 = 新上画
+		first_place[key] = float(graph.node(key).get("x", -1.0)) < 0.0
 		var n := graph.node(key)
 		if float(n.get("x", -1.0)) >= 0.0 and float(n.get("y", -1.0)) >= 0.0:
 			ci += 1
@@ -3490,6 +3539,7 @@ func _layout_force() -> void:
 		var n := graph.node(key)
 		var card: NodeCard = _cards[key]
 		var p: Vector2 = pos[key]
+		var fp: bool = bool(first_place.get(key, false))
 		if not free[key]:
 			n["x"] = p.x
 			n["y"] = p.y
@@ -3497,8 +3547,40 @@ func _layout_force() -> void:
 		p = Vector2(clampf(p.x, 60.0, WORLD_W - 220.0), clampf(p.y, 50.0, WORLD_H - 120.0))
 		n["x"] = p.x
 		n["y"] = p.y
+		var before_pos: Vector2 = card.position   # 先记原位：set_home_silent 只改锚点不挪卡
+		card.set_home_silent(p)
+		# Web 的 .node 过渡 = `left/top 0.34s cubic-bezier(.4,0,.2,1)`：已有节点位置动了才播过渡；
+		# 新上画的节点（Web 是 createElement 时直接定 left/top，初绘没有“从哪里来”）与
+		# 截图流水线一律直接落位。动画期间连线逐帧跟画（Web paintEdgesFor(420) 同口径）；
+		# 折叠 / 展开触发的那次重排才播动画（`_relayout(true)`），普通重排默认秒到——
+		# 无头回归与坐标语义都建立在「重排=即刻就位」上，不能整体动。
+		if fp or not animated or _shot_mode() or before_pos.distance_to(p) < 2.0:
+			card.position = p
+		else:
+			_start_move_tween(key, card, p)
+
+
+var _move_twens: Dictionary = {}      # key -> 卡片落位补间（下一次重排前先杀）
+var _follow_frames := 0               # >0 时每帧重画连线（过渡期间连线跟着节点走）
+
+
+func _start_move_tween(key: String, card: NodeCard, p: Vector2) -> void:
+	_kill_move(key)
+	var tw := card.create_tween()
+	tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(card, "position", p, 0.34)
+	tw.finished.connect(func() -> void:
+		_move_twens.erase(key)
 		card.position = p
-		card.set_home(p)
+		_repaint_edges(), CONNECT_ONE_SHOT)
+	_move_twens[key] = tw
+	_follow_frames = maxi(_follow_frames, 21)   # ≈420ms @ 60fps（Web paintEdgesFor(420)）
+
+
+func _kill_move(key: String) -> void:
+	if _move_twens.has(key):
+		(_move_twens[key] as Tween).kill()
+		_move_twens.erase(key)
 
 
 func _fit_cards() -> void:
@@ -3510,7 +3592,10 @@ func _fit_cards() -> void:
 		var card := c as NodeCard
 		if card == null or not card.visible:
 			continue
-		var r := Rect2(card.position + Vector2(NodeCard.PAD, NodeCard.PAD),
+		# 用数据里的最终位（过渡动画期间 card.position 还在路上，镜头该框的是终点）
+		var n := graph.node(card.card_key)
+		var at := Vector2(float(n.get("x", card.position.x)), float(n.get("y", card.position.y)))
+		var r := Rect2(at + Vector2(NodeCard.PAD, NodeCard.PAD),
 			card.size - Vector2(NodeCard.PAD * 2.0, NodeCard.PAD * 2.0))
 		if has_card:
 			bounds = bounds.merge(r)
@@ -3550,7 +3635,7 @@ func _open_tec() -> void:
 	if _tec == null:
 		return
 	_tec.visible = true
-	_tec.move_to_front()
+	_place_z(_tec, ZR_TEC)
 	_tec_min = false
 	_tec_dot = false
 	if _tec_chip != null:
@@ -3604,7 +3689,7 @@ func _sync_tec_chip() -> void:
 		_tec_chip.visible = false
 		return
 	_tec_chip.visible = true
-	_tec_chip.move_to_front()
+	_place_z(_tec_chip, ZR_DOCK)
 	if _tec.is_analyzing():
 		_tec_chip.set_analyzing(_tec.target_label(), _tec.progress())
 	else:

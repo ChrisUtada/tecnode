@@ -267,6 +267,7 @@ func _reactions(map: Dictionary, kind: String) -> Array[ReactionDef]:
 			else:
 				refs_missing.append("%s 类型不符（%s 反应表）" % [key, kind])
 		rec.text = String((map[key] as Dictionary).get("text", ""))
+		rec.results = _dict((map[key] as Dictionary).get("results", null))
 		out.append(rec)
 	return out
 

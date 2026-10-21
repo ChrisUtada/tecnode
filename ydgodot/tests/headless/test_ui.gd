@@ -533,9 +533,161 @@ func _initialize() -> void:
 	await process_frame
 	check("松手：镜像退场", scene._card_mirror == null)
 	check("松手：原卡复位可见", torch4.visible)
-	check("松手：坐标写回数据（同第 12 节口径）",
+	check("松手：坐标写回数据（同第 12-18 节口径）",
 		absf(float(scene.graph.node(TORCH)["x"]) - torch4.position.x) < 0.5,
 		str(scene.graph.node(TORCH)["x"]) + " / " + str(torch4.position.x))
+	# 收掉推演窗与两扇收纳窗（S6/S7 起开着）：后面的交互章节要用整块画布，
+	# 别让 mx-board / bag-win / clue-win 拦走 _drop_targets 里的落点
+	scene._toggle_matrix()
+	scene._toggle_storage(GraphState.BAG)
+	scene._toggle_storage(GraphState.LEDGER)
+	mw = null
+	await process_frame
+
+	# 20) 位置过渡（Web `.node{transition: left/top .34s cubic-bezier(.4,0,.2,1)}`）：
+	# 折叠 / 展开触发的那次重排才有过渡（`_relayout(true)`），普通重排秒到；
+	# 动画期间连线逐帧跟画；新节点（Web 初绘没有“从哪里来”）直接落位
+	var tk20: NodeCard = _cards()[TORCH]
+	var start20: Vector2 = tk20.position
+	# 只改数据（Web render() 前必改 n.x/n.y），卡片留在原地 → relayout 计算的目标在别处，必然要搬它
+	var far20: Vector2 = start20 + Vector2(480.0, -260.0)
+	scene.graph.node(TORCH)["x"] = far20.x
+	scene.graph.node(TORCH)["y"] = far20.y
+	scene._relayout(true)
+	var target20: Vector2 = Vector2(float(scene.graph.node(TORCH)["x"]), float(scene.graph.node(TORCH)["y"]))
+	check("重排：搬家目标离原位很远", target20.distance_to(start20) > 2.0,
+		str(target20) + " / " + str(start20))
+	await process_frame
+	check("过渡：补间已挂上", scene._move_twens.has(TORCH))
+	check("过渡：动画在路上（未到终点）", tk20.position.distance_to(target20) > 1.0,
+		str(tk20.position) + " → " + str(target20))
+	check("过渡：连线跟随窗口开着", scene._follow_frames > 0, str(scene._follow_frames))
+	await create_timer(0.55).timeout
+	check("过渡：收尾到位", tk20.position.distance_to(target20) < 1.0, str(tk20.position))
+	check("过渡：补间已清空", scene._move_twens.is_empty(), str(scene._move_twens.keys()))
+	var uc20 := ""
+	for cid20 in ["CLUES_qsan", "CLUES_mgd", "CLUES_wmhj"]:
+		if not scene.graph.has("clue", cid20):
+			uc20 = cid20
+			break
+	var new_key20: String = scene.dbg_ensure("clue", uc20)
+	await process_frame
+	var new_card20: NodeCard = _cards().get(new_key20, null)
+	check("新节点：直接落位（不播过渡）",
+		new_card20 != null and new_card20.position.is_equal_approx(
+			Vector2(float(scene.graph.node(new_key20)["x"]), float(scene.graph.node(new_key20)["y"])))
+		and not scene._move_twens.has(new_key20))
+
+	# 21) 反应表三条产出来源（Web 05-combine.js:112-123，A-001 反应表全是纯文本 —— 注入验证接线）：
+	#     A) 真拖到陆珩松：results.scene + results.items 长出卡片（「新」角标）；
+	#     B) 再注入一条直调数据层：断言 cond 边 / fresh / 主人右下 (60 + i*26) 这些数据级口径
+	var scene_pick := ""
+	for sid21 in ["SCENES_lhsdst", "SCENES_cjag"]:
+		if not scene.graph.has("loc", sid21):
+			scene_pick = sid21
+			break
+	var item_picks: Array = []
+	for iid21 in ["ITEMS_dlh", "ITEMS_a4paper", "ITEMS_zbbdz", "ITEMS_yjh"]:
+		if item_picks.size() < 2 and not scene.graph.has("item", iid21):
+			item_picks.append(iid21)
+	check("注入前提：找到没上画的场景与物品",
+		scene_pick != "" and item_picks.size() == 2, scene_pick + " / " + str(item_picks))
+	var lut := ReactionDef.new()
+	lut.trigger_id = "ITEM_shoudiantong"
+	lut.text = "REACTION-PROBE 反应表注入：[clue:CLUES_qsan]"
+	lut.results = {"scene": scene_pick, "items": item_picks}
+	var lg: CharDef = scene.case_def.char_of("CHARS_luhengs")
+	lg.item_reactions.insert(0, lut)
+	scene.dbg_ensure("char", "CHARS_luhengs")
+	await process_frame
+	var lc21: NodeCard = _cards().get("char:CHARS_luhengs", null)
+	check("前提：陆珩松卡片在画布", lc21 != null)
+	var before21: int = scene.graph.logs.size()
+	_drag(_cards()[TORCH], lc21)
+	await process_frame
+	check("反应表命中（案卷多了组合条目）", scene.graph.logs.size() > before21)
+	var sk21: String = scene.graph.key_of("loc", scene_pick)
+	check("产出①：新场景卡片上画布", _cards().has(sk21))
+	check("产出①：cond 边连向反应表主人（新建才连）",
+		scene.graph.has_edge("char:CHARS_luhengs", sk21, "cond"),
+		str(scene.graph.has_edge("char:CHARS_luhengs", sk21, "cond")))
+	for i21a in item_picks.size():
+		var ik21a: String = scene.graph.key_of("item", String(item_picks[i21a]))
+		var icard21a: NodeCard = _cards().get(ik21a, null)
+		check("产出②：物品卡片上画布", icard21a != null)
+		check("产出②：物品挂着「新」", icard21a != null and icard21a._badge.visible)
+	var last_log: String = ""
+	if not scene.graph.logs.is_empty():
+		last_log = String((scene.graph.logs[scene.graph.logs.size() - 1] as Dictionary).get("text", ""))
+	check("桌面：获得清单进案卷", last_log.contains("获得")
+		and last_log.contains(String(scene.graph.node("char:CHARS_luhengs").get("label", ""))), last_log)
+	# B) 数据层：再注入一条（换 trigger），直调数据层验证 fresh / cond / spawnItems 偏移公式
+	var scene_pick2 := ""
+	for sid21b in ["SCENES_lhsdst", "SCENES_cjag"]:
+		if sid21b != scene_pick and not scene.graph.has("loc", sid21b):
+			scene_pick2 = sid21b
+			break
+	var item_picks2: Array = []
+	for iid21b in ["ITEMS_dlh", "ITEMS_a4paper", "ITEMS_zbbdz", "ITEMS_yjh"]:
+		if item_picks2.size() < 2 and not scene.graph.has("item", iid21b) \
+			and not item_picks.has(iid21b):
+			item_picks2.append(iid21b)
+	check("注入前提 B：还有没上画的场景与物品",
+		scene_pick2 != "" and item_picks2.size() == 2, scene_pick2 + " / " + str(item_picks2))
+	var lut2 := ReactionDef.new()
+	lut2.trigger_id = "ITEMS_htys"
+	lut2.text = "REACTION-PROBE-2 数据层注入"
+	lut2.results = {"scene": scene_pick2, "items": item_picks2}
+	lg.item_reactions.insert(1, lut2)
+	scene.dbg_ensure("item", "ITEMS_htys")
+	await process_frame
+	var r21b: Dictionary = scene.combos.use_item("item:ITEMS_htys", "char:CHARS_luhengs")
+	check("数据层：反应表命中", bool(r21b.get("ok", false)), str(r21b))
+	var sk21b: String = scene.graph.key_of("loc", scene_pick2)
+	var snode21b: Dictionary = scene.graph.node(sk21b)
+	check("数据层：新场景 fresh/unread 已挂",
+		bool(snode21b.get("fresh", false)) and bool(snode21b.get("unread", false)), str(snode21b.get("fresh")))
+	check("数据层：cond 边连向反应表主人",
+		scene.graph.has_edge("char:CHARS_luhengs", sk21b, "cond"),
+		str(scene.graph.has_edge("char:CHARS_luhengs", sk21b, "cond")))
+	var src21b: Vector2 = Vector2(float(scene.graph.node("char:CHARS_luhengs")["x"]),
+		float(scene.graph.node("char:CHARS_luhengs")["y"]))
+	for i21b in item_picks2.size():
+		var ik21b: String = scene.graph.key_of("item", String(item_picks2[i21b]))
+		check("数据层：物品 %s fresh 已挂" % String(item_picks2[i21b]),
+			scene.graph.has("item", String(item_picks2[i21b]))
+			and bool(scene.graph.node(ik21b).get("fresh", false)))
+		check("数据层：位置 = 主人右下 60 + %d*26" % i21b,
+			Vector2(float(scene.graph.node(ik21b)["x"]), float(scene.graph.node(ik21b)["y"]))
+				.is_equal_approx(src21b + Vector2(60.0 + 26.0 * float(i21b), 60.0 + 26.0 * float(i21b))),
+			str(scene.graph.node(ik21b)))
+	check("正文 [clue:] 照旧建线索（回归）", scene.graph.has("clue", "CLUES_qsan"))
+
+	# 22) z 序（Web 静态 z-index 表）：rank 高的窗永远盖低的，无论谁后开；
+	# icons(24) 在普通窗(25)之下、详情(22)之上；toast(30) 在 TEC(28) 之上；镜像(40) 在 toast 之上
+	var desk22: Control = scene.get_node("desk")
+	scene._toggle_case_map()
+	await process_frame
+	scene._toggle_log()
+	await process_frame
+	var e_log: Control = scene._log_win
+	var e_map: Control = scene._map_win
+	var e_icons: Control = desk22.get_node("icons")
+	check("z：后开的日志(21) 仍压不过先开的地图(25)", e_log.get_index() < e_map.get_index(),
+		str(e_log.get_index()) + " / " + str(e_map.get_index()))
+	check("z：icons(24) 在普通窗之下", e_icons.get_index() < e_map.get_index())
+	check("z：icons(24) 在日志(21) 之上", e_log.get_index() < e_icons.get_index())
+	scene._ensure_detail()
+	await process_frame
+	var e_detail: Control = scene._detail_win
+	check("z：详情(22) 在 icons(24) 之下", e_detail.get_index() < e_icons.get_index())
+	check("z：详情(22) 在日志(21) 之上", e_log.get_index() < e_detail.get_index())
+	scene._open_tec()
+	await process_frame
+	check("z：TEC(28) 盖住先开的地图(25)", scene._map_win.get_index() < scene._tec.get_index())
+	check("z：toast(30) 在 TEC(28) 之上", scene._tec.get_index() < desk22.get_node("toast").get_index())
+	scene._hide_tec()
+	await process_frame
 
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)
