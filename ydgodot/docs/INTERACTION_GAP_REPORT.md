@@ -50,7 +50,8 @@ Godot 命中 **5 个**、动作只有 **3/6**；反向「从收纳窗拖出」8 
 **P0 之外仍未做**（属 §3.2 P1，不在本批）：
 - ~~图标栏脱离 `VBoxContainer` 可自由拖动、补 `people` / `log` 两个图标与 `bag` / `clue` 角标~~ → **已随批 1 落地，见 §0.2**；
 - ~~**拖动幽灵线**（§6.4 四件附带事的第四件：Web 从原点拉一条虚线到指针）~~ → **已随批 2 落地，见 §0.3**（其余三件——悬停高亮 / 弹回原位 / 边界夹回——已随 P0 / 批 1 落地）；
-- ~~**桌布 chip → 画布（带坐标）**：反向 8 条路径里唯一还缺的一条~~ → **已随批 2 落地，见 §0.3**（§6.3 补检时 chip 已有拖拽手势，缺的是坐标语义与册图标入口；双击取回落默认位保持原口径）。
+- ~~**桌布 chip → 画布（带坐标）**：反向 8 条路径里唯一还缺的一条~~ → **已随批 2 落地，见 §0.3**（§6.3 补检时 chip 已有拖拽手势，缺的是坐标语义与册图标入口；双击取回落默认位保持原口径）；
+- ~~§3.3 P2 细节（N8 hover / V4 pop / V5 warn / V6 dim / N7 场景命令 / D6 镜像）~~ → **已随批 3 落地，见 §0.4**。
 
 ---
 
@@ -87,6 +88,25 @@ Godot 命中 **5 个**、动作只有 **3/6**；反向「从收纳窗拖出」8 
 | overLedgerDrop | chip → 册窗**或册图标** = restash 进册 | `Desktop._on_matrix_dropped()` 两个落点都判（`icon_clue` 全局矩形） | 对齐 `12-panels.js:250` 的两条：窗开着算窗、图标任何时候都算（Godot 只认窗，图标本来不认） |
 
 断言（已进 `test_ui`）：幽灵线出现 / 起点 = 被拖卡中心 / 终点 = 指针（world 换算）/ 松手收起；chip 拖出回画布落在松手点 + 坐标写回 `n.x/n.y`；chip 拖到册图标收进册。
+
+---
+
+### 0.4 执行状态（2026-10-21 夜 · 批 3：P2 细节批已落地）
+
+批 3 = §3.3 P2 批次的尾巴一次收掉（N7 / N8 / V4 / V5 / V6 / D6 六项；D9 / E5 / L5 / L7 / C8 / I4 更早随 P0 / 批 1 落地）。
+
+- **全套无头断言 1086 项 0 失败**（14 个脚本），`test_ui.gd` 79 → **110**（批 3 新增 31）。
+
+| # | 项 | 落地位置 | 与本报告原方案的区别 |
+|---|---|---|---|
+| N7 | 场景命令 | `SceneDef.commands` 字段 + `tools/json_to_tres.gd` 场景命令映射；`ComboSystem.activate()` 吃 `kind=="loc"`；`Desktop._on_card_activated` 分支 = 场景带命令先跑 `commands[0]`，无命令回「展开 / 折叠」 | a001 数据 0/11 场景带命令 → `test_ui` 用**运行时注入**验证接线（注入后双击跑命令且不折叠；清掉后双击折叠） |
+| N8 | hover / 光标 | `NodeCard.setup()` 接 `mouse_entered/exited` → `set_hover_state()`（shade_soft 7→10，原是死代码）；`mouse_default_cursor_shape = CURSOR_POINTING_HAND`；拖起全局 `CURSOR_DRAG`、松手归还 | |
+| V4 | 入场 pop | `NodeCard.play_pop()`（scale .4→1.12→1 + 淡入，0.45s，照 Web keyframes）；`Desktop._spawn_card()` 对 `fresh` 节点弹一次 + `GraphState.consume_fresh()` —— **fresh / unread 分轨**（`unread`「新」角标要玩家点过才摘，与 Web `n.fresh` × `n.unread` 双轨一致） | `--shot` 模式里不弹（像素对拍要稳），fresh 照样消费（两次截图状态收敛） |
+| V5 | warn 药丸 | `GraphState.is_no_entry()`：`kind=loc + 未探索 + [loc:] 文本入边 0（_loc_in 与 isHub 同一次遍历拆出入度）+ 命令产出通路 0（_route_scene 从 choice.options[].payload.scene、use-item 与 conditional 的 on_success.scene 枚举）+ 自己没出口（scene_locs 空）`；`NodeCard._warn_badge`（右上槽位与「新」同位、2px 墨边 + 卡底墨字，子节点序 warn 在前 ⇒ 「新」盖 warn，与 Web DOM 顺序一致） | 谓词随 hub 度数一起懒建；a001 里唯一命中的是 `SCENES_mdhm`，其余场景都带 [loc:] 通路或命令产出 |
+| V6 | dim 0.32 | `NodeCard.set_dim()` 目标 alpha 0.25 → **0.32** | `test_ui` 锁了精确浮点断言 |
+| D6 | 拖动镜像 | `NodeCard.build_mirror()` + `Desktop._mount_card_mirror / _sync_card_mirror / _drop_card_mirror`：拖起镜像挂桌布根（全部窗之上）、原卡隐藏，松手换身回来（可见性回读 `graph.visible_node`）；镜像吃不到输入（递归 `MOUSE_FILTER_IGNORE`） | **不能用 `duplicate()`**：脚本成员不跟着拷（探针实测 `_mat=null / card_key=""`），所以走 `setup()` 重画 + shell 态回灌；原卡隐藏期间连线照常以它为端点（`_repaint_edges` 给 `_drag_key` 开豁免，补 Web `visibility:hidden` + SVG 边照画的行为） |
+
+断言（已进 `test_ui` 第 14–19 节）：warn 谓词三分（mdhm 真 / 枢纽假 / 命令产出假）+ 药丸挂摘 7 条；pop 初生 0.4 → 收尾 1.0 + 不透明 + fresh 消费 + unread 保留 6 条；hover shade 7↔10 + 手形光标 3 条；dim 0.32 精确断言 2 条；N7 注入往返 5 条；镜像挂桌 / 跟随 / 隐藏 / 退场 / 复位 / 坐标写回 8 条。
 
 ---
 
@@ -293,6 +313,8 @@ ydgodot/scenes/canvas/CanvasInput.gd   # 平移 / 滚轮缩放 / 点空白清选
 N7 场景命令、N8 hover/cursor、D6 镜像层、D9 落点互斥、E5 glow、L5 点空白清选中、
 L7 world 边界、V4 pop 动画、V5 warn 角标、V6 dim 改 0.32、C8 成功不弹 toast、
 I4 叙事卡锚定。
+
+（后注：N7 / N8 / V4 / V5 / V6 / D6 已随批 3 落地，见 §0.4；D9 / E5 / L5 / L7 / C8 / I4 更早随 P0 / 批 1 落地。）
 
 ---
 
@@ -507,7 +529,7 @@ check("袋行拖到画布落在松手点", abs(d.graph.node(k).x - 640.0) < 2.0)
 
 > 口径：**已接通** = 玩家在界面上能用出这个动作，且落到正确的数据变更。
 > 只验证"数据层有方法"不算接通。
-> **「现在」列 = P0 + 批 1 + 批 2 落地后的复核值**，判据见 §0.1 / §0.2 / §0.3 与 `tests/headless/` 的 1055 项断言。
+> **「现在」列 = P0 + 批 1 + 批 2 + 批 3 落地后的复核值**，判据见 §0.1 / §0.2 / §0.3 / §0.4 与 `tests/headless/` 的 1086 项断言。
 
 | 模块 | 检查时 | 现在 | 备注 |
 |---|---|---|---|
@@ -525,6 +547,7 @@ check("袋行拖到画布落在松手点", abs(d.graph.node(k).x - 640.0) < 2.0)
 | 角标 | 🟡 缺 2 个 | 🟢 **4/4** | 批 1：推演器「N 条」/ 证物袋「N 件」/ 线索册「N 条」/ 日志「未读」 |
 | 因果追踪（SYS_LOGS） | 🔴 无窗、无数据 | 🟢 **有窗 + 只记结果** | 批 1：口径照 `03-utils.js:250-262`，日志不进快照 |
 | 人物名册（ROSTER） | 🔴 无窗 | 🟢 **有窗 + 点行说下一句** | 批 1：收录口径按 `metChars()`，常驻两人恒在册 |
+| 节点细节（N7 命令 / N8 hover / V4 pop / V5 warn / V6 dim / D6 镜像） | 🔴 **0 / 6** | 🟢 **6 / 6** | 批 3：N7 数据 0/11 场景用到，断言走运行时注入；warn 谓词四件套见 §0.4 |
 
 **§6.4 那四件附带的事**：悬停高亮 ✅ / 弹回原位 ✅ / 边界夹回 ✅ / ~~拖动幽灵线 ❌~~ → ✅
 ~~（Web 从原点拉一条虚线到指针；Godot 没有，`NodeCard` 拖动时只有卡片本身跟着走）~~ → 批 2 补齐：`EdgeLayer` 幽灵线从被拖卡中心直连指针，松手收线（§0.3）。

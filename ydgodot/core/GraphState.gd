@@ -323,6 +323,15 @@ func clear_fresh(key: String) -> void:
 	n["unread"] = false
 
 
+## 入场动画的一次性消费：只摘 fresh（pop 的来源），unread 还在
+##（「新」角标要等玩家点过节点才摘，与 Web 的 n.unread / n.fresh 双轨一致）
+func consume_fresh(key: String) -> void:
+	var n := node(key)
+	if n.is_empty():
+		return
+	n["fresh"] = false
+
+
 func has_unread(key: String) -> bool:
 	return bool(node(key).get("unread", false))
 
@@ -790,6 +799,12 @@ func recompute_hidden() -> void:
 ## 容器物品正文里的 [loc:X] 也算一条入边 —— 否则把书桌改成物品后，花园会因为
 ## 「承载通路的东西换了身份」平白丢掉枢纽身份，画布上的双线框也会跟着消失。
 var _hub_degree: Dictionary = {}
+## [loc:X] 文本入边计数（Web 03-utils.js `inbound`）：场景内容 + 容器物品内容里的
+## loc 标签都指向目标场景。is_no_entry（warn 药丸谓词）的第一条排除项。
+var _loc_in: Dictionary = {}
+## 命令产出的场景通路（Web `condRoutes`）：物品命令的结果中所指向的场景
+##（choice options 的 results.scene / use-item 与 conditional 的 onSuccess.scene）。
+var _route_scene: Dictionary = {}
 
 
 func is_hub(kind: String, id: String) -> bool:
@@ -800,8 +815,27 @@ func is_hub(kind: String, id: String) -> bool:
 	return int(_hub_degree.get(id, 0)) >= 5
 
 
+## 「无文本入口」谓词（Web 07-render.js:134-135 的 `badge warn`）：
+## kind=loc + 未探索 + 没有任何 [loc:X] 文本通路指向 + 没有任何命令能产出 +
+## 自己也没有出口。四个条件都成立才挂药丸 —— 这是「永远走不进来的瞎掰地点」
+## 的第一道提醒（若在推演 / 档案里确实有别的到达法，药丸会在数据里替它背书）。
+func is_no_entry(key: String) -> bool:
+	var n := node(key)
+	if n.is_empty() or String(n["kind"]) != "loc":
+		return false
+	var id := String(n["id"])
+	if explored.has(id):
+		return false
+	if _loc_in.is_empty():
+		_build_hub_degree()
+	return int(_loc_in.get(id, 0)) == 0 and not _route_scene.has(id) \
+		and scene_locs(id).is_empty()
+
+
 func _build_hub_degree() -> void:
 	_hub_degree.clear()
+	_loc_in.clear()
+	_route_scene.clear()
 	if case_def == null:
 		return
 	for sid in case_def.scenes.keys():
@@ -810,6 +844,7 @@ func _build_hub_degree() -> void:
 		for loc in scene_locs(sid_s):
 			_hub_degree[sid_s] = int(_hub_degree[sid_s]) + 1
 			_hub_degree[String(loc)] = int(_hub_degree.get(String(loc), 0)) + 1
+			_loc_in[String(loc)] = int(_loc_in.get(String(loc), 0)) + 1
 	for iid in case_def.items.keys():
 		var it := case_def.item_of(String(iid))
 		if it == null or it.content == "":
@@ -817,6 +852,34 @@ func _build_hub_degree() -> void:
 		for tag in case_def.tags_of(it.content):
 			if tag["kind"] == "loc":
 				_hub_degree[String(tag["id"])] = int(_hub_degree.get(String(tag["id"]), 0)) + 1
+				_loc_in[String(tag["id"])] = int(_loc_in.get(String(tag["id"]), 0)) + 1
+	for iid2 in case_def.items.keys():
+		var it2 := case_def.item_of(String(iid2))
+		if it2 == null:
+			continue
+		for cmd in it2.commands:
+			_collect_cmd_scenes(cmd)
+
+
+## 命令树里所有「指向场景」的结果（Web 是对 ITEMS 原始 JSON 全嵌套遍历键名
+## `scene`；这里的资源是强类型，枚举三处拥有的 PayloadDef 就是全集）
+func _collect_cmd_scenes(cmd: CommandDef) -> void:
+	var p := payload_of_command(cmd)
+	if p != null and p.scene != null and p.scene.id != "":
+		_route_scene[p.scene.id] = true
+	if cmd is ChoiceCommandDef:
+		for opt in (cmd as ChoiceCommandDef).options:
+			if opt != null and opt.payload != null and opt.payload.scene != null \
+					and opt.payload.scene.id != "":
+				_route_scene[opt.payload.scene.id] = true
+
+
+func payload_of_command(cmd: CommandDef) -> PayloadDef:
+	if cmd is UseItemCommandDef:
+		return (cmd as UseItemCommandDef).on_success
+	if cmd is ConditionalCommandDef:
+		return (cmd as ConditionalCommandDef).on_success
+	return null
 
 
 ## 容器正文里列出的其他地点（`[loc:X]`）—— 拖容器到场景 = 前往的通路。

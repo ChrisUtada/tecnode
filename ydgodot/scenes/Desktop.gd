@@ -62,6 +62,10 @@ var _selected: String = ""
 var _drop_over_id := ""
 var _drop_over_node: Node = null
 var _drag_over_card := ""
+## 拖动镜像（Web #drag-layer）：拖起时在桌布根上占一份"假身"，松手销毁。
+var _card_mirror: NodeCard = null
+## 正在拖的节点 key（原卡被隐藏期间，连线照常以它为端点）
+var _drag_key := ""
 ## 收纳行拖拽会话（见 _process）
 var _sdrag_key := ""
 var _sdrag_from := ""
@@ -1888,6 +1892,14 @@ func _spawn_card(key: String) -> NodeCard:
 	card.pin_toggled.connect(_on_card_pin_toggled)
 	_card_layer.add_child(card)
 	_cards[key] = card
+	# Web 的入场 pop：fresh 的节点初次上画布闪一下（`n.fresh` 渲染一次即被摘掉；
+	# `unread`「新」角标继续保留，直到玩家点过卡片）。截图模式里不弹（像素对拍要稳），
+	# 但 fresh 照样消费掉（两次截图的 fresh 状态必须收敛）。
+	if bool(n.get("fresh", false)):
+		graph.consume_fresh(key)
+		if not _shot_mode():
+			card.pivot_offset = card.size * 0.5
+			card.play_pop()
 	return card
 
 
@@ -1933,6 +1945,12 @@ func _on_card_dragged(key: String) -> void:
 	_selected = key
 	graph.selected = key
 	_apply_focus()
+	# Web 拖起即把整卡搬进 #drag-layer（浮在所有窗子之上）+ 原件 `visibility:hidden`。
+	# Godot 里用镜像卡承载「浮层」那份视觉，原件隐藏（连线仍然用它的 world 坐标）。
+	_drag_key = key
+	var card: NodeCard = _cards.get(key, null)
+	if card != null:
+		_mount_card_mirror(card)
 
 
 ## 拖动中：落点悬停高亮（Web 的 `.over`）+ 幽灵线，每帧按指针重算一次。
@@ -1942,12 +1960,51 @@ func _on_card_drag_moved(key: String, at_global: Vector2) -> void:
 	if card != null and _edge_layer != null and _card_layer != null:
 		var world_at: Vector2 = _card_layer.get_global_transform().affine_inverse() * at_global
 		_edge_layer.set_ghost(card.visual_center(), world_at)
+	_sync_card_mirror(card)
 	_update_drop_over(at_global)
 	_repaint_edges()
 
 
+## ── 拖动镜像（Web #drag-layer）──────────────────────────────────────────
+## 镜像 = 卡片的「假身」：挂到桌布根（在所有窗子之上）、吃不到输入、
+## 每帧跟着原卡的位置。原卡被隐藏，但仍是连线端点与数据写回的坐标来源。
+
+
+func _mount_card_mirror(card: NodeCard) -> void:
+	if card == null or _desk == null:
+		return
+	if _card_mirror != null and is_instance_valid(_card_mirror):
+		_card_mirror.queue_free()
+	card.visible = false
+	var mirror := card.build_mirror()
+	if mirror == null:
+		return
+	_desk.add_child(mirror)
+	mirror.scale = card.get_global_transform().get_scale()
+	mirror.global_position = card.get_global_position()
+	_card_mirror = mirror
+
+
+func _sync_card_mirror(card: NodeCard) -> void:
+	if _card_mirror == null or not is_instance_valid(_card_mirror) or card == null:
+		return
+	_card_mirror.global_position = card.get_global_position()
+
+
+## 松手换身回来：镜像销毁、原卡按数据可见性复位（后续的弹回 / 收纳 / 消费各走各路）
+func _drop_card_mirror(card: NodeCard) -> void:
+	if _card_mirror != null and is_instance_valid(_card_mirror):
+		_card_mirror.queue_free()
+	_card_mirror = null
+	if card != null and is_instance_valid(card):
+		card.visible = graph.visible_node(graph.node(card.card_key))
+
+
 ## 松手：落点由 `_handle_card_drop` 分派；没命中就停在松手处并把坐标写回数据
 func _on_card_drag_finished(key: String, pos: Vector2, handled: bool) -> void:
+	var finished_card: NodeCard = _cards.get(key, null)
+	_drop_card_mirror(finished_card)
+	_drag_key = ""
 	_clear_drop_over()
 	if _edge_layer != null:
 		_edge_layer.clear_ghost()
@@ -1975,7 +2032,11 @@ func _repaint_edges() -> void:
 		var b := String(e.get("b", ""))
 		var ca: NodeCard = _cards.get(a, null)
 		var cb: NodeCard = _cards.get(b, null)
-		if ca == null or cb == null or not ca.visible or not cb.visible:
+		if ca == null or cb == null:
+			continue
+		# 拖动中本卡被镜像隐藏（Web 也 `visibility:hidden` 原件）—— 边照常画
+		if not (ca.visible or String(a) == _drag_key) or \
+				not (cb.visible or String(b) == _drag_key):
 			continue
 		segs.append({
 			"a": ca.visual_center(), "b": cb.visual_center(),
@@ -1989,7 +2050,10 @@ func _repaint_edges() -> void:
 			continue
 		var ca: NodeCard = _cards.get(pair[0], null)
 		var cb: NodeCard = _cards.get(pair[1], null)
-		if ca == null or cb == null or not ca.visible or not cb.visible:
+		if ca == null or cb == null:
+			continue
+		if not (ca.visible or String(pair[0]) == _drag_key) or \
+				not (cb.visible or String(pair[1]) == _drag_key):
 			continue
 		segs.append({
 			"a": ca.visual_center(), "b": cb.visual_center(), "kind": "tried",
@@ -2293,6 +2357,17 @@ func _on_card_activated(key: String) -> void:
 		_capture_clue_node(key)
 		return
 	if n["kind"] == "loc":
+		# Web dblclick：场景若带命令（SCENES[id].commands），双击先跑 commands[0]，
+		# 不展开容器 —— 数据里 0/11 的场景用到这条，分支为未来案件铺路
+		var sc := case_def.scene_of(id)
+		if sc != null and sc.commands.size() > 0:
+			var before_loc := _save.snapshot()
+			var res := combos.activate(key)
+			if res.is_empty():
+				return
+			_apply_outcome(res, key)
+			_commit(before_loc)
+			return
 		_toggle_container("loc", id)
 		return
 	if graph.is_container("item", id):
@@ -2769,6 +2844,7 @@ func _sync_card_shell(card: NodeCard) -> void:
 	card.set_shell_state(graph.is_container_node(card.card_key),
 		graph.explored.has(id), graph.is_collapsed(id), bool(n.get("unread", false)),
 		graph.is_hub(String(n.get("kind", "")), id))
+	card.set_warn(graph.is_no_entry(card.card_key))
 
 
 ## 供测试钩子 / 后续接线用：把当前选中的节点收进某个收纳处

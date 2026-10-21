@@ -73,6 +73,9 @@ var _bg: ColorRect
 var _title: Label
 var _sub: Label
 var _badge: Label
+## 「无文本入口」药丸（Web `badge.warn`）：与「新」同一右上槽位，先加在 DOM 里
+## 让「新」盖上去 —— 这里按同样的子节点顺序（warn 在前、新在后）保证叠放一致。
+var _warn_badge: Label
 var _pin_badge: Label
 var _border: Control
 ## 选中环（独立一层：框是虚线 / 双线，环是 2px 实线，两者会同时存在）
@@ -85,6 +88,8 @@ var _container := false
 var _explored := false
 var _collapsed := false
 var _unread := false
+## 「无文本入口」的显示态：谓词在 GraphState（is_no_entry），这里只管画
+var _warn := false
 var _hover := false
 var _dragging := false
 var _moved := false
@@ -98,6 +103,8 @@ var _grab := Vector2.ZERO
 var _home := Vector2.ZERO
 var _last_click_ms := -100000
 var _spring: Tween = null
+## 入场动画补间（play_pop 建的；拖动 / 聚焦改外观时不与它打架）
+var _pop: Tween = null
 
 
 class DashBorder extends Control:
@@ -159,6 +166,10 @@ func setup(p_key: String, p_kind: String, p_data: Dictionary, w: float, h: float
 	size = Vector2(w + PAD * 2.0, h + PAD * 2.0)
 	custom_minimum_size = size
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	# Web `.node{cursor:grab}`：悬停手形；拖起来时 Input 全局覆盖成拖拽光标
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	mouse_entered.connect(func() -> void: set_hover_state(true))
+	mouse_exited.connect(func() -> void: set_hover_state(false))
 	_pinned = bool(p_data.get("pinned", false))
 	_build(w, h)
 
@@ -221,6 +232,18 @@ func _build(w: float, h: float) -> void:
 	_title.size = Vector2(w - 14.0, 16.0)
 	_sub.position = Vector2(PAD + 7.0, PAD + h * 0.5 + 2.0)
 	_sub.size = Vector2(w - 14.0, 14.0)
+
+	_warn_badge = TecTheme.label("无文本入口", 9, TecTheme.TEXT)
+	_warn_badge.name = "warn"
+	_warn_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_warn_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_warn_badge.position = Vector2(PAD + w - 52.0, -1.0)
+	_warn_badge.size = Vector2(60.0, 17.0)
+	_warn_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, 9,
+		TecTheme.TEXT, 2))
+	_warn_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_warn_badge.visible = false
+	add_child(_warn_badge)
 
 	_badge = TecTheme.label("新", 9, TecTheme.CARD)
 	_badge.name = "unread"
@@ -308,9 +331,19 @@ func _apply_shell() -> void:
 	else:
 		_apply_plain_look()
 	_badge.visible = _unread
+	_warn_badge.visible = _warn
 	_pin_badge.visible = _pinned
 	if _glow != null:
 		_glow.visible = lit
+
+
+## 「无文本入口」谓词每帧在 Desktop 算（is_no_entry），这里只负责显示态回灌
+##（refresh → _apply_shell 会整块重刷外观，所以 set_warn 只改自己的标记）
+func set_warn(on: bool) -> void:
+	if _warn == on:
+		return
+	_warn = on
+	_warn_badge.visible = on
 
 
 ## 普通态（含未探索 / 已折叠的扁平虚框）
@@ -383,6 +416,7 @@ func _apply_over_look() -> void:
 	_sub.add_theme_color_override("font_color", TecTheme.LINE2)
 	_border.visible = false
 	_badge.visible = false
+	_warn_badge.visible = false
 	_pin_badge.visible = false
 	if _glow != null:
 		_glow.visible = false
@@ -478,6 +512,8 @@ func _gui_input(event: InputEvent) -> void:
 			if not _dragging and delta.length() > DRAG_THRESHOLD:
 				_dragging = true
 				_moved = true
+				# Web `.node.dragging{cursor:grabbing}`：拖拽期间全局覆盖为拖拽光标
+				Input.set_default_cursor_shape(Input.CURSOR_DRAG)
 				dragged.emit(card_key)
 			if _dragging:
 				var s := maxf(get_parent().scale.x, 0.01) if get_parent() != null else 1.0
@@ -504,6 +540,8 @@ var _last_click_global := Vector2.ZERO
 
 
 func _release_drop(at_global: Vector2) -> void:
+	# 拖拽光标随松手归还（悬停手形由 mouse_default_cursor_shape 天然接管）
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	# 1) 落点表（图标 / 两扇收纳窗 / 推演桌布 / TEC / 对话窗）：命中即回原位
 	if drop_sink.is_valid() and bool(drop_sink.call(card_key, at_global)):
 		spring_back()
@@ -579,8 +617,45 @@ func set_hover_state(on: bool) -> void:
 		_mat.set_shader_parameter("shade_soft", 10.0 if on else 7.0)
 
 
-## 「聚焦选中」：与选中卡无关的卡淡化（Web 是把无关节点 opacity 落到 0.32）
+## 「聚焦选中」：与选中卡无关的卡淡化（Web 04-nodes.css `.node.dim{opacity:.32}`）
 func set_dim(on: bool) -> void:
-	var target := Color(1, 1, 1, 0.25) if on else Color(1, 1, 1, 1)
+	var target := Color(1, 1, 1, 0.32) if on else Color(1, 1, 1, 1)
 	if modulate != target:
 		modulate = target
+
+
+## 入场动画（Web `.node.pop` keyframes：0% scale .4 opacity 0 → 60% scale 1.12
+## → 100% scale 1 opacity 1，共 0.45s）。只在卡片初生时调一次（fresh 消费掉）。
+func play_pop() -> void:
+	if _pop != null and _pop.is_valid():
+		_pop.kill()
+	scale = Vector2.ONE * 0.4
+	modulate.a = 0.0
+	_pop = create_tween()
+	_pop.tween_property(self, "scale", Vector2.ONE * 1.12, 0.270) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_pop.tween_property(self, "scale", Vector2.ONE, 0.180) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_pop.parallel().tween_property(self, "modulate:a", 1.0, 0.200)
+
+
+## 拖动镜像（Web 的 #drag-layer 复刻）：新建一张"inert"翻版卡交给 Desktop 挂到
+## 最顶层（windows 之上）。不能用 duplicate() —— 脚本成员不会一起拷贝
+## （_mat/card_key 会是空值），所以走 setup() 重画一遍再回灌当前外观态。
+func build_mirror() -> NodeCard:
+	var m := NodeCard.new()
+	m.name = "card_mirror"
+	m.setup(card_key, kind, node_data, _w, _h)
+	m.set_shell_state(_container, _explored, _collapsed, _unread, _hub)
+	m.set_warn(_warn)
+	m.position = position
+	_strip_input(m)
+	return m
+
+
+func _strip_input(c: Node) -> void:
+	var ctl := c as Control
+	if ctl != null:
+		ctl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for ch in c.get_children():
+		_strip_input(ch)

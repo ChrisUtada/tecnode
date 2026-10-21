@@ -183,14 +183,25 @@ func _apply_reaction(hit: Dictionary, owner_key: String) -> Dictionary:
 
 
 ## 双击节点的默认命令（第一条）。没有命令就返回空，由调用方决定「展开」还是别的。
+## Web 双击语义对条（08-interact.js）：场景（loc）也吃 SCENES[id].commands[0]，
+## 只是 a001 数据里 0/11 个场景真带命令 —— 支路通路在小盘上同样打开。
 func activate(node_key: String) -> Dictionary:
 	var n := graph.node(node_key)
-	if n.is_empty() or n["kind"] != "item":
+	if n.is_empty():
 		return {}
-	var it := case_def.item_of(String(n["id"]))
-	if it == null or it.commands.is_empty():
+	var cmds: Array = []
+	match String(n["kind"]):
+		"item":
+			var it := case_def.item_of(String(n["id"]))
+			if it != null:
+				cmds = it.commands
+		"loc":
+			var sc := case_def.scene_of(String(n["id"]))
+			if sc != null:
+				cmds = sc.commands
+	if cmds.is_empty():
 		return {}
-	return cmd_sys.execute(node_key, it.commands[0])
+	return cmd_sys.execute(node_key, cmds[0])
 
 
 ## 从一次成功的组合里抽出「新获得的线索」（P0：正文里出现的 [clue:] 直接记为已捕获）

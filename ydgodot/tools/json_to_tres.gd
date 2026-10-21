@@ -187,6 +187,12 @@ func _fill_scene(r: Resource, d: Dictionary) -> void:
 	r.set("image", String(d.get("image", "")))
 	r.set("can_be_picked", bool(d.get("canBePicked", false)))
 	r.set("hidden_clue", _hidden(d.get("hiddenClue", null)))
+	var scene_cmds: Array[CommandDef] = []
+	for c in d.get("commands", []):
+		var s_cmd := _command(c)
+		if s_cmd != null:
+			scene_cmds.append(s_cmd)
+	r.set("commands", scene_cmds)
 
 
 func _fill_item(r: Resource, d: Dictionary) -> void:

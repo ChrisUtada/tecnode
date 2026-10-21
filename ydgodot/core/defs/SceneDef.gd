@@ -9,3 +9,6 @@ extends Resource
 @export var image: String = ""
 @export var can_be_picked: bool = false
 @export var hidden_clue: HiddenClueDef = null
+## 双击可先跑的命令（Web `SCENES[id].commands`，a001 里 0/11 用到；为未来案件铺路）。
+## 空数组 = 回到容器展开 / 折叠的默认行为。
+@export var commands: Array[CommandDef] = []

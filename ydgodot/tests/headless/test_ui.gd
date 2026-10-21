@@ -1,4 +1,4 @@
-extends SceneTree
+﻿extends SceneTree
 ## P0 界面级回归：真的往 NodeCard 里塞鼠标事件，验证「拖拽 = 组合 / 双击 = 点亮」这条接线。
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_ui.gd
 
@@ -409,6 +409,134 @@ func _initialize() -> void:
 		String(scene.graph.stored.get(clue_key, "")) == GraphState.LEDGER,
 		String(scene.graph.stored.get(clue_key, "")))
 
+	# ── 批 3（报告 §3.3 P2 残留）：warn 药丸 · pop 入场 · hover 光标 · dim 0.32 · 场景命令 · 拖动镜像 ──
+
+	# 14) V5 warn 药丸：mdhm 是 a001 里唯一「无文本入口」的未探索场景
+	# （零 [loc:] 入边 · 零命令产出 · 自己也没有出口）
+	check("谓词：mdhm 未探索前提", not (scene.dbg_state()["explored"] as Array).has("SCENES_mdhm"))
+	check("谓词：枢纽花园（5 条入边）不算", not scene.graph.is_no_entry("loc:SCENES_garden"))
+	check("谓词：命令产出的 choutiyi 不算", not scene.graph.is_no_entry("loc:SCENES_choutiyi"))
+	var md_key: String = scene.dbg_ensure("loc", "SCENES_mdhm")
+	await process_frame
+	check("谓词：mdhm 无文本入口", scene.graph.is_no_entry(md_key))
+	var md_card: NodeCard = _cards().get(md_key, null)
+	check("mdhm 上卡", md_card != null)
+	check("无文本入口药丸挂上了", md_card != null and md_card._warn and md_card._warn_badge.visible,
+		str(md_card != null and md_card._warn))
+	check("已探索的花园不挂药丸", (_cards()["loc:SCENES_garden"] as NodeCard)._warn == false)
+
+	# 15) V4 pop：fresh 节点初生 0.4→1.12→1（0.45s）；fresh 一次性消费、「新」角标保留
+	var pop_key: String = scene.dbg_ensure("clue", "CLUES_wmhj")
+	await process_frame
+	var pop_card: NodeCard = _cards().get(pop_key, null)
+	check("前提：dbg_ensure 不标记 fresh（首次出生不弹）",
+		pop_card != null and pop_card.scale.is_equal_approx(Vector2.ONE)
+		and not bool(scene.graph.node(pop_key).get("fresh", false)))
+	scene.graph.mark_fresh(pop_key)
+	var old_pop: NodeCard = _cards().get(pop_key, null)
+	if old_pop != null:
+		old_pop.queue_free()
+		scene._cards.erase(pop_key)
+	await process_frame
+	scene.dbg_ensure("clue", "CLUES_wmhj")
+	var reborn: NodeCard = _cards().get(pop_key, null)
+	check("pop 初生：0.4", reborn != null and reborn.scale.is_equal_approx(Vector2(0.4, 0.4)),
+		str(reborn.scale if reborn != null else Vector2.ZERO))
+	check("fresh 已被消费", not bool(scene.graph.node(pop_key).get("fresh", false)))
+	await create_timer(0.6).timeout
+	check("pop 收尾：1.0", reborn.scale.is_equal_approx(Vector2.ONE), str(reborn.scale))
+	check("pop 收尾：不透明", absf(reborn.modulate.a - 1.0) < 0.02,
+		str(reborn.modulate.a))
+	check("「新」角标还在（unread 不随 pop 摘）", reborn._badge.visible)
+
+	# 16) N8 hover：悬停 shade_soft 7→10、离开还原 + 手形光标（Web .node{cursor:grab}）
+	md_card.mouse_entered.emit()
+	check("悬停：shade 变浅",
+		float(md_card._mat.get_shader_parameter("shade_soft")) == 10.0,
+		str(md_card._mat.get_shader_parameter("shade_soft")))
+	check("悬停：光标手形", md_card.mouse_default_cursor_shape == Control.CURSOR_POINTING_HAND)
+	md_card.mouse_exited.emit()
+	check("离开：shade 还原",
+		float(md_card._mat.get_shader_parameter("shade_soft")) == 7.0)
+
+	# 17) V6 dim：选中卡以外的卡片不透明度 0.32（Web .node.dim；P0 里误写成 0.25）
+	_single_click(md_card)
+	var dim_other: NodeCard = _cards()[pop_key]
+	check("无关卡被淡化到 0.32", dim_other.modulate.is_equal_approx(Color(1, 1, 1, 0.32)),
+		str(dim_other.modulate))
+	check("选中卡保持不透明", md_card.modulate.is_equal_approx(Color(1, 1, 1, 1)))
+
+	# 18) N7 场景命令：双击带 commands 的场景先跑 commands[0]（a001 数据 0/11 用到，
+	# 运行时注入验证接线；无命令时回到「展开 / 折叠」默认）
+	check("前提：garden 数据无命令", case_cmds_empty())
+	# 第 8/9 节的两次单击 realtime 间隔 < 280ms 会合成「双击激活」把 garden 折叠
+	# （与 Web dblclick 同一句话）—— 这里显式 uncollapse，再验证 N7 分支
+	scene.graph.uncollapse("SCENES_garden")
+	await process_frame
+	check("前提：garden 展开态", not (scene.dbg_state()["collapsed"] as Array).has("SCENES_garden"))
+	var tcmd := TextCommandDef.new()
+	tcmd.value = "SCN-CMD-PROBE 床底下压着一行蜡笔字"
+	var injected: Array[CommandDef] = [tcmd]
+	var gdef = scene.case_def.scene_of("SCENES_garden")
+	gdef.commands = injected
+	_double_click(_cards()["loc:SCENES_garden"] as NodeCard)
+	await process_frame
+	check("带命令场景双击：先跑命令（toast 命中）",
+		String(scene._toast_label.text).contains("SCN-CMD-PROBE"),
+		String(scene._toast_label.text))
+	check("带命令场景双击：不折叠",
+		not (scene.dbg_state()["collapsed"] as Array).has("SCENES_garden"))
+	var cleaned: Array[CommandDef] = []
+	gdef.commands = cleaned
+	_double_click(_cards()["loc:SCENES_garden"] as NodeCard)
+	await process_frame
+	check("无命令场景双击：回到折叠默认",
+		(scene.dbg_state()["collapsed"] as Array).has("SCENES_garden"))
+
+	# 19) D6 拖动镜像（Web #drag-layer）：拖起 = 镜像挂桌布最顶 + 原卡隐藏；
+	# 松手 = 镜像退场 + 原卡复位；被拖卡的连线照常续画
+	var stage4: Control = scene.get_node("desk/case_win/body/stage")
+	var torch4: NodeCard = _cards()[TORCH]
+	var m_a: Vector2 = torch4.get_global_rect().get_center()
+	var m_blank: Vector2 = stage4.get_global_rect().get_center()
+	for off in [Vector2(0, 190), Vector2(-190, 0), Vector2(190, 0), Vector2(0, -190),
+		Vector2(-140, 150), Vector2(140, 150), Vector2(-140, -150), Vector2(140, -150)]:
+		var cand4: Vector2 = stage4.get_global_rect().get_center() + off
+		var occupied4 := false
+		for key in _cards().keys():
+			var c4: NodeCard = _cards()[key]
+			if c4 != torch4 and c4.visible and c4.get_global_rect().has_point(cand4):
+				occupied4 = true
+				break
+		if not occupied4 and scene._bag_win != null and scene._bag_win.get_global_rect().has_point(cand4):
+			occupied4 = true
+		if not occupied4 and scene._ledger_win != null and scene._ledger_win.get_global_rect().has_point(cand4):
+			occupied4 = true
+		if not occupied4 and mw != null and mw._board.get_global_rect().has_point(cand4):
+			occupied4 = true
+		if not occupied4:
+			m_blank = cand4
+			break
+	var edges4: EdgeLayer = scene.get_node("desk/case_win/body/stage/cards/edges")
+	_press(torch4, m_a)
+	_motion(torch4, m_blank)
+	var mir: NodeCard = scene._card_mirror
+	check("拖起：镜像挂在桌布上", mir != null and is_instance_valid(mir)
+		and mir.get_parent() == scene.get_node("desk"), str(mir))
+	check("拖起：原卡隐藏", not torch4.visible)
+	check("拖起：镜像不收输入", mir == null or mir.mouse_filter == Control.MOUSE_FILTER_IGNORE)
+	check("拖起：镜像跟着原卡",
+		mir != null and mir.global_position.is_equal_approx(torch4.get_global_position()),
+		str(mir.global_position if mir != null else Vector2.ZERO))
+	check("拖起：被拖卡的连线照常画", edges4.segment_count() > 0, str(edges4.segment_count()))
+	_release(torch4, m_blank)
+	await process_frame
+	check("松手：镜像退场", scene._card_mirror == null)
+	check("松手：原卡复位可见", torch4.visible)
+	check("松手：坐标写回数据（同第 12 节口径）",
+		absf(float(scene.graph.node(TORCH)["x"]) - torch4.position.x) < 0.5,
+		str(scene.graph.node(TORCH)["x"]) + " / " + str(torch4.position.x))
+
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)
 
@@ -490,3 +618,8 @@ func _chip_release(chip: Control, pos: Vector2) -> void:
 	ev.pressed = false
 	ev.global_position = pos
 	chip.gui_input.emit(ev)
+
+
+func case_cmds_empty() -> bool:
+	var s = scene.case_def.scene_of("SCENES_garden")
+	return s != null and s.commands.is_empty()

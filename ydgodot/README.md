@@ -96,6 +96,14 @@
   - 桌布 chip → 画布**带坐标**（反向 8 条路径的最后一条）：`MatrixWin` chip 拖出即发 `clue_dropped(key, at_global)`，`Desktop._on_matrix_took()` 把卡片落在松手那一点并写回 `n.x/n.y`（换算与 `_finish_sdrag` 同一条公式）；**双击 = 无坐标取回**沿承原「取下」按钮口径
   - chip → 线索册**窗或册图标**：两个落点都收进册子（对齐 Web `overLedgerDrop` 两条，此前只认册窗）
   - 回归：全套无头 **14 个脚本 1055 项 0 失败**；`test_ui.gd` 67 → 79（批 2 新增 12：桌布窗可开 / 测试前提 3 · 幽灵线出现 / 起点中心 / 终点跟随 / 松手收起 4 · chip 回画布 / 落在松手点 / 坐标写回 3 · chip 收进册 1 · 芯片在桌 1）
+- **交互层 · 批 3（P2 细节批）**：✅ 已落地（差距报告 §0.4：N7 / N8 / V4 / V5 / V6 / D6）
+  - 「无文本入口」药丸（V5 / Web `badge warn`）：`GraphState.is_no_entry()` 谓词四件套（未探索 + `[loc:]` 文本入边 0 + 命令产出通路 0 + 自己没出口）；a001 里唯一命中的是「地毯下的暗门」；药丸挂右上槽、与「新」同位，「新」盖在上层
+  - 入场 pop（V4 / Web `.node.pop`）：fresh 节点初生 scale .4→1.12→1 + 淡入 0.45s，`fresh` 一次性消费、`unread`「新」角标保留；`--shot` 模式不弹（对拍要稳）
+  - hover（N8）：`set_hover_state` 接上鼠标进出（shade_soft 7→10），悬停手形光标 / 拖动全局 `CURSOR_DRAG`、松手归还
+  - 聚焦淡化 alpha .25 → **.32**（V6，对齐 `.node.dim`）
+  - 场景命令（N7）：`SceneDef.commands` 字段进迁移；双击带命令的场景**先跑 `commands[0]` 再说**，无命令才展开折叠；a001 数据 0/11 场景用到，断言走运行时注入
+  - 拖动镜像（D6 / Web `#drag-layer`）：拖起整卡「假身」浮到所有窗之上、原卡隐藏，松手换身回来；被拖卡的连线照常续画（`_drag_key` 豁免）
+  - 回归：全套无头 **14 个脚本 1086 项 0 失败**；`test_ui.gd` 79 → 110（批 3 新增 31：warn 7 · pop 6 · hover 3 · dim 2 · 场景命令 5 · 镜像 8）
 - **P3 视觉追平**：🔧 进行中，**全屏 diff 7.00% → 2.30%**（1280×800 / 阈值 8，计划目标 < 0.5% 且文字区外为零）
   - 对拍流水线：`tools/pixeldiff/capture_web.cjs`（CDP 无头 Edge，关 LCD 次像素）→ `--shot-p3` → `compare.py`（分区统计 + 差异图 + `start.json`）
   - 已消灭：窗框九切片烘焙（`assets/baked/win_frame.png`，`patch_margin=46`，外沿差异 **0**）、页眉几何逐坐标对齐、**页眉控件高 31 → 25/27**（Button 最小尺寸反顶 `set_size`，见 `_sync_header_sizes`）、枢纽场景双线框、图标块（渐变 150°、描边 alpha、字形高 10px、标签 4px、阴影软度）
@@ -177,7 +185,7 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 | `core/defs/` | 25 个自定义 Resource 类（`SceneDef` / `ItemDef` / `CommandDef` 六子类 / `CharDef` …） |
 | `data/` | `case-a001.json` —— **已冻结为只读档案**（迁移输入 + 对照基准，运行时不再读它） |
 | `assets/raw/` | `src/assets/` 的拷贝（字体 / 头像 / OGG / 花园序列帧） |
-| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 79）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 15）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 103）、`test_p25.gd`（音乐 / 花园 146）、`test_p26.gd`（名册 / 日志 / 图标栏 85）—— **共 1055 项** |
+| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 110）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 15）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 103）、`test_p25.gd`（音乐 / 花园 146）、`test_p26.gd`（名册 / 日志 / 图标栏 85）—— **共 1086 项** |
 | `docs/` | P0 切片 6 张 + P1 新特性 15 张 + P2 案件 / TEC / 回忆 / 对话 / 音乐 / 花园 / 名册 / 日志 22 张截图，共 43 张（P3 对拍基线从这些图起步） |
 | `tools/` | P1 的 `json_to_tres.gd` 与对拍工具（待建） |
 
@@ -190,13 +198,14 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 - 组合与命令：发光工具门（未点亮拦下、不记 tried）、`useItem` 命中、`onSuccess.scene` 揭示、反应表五段通道
 - 画布：world/view 分离（2000×1300）、力导向布局、以光标为锚缩放 0.35–1.8、平移、位置写回与边界夹回
 - 连线：四种边（entity / move / cond / tried），二次贝塞尔 24 段采样，虚线按弧长切
-- 节点交互：单击选中 / 双击激活 / 右键钉住 / 拖动（5px 阈值）/ `spring_back()` 弹回
+- 节点交互：单击选中 / 双击激活 / 右键钉住 / 拖动（5px 阈值+镜像）/ `spring_back()` 弹回
+- 交互细节：hover 手形与阴影（N8）/ 入场 pop（V4）/ 无文本入口药丸（V5）/ dim .32（V6）/ 场景命令前置（N7）
 - 落点：11 项单一表（3 窗口 + 5 图标 + TEC 头像 + 助手卡片 + 推演桌布），悬停高亮与松手分派共用
 - 窗口基类：拖动标题栏、关闭、内容流 / 定位容器分离
 - 详情窗：简介 / 状态 / 来源 + 四个重看按钮
 - TEC 对话 / 分析：5–8 秒进度条 + `--fast` 旁路 + 闲聊 + 档案解读 + 右下角助手卡片
 - 结局演出：分幕台词按 `delay` 落下、点击继续、遮罩收幕
-- 无头回归 **14 个脚本 1055 项**，全绿
+- 无头回归 **14 个脚本 1086 项**，全绿
 
 **没做（P4 / 后续）**
 
