@@ -78,13 +78,30 @@
   - 落点表：`_drop_targets()` 单一清单 11 项（3 窗口 + 5 图标 + TEC 头像 + 助手卡片 + 推演桌布），悬停高亮与松手分派共用同一份，卡片命中后 `spring_back()` 300ms 弹回
   - 反应表通道：`ComboSystem.use_item` 顺序 目标反应表 → 工具反应表 → `useItem` 命令 → 容器扫描，失败记 `tried`；实测 27 条反应（物品触发 14 + 线索触发 13）
   - 详情窗 `DetailWin`：只列简介 / 状态 / 来源（刻意不列"装着什么/谁指向它/跟谁有反应"），底部四个重看按钮；点空白收起
-  - 回归：`test_ui.gd` 67 项（P0 新增 26 条：单击不激活 / 右键钉住 + 角标 / 坐标写回 / 拒收回原位 / 落点 11 项白名单 / 连线层有线段 / 滚轮缩放 / 点空白清选中 / 详情窗 / 反应表 / 袋行拖回落在松手点）
+  - 回归：`test_ui.gd` 79 项（P0 新增 26 条：单击不激活 / 右键钉住 + 角标 / 坐标写回 / 拒收回原位 / 落点 11 项白名单 / 连线层有线段 / 滚轮缩放 / 点空白清选中 / 详情窗 / 反应表 / 袋行拖回落在松手点；批 2 新增 12 条见下）
+- **交互层 · 批 1（名册 / 日志 / 图标栏）**：✅ 已落地（差距报告 §0.2，实证截图 `docs/p2_21_people.png`、`docs/p2_22_log.png`）
+  - 人物名册 `PeopleWin`（`ROSTER // 人物`，324×399 body）：常驻两人（TEC / 执行者）在前，其余按 id 排序；「已结识」= 画布上有已登场节点 ∪ 到过某时刻（`card_seen`）∪ 探索过 `sceneTalks` 覆盖的场景，**纸面提及不算**
+  - 名册行：48×48 头像（TEC / 执行者用各自窗里那张，其余首字方块）；状态列只给状态词（`助手窗` / `逻辑阵列` / `未交谈` / `可继续` / `已聊完` / `无对话文本`），**不给 x/y 计数**
+  - 名册动作：点常驻行 = 开 TEC 窗 / 推演桌布；点普通行 = 叫到镜头中央 + 选中 + **说下一句**（`charTalkQueue` = `talkQueue` + 他所在场景的 `sceneTalks`，此前 Godot 只用 `talkQueue`，是隐性偏差）
+  - 因果追踪 `LogWin`（`SYS_LOGS // 因果追踪`，320×383 body）：条目按 kind 上样式（`sys` 加粗 + `▍ ` / `warn` 灰 + `※ ` / `err` 反白 / `cap` 下划线 / `act` 浅底），自动滚到底，空档给占位行
+  - 日志口径照抄 `03-utils.js:250-262`：**只记结果**（捕获线索 / 组合成与败 / 前往 / 一切失败与拦截 / 开局换案 / 「另有 N 个节点留在画布上」），不记展开收起、收入取出、台词本身、撤销重置
+  - 日志未读：窗关着时 `_log_unread` 累加并挂到「日志」图标角标，开窗清零
+  - 图标栏 8 项（`ICON_DEFS` = 推演器 / 档案 / 线索册 / 人物 / 证物袋 / TEC / 日志 / 案件地图）+ 动态 2 项（播放器 / 花园）；脱离 `VBoxContainer` 改绝对定位（left 18 / top 16 / 步距 85，图标变多时按 `resetIconPositions()` 压到 70 下限）
+  - 图标可自由拖动（5px 阈值内算点击、超出算拖动，夹在桌面矩形内），只改位置、**不进撤销栈、重置不回位**；`DeskIcon` 从 `Button.pressed` 改成自管指针手势，拖动后不会再误触发一次点击
+  - 四角标：推演器「N 条」（桌布已归位数）、证物袋「N 件」、线索册「N 条」、日志「未读」
+  - 组合成功**不再弹提示条**（对齐 `05-combine.js:155-160`）：结果靠画面自证，正文与「获得 / 消耗」只进案卷（修差距报告 C8）
+  - 回归：`test_p26.gd` 85 项（日志底层 / 名册收录规则 / 队列与进度 / 图标 8 项与步距 / 自由拖动不进撤销栈 / 四角标 / 日志窗样式与未读 / 日志口径 / 名册点行 / 双击图标开窗）
+- **交互层 · 批 2（幽灵线 / 带坐标 chip）**：✅ 已落地（差距报告 §0.3）
+  - 拖动幽灵线（差距报告 E2）：拖卡时 `EdgeLayer` 画一条 2px 实虚线（6-5 @ 0.85）从被拖卡中心直连指针 —— world 空间挂在连线层上，平移/缩放自动跟随；松手（或命中落点）即收线
+  - 桌布 chip → 画布**带坐标**（反向 8 条路径的最后一条）：`MatrixWin` chip 拖出即发 `clue_dropped(key, at_global)`，`Desktop._on_matrix_took()` 把卡片落在松手那一点并写回 `n.x/n.y`（换算与 `_finish_sdrag` 同一条公式）；**双击 = 无坐标取回**沿承原「取下」按钮口径
+  - chip → 线索册**窗或册图标**：两个落点都收进册子（对齐 Web `overLedgerDrop` 两条，此前只认册窗）
+  - 回归：全套无头 **14 个脚本 1055 项 0 失败**；`test_ui.gd` 67 → 79（批 2 新增 12：桌布窗可开 / 测试前提 3 · 幽灵线出现 / 起点中心 / 终点跟随 / 松手收起 4 · chip 回画布 / 落在松手点 / 坐标写回 3 · chip 收进册 1 · 芯片在桌 1）
 - **P3 视觉追平**：🔧 进行中，**全屏 diff 7.00% → 2.30%**（1280×800 / 阈值 8，计划目标 < 0.5% 且文字区外为零）
   - 对拍流水线：`tools/pixeldiff/capture_web.cjs`（CDP 无头 Edge，关 LCD 次像素）→ `--shot-p3` → `compare.py`（分区统计 + 差异图 + `start.json`）
   - 已消灭：窗框九切片烘焙（`assets/baked/win_frame.png`，`patch_margin=46`，外沿差异 **0**）、页眉几何逐坐标对齐、**页眉控件高 31 → 25/27**（Button 最小尺寸反顶 `set_size`，见 `_sync_header_sizes`）、枢纽场景双线框、图标块（渐变 150°、描边 alpha、字形高 10px、标签 4px、阴影软度）
-  - 剩余：图标栏缺「人物」「日志」两扇窗（两个空槽 ≈ 0.54 pt，是**功能缺口**）、各处文字 AA（Godot 硬边 vs Web 灰度覆盖率，计划 §七 已约定「接受 AA 微小差异」）
+  - 剩余：各处文字 AA（Godot 硬边 vs Web 灰度覆盖率，计划 §七 已约定「接受 AA 微小差异」）；图标栏「人物」「日志」两个空槽已随批 1 补齐（原 ≈ 0.54 pt），**待重跑 `--shot-p3` 复测总分**
   - 交互层上线后重拍：与上线前**逐像素 `max diff = 0`**，2.30% 基线原样有效
-  - 契约：`test_ui.gd` 67 项含 9 条 P3 断言（页眉高 52 / 品牌 14px / 七件套 x 坐标 / 证章 318,190 / 九切片 patch_margin / 枢纽卡双线框）
+  - 契约：`test_ui.gd` 79 项含 9 条 P3 断言（页眉高 52 / 品牌 14px / 七件套 x 坐标 / 证章 318,190 / 九切片 patch_margin / 枢纽卡双线框）
   - 账目：`.workbuddy/memory/2026-10-21.md`
 
 一条完整链路已在 Godot 4.7 里跑通，其余系统尚未搬迁：
@@ -129,6 +146,7 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 "$GODOT" --headless --path ydgodot --script res://tests/headless/test_p23.gd
 "$GODOT" --headless --path ydgodot --script res://tests/headless/test_p24.gd
 "$GODOT" --headless --path ydgodot --script res://tests/headless/test_p25.gd
+"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p26.gd
 
 # 3.5) 重跑数据迁移（JSON → .tres；只在确认数据基准后跑）
 "$GODOT" --headless --path ydgodot --script res://tools/json_to_tres.gd
@@ -139,13 +157,13 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 # 4.5) 开场 / 调查员证截图（6 张，写到 docs/p1_1*.png）
 "$GODOT" --path ydgodot --resolution 1280x800 -- --shot --shot-intro
 
-# 4.6) 案件 / TEC / 回忆 / 对话 / 音乐 / 花园截图（20 张，写到 docs/p2_*.png）
+# 4.6) 案件 / TEC / 回忆 / 对话 / 音乐 / 花园 / 名册 / 日志截图（22 张，写到 docs/p2_*.png）
 "$GODOT" --path ydgodot --resolution 1280x800 -- --shot-p2
 ```
 
 - `--fast`：把「分析计时」「结局分幕延迟」压到 0（无头/测试旁路，见计划 §四.3）。
 - `--shot`：跑固定剧本并截图（`docs/p0_*.png`、`docs/p1_*.png`）。截图需要真实渲染，**不能加 `--headless`**。
-- `--shot-p2`：跑案件地图 / 收起 / 关闭 / 解锁 + TEC 对话 / 分析 / 助手卡片 / 档案 + 档案窗 / 放映卡 / 回忆小剧场 + 多人对话 / 等待加入 / 独白 + 音乐播放器 / 右下角卡片 + 种子 / 花园 / 旁白共 20 张截图；使用临时进度档，退出时清理。
+- `--shot-p2`：跑案件地图 / 收起 / 关闭 / 解锁 + TEC 对话 / 分析 / 助手卡片 / 档案 + 档案窗 / 放映卡 / 回忆小剧场 + 多人对话 / 等待加入 / 独白 + 音乐播放器 / 右下角卡片 + 种子 / 花园 / 旁白 + 人物名册 / 因果追踪共 22 张截图；使用临时进度档，退出时清理。
 - `--no-intro`：跳过开场适性测试（无证时也不弹）。
 
 ## 目录
@@ -159,8 +177,8 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 | `core/defs/` | 25 个自定义 Resource 类（`SceneDef` / `ItemDef` / `CommandDef` 六子类 / `CharDef` …） |
 | `data/` | `case-a001.json` —— **已冻结为只读档案**（迁移输入 + 对照基准，运行时不再读它） |
 | `assets/raw/` | `src/assets/` 的拷贝（字体 / 头像 / OGG / 花园序列帧） |
-| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 32）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 15）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 102）、`test_p25.gd`（音乐 / 花园 146）—— **共 922 项** |
-| `docs/` | P0 切片 6 张 + P1 新特性 15 张 + P2 案件 / TEC / 回忆 / 对话 / 音乐 / 花园 20 张截图，共 41 张（P3 对拍基线从这些图起步） |
+| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 79）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 15）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 103）、`test_p25.gd`（音乐 / 花园 146）、`test_p26.gd`（名册 / 日志 / 图标栏 85）—— **共 1055 项** |
+| `docs/` | P0 切片 6 张 + P1 新特性 15 张 + P2 案件 / TEC / 回忆 / 对话 / 音乐 / 花园 / 名册 / 日志 22 张截图，共 43 张（P3 对拍基线从这些图起步） |
 | `tools/` | P1 的 `json_to_tres.gd` 与对拍工具（待建） |
 
 ## 已做 / 明确没做
@@ -178,14 +196,11 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 - 详情窗：简介 / 状态 / 来源 + 四个重看按钮
 - TEC 对话 / 分析：5–8 秒进度条 + `--fast` 旁路 + 闲聊 + 档案解读 + 右下角助手卡片
 - 结局演出：分幕台词按 `delay` 落下、点击继续、遮罩收幕
-- 无头回归 **13 个脚本 957 项**，全绿
+- 无头回归 **14 个脚本 1055 项**，全绿
 
 **没做（P4 / 后续）**
 
-- 人物名册、因果追踪两扇窗（图标栏只有 6 / 8）
-- 图标栏可自由拖动；证物袋 / 线索册两个角标
-- 拖动幽灵线（从原位拉虚线到指针）
-- 桌布 chip → 画布（带坐标）—— 反向 8 条路径里唯一缺的一条
+- 反应表三条产出来源（`results.scene` / `results.items` / `onSuccess.items`）—— 数据不触发，接了也无从验证（已知缺口）
 - 折叠 / 展开的位置过渡动画（Web 是 CSS 过渡，Godot 目前瞬时换位）
 - 系统窗层级与 z 序的完整规则（音乐 / 花园已按各自场景接入最小化或固定按钮）
 

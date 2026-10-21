@@ -1,9 +1,18 @@
 class_name DeskIcon
 extends Button
 
+## 桌面图标：单击 = 选中，双击 = 打开（对齐 Web `attachIcon`）；
+## 按住拖走 = 挪位置（Web 同样可拖：位置不进撤销栈、重置不回位）。
+##
+## 为什么自己接管指针：Button 的 `pressed` 在「拖完松手」时也会发一次，
+## 要在拖动后吞掉它就得跟 Button 的内部按下态打架。这里改成自己判
+## 「5px 内 = 点击 / 超过 = 拖动」，一个信号 `clicked` 只给干净的点击。
+signal clicked
+
 const ROOT_SIZE := 64.0
 const GLYPH_SIZE := 44.0
 const GLYPH_PAD := 10.0
+const DRAG_THRESHOLD := 5.0
 
 var _glyph: ColorRect
 var _icon: TextureRect
@@ -12,6 +21,10 @@ var _mat: ShaderMaterial
 var _selected := false
 var _down := false
 var _over := false
+var _press_pos := Vector2.ZERO
+var _drag_origin := Vector2.ZERO
+var _moved := false
+var _bounds := Rect2(Vector2.ZERO, Vector2(1280, 800))
 
 
 func setup(p_text: String, p_icon: String) -> void:
@@ -68,9 +81,51 @@ func setup(p_text: String, p_icon: String) -> void:
 
 	mouse_entered.connect(_on_hover.bind(true))
 	mouse_exited.connect(_on_hover.bind(false))
-	button_down.connect(func(): _down = true; _apply_style())
-	button_up.connect(func(): _down = false; _apply_style())
 	_apply_style()
+
+
+## 拖动范围 = 桌面矩形（Web：`clamp(0, desktop.w - 64)`）
+func set_bounds(r: Rect2) -> void:
+	_bounds = r
+
+
+func icon_position() -> Vector2:
+	return position
+
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT:
+			if mb.pressed:
+				_press_pos = mb.global_position
+				_drag_origin = position
+				_moved = false
+				_down = true
+				_apply_style()
+			else:
+				var was_moved := _moved
+				_down = false
+				_moved = false
+				_apply_style()
+				if not was_moved:
+					clicked.emit()
+			accept_event()
+			return
+	# 位移超过阈值 = 拖动：按指针位移挪位置，夹在桌面矩形内（把显卡上沿的 -10 也算进去）
+	if event is InputEventMouseMotion and _down:
+		var mm := event as InputEventMouseMotion
+		var d := mm.global_position - _press_pos
+		if not _moved and absf(d.x) + absf(d.y) < DRAG_THRESHOLD:
+			return
+		if not _moved:
+			_moved = true
+			move_to_front()
+		var p := _drag_origin + d
+		var max_x := maxf(_bounds.size.x - ROOT_SIZE, 0.0)
+		var max_y := maxf(_bounds.size.y - ROOT_SIZE, 0.0)
+		position = Vector2(clampf(p.x, 0.0, max_x), clampf(p.y, 0.0, max_y))
+		accept_event()
 
 
 func set_selected(on: bool) -> void:

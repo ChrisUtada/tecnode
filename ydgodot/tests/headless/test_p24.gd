@@ -230,7 +230,15 @@ func _test_desktop(c: CaseLoader) -> void:
 	scene.dbg_set_time("SCENES_0704")
 	await process_frame
 	scene.dbg_close_mem()
-	check("双击人物开独白", scene.dbg_activate("char:CHARS_luhengs") or scene.dbg_chat() != null)
+	# 双击人物 = 走 talkQueue 说下一句（Web 口径）；独白是独立通道，入口在详情窗按钮
+	scene.dbg_activate("char:CHARS_luhengs")
+	await process_frame
+	check("双击人物不说独白", scene.dbg_chat() == null
+		or String(scene.dbg_chat_state()["id"]) != "DLG_lhs_alone")
+	if scene.dbg_chat() != null:
+		scene.dbg_chat_close()
+	# 独白通道：详情窗「播放独白」
+	check("详情窗按钮开独白", scene.dbg_open_monologue("CHARS_luhengs"))
 	await process_frame
 	chat = scene.dbg_chat()
 	check("独白窗打开", chat != null)

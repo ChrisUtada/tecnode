@@ -25,6 +25,9 @@ const STYLE := {
 
 ## [{a: Vector2, b: Vector2, kind: String, dim: bool}]
 var _segments: Array = []
+## 拖动幽灵线（Web `08-interact.js:63`）：`{a, b}` 或空。从被拖节点的中心直连指针，
+## 2px `#2b2b26` 虚线 6-5、`opacity .85` —— 直线（不走贝塞尔）。
+var _ghost := {}
 
 
 func _ready() -> void:
@@ -44,6 +47,27 @@ func segment_count() -> int:
 	return _segments.size()
 
 
+## 拖动中每帧调一次（world 坐标）。传同一个点或空调用 `clear_ghost()` 收起。
+func set_ghost(a: Vector2, b: Vector2) -> void:
+	_ghost = {"a": a, "b": b}
+	queue_redraw()
+
+
+func clear_ghost() -> void:
+	if _ghost.is_empty():
+		return
+	_ghost = {}
+	queue_redraw()
+
+
+func has_ghost() -> bool:
+	return not _ghost.is_empty()
+
+
+func ghost_points() -> Dictionary:
+	return _ghost.duplicate()
+
+
 func _draw() -> void:
 	for raw in _segments:
 		var s: Dictionary = raw
@@ -59,6 +83,10 @@ func _draw() -> void:
 			_draw_dashed(pts, col, float(st["width"]), float(st["dash"]), float(st["gap"]))
 		else:
 			draw_polyline(pts, col, float(st["width"]), true)
+	# 幽灵线最后画，压在既有连线上面（Web 是 appendChild 到同一个 svg，天然在最上层）
+	if not _ghost.is_empty():
+		var line := PackedVector2Array([_ghost["a"], _ghost["b"]])
+		_draw_dashed(line, Color(0.169, 0.169, 0.149, 0.85), 2.0, 6.0, 5.0)
 
 
 ## 二次贝塞尔：控制点抬升 = min(70, |dx| × 0.16)

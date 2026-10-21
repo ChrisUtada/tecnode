@@ -36,6 +36,28 @@ const SYMBOL := {"loc": "■ ", "item": "□ ", "char": "● ", "clue": "▲ ", 
 const KIND_NAME := {"loc": "场景", "item": "物品", "char": "人物", "clue": "线索", "time": "时刻"}
 const DARK_HI := Color("38372f")
 const DARK_LO := Color("1f1f19")
+## 点亮态的光晕直径。Web 的 `#glow` 是 560×560 挂在节点上，这里按卡片尺寸取一个
+## 「近身一圈」的尺寸就够 —— 太大会把相邻节点糊成一片（一屏常有 10+ 张卡）。
+const GLOW_SIZE := Vector2(220, 220)
+
+
+## 程序化生成光晕贴图：两圈高斯叠起来，靠近卡片边缘最亮、往外淡出。
+## 对像素画风来说这比真高斯更"干净"（没有灰阶噪点），也省一张资产。
+static func _glow_texture() -> Texture2D:
+	var n := 96
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var c := float(n - 1) * 0.5
+	for y in n:
+		for x in n:
+			var dx := (float(x) - c) / c
+			var dy := (float(y) - c) / c
+			var r := sqrt(dx * dx + dy * dy)
+			var a := 0.55 * exp(-pow((r - 0.30) * 7.0, 2.0)) \
+				+ 0.30 * exp(-pow((r - 0.42) * 2.6, 2.0))
+			if r > 1.0:
+				a = 0.0
+			img.set_pixel(x, y, Color(1.0, 0.827, 0.431, clampf(a, 0.0, 0.6)))
+	return ImageTexture.create_from_image(img)
 
 var card_key: String = ""
 var kind: String = ""
@@ -53,6 +75,10 @@ var _sub: Label
 var _badge: Label
 var _pin_badge: Label
 var _border: Control
+## 选中环（独立一层：框是虚线 / 双线，环是 2px 实线，两者会同时存在）
+var _sel: Control
+## 点亮态的局部光晕（Web `#glow` 那个 560×560 径向渐变的近身版）
+var _glow: TextureRect
 var _w := 0.0
 var _h := 0.0
 var _container := false
@@ -81,6 +107,19 @@ class DashBorder extends Control:
 	## 枢纽场景用 CSS 的 `3px double`：外 1px 线、1px 空隙、内 1px 线。
 	## 不能拿虚线凑 —— 两者语义不同（虚线=未探索，双线=枢纽），在 Web 里也是两套规则。
 	var double_line := false
+	## 选中环：Web `.node.sel{outline:2px solid #2b2b26; outline-offset:2px}`。
+	## CSS 的 outline 画在**边框盒之外**、留 2px 空隙，所以这里用 `rect.grow(4)` 画 2px 实线，
+	## 实际占掉 2~4px 那一圈（视觉框离卡片外沿还有 8px 的 PAD，够放）。
+	var sel_line := false
+
+	func _draw_sel() -> void:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0, 0, 0, 0)
+		sb.set_border_width_all(2)
+		sb.border_color = Color("2b2b26")
+		sb.set_corner_radius_all(int(maxf(radius, 1.0)) + 2)
+		sb.anti_aliasing = true
+		draw_style_box(sb, rect.grow(4.0))
 
 	func _ring(r: Rect2, rad: float) -> void:
 		var sb := StyleBoxFlat.new()
@@ -92,6 +131,9 @@ class DashBorder extends Control:
 		draw_style_box(sb, r)
 
 	func _draw() -> void:
+		if sel_line:
+			_draw_sel()
+			return
 		if double_line:
 			_ring(rect, radius)
 			_ring(rect.grow(-2.0), radius - 2.0)
@@ -138,6 +180,18 @@ func _build(w: float, h: float) -> void:
 	_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_bg)
+
+	# 光晕垫在卡面下面（同级先画），比卡片大一圈，超出部分不会被裁
+	_glow = TextureRect.new()
+	_glow.name = "glow"
+	_glow.texture = _glow_texture()
+	_glow.size = GLOW_SIZE
+	_glow.position = Vector2(PAD + w * 0.5, PAD + h * 0.5) - GLOW_SIZE * 0.5
+	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_glow.visible = false
+	add_child(_glow)
+	move_child(_glow, 0)
 
 	_border = DashBorder.new()
 	_border.name = "border"
@@ -193,6 +247,16 @@ func _build(w: float, h: float) -> void:
 	_pin_badge.visible = false
 	add_child(_pin_badge)
 
+	_sel = DashBorder.new()
+	_sel.name = "sel"
+	_sel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sel.visible = false
+	(_sel as DashBorder).rect = Rect2(Vector2(PAD, PAD), Vector2(w, h))
+	(_sel as DashBorder).radius = float(TecTheme.R_SM)
+	(_sel as DashBorder).sel_line = true
+	add_child(_sel)
+
 	refresh()
 
 
@@ -225,12 +289,32 @@ func set_shell_state(container: bool, explored: bool, collapsed: bool, unread: b
 	refresh()
 
 
+## 外观分四套（优先级：拖动目标 > 已捕获 > 点亮 > 普通）。
+## Web 的 `.got` / `.lit` 在 CSS 里是独立 class、写在 `.over` 之后，同特异性后者胜；
+## 但真机上把「被拖的发光工具」压在目标卡上时，目标卡的 `.over` 才是玩家要读的信息，
+## 所以这里让 `.over` 压在最上面（与 `_apply_over_look` 的既有口径一致）。
 func _apply_shell() -> void:
 	if _mat == null:
 		return
 	if _over:
 		_apply_over_look()
 		return
+	var got := kind == "clue" and bool(node_data.get("captured", false))
+	var lit := kind == "item" and bool(node_data.get("lit", false))
+	if got:
+		_apply_got_look()
+	elif lit:
+		_apply_lit_look()
+	else:
+		_apply_plain_look()
+	_badge.visible = _unread
+	_pin_badge.visible = _pinned
+	if _glow != null:
+		_glow.visible = lit
+
+
+## 普通态（含未探索 / 已折叠的扁平虚框）
+func _apply_plain_look() -> void:
 	var flat := _container and (not _explored or _collapsed)
 	_mat.set_shader_parameter("flat_fill", flat)
 	_mat.set_shader_parameter("col_hi", TecTheme.BG if flat else Color("fbf8ee"))
@@ -243,13 +327,46 @@ func _apply_shell() -> void:
 	_mat.set_shader_parameter("shade_col", Color(0, 0, 0, 0) if flat
 		else Color(0.306, 0.282, 0.212, 0.30))
 	_title.add_theme_color_override("font_color", TecTheme.MUTED if flat else TecTheme.TEXT)
+	_sub.add_theme_color_override("font_color", TecTheme.FAINT)
 	_border.double_line = _hub
 	_border.visible = flat or _hub
 	_border.queue_redraw()
-	if _badge != null:
-		_badge.visible = _unread and not _over
-	if _pin_badge != null:
-		_pin_badge.visible = _pinned and not _over
+	if _glow != null:
+		_glow.visible = false
+
+
+## Web `.node.ent-clue.got`：深色反白（`linear-gradient(150deg,#38372f,#1f1f19)`）+
+## 内嵌阴影 + 顶上 1px 白边。已捕获的线索「翻到背面」，一眼能和没读过的区分开。
+func _apply_got_look() -> void:
+	_mat.set_shader_parameter("flat_fill", false)
+	_mat.set_shader_parameter("col_hi", DARK_HI)
+	_mat.set_shader_parameter("col_mid", DARK_HI.lerp(DARK_LO, 0.55))
+	_mat.set_shader_parameter("col_lo", DARK_LO)
+	_mat.set_shader_parameter("edge_col", Color(0, 0, 0, 0))
+	_mat.set_shader_parameter("rim_col", Color(1, 1, 1, 0.28))
+	_mat.set_shader_parameter("shade_col", Color(0, 0, 0, 0.35))
+	_title.add_theme_color_override("font_color", TecTheme.CARD)
+	_sub.add_theme_color_override("font_color", TecTheme.LINE2)
+	_border.visible = false
+	if _glow != null:
+		_glow.visible = false
+
+
+## Web `.node.lit`：金框 `#e3b341` + 暖白底 `#fffbeb` + 双层外发光。
+## 发光用贴图光晕近似（CSS 是 `0 0 14px 3px` + `0 0 46px 14px` 两层叠加）。
+func _apply_lit_look() -> void:
+	_mat.set_shader_parameter("flat_fill", false)
+	_mat.set_shader_parameter("col_hi", Color("fffdf6"))
+	_mat.set_shader_parameter("col_mid", Color("fffbeb"))
+	_mat.set_shader_parameter("col_lo", Color("fcf0cd"))
+	_mat.set_shader_parameter("edge_col", Color("e3b341"))
+	_mat.set_shader_parameter("rim_col", Color(1, 0.988, 0.945, 0.95))
+	_mat.set_shader_parameter("shade_col", Color(1.0, 0.769, 0.259, 0.16))
+	_title.add_theme_color_override("font_color", TecTheme.TEXT)
+	_sub.add_theme_color_override("font_color", Color("9a7b2a"))
+	_border.visible = false
+	if _glow != null:
+		_glow.visible = true
 
 
 ## Web `.node.over{background:linear-gradient(150deg,#38372f,#1f1f19);color:var(--card);transform:scale(1.06)}`
@@ -267,6 +384,33 @@ func _apply_over_look() -> void:
 	_border.visible = false
 	_badge.visible = false
 	_pin_badge.visible = false
+	if _glow != null:
+		_glow.visible = false
+
+
+## 选中环（Web `.node.sel`）。独立于外观三态：已捕获的线索被选中时，
+## 深色卡面外面照样套一圈 2px 实线。
+func set_selected(on: bool) -> void:
+	if _sel == null or _sel.visible == on:
+		return
+	_sel.visible = on
+	_sel.queue_redraw()
+
+
+func is_selected() -> bool:
+	return _sel != null and _sel.visible
+
+
+## 当前外观态：`plain` / `got` / `lit` / `over`。给无头断言一个可读的出口，
+## 免得测试去反查 shader 参数（那是实现细节）。
+func look_state() -> String:
+	if _over:
+		return "over"
+	if kind == "clue" and bool(node_data.get("captured", false)):
+		return "got"
+	if kind == "item" and bool(node_data.get("lit", false)):
+		return "lit"
+	return "plain"
 
 
 ## 拖动悬停反馈（Desktop 每帧算一次命中后回填）
@@ -277,7 +421,6 @@ func set_over(on: bool) -> void:
 	if on:
 		_apply_over_look()
 	else:
-		_sub.add_theme_color_override("font_color", TecTheme.FAINT)
 		_apply_shell()
 
 

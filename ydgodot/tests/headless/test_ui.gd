@@ -325,6 +325,90 @@ func _initialize() -> void:
 		and back.get_global_rect().has_point(drop_at),
 		str(back.get_global_rect()) if back != null else "null")
 
+	# ── P0 交互（批 2）：拖动幽灵线 · 桌布 chip 带坐标取回 ──
+	var mw: MatrixWin = scene.dbg_open_matrix()
+	await process_frame
+	check("桌布窗能打开", mw != null)
+	# 挑一个不压在任何可见卡 / 开着的窗 / 桌布上的松手点（四角 + 四边各试一次）
+	var blank_pt := stage3.get_global_rect().get_center()
+	for off in [Vector2(0, 190), Vector2(-190, 0), Vector2(190, 0), Vector2(0, -190),
+		Vector2(-140, 150), Vector2(140, 150), Vector2(-140, -150), Vector2(140, -150)]:
+		var cand: Vector2 = stage3.get_global_rect().get_center() + off
+		var occupied := false
+		for key in _cards().keys():
+			var c3: NodeCard = _cards()[key]
+			if c3.visible and c3.get_global_rect().has_point(cand):
+				occupied = true
+				break
+		if not occupied and scene._bag_win != null and scene._bag_win.get_global_rect().has_point(cand):
+			occupied = true
+		if not occupied and scene._ledger_win != null and scene._ledger_win.get_global_rect().has_point(cand):
+			occupied = true
+		if not occupied and mw != null and mw._board.get_global_rect().has_point(cand):
+			occupied = true
+		if not occupied:
+			blank_pt = cand
+			break
+	check("测试前提：落点在空画布、桌布外、开着的窗外",
+		not mw._board.get_global_rect().has_point(blank_pt)
+		and not (scene._bag_win != null and scene._bag_win.get_global_rect().has_point(blank_pt))
+		and not (scene._ledger_win != null and scene._ledger_win.get_global_rect().has_point(blank_pt)),
+		str(blank_pt))
+
+	# 12) 幽灵线（Web 08-interact.js:63）：拖动中从卡片中心直连指针，松手即收
+	var edges2: EdgeLayer = scene.get_node("desk/case_win/body/stage/cards/edges")
+	_press(torch, torch.get_global_rect().get_center())
+	_motion(torch, blank_pt)
+	check("拖动中幽灵线出现", edges2.has_ghost())
+	check("幽灵线起点 = 被拖卡中心",
+		(edges2.ghost_points()["a"] as Vector2).is_equal_approx(torch.visual_center()),
+		str(edges2.ghost_points()))
+	var want_b: Vector2 = (blank_pt - stage3.get_global_position() - scene._view_pos) / scene._view_k
+	check("幽灵线终点 = 指针（world）",
+		((edges2.ghost_points()["b"] as Vector2) - want_b).length() < 0.5,
+		str(edges2.ghost_points()))
+	_release(torch, blank_pt)
+	await process_frame
+	check("松手幽灵线收起", not edges2.has_ghost())
+
+	# 13) 桌布 chip → 画布（带坐标，反向 8 条路径的最后一条）/ chip → 册图标 = 收进册子
+	var clue_key := "clue:CLUES_nm"
+	check("测试前提：松手点在桌布外", not mw._board.get_global_rect().has_point(blank_pt))
+	scene.dbg_matrix_assign(clue_key)
+	await process_frame
+	var chip_panel: Control = mw._chips.get("CLUES_nm", null) as Control
+	check("归位后桌布上有芯片", chip_panel != null)
+	_chip_press(chip_panel, chip_panel.get_global_rect().get_center())
+	_chip_motion(chip_panel, blank_pt)
+	_chip_release(chip_panel, blank_pt)
+	await process_frame
+	await process_frame
+	check("chip 拖出桌布：重新回到画布", not scene.graph.stored.has(clue_key))
+	var back2: NodeCard = _cards().get(clue_key, null)
+	check("chip 回到画布：落在松手那一点", back2 != null and back2.visible
+		and back2.get_global_rect().has_point(blank_pt),
+		str(back2.get_global_rect()) if back2 != null else "null")
+	var n2: Dictionary = scene.graph.node(clue_key)
+	var want2: Vector2 = (blank_pt - stage3.get_global_position() - scene._view_pos) / scene._view_k
+	check("chip 回画布：坐标写回数据",
+		absf(float(n2["x"]) - back2.position.x) < 0.5
+		and absf(float(n2["x"]) - want2.x) < 0.5
+		and absf(float(n2["y"]) - want2.y) < 0.5,
+		str(n2["x"]) + " / " + str(n2["y"]) + " want " + str(want2))
+
+	# chip 拖到线索册图标 = 收进册子（Web overLedgerDrop：窗或图标都算）
+	scene.dbg_matrix_assign(clue_key)
+	await process_frame
+	chip_panel = mw._chips.get("CLUES_nm", null) as Control
+	var clue_icon2: Control = scene.get_node("desk/icons/icon_clue")
+	_chip_press(chip_panel, chip_panel.get_global_rect().get_center())
+	_chip_motion(chip_panel, clue_icon2.get_global_rect().get_center())
+	_chip_release(chip_panel, clue_icon2.get_global_rect().get_center())
+	await process_frame
+	check("chip 拖到册图标：收进册",
+		String(scene.graph.stored.get(clue_key, "")) == GraphState.LEDGER,
+		String(scene.graph.stored.get(clue_key, "")))
+
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)
 
@@ -381,3 +465,28 @@ func _single_click(card: NodeCard) -> void:
 func _double_click(card: NodeCard) -> void:
 	_single_click(card)
 	_single_click(card)
+
+
+# 桌布 chip 走的是 `gui_input` 信号（矩阵窗把 handler bind 上去），不走 `_gui_input` 重载，
+# 所以 chip 的手套事件直接 emit 信号 —— 与 NodeCard 手套路径两条并存。
+func _chip_press(chip: Control, pos: Vector2) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.global_position = pos
+	chip.gui_input.emit(ev)
+
+
+func _chip_motion(chip: Control, pos: Vector2) -> void:
+	var ev := InputEventMouseMotion.new()
+	ev.global_position = pos
+	ev.button_mask = MOUSE_BUTTON_MASK_LEFT
+	chip.gui_input.emit(ev)
+
+
+func _chip_release(chip: Control, pos: Vector2) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = false
+	ev.global_position = pos
+	chip.gui_input.emit(ev)

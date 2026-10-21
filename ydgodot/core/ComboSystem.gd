@@ -40,6 +40,11 @@ func toggle_light(node_key: String) -> Dictionary:
 	return {"changed": true, "lit": n["lit"], "message": case_def.strip_tags(msg)}
 
 
+## 是不是「场景类」节点（loc / time / 旧版 scene）。场景⇄场景的判定只认这个。
+func _is_scene(n: Dictionary) -> bool:
+	return not n.is_empty() and GraphState.is_scene_kind(String(n["kind"]))
+
+
 ## 把一个节点拖到另一个节点上。返回：
 ##   {ok, blocked, message, reveal:Array, next_scene:String, tried:String}
 ## blocked = 被规则拦下（不执行、不记 tried）
@@ -56,6 +61,20 @@ func use_item(tool_key: String, target_key: String) -> Dictionary:
 		return {"ok": false, "message": ""}
 	var tool_id := String(tool["id"])
 	var target_id := String(target["id"])
+
+	# ⓪ 场景通路（Web `05-combine.js:15`）：把容器拖到场景上，只要**容器正文里 `[loc:对方]`**
+	#    列着对方，就等于「前往」。书桌 / 垃圾桶不是场景，但它们 content 里的
+	#    `[loc:…]`（如书桌的「返回花园」）照样是一条通路 —— 这也是 Web 那句
+	#    `isSceneKind(tool.kind) || isContainerNode(tool)` 的用意。
+	if _is_scene(target) and (_is_scene(tool) or graph.is_container_node(tool_key)):
+		if graph.scene_locs(tool_id).has(target_id) or graph.scene_locs(target_id).has(tool_id):
+			return {"ok": true, "travel": target_id, "message": ""}
+	# 两个场景之间没有通路 = 「走不过去」：明确说清楚再停，不往下淌到反应表
+	# （否则玩家会得到「场景 A 对场景 B 没有反应」这种答非所问的话）。
+	# ⚠ 与其余失败**不同**：Web 这条分支只记失败原因、不记「已试过」，也不画 tried 虚线。
+	if _is_scene(tool) and _is_scene(target):
+		return {"ok": false, "no_tried": true,
+			"message": "这两个场景之间没有直接通路"}
 
 	# ① 目标自己有反应表（人物对「你手上的东西」说一句话）
 	var hit := lookup_reaction(String(target["kind"]), target_id, tool_id)

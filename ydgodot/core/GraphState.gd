@@ -34,6 +34,16 @@ var time: String = PRESENT_TIME    # 当前时刻；初始是「现在」
 var garden: Dictionary = {"seed": false, "plots": []}   # 真名结局后的花园
 var selected: String = ""
 var last_scene: String = ""
+## 因果追踪（SYS_LOGS）的条目：{text, kind}，kind ∈ "" / "sys" / "warn" / "err" / "cap" / "act"。
+## **不进快照**、不随撤销回滚 —— 对齐 Web：日志是 DOM 节点，重来 / 换案才清（17-boot.js:20）。
+var logs: Array = []
+
+## 名册常驻成员（Web `ROSTER_PINNED`）：一进游戏就在册，不靠「已结识」判定；
+## 两者都没有画布节点，点一行 = 打开各自的窗。
+const ROSTER_PINNED := ["CHARS_TEC", "CHARS_EXEC"]
+const ROSTER_PINNED_TAG := {"CHARS_TEC": "助手窗", "CHARS_EXEC": "逻辑阵列"}
+const ROSTER_PINNED_NAME := {"CHARS_EXEC": "执行者"}
+const ROSTER_PINNED_DESC := {"CHARS_EXEC": "逻辑阵列中央的执行者，长按 2.5 秒激活归因。"}
 
 ## 三个收纳落点（与 Web 版 06-storage.js / 12-panels.js / 13-matrix.js 同名）
 const BAG := "BAG"                # 证物袋：什么都收
@@ -400,6 +410,79 @@ func meet_char_at(id: String, sid: String) -> void:
 	debuted[id] = true
 
 
+## 人物对话队列（对齐 Web `charTalkQueue`）：基础 talkQueue + 他 **当前所在场景** 的 sceneTalks。
+## 队列里的空行会被剔掉 —— 与 Web 的 `filter(Boolean)` 同口径。
+func char_talk_queue(id: String) -> Array:
+	var out: Array = []
+	var c := case_def.char_of(id)
+	if c == null:
+		return out
+	for line in c.talk_queue:
+		if String(line) != "":
+			out.append(String(line))
+	var home := ""
+	var n := node(key_of("char", id))
+	if not n.is_empty():
+		home = String(n.get("home_scene", ""))
+	if home == "":
+		return out
+	for st in c.scene_talks:
+		if st == null or st.scene == null or st.scene.id != home:
+			continue
+		for line in st.lines:
+			if String(line) != "":
+				out.append(String(line))
+	return out
+
+
+## 名册进度：{prog, total}。有节点按真实结算，没有节点时 prog = 0。
+## talk_prog 的键是**节点 key**（`char:ID`），不是裸 id —— 取错就会永远读到 0。
+func char_progress(id: String) -> Dictionary:
+	var key := key_of("char", id)
+	var prog := int(talk_prog.get(key, 0)) if nodes.has(key) else 0
+	return {"prog": prog, "total": char_talk_queue(id).size()}
+
+
+## 名册收录（对齐 Web `metChars`）：常驻成员在前 + 已结识的角色。
+## 「已结识」= 画布上有已登场的人物节点 ∪ 到过某个时刻（放过放映卡）∪ 探索过 sceneTalks 覆盖的场景。
+## **纸面提及不算** —— 只读过名字不进名册（节点也还没登场）。
+func met_char_ids() -> Array:
+	var out: Array = []
+	for id in ROSTER_PINNED:
+		out.append(id)
+	var met: Dictionary = {}
+	for key in nodes.keys():
+		var k := String(key)
+		if not k.begins_with("char:"):
+			continue
+		var cid := k.substr(5)
+		if char_debuted(cid):
+			met[cid] = true
+	# 「到过」的场景集合 = 读过放映卡的时刻 ∪ 已探索的场景
+	var reached: Dictionary = card_seen.duplicate()
+	for sid in explored.keys():
+		if bool(explored[sid]):
+			reached[String(sid)] = true
+	for cid in case_def.chars.keys():
+		var c := case_def.char_of(String(cid))
+		if c == null or String(cid) == "CHARS_TEC":
+			continue
+		if met.has(String(cid)):
+			continue
+		for st in c.scene_talks:
+			if st == null or st.scene == null:
+				continue
+			if reached.has(st.scene.id):
+				met[String(cid)] = true
+				break
+	var rest: Array = []
+	for cid in met.keys():
+		rest.append(String(cid))
+	rest.sort()
+	out.append_array(rest)
+	return out
+
+
 ## 人物在「现在」档的登场点：sceneTalks 里第一个非回忆场景；没有 = 现在档不登场。
 func char_now_scene(id: String) -> String:
 	var c := case_def.char_of(id)
@@ -736,13 +819,43 @@ func _build_hub_degree() -> void:
 				_hub_degree[String(tag["id"])] = int(_hub_degree.get(String(tag["id"]), 0)) + 1
 
 
-## 场景正文里列出的其他地点（[loc:X]）—— 拖场景到场景 = 前往的通路
+## 容器正文里列出的其他地点（`[loc:X]`）—— 拖容器到场景 = 前往的通路。
+## 覆盖两类宿主：场景，以及**能展开的容器物品**（书桌 / 垃圾桶）。
+## 后者在 Web 里也走同一条函数（`containerData()` 会落到 ITEMS 上），
+## 「书桌 → 返回花园」这类通路本来就在数据里，漏掉就等于把一条路堵了。
 func scene_locs(sid: String) -> Array:
 	var out: Array = []
+	var raw := ""
 	var s := case_def.scene_of(sid)
-	if s == null:
+	if s != null:
+		raw = s.content
+	else:
+		var it := case_def.item_of(sid)
+		if it != null:
+			raw = it.content
+	if raw == "":
 		return out
-	for tag in case_def.tags_of(s.content):
+	for tag in case_def.tags_of(raw):
 		if tag["kind"] == "loc":
 			out.append(tag["id"])
 	return out
+
+
+## ── 因果追踪（SYS_LOGS）────────────────────────────────────────────────
+## 口径照抄 Web `03-utils.js:250-262`：日志是**案卷**，只记「结果」，不记操作流水。
+## ✅ 记：捕获线索 / 结局 / 案件解锁、组合结果与失败、使用物品的结果、前往、
+##        一切失败与拦截（缺线索 / 缺工具 / 密码错 / 推演不匹配）、开局与换案标记。
+## ❌ 不记：展开与收起容器、收入与取出、卡片放映、撤销 / 重置等桌面操作、
+##        可达性统计、**对话台词本身**（台词里给出线索才是结果）。
+func add_log(text: String, kind: String = "") -> void:
+	if text == "":
+		return
+	logs.append({"text": text, "kind": kind})
+
+
+func clear_logs() -> void:
+	logs.clear()
+
+
+func log_count() -> int:
+	return logs.size()
