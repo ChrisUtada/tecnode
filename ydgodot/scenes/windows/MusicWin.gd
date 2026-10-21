@@ -52,7 +52,7 @@ func setup_music() -> void:
 
 
 func _build_content() -> void:
-	_head = TecTheme.label("内置音乐 · %d 首" % TRACKS.size(), 12, TecTheme.LINE2)
+	_head = TecTheme.label("内置音乐 · %d 首" % TRACKS.size(), TecTheme.FS_BODY, TecTheme.MUTED)
 	content.add_child(_head)
 
 	_list = VBoxContainer.new()
@@ -67,7 +67,7 @@ func _build_content() -> void:
 		row.custom_minimum_size = Vector2(0, 32)
 		row.focus_mode = Control.FOCUS_NONE
 		row.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		row.add_theme_font_size_override("font_size", 14)
+		row.add_theme_font_size_override("font_size", TecTheme.FS_TITLE)
 		row.add_theme_color_override("font_hover_color", TecTheme.TEXT)
 		row.add_theme_stylebox_override("normal", TecTheme.flat(Color(0, 0, 0, 0), TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
 		row.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
@@ -102,7 +102,7 @@ func _build_content() -> void:
 	_prog.gui_input.connect(_on_prog_input)
 	_player.add_child(_prog)
 
-	_time_label = TecTheme.label("--:-- / --:--", 10, TecTheme.MUTED)
+	_time_label = TecTheme.label("--:-- / --:--", TecTheme.FS_BODY, TecTheme.MUTED)
 	_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_player.add_child(_time_label)
 
@@ -122,7 +122,7 @@ func _icon_button(text: String, tip: String) -> Button:
 	var b := TecTheme.button(text)
 	b.custom_minimum_size = Vector2(34, 26)
 	b.size = Vector2(34, 26)
-	b.add_theme_font_size_override("font_size", 11)
+	b.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 	b.tooltip_text = tip
 	return b
 

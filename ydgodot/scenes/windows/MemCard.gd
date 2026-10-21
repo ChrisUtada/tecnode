@@ -153,7 +153,7 @@ func _play_next() -> void:
 
 
 func _new_text_label(color: Color) -> Label:
-	var label := TecTheme.label("", 13, color)
+	var label := TecTheme.label("", TecTheme.FS_TITLE, color)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -184,7 +184,7 @@ func _append_say(spec: Dictionary, text: String) -> void:
 	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main.add_theme_constant_override("separation", 1)
 	main.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var name_label := TecTheme.label(name, 11, TALK_COLOR)
+	var name_label := TecTheme.label(name, TecTheme.FS_BODY, TALK_COLOR)
 	name_label.name = "mem_say_name"
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	main.add_child(name_label)
@@ -214,7 +214,7 @@ func _say_avatar(who: String, name: String) -> Control:
 		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		frame.add_child(tex)
 	else:
-		var ini := TecTheme.label(name.substr(0, 1) if name != "" else "?", 19, TALK_COLOR)
+		var ini := TecTheme.label(name.substr(0, 1) if name != "" else "?", TecTheme.FS_DISPLAY, TALK_COLOR)
 		ini.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		ini.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		ini.mouse_filter = Control.MOUSE_FILTER_IGNORE

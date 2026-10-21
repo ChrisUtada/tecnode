@@ -19,7 +19,7 @@ func setup_narr(scene_title: String, text: String, w: float = 470.0, h: float = 
 	_text.fit_content = true
 	_text.scroll_active = false
 	_text.add_theme_font_override("normal_font", TecTheme.font())
-	_text.add_theme_font_size_override("normal_font_size", 13)
+	_text.add_theme_font_size_override("normal_font_size", TecTheme.FS_TITLE)
 	_text.add_theme_color_override("default_color", TecTheme.TEXT)
 	_text.add_theme_constant_override("line_separation", 6)
 	_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL

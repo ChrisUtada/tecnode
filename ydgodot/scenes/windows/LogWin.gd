@@ -49,7 +49,7 @@ func refresh_log() -> void:
 	_rows.clear()
 	var entries: Array = graph.logs if graph != null else []
 	if entries.is_empty():
-		var empty := TecTheme.label("（还没有记录）", TecTheme.FS_BODY, TecTheme.FAINT)
+		var empty := TecTheme.label("（还没有记录）", TecTheme.FS_BODY, TecTheme.MUTED)
 		_list.add_child(empty)
 		return
 	for e in entries:

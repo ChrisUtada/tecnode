@@ -77,14 +77,20 @@ func _run_choice(node_key: String, cmd: ChoiceCommandDef) -> Dictionary:
 			messages.append(case_def.strip_tags(o.message))
 		if o.payload != null:
 			if o.payload.scene != null:
-				# 选项 = 场景：摆上画布并连 cond 边（左右抽屉同款）
-				var exists := graph.has("loc", o.payload.scene.id)
-				var fresh := graph.reveal_scene(o.payload.scene.id)
-				for k in fresh:
-					spawn.append(k)
-				graph.link(node_key, graph.key_of("loc", o.payload.scene.id), "cond")
-				if exists:
+				# 选项 = 场景：**只把选项节点摆上画布**（Web `spawnChoiceNodes` 走的是
+				# `ensureSceneNode` + `link(cond)`，不 reveal）。内容要玩家自己双击那个抽屉才展开。
+				# 旧版在这里调 `reveal_scene`，等于双击一下抽屉就把两个抽屉里的东西全倒出来，
+				# 抽屉还一出生就记成「已探索」—— 手电筒也因此不劳而获。
+				var sid := o.payload.scene.id
+				var skey := graph.scene_key(sid)
+				var exists := graph.nodes.has(skey)
+				graph.add_node("loc", sid)
+				if not exists:
+					graph.mark_fresh(skey)
+					spawn.append(skey)
+				else:
 					messages.append("「%s」已经在画布上了" % o.payload.scene.title)
+				graph.link(node_key, skey, "cond")
 			else:
 				var r := _apply_payload(o.payload, node_key)
 				spawn.append_array(r.get("spawn", []))

@@ -1,5 +1,6 @@
 [gd_resource type="Resource" script_class="SceneDef" format=3]
 
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_0y1ex"]
 [ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_v2wky"]
 [ext_resource type="Resource" path="res://cases/a001/clues/CLUES_V_luheng.tres" id="2_0y1ex"]
 [ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="3_n8as6"]
@@ -18,3 +19,7 @@ content = "黑影被手电筒照亮，出现在眼前的是一具吊死的尸体
 desc = "一具被吊死的尸体，你上前仔细查看。"
 can_be_picked = true
 hidden_clue = SubResource("Resource_h2gs8")
+node_items = PackedStringArray("ITEMS_bd", "ITEMS_xfbyc", "ITEMS_ccss", "ITEMS_xh")
+node_chars = PackedStringArray()
+node_locs = PackedStringArray("SCENES_garden")
+node_clues = PackedStringArray()

@@ -80,7 +80,7 @@ func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader) ->
 	_hint_box.visible = false
 	col.add_child(_hint_box)
 
-	_hint = TecTheme.label("", 11, TecTheme.FAINT)
+	_hint = TecTheme.label("", TecTheme.FS_BODY, TecTheme.MUTED)
 	_hint.name = "chat_hint"
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -167,7 +167,7 @@ func _say_row(who_id: String, who_name: String, text: String) -> Control:
 	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main.add_theme_constant_override("separation", 2)
 	main.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var name := TecTheme.label(who_name, 12, TecTheme.MUTED)
+	var name := TecTheme.label(who_name, TecTheme.FS_BODY, TecTheme.MUTED)
 	name.name = "chat_who"
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	main.add_child(name)
@@ -198,7 +198,7 @@ func _say_avatar(who_id: String, who_name: String) -> Control:
 		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		frame.add_child(tex)
 	else:
-		var ini := TecTheme.label(who_name.substr(0, 1) if who_name != "" else "?", 15, TecTheme.MUTED)
+		var ini := TecTheme.label(who_name.substr(0, 1) if who_name != "" else "?", TecTheme.FS_TITLE, TecTheme.MUTED)
 		ini.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		ini.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		ini.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -207,7 +207,7 @@ func _say_avatar(who_id: String, who_name: String) -> Control:
 
 
 func _new_text_label(color: Color) -> Label:
-	var label := TecTheme.label("", 13, color)
+	var label := TecTheme.label("", TecTheme.FS_TITLE, color)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE

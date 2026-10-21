@@ -51,7 +51,7 @@ func setup_overlay() -> void:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(col)
 
-	_name_label = TecTheme.label("", 14, TecTheme.LINE2)
+	_name_label = TecTheme.label("", TecTheme.FS_TITLE, TecTheme.LINE2)
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_name_label)
 
@@ -60,7 +60,7 @@ func setup_overlay() -> void:
 	_box.add_theme_constant_override("separation", 14)
 	col.add_child(_box)
 
-	_hint = TecTheme.label(_final_text, 11, TecTheme.FAINT)
+	_hint = TecTheme.label(_final_text, TecTheme.FS_BODY, TecTheme.LINE2)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.visible = false
 	col.add_child(_hint)
@@ -106,7 +106,7 @@ func _process(delta: float) -> void:
 		var line: EndingLineDef = _lines[_idx]
 		_idx += 1
 		_shown += 1
-		var l := TecTheme.label(line.text, 15, TecTheme.CARD)
+		var l := TecTheme.label(line.text, TecTheme.FS_TITLE, TecTheme.CARD)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.custom_minimum_size = Vector2(560, 0)
@@ -118,7 +118,7 @@ func _process(delta: float) -> void:
 
 func _show_message() -> void:
 	if _is_true and _truename != "" and not _truename_shown:
-		var tn := TecTheme.label("真名已识破\n——%s——" % _truename, 26, TecTheme.CARD)
+		var tn := TecTheme.label("真名已识破\n——%s——" % _truename, TecTheme.FS_DISPLAY, TecTheme.CARD)
 		tn.name = "truename"
 		tn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		tn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -127,7 +127,7 @@ func _show_message() -> void:
 		_box.add_child(tn)
 		_truename_shown = true
 	if _message != "":
-		var m := TecTheme.label(_message, 12, TecTheme.LINE2)
+		var m := TecTheme.label(_message, TecTheme.FS_BODY, TecTheme.LINE2)
 		m.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		m.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		m.custom_minimum_size = Vector2(620, 0)
@@ -148,7 +148,7 @@ func finish_now() -> void:
 		var line: EndingLineDef = _lines[_idx]
 		_idx += 1
 		_shown += 1
-		var l := TecTheme.label(line.text, 15, TecTheme.CARD)
+		var l := TecTheme.label(line.text, TecTheme.FS_TITLE, TecTheme.CARD)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.custom_minimum_size = Vector2(560, 0)

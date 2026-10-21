@@ -32,6 +32,23 @@ func _initialize() -> void:
 	check("花园展开：场景节点已探索", g.explored.has("SCENES_garden"))
 	check("重复展开不重复建节点", g.reveal_scene("SCENES_garden").size() == 0)
 
+	# ── 正文与画布解耦 ──
+	# 节点清单只认资源上的 node_items / node_chars / node_locs / node_clues。
+	# 正文写什么（甚至写成空的）都不该改变画布上出现的东西 —— 这正是原先的病灶：
+	# 在检查器里润色正文时把 `[item:x]` 删掉，花园就一个节点都不长了。
+	var s_garden := c.scene_of("SCENES_garden")
+	var keep_content := s_garden.content
+	s_garden.content = keep_content + "<br>[item:ITEMS_bd][char:CHARS_js]"
+	var g_extra := GraphState.new(c)
+	var n_extra: int = g_extra.reveal_scene("SCENES_garden").size()
+	check("正文多写标签：不多长节点", n_extra == 7, str(n_extra))
+	check("正文多写的标签没被建成节点", not g_extra.has("item", "ITEMS_bd") and not g_extra.has("char", "CHARS_js"))
+	s_garden.content = ""
+	var g_blank := GraphState.new(c)
+	var n_blank: int = g_blank.reveal_scene("SCENES_garden").size()
+	check("正文清空：节点照旧长出 7 个", n_blank == 7, str(n_blank))
+	s_garden.content = keep_content
+
 	var comb := ComboSystem.new(c, g)
 	g.add_node("item", "ITEM_shoudiantong")
 

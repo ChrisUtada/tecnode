@@ -200,6 +200,11 @@ func _test_desktop() -> void:
 	check("桌面：开局没有撤销步", scene.dbg_history_size() == 0)
 	check("桌面：没有可撤销", not bool(scene.dbg_state()["can_undo"]))
 
+	# 开局不再凭空给手电筒（对齐 Web `17-boot.js`：画布上只有一张起始场景卡），
+	# 这一节只验撤销栈，工具自己造一把摆上桌
+	scene.dbg_ensure("item", "ITEM_shoudiantong")
+	await process_frame
+
 	scene.dbg_activate("item:ITEM_shoudiantong")
 	await process_frame
 	check("桌面：开关灯进了撤销栈", scene.dbg_history_size() == 1)

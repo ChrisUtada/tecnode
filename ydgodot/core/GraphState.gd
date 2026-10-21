@@ -181,6 +181,12 @@ func neighbors(key: String) -> Array:
 
 ## 展开一个场景：建容器节点 + 正文里点名的实体（item / char / clue / 互通的 loc）。
 ## 幂等；返回本次新建的 key 列表。
+## 展开一个场景：建容器节点 + 把**资源里那四栏节点**摆上桌面。
+## 幂等；返回本次新建的 key 列表。
+##
+## ⚠ 节点清单**只读** `SceneDef.node_items / node_chars / node_locs / node_clues`，
+## 绝不解析 `content`。正文随便改、标签删干净，画布上该有的东西一个不少；
+## 要让某个东西出现在场景里，就去 Godot 检查器里加进那四栏。
 func reveal_scene(sid: String) -> Array:
 	var s := case_def.scene_of(sid)
 	if s == null:
@@ -193,11 +199,9 @@ func reveal_scene(sid: String) -> Array:
 	explored[sid] = true
 	last_scene = sid
 
-	for tag in case_def.tags_of(s.content):
+	for tag in case_def.nodes_of_scene(s):
 		var kind: String = tag["kind"]
 		var id: String = tag["id"]
-		if kind == "char" and id == "CHARS_TEC":
-			continue                      # TEC 常驻，不上画布（与 Web 版 sceneTags 同口径）
 		var existed := has(kind, id)
 		var n := add_node(kind, id)
 		if String(n.get("home_scene", "")) == "":
@@ -211,9 +215,11 @@ func reveal_scene(sid: String) -> Array:
 	return fresh
 
 
-# ── 容器（场景 / 书桌这类带 content 的物品）────────────────────────────
+# ── 容器（场景 / 书桌这类能倒出东西的物品）──────────────────────────────
 
-## 是不是「容器」：场景，或 content 里带标签的物品（书桌 / 抽屉 / 垃圾桶）
+## 是不是「容器」：场景，或**节点清单非空**的物品（书桌 / 抽屉 / 垃圾桶）。
+## 早先按「content 里有没有标签」判，结果正文一改写，书桌就不是容器了 ——
+## 现在只看显式清单。
 func is_container(kind: String, id: String) -> bool:
 	var k := normalize_kind(kind, id)
 	if k == "loc" or k == "time":
@@ -221,7 +227,7 @@ func is_container(kind: String, id: String) -> bool:
 	if k != "item":
 		return false
 	var it := case_def.item_of(id)
-	return it != null and case_def.tags_of(it.content).size() > 0
+	return it != null and case_def.nodes_of_item(it).size() > 0
 
 
 func container_content(kind: String, id: String) -> String:
@@ -247,11 +253,9 @@ func reveal_container(kind: String, id: String) -> Array:
 	explored[id] = true
 	collapsed.erase(id)
 
-	for tag in case_def.tags_of(container_content(kind, id)):
+	for tag in case_def.container_nodes(kind, id):
 		var k: String = tag["kind"]
 		var cid: String = tag["id"]
-		if k == "char" and cid == "CHARS_TEC":
-			continue
 		var existed := has(k, cid)
 		var n := add_node(k, cid)
 		if String(n.get("home_scene", "")) == "":
@@ -529,7 +533,7 @@ func visible_node(n: Dictionary) -> bool:
 	return visible_now(n)
 
 
-## 进入回忆时刻：把那天文本里在场的、且 debut 正是这一刻的人物带出画布。
+## 进入回忆时刻：把那一刻 `node_chars` 里列着、且 debut 正是这一刻的人物带出画布。
 ## 已存在的节点不动（不重复提示、不挪坐标）；返回新增数量。
 func spawn_mem_cast(t: String) -> int:
 	var s := case_def.scene_of(t)
@@ -541,7 +545,7 @@ func spawn_mem_cast(t: String) -> int:
 	var hy := float(pn.get("y", 0.0)) if not pn.is_empty() else -1.0
 	var added := 0
 	var i := 0
-	for tag in case_def.tags_of(s.content):
+	for tag in case_def.nodes_of_scene(s):
 		var tag_i := i
 		i += 1
 		if String(tag["kind"]) != "char":
@@ -846,13 +850,9 @@ func _build_hub_degree() -> void:
 			_hub_degree[String(loc)] = int(_hub_degree.get(String(loc), 0)) + 1
 			_loc_in[String(loc)] = int(_loc_in.get(String(loc), 0)) + 1
 	for iid in case_def.items.keys():
-		var it := case_def.item_of(String(iid))
-		if it == null or it.content == "":
-			continue
-		for tag in case_def.tags_of(it.content):
-			if tag["kind"] == "loc":
-				_hub_degree[String(tag["id"])] = int(_hub_degree.get(String(tag["id"]), 0)) + 1
-				_loc_in[String(tag["id"])] = int(_loc_in.get(String(tag["id"]), 0)) + 1
+		for loc in scene_locs(String(iid)):
+			_hub_degree[String(loc)] = int(_hub_degree.get(String(loc), 0)) + 1
+			_loc_in[String(loc)] = int(_loc_in.get(String(loc), 0)) + 1
 	for iid2 in case_def.items.keys():
 		var it2 := case_def.item_of(String(iid2))
 		if it2 == null:
@@ -882,25 +882,16 @@ func payload_of_command(cmd: CommandDef) -> PayloadDef:
 	return null
 
 
-## 容器正文里列出的其他地点（`[loc:X]`）—— 拖容器到场景 = 前往的通路。
-## 覆盖两类宿主：场景，以及**能展开的容器物品**（书桌 / 垃圾桶）。
-## 后者在 Web 里也走同一条函数（`containerData()` 会落到 ITEMS 上），
-## 「书桌 → 返回花园」这类通路本来就在数据里，漏掉就等于把一条路堵了。
+## 容器节点清单里列出的其他地点（`node_locs`）—— 拖容器到场景 = 前往的通路。
+## 覆盖两类宿主：场景，以及能展开的容器物品（书桌 / 垃圾桶）。
+## 清单来自资源上的 `node_locs`，与正文写了什么无关。
 func scene_locs(sid: String) -> Array:
 	var out: Array = []
-	var raw := ""
 	var s := case_def.scene_of(sid)
-	if s != null:
-		raw = s.content
-	else:
-		var it := case_def.item_of(sid)
-		if it != null:
-			raw = it.content
-	if raw == "":
-		return out
-	for tag in case_def.tags_of(raw):
-		if tag["kind"] == "loc":
-			out.append(tag["id"])
+	var list: Array = case_def.nodes_of_scene(s) if s != null else case_def.nodes_of_item(case_def.item_of(sid))
+	for tag in list:
+		if String(tag["kind"]) == "loc":
+			out.append(String(tag["id"]))
 	return out
 
 

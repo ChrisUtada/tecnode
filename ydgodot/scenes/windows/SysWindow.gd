@@ -123,7 +123,7 @@ func _build(radius: int) -> void:
 
 	var left_rule := _title_rule()
 	title_row.add_child(left_rule)
-	_title_label = TecTheme.label(title, 10, TecTheme.TEXT)
+	_title_label = TecTheme.label(title, TecTheme.FS_BODY, TecTheme.TEXT)
 	_title_label.name = "win_title"
 	var spaced := FontVariation.new()
 	spaced.base_font = TecTheme.font()
@@ -219,7 +219,7 @@ func _mini_button(text: String) -> Button:
 	b.size = Vector2(18.0, 18.0)
 	b.custom_minimum_size = b.size
 	b.add_theme_font_override("font", TecTheme.font())
-	b.add_theme_font_size_override("font_size", 11)
+	b.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 	b.add_theme_color_override("font_color", TecTheme.TEXT)
 	b.add_theme_color_override("font_hover_color", TecTheme.CARD)
 	b.add_theme_color_override("font_pressed_color", TecTheme.TEXT)
@@ -285,9 +285,49 @@ func set_inner_height(h: float) -> void:
 	var target := Vector2(size.x, ih + PAD * 2.0)
 	custom_minimum_size = target
 	size = target
+	_sync_frame(Vector2(size.x - PAD * 2.0, ih))
 	body.size.y = ih - BAR_H - 20.0
 	if _mat != null:
 		_mat.set_shader_parameter("rect_size", size)
+
+
+## 重设「内容区」尺寸（w × h，不含 PAD）。`content_scale_mode` 关掉之后，主窗要跟着
+## **窗口像素**长，而不是跟着 1280×720 的设计基准；九切片底板、标题栏、分隔线、
+## 关闭按钮、body 必须一起改，否则只有纸面变大、框线和标题还留在原处。
+## `custom_minimum_size` 放松到最小可用尺寸（不是新尺寸），否则窗口从此缩不回去。
+func resize_to(w: float, h: float) -> void:
+	var iw := maxf(320.0, w)
+	var ih := maxf(160.0, h)
+	custom_minimum_size = Vector2(320.0 + PAD * 2.0, 160.0 + PAD * 2.0)
+	size = Vector2(iw + PAD * 2.0, ih + PAD * 2.0)
+	_sync_frame(Vector2(iw, ih))
+	if _mat != null:
+		_mat.set_shader_parameter("rect_size", size)
+	var bar := get_node_or_null("bar") as Control
+	if bar != null:
+		bar.size.x = iw
+		var row := bar.get_node_or_null("title_row") as Control
+		if row != null:
+			row.size.x = iw - 20.0
+		var hl := bar.get_node_or_null("top_hl") as Control
+		if hl != null:
+			hl.size.x = iw
+		if _close_btn != null and is_instance_valid(_close_btn):
+			_close_btn.position.x = iw - 23.0
+	var sep := get_node_or_null("sep") as Control
+	if sep != null:
+		sep.size.x = iw
+	if body != null and is_instance_valid(body):
+		body.size = Vector2(iw - 24.0, ih - BAR_H - 20.0)
+
+
+## 底板（烘焙九切片 / shader 面）跟着内容区走。九切片是 `size` 的显式子控件，
+## 不会自己随父节点长 —— 忘了这一步，窗口长高时纸面就只在左上角留一块。
+func _sync_frame(inner: Vector2) -> void:
+	var frame := get_node_or_null("frame") as Control
+	if frame != null:
+		frame.position = Vector2(PAD - BLEED, PAD - BLEED)
+		frame.size = inner + Vector2(BLEED, BLEED) * 2.0
 
 
 func enable_case_controls() -> void:

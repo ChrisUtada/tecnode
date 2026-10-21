@@ -66,7 +66,7 @@ func _build_content() -> void:
 	_avatar.gui_input.connect(_on_talk_input)
 	av_box.add_child(_avatar)
 
-	var av_label := TecTheme.label("TEC", 10, TecTheme.MUTED)
+	var av_label := TecTheme.label("TEC", TecTheme.FS_BODY, TecTheme.MUTED)
 	av_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	av_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	av_col.add_child(av_label)
@@ -112,7 +112,7 @@ func _build_content() -> void:
 	acol.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_analysis.add_child(acol)
 
-	_analysis_label = TecTheme.label("", 11, TecTheme.MUTED)
+	_analysis_label = TecTheme.label("", TecTheme.FS_BODY, TecTheme.MUTED)
 	_analysis_label.name = "tec_analysis_label"
 	_analysis_label.clip_text = true
 	_analysis_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -133,12 +133,14 @@ func _build_content() -> void:
 	_bar.add_theme_stylebox_override("fill", fill)
 	acol.add_child(_bar)
 
-	_hint = TecTheme.label("拖节点到我身上分析 · 点框内任意位置闲聊", 10, TecTheme.FAINT)
+	_hint = TecTheme.label("拖节点到我身上分析 · 点框内任意位置闲聊", TecTheme.FS_BODY, TecTheme.MUTED)
 	_hint.name = "tec_hint"
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	main.add_child(_hint)
+	## 提示行放**整行页脚**，不再塞在 224px 的对话列里：12px 下一行要 252px，
+	## 挤在列里必然折成两行、第二行被 body 裁掉（10px 时刚好一行）。
+	content.add_child(_hint)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -153,7 +155,7 @@ func _on_talk_input(event: InputEvent) -> void:
 func append_line(text: String, color: Color = TecTheme.TEXT) -> void:
 	if text == "":
 		return
-	var l := TecTheme.label(text, 12, color)
+	var l := TecTheme.label(text, TecTheme.FS_BODY, color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE

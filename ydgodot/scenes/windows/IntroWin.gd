@@ -93,7 +93,7 @@ func _fit() -> void:
 
 
 func _title(text: String) -> void:
-	var l := TecTheme.label(text, TecTheme.FS_SMALL, TecTheme.MUTED)
+	var l := TecTheme.label(text, TecTheme.FS_BODY, TecTheme.MUTED)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_box.add_child(l)
@@ -105,7 +105,7 @@ func _title(text: String) -> void:
 
 
 func _paragraph(text: String, color: Color = TecTheme.TEXT) -> Label:
-	var l := TecTheme.label(text, 13, color)
+	var l := TecTheme.label(text, TecTheme.FS_TITLE, color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.custom_minimum_size = Vector2(WIDTH - 36.0, 0)
@@ -130,7 +130,7 @@ func _render_name() -> void:
 	edit.max_length = 12
 	edit.text = _name
 	edit.add_theme_font_override("font", TecTheme.font())
-	edit.add_theme_font_size_override("font_size", 14)
+	edit.add_theme_font_size_override("font_size", TecTheme.FS_TITLE)
 	edit.add_theme_color_override("font_color", TecTheme.TEXT)
 	edit.add_theme_color_override("font_placeholder_color", TecTheme.FAINT)
 	edit.add_theme_stylebox_override("normal", _input_style(false))
@@ -181,10 +181,10 @@ func _render_quiz(index: int) -> void:
 	_title("APTITUDE // 调查员适性测试")
 	var q: Dictionary = Investigator.QUIZ[index]
 	var prog := TecTheme.label("第 %d / %d 问" % [index + 1, Investigator.QUIZ.size()],
-		TecTheme.FS_SMALL, TecTheme.FAINT)
+		TecTheme.FS_BODY, TecTheme.MUTED)
 	prog.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_box.add_child(prog)
-	var qt := TecTheme.label(String(q["q"]), 13, TecTheme.TEXT)
+	var qt := TecTheme.label(String(q["q"]), TecTheme.FS_TITLE, TecTheme.TEXT)
 	qt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	qt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	qt.custom_minimum_size = Vector2(WIDTH - 36.0, 0)
@@ -232,7 +232,7 @@ func _render_avatar() -> void:
 	for i in _locked:
 		grid.add_child(_locked_button())
 	var count := TecTheme.label("已解锁 %d / %d" % [_pool.size(), _pool.size() + _locked],
-		TecTheme.FS_SMALL, TecTheme.FAINT)
+		TecTheme.FS_BODY, TecTheme.MUTED)
 	_box.add_child(count)
 	var btn := _primary("[ 用这张 ]")
 	btn.pressed.connect(_confirm_pick)
@@ -261,7 +261,7 @@ func _avatar_button(id: String) -> Button:
 	var face := _avatar_face(id, 48)
 	face.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(face)
-	var nm := TecTheme.label(String(_names.get(id, id)), TecTheme.FS_SMALL, TecTheme.MUTED)
+	var nm := TecTheme.label(String(_names.get(id, id)), TecTheme.FS_BODY, TecTheme.MUTED)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	nm.custom_minimum_size = Vector2(0, 14)
@@ -278,10 +278,10 @@ func _locked_button() -> Control:
 	box.add_theme_constant_override("separation", 4)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	p.add_child(box)
-	var mark := TecTheme.label("?", 20, TecTheme.FAINT)
+	var mark := TecTheme.label("?", TecTheme.FS_DISPLAY, TecTheme.FAINT)
 	mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(mark)
-	var nm := TecTheme.label("未解锁", TecTheme.FS_SMALL, TecTheme.FAINT)
+	var nm := TecTheme.label("未解锁", TecTheme.FS_BODY, TecTheme.MUTED)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(nm)
 	return p
@@ -297,7 +297,7 @@ func _avatar_face(id: String, px: float) -> Control:
 		tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		return tex
-	var l := TecTheme.label(_initial_of(id), 24, TecTheme.MUTED)
+	var l := TecTheme.label(_initial_of(id), TecTheme.FS_DISPLAY, TecTheme.MUTED)
 	l.custom_minimum_size = Vector2(px, px)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -344,7 +344,7 @@ func _render_card() -> void:
 	var btn := _primary("[ 确认领证 ]")
 	btn.pressed.connect(_confirm_card)
 	var back := TecTheme.button("[ 换一张头像 ]")
-	back.add_theme_font_size_override("font_size", 11)
+	back.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	back.pressed.connect(_back_to_avatar)
 	_box.add_child(back)
@@ -378,7 +378,7 @@ static func build_cert(c: Dictionary) -> Control:
 	head.color = TecTheme.LINE
 	head.custom_minimum_size = Vector2(0, 36)
 	col.add_child(head)
-	var head_label := TecTheme.label("T.E.C-OS 调查员证", 15, Color("e6e3d2"))
+	var head_label := TecTheme.label("T.E.C-OS 调查员证", TecTheme.FS_TITLE, Color("e6e3d2"))
 	head_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	head_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -401,13 +401,13 @@ static func build_cert(c: Dictionary) -> Control:
 	var face := CenterContainer.new()
 	pm.add_child(face)
 	face.add_child(_cert_photo(c))
-	var nm := TecTheme.label(String(c.get("name", "")), 24, TecTheme.TEXT)
+	var nm := TecTheme.label(String(c.get("name", "")), TecTheme.FS_DISPLAY, TecTheme.TEXT)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sec1.add_child(nm)
-	var idn := TecTheme.label(String(c.get("id", "")), 14, TecTheme.MUTED)
+	var idn := TecTheme.label(String(c.get("id", "")), TecTheme.FS_TITLE, TecTheme.MUTED)
 	idn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sec1.add_child(idn)
-	var level := TecTheme.label("等级：初级调查员", 13, TecTheme.MUTED)
+	var level := TecTheme.label("等级：初级调查员", TecTheme.FS_TITLE, TecTheme.MUTED)
 	level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sec1.add_child(level)
 
@@ -417,7 +417,7 @@ static func build_cert(c: Dictionary) -> Control:
 		21, TecTheme.TEXT)
 	sense_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sec2.add_child(sense_label)
-	var flavor := TecTheme.label(String(Investigator.SENSE_FLAVOR.get(sense, "")), 13, TecTheme.MUTED)
+	var flavor := TecTheme.label(String(Investigator.SENSE_FLAVOR.get(sense, "")), TecTheme.FS_TITLE, TecTheme.MUTED)
 	flavor.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	flavor.custom_minimum_size = Vector2(292, 0)
@@ -426,7 +426,7 @@ static func build_cert(c: Dictionary) -> Control:
 	var sec3 := _cert_section(col, true)
 	var row := HBoxContainer.new()
 	sec3.add_child(row)
-	var date := TecTheme.label("签发日期：" + String(c.get("date", "")), 13, TecTheme.TEXT)
+	var date := TecTheme.label("签发日期：" + String(c.get("date", "")), TecTheme.FS_TITLE, TecTheme.TEXT)
 	date.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(date)
 	row.add_child(_stamp())
@@ -462,7 +462,7 @@ static func _cert_photo(c: Dictionary) -> Control:
 		tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		return tex
 	if id != "":
-		var l := TecTheme.label(id.substr(0, 1), 64, TecTheme.MUTED)
+		var l := TecTheme.label(id.substr(0, 1), TecTheme.FS_INITIAL, TecTheme.MUTED)
 		l.custom_minimum_size = Vector2(144, 144)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -484,7 +484,7 @@ static func _stamp() -> Control:
 	var sb := TecTheme.flat(Color(0, 0, 0, 0), 29, Color("c0392b"), 2)
 	circle.add_theme_stylebox_override("panel", sb)
 	holder.add_child(circle)
-	var label := TecTheme.label("T.E.C\n核准", 11, Color("c0392b"))
+	var label := TecTheme.label("T.E.C\n核准", TecTheme.FS_BODY, Color("c0392b"))
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

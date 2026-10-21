@@ -98,7 +98,7 @@ func _rebuild(n: Dictionary) -> void:
 	_head = _line(String(n.get("label", _key)), 13, TecTheme.TEXT)
 	_head.name = "dt_title"
 	_rows.add_child(_head)
-	_meta = _line(_kind_name(kind), 10, TecTheme.FAINT)
+	_meta = _line(_kind_name(kind), TecTheme.FS_BODY, TecTheme.MUTED)
 	_meta.name = "dt_meta"
 	_rows.add_child(_meta)
 	_rows.add_child(_para(_intro_text(n, kind)))
@@ -272,7 +272,7 @@ func _button(text: String) -> Button:
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
 	b.add_theme_font_override("font", TecTheme.font())
-	b.add_theme_font_size_override("font_size", 12)
+	b.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 	b.add_theme_color_override("font_color", TecTheme.TEXT)
 	b.add_theme_color_override("font_hover_color", TecTheme.CARD)
 	for state in ["normal", "hover", "pressed", "focus"]:

@@ -140,12 +140,13 @@ func lookup_reaction(kind: String, owner_id: String, tool_id: String) -> Diction
 	return {}
 
 
-## 容器扫描：读**带标签的原文**（`raw_text_of`），逐个内容物查反应表
+## 容器扫描：读**显式节点清单**（`node_items / node_chars / ...`），逐个内容物查反应表。
+## 早先读的是 `raw_text_of` 里的标签 —— 正文一改写就扫不出东西，现在与画布同源。
 func _scan_container_reaction(container_key: String, other_id: String) -> Dictionary:
 	var n := graph.node(container_key)
 	if n.is_empty() or not graph.is_container_node(container_key):
 		return {}
-	for tag in case_def.tags_of(case_def.raw_text_of(String(n["kind"]), String(n["id"]))):
+	for tag in case_def.container_nodes(String(n["kind"]), String(n["id"])):
 		var h := lookup_reaction(String(tag["kind"]), String(tag["id"]), other_id)
 		if not h.is_empty():
 			h["via"] = container_key

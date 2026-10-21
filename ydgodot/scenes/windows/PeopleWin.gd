@@ -52,7 +52,7 @@ func refresh_people() -> void:
 	var ids: Array = graph.met_char_ids() if graph != null else []
 	if ids.is_empty():
 		var empty := TecTheme.label("（还没有结识任何人）展开场景、读一读文本，就会记下遇到的人",
-			TecTheme.FS_BODY, TecTheme.FAINT)
+			TecTheme.FS_BODY, TecTheme.MUTED)
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empty.custom_minimum_size = Vector2(body.size.x - 10.0, 0)
 		_list.add_child(empty)
@@ -121,13 +121,13 @@ func _make_row(id: String) -> Control:
 	box.add_child(lb)
 
 	if desc != "":
-		var ds := TecTheme.label(desc, TecTheme.FS_SMALL, TecTheme.FAINT)
+		var ds := TecTheme.label(desc, TecTheme.FS_BODY, TecTheme.MUTED)
 		ds.clip_text = true
 		ds.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		ds.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(ds)
 
-	var st := TecTheme.label(state, TecTheme.FS_SMALL, TecTheme.LINE2 if done else TecTheme.FAINT)
+	var st := TecTheme.label(state, TecTheme.FS_BODY, TecTheme.TEXT if done else TecTheme.MUTED)
 	st.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hb.add_child(st)
 	return row
@@ -165,7 +165,7 @@ func _make_avatar(id: String, name_text: String) -> Control:
 		var c := CenterContainer.new()
 		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		frame.add_child(c)
-		var ini := TecTheme.label(name_text.substr(0, 1) if name_text != "" else "?", 22, TecTheme.MUTED)
+		var ini := TecTheme.label(name_text.substr(0, 1) if name_text != "" else "?", TecTheme.FS_DISPLAY, TecTheme.MUTED)
 		ini.name = "ini"
 		ini.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		c.add_child(ini)

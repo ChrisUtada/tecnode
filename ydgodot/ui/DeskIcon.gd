@@ -24,7 +24,7 @@ var _over := false
 var _press_pos := Vector2.ZERO
 var _drag_origin := Vector2.ZERO
 var _moved := false
-var _bounds := Rect2(Vector2.ZERO, Vector2(1280, 800))
+var _bounds := Rect2(Vector2.ZERO, Vector2(1280, 668))
 
 
 func setup(p_text: String, p_icon: String) -> void:
@@ -70,7 +70,7 @@ func setup(p_text: String, p_icon: String) -> void:
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_glyph.add_child(_icon)
 
-	_label = TecTheme.label(p_text, 11, TecTheme.MUTED)
+	_label = TecTheme.label(p_text, TecTheme.FS_BODY, TecTheme.MUTED)
 	_label.name = "label"
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

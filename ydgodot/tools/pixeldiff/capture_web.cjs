@@ -10,7 +10,7 @@ const OUT = path.resolve(__dirname, "../../docs/p3/web");
 const PORT = 9913;
 const PROFILE = path.join(require("os").tmpdir(), "tec-pixeldiff-profile-" + Date.now());
 const W = 1280;
-const H = 800;
+const H = 720;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const CASES = {

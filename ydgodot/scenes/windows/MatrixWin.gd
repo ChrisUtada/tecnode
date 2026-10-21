@@ -48,6 +48,13 @@ var _seed_press := Vector2.ZERO
 var _seed_grab := Vector2.ZERO
 var _seed_moved := false
 
+## 线索卡拖动（Web `makeMatrixNodeDraggable`）：原件留在原位当锚，跟着指针的是镜像。
+## 镜像必须挂在桌布外面 —— `_board` 是 clip_contents，挂在里面拖到边缘就被裁掉。
+var drag_host: Control = null
+var _drag_chip: PanelContainer = null
+var _drag_mirror: PanelContainer = null
+var _drag_off := Vector2.ZERO
+
 
 func setup_matrix(p_graph: GraphState, p_case: CaseLoader) -> void:
 	graph = p_graph
@@ -75,7 +82,7 @@ func setup_matrix(p_graph: GraphState, p_case: CaseLoader) -> void:
 	_build_executor()
 	_build_seed_pop()
 
-	_hint = TecTheme.label("长按执行者蓄力推演 · 双击 / 拖出桌布取回线索", 10, TecTheme.FAINT)
+	_hint = TecTheme.label("长按执行者蓄力推演 · 双击 / 拖出桌布取回线索", TecTheme.FS_BODY, TecTheme.MUTED)
 	_hint.position = Vector2(12, BOARD_H - 20)
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_board.add_child(_hint)
@@ -199,6 +206,7 @@ func _bounce_seed() -> void:
 func refresh_matrix() -> void:
 	if _chip_layer == null:
 		return
+	_cancel_chip_drag()          # 重排会重建 chip，拖动中的镜像与原件引用都得先放掉
 	for child in _chip_layer.get_children():
 		_chip_layer.remove_child(child)
 		child.queue_free()
@@ -238,21 +246,21 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.add_child(col)
 
-	var title := TecTheme.label(String(n.get("label", cid)), 12, TecTheme.TEXT)
+	var title := TecTheme.label(String(n.get("label", cid)), TecTheme.FS_BODY, TecTheme.TEXT)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.clip_text = true
 	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(title)
 
-	var sub := TecTheme.label("线索 · 已归位", 10, TecTheme.FAINT)
+	var sub := TecTheme.label("线索 · 已归位", TecTheme.FS_BODY, TecTheme.MUTED)
 	if not bool(n.get("captured", false)):
 		sub.text = "线索"
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(sub)
 
-	chip.gui_input.connect(_on_chip_input.bind(key))
+	chip.gui_input.connect(_on_chip_input.bind(key, chip))
 	return chip
 
 
@@ -338,7 +346,7 @@ func _draw_rite(center: Vector2, pts: Array) -> void:
 
 # ── 交互：线索卡 ────────────────────────────────────────────────────────
 
-func _on_chip_input(event: InputEvent, key: String) -> void:
+func _on_chip_input(event: InputEvent, key: String, chip: PanelContainer) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			if event.double_click:
@@ -348,16 +356,87 @@ func _on_chip_input(event: InputEvent, key: String) -> void:
 			_pressed_chip = key
 			_chip_press = event.global_position
 			_chip_moved = false
+			accept_event()
 		else:
 			if _pressed_chip == key:
-				if _chip_moved and not _board.get_global_rect().has_point(event.global_position):
-					clue_dropped.emit(key, event.global_position)
-				_pressed_chip = ""
+				_finish_chip_drag(event.global_position)
+			_pressed_chip = ""
 			_chip_moved = false
+			accept_event()
 	elif event is InputEventMouseMotion and _pressed_chip == key:
-		if (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0 \
-			and (event.global_position - _chip_press).length() > 5.0:
+		if (event.button_mask & MOUSE_BUTTON_MASK_LEFT) == 0:
+			return
+		var at: Vector2 = (event as InputEventMouseMotion).global_position
+		if not _chip_moved and (at - _chip_press).length() > 5.0:
 			_chip_moved = true
+			_begin_chip_drag(key, at, chip)
+		if _chip_moved:
+			_move_chip_mirror(at)
+		accept_event()
+
+
+## ── 线索卡拖动：镜像跟手（Web 里克隆到 #drag-layer，原件 visibility:hidden）──
+
+func _begin_chip_drag(key: String, at: Vector2, chip: PanelContainer) -> void:
+	if chip == null or not is_instance_valid(chip):
+		return
+	if drag_host == null:
+		# 没有注入宿主（单元测试直接喂事件）：仍然标记在拖，只是不出镜像
+		_drag_chip = chip
+		return
+	_drag_chip = chip
+	var rect := chip.get_global_rect()
+	_drag_off = at - rect.position
+	var m := chip.duplicate() as PanelContainer
+	if m == null:
+		return
+	_strip_chip_input(m)
+	drag_host.add_child(m)
+	m.size = chip.size
+	m.scale = chip.get_global_transform().get_scale()
+	m.global_position = rect.position
+	m.z_index = 40                      # 与 Desktop 的 ZR_MIRROR 同档：桌面最高层
+	_drag_mirror = m
+	# 原件让位但不隐藏：隐藏会被 GUI 命中判定剔除，后续 motion 就收不到了
+	# （与画布卡片同一个坑，见 NodeCard.set_ghost 的注释）
+	chip.modulate.a = 0.0
+
+
+func _move_chip_mirror(at: Vector2) -> void:
+	if _drag_mirror == null or not is_instance_valid(_drag_mirror):
+		return
+	_drag_mirror.global_position = at - _drag_off
+
+
+## 松手：只有「拖出桌布」才有动作 —— 桌布内松手 = 归位（原件本来就没动过）
+func _finish_chip_drag(at: Vector2) -> void:
+	var key := _pressed_chip
+	var moved := _chip_moved
+	_cancel_chip_drag()
+	if not moved or key == "":
+		return
+	if not _board.get_global_rect().has_point(at):
+		clue_dropped.emit(key, at)
+
+
+## 摘镜像 / 原件恢复 / 会话清零。重排（refresh_matrix）打断拖动时也走这里。
+func _cancel_chip_drag() -> void:
+	if _drag_mirror != null and is_instance_valid(_drag_mirror):
+		_drag_mirror.queue_free()
+	_drag_mirror = null
+	if _drag_chip != null and is_instance_valid(_drag_chip):
+		_drag_chip.modulate.a = 1.0
+	_drag_chip = null
+	_pressed_chip = ""
+	_chip_moved = false
+
+
+func _strip_chip_input(n: Node) -> void:
+	var c := n as Control
+	if c != null:
+		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for ch in n.get_children():
+		_strip_chip_input(ch)
 
 
 # ── 交互：长按执行者 ────────────────────────────────────────────────────

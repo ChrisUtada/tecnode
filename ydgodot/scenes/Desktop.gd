@@ -5,6 +5,16 @@ extends Control
 ## 数据直读 `data/case-a001.json`（P0 允许），逻辑全在 core/ 里，本文件只管「搭界面 + 接线」。
 
 const HEADER_H := 52.0
+## 设计基准分辨率：**16:9**。注意它现在只是「默认窗口尺寸 + Web 版对拍口径」，
+## **不再是逻辑坐标系** —— `content_scale_mode = DISABLED` 之后，逻辑尺寸 = 窗口像素，
+## 界面贴着窗口右下边的东西一律用 `_vw()` / `_vh()` 现算（见 `_layout_root()`）。
+## 为什么放弃整体放大：点阵字体只在 12 的整数倍像素落得下原字格，1920×1080 的可用区
+## 算出来是 1.444x，整屏字发胖发糊（docs/font_scale.png）。
+const DESIGN_W := 1280.0
+const DESIGN_H := 720.0
+## 窗口最小尺寸：再小左栏（86）+ 画布就挤成一团，也给 `_vw()` 一个兜底。
+const MIN_W := 960
+const MIN_H := 560
 const SLICE_SCENE := "SCENES_garden"
 const CARD_PAD := 8.0
 const MEM_CARD_MIN_X := 132.0
@@ -32,11 +42,16 @@ var graph: GraphState
 var combos: ComboSystem
 
 var _desk: Control
+var _head: Panel
+var _ui_built := false
 var _stage: Control
 var _card_layer: Control
 var _edge_layer: EdgeLayer
 var _view_k := 1.0
 var _view_pos := Vector2.ZERO
+## 玩家是否手动动过视图（滚轮 / 拖空白 / 定位某张卡）。false = 还在「适应窗口」的
+## 自动档上，此时窗口尺寸变化就重新 fit，否则按中心补偿（别抢玩家的镜头）。
+var _view_user := false
 var _panning := false
 var _pan_from := Vector2.ZERO
 var _pan_origin := Vector2.ZERO
@@ -44,6 +59,7 @@ var _opt_focus := true          # 页眉「聚焦选中」
 var _opt_reveal := true         # 页眉「新节点自动居中」
 var _crumb: Label
 var _hdr_sized: Array = []      # [Control, Vector2]：页眉控件的目标尺寸，见 _sync_header_sizes()
+var _hdr_right: Array = []      # [Control, float]：贴右控件的「距右边缘」距离，见 _layout_header_right()
 var _toast: PanelContainer
 var _toast_label: Label
 var _toast_timer: SceneTreeTimer
@@ -138,7 +154,121 @@ var _clue_badge: PanelContainer = null
 var _log_badge: PanelContainer = null
 
 
+## 窗口物理尺寸按屏幕可用区算 —— **绝不能写死**。旧版 `window_*_override` 写死
+## 1280×800，在 2560×1440 上只占 28% 面积，这就是「看着偏小」的根因。
+##
+## **不做整体缩放**：`content_scale_mode = DISABLED`，逻辑尺寸 = 窗口像素。
+## 点阵字体只在 12 / 24 / 36px（12 的整数倍）落得下原字格，任何等比缩放都是重采样
+## —— 1920×1080 的可用区算出来是 1.444x，整屏字发胖发糊。代价是界面元素不随屏幕
+## 变大，所以改成「桌面铺满可用区 + 布局自适应」（`_layout_root()`）：
+## 画布区跟着窗口长，左栏宽度与字号恒定。
+func _setup_window_scale() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var win := get_window()
+	if win == null:
+		return
+	win.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
+	win.min_size = Vector2i(MIN_W, MIN_H)
+	var forced := _win_override()
+	if forced.x >= MIN_W and forced.y >= MIN_H:
+		win.size = forced
+		return
+	if _shot_mode():
+		## 对拍要 1:1 像素口径：截图窗口必须正好等于设计基准。
+		win.size = Vector2i(int(DESIGN_W), int(DESIGN_H))
+		return
+	var usable := DisplayServer.screen_get_usable_rect()
+	var avail: Vector2i = usable.size
+	if avail.x < MIN_W or avail.y < MIN_H:
+		win.size = Vector2i(int(DESIGN_W), int(DESIGN_H))
+		return
+	win.size = avail
+	win.position = usable.position
+
+
+# ── 自适应布局（不缩放的配套）────────────────────────────────────────────
+## `content_scale_mode` 是 DISABLED，所以视口尺寸就是窗口像素。凡是「贴着窗口右/下边」
+## 的东西都按这两个值现算，不再拿 DESIGN_W/H 当坐标系（那两个只是默认窗口尺寸）。
+
+func _vw() -> float:
+	var w := get_viewport_rect().size.x
+	return w if w >= float(MIN_W) * 0.5 else DESIGN_W
+
+
+func _vh() -> float:
+	var h := get_viewport_rect().size.y
+	return h if h >= float(MIN_H) * 0.5 else DESIGN_H
+
+
+## 屏幕尺寸变了：页眉拉满、桌面区铺满、主窗跟长、贴右的浮层重新对边。
+## 只改「容器与贴边位置」，画布内容靠 `_stage.size` 变化后的中心补偿保持视觉不动。
+func _layout_root() -> void:
+	if not _ui_built:
+		return
+	var vw := _vw()
+	var vh := _vh()
+	if _head != null and is_instance_valid(_head):
+		_head.size = Vector2(vw, HEADER_H)
+	_layout_header_right(vw)
+	if _desk != null and is_instance_valid(_desk):
+		_desk.position = Vector2(0, HEADER_H)
+		_desk.size = Vector2(vw, vh - HEADER_H)
+	_resize_case_window(vw, vh)
+	_place_toast_anchor()
+	_relayout_edge_windows(vw)
+
+
+## 页眉工具组是 flex 的 `margin-left:auto`：贴右，不贴左。坐标表按 1280 量出来的，
+## 存的是「距右边多少」，所以窗口变宽时整体右移即可。
+func _layout_header_right(vw: float) -> void:
+	for pair in _hdr_right:
+		var c: Control = pair[0]
+		if is_instance_valid(c):
+			c.position.x = vw - float(pair[1])
+
+
+## 主窗铺满「桌面 − 左侧图标列」。宽度/高度都用实际视口算，1280×720 下正好落在
+## 原来的 1164(内宽) × 638(内高)、画布 1162 × 613，与 Web 版 P3 对拍口径一致
+## （`test_ui` 有断言钉住这两个数）。
+func _resize_case_window(vw: float, vh: float) -> void:
+	if _case_win == null or not is_instance_valid(_case_win):
+		return
+	var inner_w := maxf(vw - 86.0 - SysWindow.PAD * 2.0 - 2.0, 640.0)
+	var inner_h := maxf(vh - HEADER_H - 2.0 - SysWindow.PAD * 2.0, 360.0)
+	_case_win.position = Vector2(86, 0)
+	_case_win.resize_to(inner_w, inner_h)
+	_case_win.body.position = Vector2(SysWindow.PAD + 1, SysWindow.PAD + 1 + SysWindow.BAR_H)
+	_case_win.body.size = Vector2(inner_w - 2, inner_h - 2 - SysWindow.BAR_H)
+	if _stage == null or not is_instance_valid(_stage):
+		return
+	var old := _stage.size
+	if old == _case_win.body.size:
+		return
+	_stage.size = _case_win.body.size
+	if _card_layer == null or not is_instance_valid(_card_layer):
+		return
+	if _view_user:
+		## 玩家自己调过镜头：只补偿尺寸差的一半，保持画面中心不跑，缩放比不动。
+		_view_pos += (_stage.size - old) * 0.5
+		_apply_view()
+	else:
+		## 还在「适应窗口」自动档上：窗口变大就重新铺满，否则卡片会缩在中间一小块。
+		_fit_cards()
+
+
+## 贴右边的常驻浮窗（人物名册 / 日志）：只在它们开着的时候重算，关着的等下次打开。
+## 日志窗是**右下角**（x、y 都贴边），名册只有 x 贴边、y 固定 60。
+func _relayout_edge_windows(vw: float) -> void:
+	if _people_win != null and is_instance_valid(_people_win):
+		_people_win.position.x = vw - 328.0 - _people_win.size.x + SysWindow.PAD
+	if _log_win != null and is_instance_valid(_log_win):
+		_log_win.position = Vector2(vw - 14.0 - _log_win.size.x + SysWindow.PAD,
+			_desk.size.y - 96.0 - _log_win.size.y + SysWindow.PAD)
+
+
 func _ready() -> void:
+	_setup_window_scale()
 	theme = TecTheme.build()
 	_progress_path = "user://shot_progress.json" if _shot_mode() else CaseCatalog.PROGRESS_PATH
 	_progress_read_only = DisplayServer.get_name() == "headless" and not _shot_mode()
@@ -177,6 +307,10 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_autosave()
 		get_tree().quit()
+	elif what == NOTIFICATION_RESIZED:
+		## 不缩放之后，窗口尺寸变了就得自己重排（页眉拉满 / 主窗跟长 / 贴右浮层对边）。
+		## `_ui_built` 挡住 _build_ui 期间的那几次重排：那时 _case_win 还没建出来。
+		_layout_root()
 
 
 ## 收纳行拖拽会话（Web `06-storage.js` / `12-panels.js` 的行拖拽）：
@@ -187,6 +321,11 @@ func _process(_dt: float) -> void:
 	if _follow_frames > 0:
 		_follow_frames -= 1
 		_repaint_edges()
+	# 锚点节点还在重排补间里飞：浮层每帧重锚，跟着它一起走（Web 是每次 render 重算锚点）。
+	# 只在补间期间做 —— 落地后重锚交给 `_start_move_tween` 的 finished，免得跟玩家拖窗口打架。
+	if _mem_card != null and is_instance_valid(_mem_card) and _mem_anchor_key != "" \
+		and _move_twens.has(_mem_anchor_key):
+		_anchor_card_to(_mem_card, _mem_anchor_key)
 	if _sdrag_key == "":
 		return
 	var at := _desk.get_global_mouse_position()
@@ -242,7 +381,7 @@ func _make_drag_ghost(text: String) -> PanelContainer:
 	sb.content_margin_top = 4
 	sb.content_margin_bottom = 4
 	p.add_theme_stylebox_override("panel", sb)
-	var l := TecTheme.label(text, TecTheme.FS_SMALL, TecTheme.CARD)
+	var l := TecTheme.label(text, TecTheme.FS_BODY, TecTheme.CARD)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(l)
 	_desk.add_child(p)
@@ -327,6 +466,19 @@ func _has_arg(flag: String) -> bool:
 	return OS.get_cmdline_user_args().has(flag) or OS.get_cmdline_args().has(flag)
 
 
+## 调试用：`--win=1600x900` 直接钉窗口尺寸。因为 `content_scale_mode` 是 DISABLED，
+## 这个值就等于逻辑尺寸 —— 排查「某个尺寸下布局崩了」和换截图口径全靠它。
+## 不传则按屏幕可用区铺满（见 `_setup_window_scale`）。
+func _win_override() -> Vector2i:
+	for a in OS.get_cmdline_user_args() + OS.get_cmdline_args():
+		if not a.begins_with("--win="):
+			continue
+		var parts := a.substr(6).split("x")
+		if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+			return Vector2i(int(parts[0]), int(parts[1]))
+	return Vector2i.ZERO
+
+
 func _shot_mode() -> bool:
 	return _has_arg("--shot") or _has_arg("--shot-p2") or _has_arg("--shot-p3")
 
@@ -359,7 +511,7 @@ func _build_ui() -> void:
 	_desk = Control.new()
 	_desk.name = "desk"
 	_desk.position = Vector2(0, HEADER_H)
-	_desk.size = Vector2(1280, 800 - HEADER_H)
+	_desk.size = Vector2(DESIGN_W, DESIGN_H - HEADER_H)
 	_desk.mouse_filter = Control.MOUSE_FILTER_PASS
 	## 对齐 Web `#desktop{overflow:hidden}`：窗框的九切片会往外撑 32px 画投影，
 	## 桌面必须裁掉溢到页眉上的那一段，否则页眉底下会多一圈影。
@@ -397,6 +549,10 @@ func _build_ui() -> void:
 
 	_build_toast()
 
+	## 界面建完才开自适应：_build_ui 期间主窗/浮层还没影，重排会空转。
+	_ui_built = true
+	_layout_root()
+
 
 func setup_ending() -> void:
 	add_child(_ending)
@@ -409,7 +565,8 @@ func _build_header() -> void:
 	var head := Panel.new()
 	head.name = "header"
 	head.position = Vector2.ZERO
-	head.size = Vector2(1280, HEADER_H)
+	head.size = Vector2(DESIGN_W, HEADER_H)
+	_head = head
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = TecTheme.LINE
 	sb.border_width_bottom = 2
@@ -418,14 +575,14 @@ func _build_header() -> void:
 	add_child(head)
 
 	# 品牌：`.brand` 14px + 字距 2；副题是它的 `<small>`（11px，间距 6px）
-	var brand := TecTheme.brand_label("T.E.C-OS", 14, TecTheme.CARD)
+	var brand := TecTheme.brand_label("T.E.C-OS", TecTheme.FS_TITLE, TecTheme.CARD)
 	brand.name = "brand"
 	brand.position = Vector2(HDR_X_BRAND, -1.0)
 	brand.size = Vector2(92.0, HEADER_H + 2.0)
 	brand.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	head.add_child(brand)
 
-	var sub := TecTheme.label(HDR_SUB, 11, TecTheme.LINE2)
+	var sub := TecTheme.label(HDR_SUB, TecTheme.FS_BODY, TecTheme.LINE2)
 	sub.name = "brand_sub"
 	sub.position = Vector2(HDR_X_SUB, 0.0)
 	sub.size = Vector2(206.0, HEADER_H)
@@ -438,7 +595,7 @@ func _build_header() -> void:
 	_inv_chip.position = Vector2(HDR_X_CHIP, 13.5)
 	_inv_chip.size = Vector2(HDR_W_CHIP, 23.0)
 	_inv_chip.clip_text = true
-	_inv_chip.add_theme_font_size_override("font_size", 11)
+	_inv_chip.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 	_inv_chip.add_theme_color_override("font_color", TecTheme.CARD)
 	_inv_chip.add_theme_color_override("font_hover_color", TecTheme.TEXT)
 	_inv_chip.add_theme_color_override("font_pressed_color", TecTheme.TEXT)
@@ -466,19 +623,21 @@ func _build_header() -> void:
 	_crumb.clip_text = true
 	head.add_child(_crumb)
 
-	# 工具组：三个开关 + 四个按钮，x / 宽度全部按量出来的坐标摆
+	# 工具组：三个开关 + 四个按钮，x / 宽度全部按量出来的坐标摆。
+	# 这一组贴**右**（Web 是 flex 的 margin-left:auto）：窗口变宽时整体右移，
+	# 左边空出来的地方留给面包屑，不会在中间飘着。
 	var togs := [["合成消耗", 670.0, 86.0], ["聚焦选中", 763.0, 86.0], ["新节点自动居中", 856.0, 122.0]]
 	for item in togs:
 		var b := _make_toggle(String(item[0]))
 		head.add_child(b)
-		_place_hdr(b, Vector2(float(item[1]), HDR_TOG_Y), Vector2(float(item[2]), HDR_TOG_H))
+		_place_hdr(b, Vector2(float(item[1]), HDR_TOG_Y), Vector2(float(item[2]), HDR_TOG_H), true)
 	var btns := [["适应窗口", 985.0, 74.0, false], ["撤销", 1066.0, 50.0, false],
 		["重置", 1123.0, 50.0, false], ["检查可达性", 1180.0, 86.0, true]]
 	for item in btns:
 		var b := TecTheme.header_button(String(item[0]), bool(item[3]))
 		b.name = "btn_" + String(item[0])
 		head.add_child(b)
-		_place_hdr(b, Vector2(float(item[1]), HDR_BTN_Y), Vector2(float(item[2]), HDR_BTN_H))
+		_place_hdr(b, Vector2(float(item[1]), HDR_BTN_Y), Vector2(float(item[2]), HDR_BTN_H), true)
 		var label := String(item[0])
 		if label == "适应窗口":
 			b.pressed.connect(_fit_view)
@@ -524,10 +683,14 @@ func _make_toggle(text: String) -> Button:
 ## 于是 `size = 25` 当场被抬成 31，而等入树后最小尺寸掉回 24/20，控件也不会自己缩回去。
 ## 症状是页眉所有按钮都比 Web 高 6px、文字整体下沉 3px（P3 对拍里 tools 区 17.7% 差异的主因）。
 ## 解法：目标尺寸记在这里，入树之后再赋一遍（`_sync_header_sizes`）。
-func _place_hdr(c: Control, pos: Vector2, sz: Vector2) -> void:
+## `anchor_right`：坐标表是按 1280 宽量的，贴右的那组存「距右边缘多少」而不是绝对 x，
+## 窗口变宽时由 `_layout_header_right()` 整体右移。
+func _place_hdr(c: Control, pos: Vector2, sz: Vector2, anchor_right: bool = false) -> void:
 	c.position = pos
 	c.size = sz
 	_hdr_sized.append([c, sz])
+	if anchor_right:
+		_hdr_right.append([c, DESIGN_W - pos.x])
 
 
 func _sync_header_sizes() -> void:
@@ -568,7 +731,7 @@ func _on_header_toggle(text: String, on: bool) -> void:
 		"新节点自动居中":
 			_opt_reveal = on
 			if on:
-				_relayout()
+				_relayout(false, true)   # 开关本身要求「现在就居中」——签名没变也得跑
 
 
 ## 面包屑计数：与 Web `updateCrumbs()` 同口径（可见/总数 · 已探索场景 · 已试组合 · 线索 · 结局）
@@ -643,10 +806,13 @@ func _apply_focus() -> void:
 func _build_case_window() -> void:
 	_case_win = SysWindow.new()
 	_case_win.name = "case_win"
-	_case_win.setup(_case_window_title(), 1164, 718)
+	## 主窗高度跟着设计基准走：桌面可用高 = DESIGN_H - HEADER_H，减去底部 2px 余量
+	## 与窗框两侧 14px 的 PAD。宽度 1164 不变（86 图标列 + 1164 + 2×14 = 1278 ≤ 1280）。
+	var case_h := DESIGN_H - HEADER_H - 2.0 - SysWindow.PAD * 2.0
+	_case_win.setup(_case_window_title(), 1164, case_h)
 	_case_win.position = Vector2(86, 0)
 	_case_win.body.position = Vector2(SysWindow.PAD + 1, SysWindow.PAD + 1 + SysWindow.BAR_H)
-	_case_win.body.size = Vector2(1162, 718 - 2 - SysWindow.BAR_H)
+	_case_win.body.size = Vector2(1162, case_h - 2 - SysWindow.BAR_H)
 	_case_win.body.clip_contents = true
 	_case_win.enable_case_controls()
 	_case_win.closed.connect(func(): _park_case("icon"))
@@ -829,7 +995,7 @@ func _make_badge(parent: Control, badge_name: String, text: String = "") -> Pane
 	sb.content_margin_top = 1
 	sb.content_margin_bottom = 1
 	badge.add_theme_stylebox_override("panel", sb)
-	var l := TecTheme.label(text, 9, TecTheme.CARD)
+	var l := TecTheme.label(text, TecTheme.FS_BODY, TecTheme.CARD)
 	l.name = "Label"
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1249,7 +1415,7 @@ func _build_case_park() -> void:
 	glyph_box.add_theme_stylebox_override("panel",
 		TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.EDGE))
 	row.add_child(glyph_box)
-	var glyph := TecTheme.label("▣", 15, TecTheme.MUTED)
+	var glyph := TecTheme.label("▣", TecTheme.FS_TITLE, TecTheme.MUTED)
 	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1262,15 +1428,15 @@ func _build_case_park() -> void:
 	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(meta)
 
-	_dock_code = TecTheme.label("", 9, TecTheme.MUTED)
+	_dock_code = TecTheme.label("", TecTheme.FS_BODY, TecTheme.MUTED)
 	_dock_code.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(_dock_code)
-	_dock_title = TecTheme.label("", 11, TecTheme.TEXT)
+	_dock_title = TecTheme.label("", TecTheme.FS_BODY, TecTheme.TEXT)
 	_dock_title.clip_text = true
 	_dock_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_dock_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(_dock_title)
-	_dock_sub = TecTheme.label("进度已保存 · 点此展开", 9, TecTheme.FAINT)
+	_dock_sub = TecTheme.label("进度已保存 · 点此展开", TecTheme.FS_BODY, TecTheme.MUTED)
 	_dock_sub.clip_text = true
 	_dock_sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_dock_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1303,7 +1469,7 @@ func _build_toast() -> void:
 	_toast.add_theme_stylebox_override("panel", sb)
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toast.visible = false
-	_toast_label = TecTheme.label("", TecTheme.FS_BODY, TecTheme.CARD)
+	_toast_label = TecTheme.label("", TecTheme.FS_TITLE, TecTheme.CARD)
 	_toast.add_child(_toast_label)
 	_desk.add_child(_toast)
 	_place_z(_toast, ZR_TOAST)
@@ -1487,6 +1653,7 @@ func _new_runtime() -> void:
 			_card_layer.remove_child(c)
 			c.queue_free()
 	_cards.clear()
+	_layout_sig = ""            # 换案子 / 重开一局：卡片表清空，下次 `_relayout()` 必须真跑一次
 	graph = GraphState.new(case_def)
 	combos = ComboSystem.new(case_def, graph)
 	_cmds = CommandSystem.new(case_def, graph)
@@ -1582,24 +1749,20 @@ func _sync_case_progress_from_graph() -> void:
 func _start_slice() -> void:
 	_new_runtime()
 
-	# 切片固定从花园开始：config.startScene 是封面标题页（SCENE_START），不是调查起点
+	# 开局状态**照 Web `17-boot.js:42` 一模一样的口径**：画布上只放一张「未探索」的起始场景节点，
+	# 位置也用 Web 的 (1000, 620)。手电筒不在这里给 —— 它在「花园 → 书桌 → 抽屉 → 左侧抽屉」
+	# 这条真实链路的末端（旧版图省事直接摆一把在桌上，等于跳掉了整个开场探索）。
 	var sid := SLICE_SCENE
 	var loc := graph.add_node("loc", sid)
-	loc["x"] = 40.0
-	loc["y"] = 30.0
+	loc["x"] = 1000.0
+	loc["y"] = 620.0
 	graph.mark_fresh(String(loc["key"]))
 	_spawn_card(loc["key"])
 
-	# P0：抽屉链路（书桌 → 左侧抽屉 → 手电筒）不在切片内，直接把点亮的工具放到桌上
-	var torch := graph.add_node("item", "ITEM_shoudiantong")
-	torch["x"] = 40.0
-	torch["y"] = 40.0 + 100.0
-	graph.link(loc["key"], torch["key"], "entity")
-	_spawn_card(torch["key"])
-	_flash_supply_note = false
-
 	_set_crumb(_case_label() + " // " + case_def.scene_title(sid))
-	_show_toast("把「%s」拖到「手电筒」上试试" % case_def.scene_title(sid))
+	_log("已载入%s：双击「场景节点」展开里面的东西，把节点拖到另一个节点上组合使用。" % _case_label())
+	_log("提示：先双击「%s」展开场景，再双击「书桌」等继续展开，拖动手电筒到黑影上试试。"
+		% case_def.scene_title(sid))
 	_relayout()
 
 
@@ -1711,11 +1874,27 @@ func _show_toast(text: String, warn: bool = false) -> void:
 	_toast.add_theme_stylebox_override("panel", _toast_style(warn))
 	_toast.visible = true
 	_toast.reset_size()
-	_toast.position = Vector2((1280.0 - _toast.size.x) * 0.5, 800.0 - HEADER_H - 60.0)
+	_place_toast_anchor()
 	if _toast_timer != null:
 		_toast_timer.timeout.disconnect(_hide_toast)
 	_toast_timer = get_tree().create_timer(2.2)
 	_toast_timer.timeout.connect(_hide_toast)
+
+
+## toast 停**右下角**，不压底部正中：底部正中是叙事卡 / 详情卡的下沉落点
+## （`_anchor_card_to` 上→下→右→左都会用到），停在那儿十有八九正好盖住卡上的字。
+## 右下角与 TEC 收起胶囊同一列（右边距 16）；胶囊 / 播放器坞在场时往上让。
+## 独立成函数是因为窗口 resize 之后要按新视口重新对边。
+func _place_toast_anchor() -> void:
+	if _toast == null or not is_instance_valid(_toast) or not _toast.visible:
+		return
+	var right := _vw() - 16.0
+	var bottom := _vh() - HEADER_H - 16.0
+	if _tec_chip != null and is_instance_valid(_tec_chip) and _tec_chip.visible:
+		bottom = minf(bottom, _tec_chip.position.y - 8.0)
+	if _music_dock != null and is_instance_valid(_music_dock) and _music_dock.visible:
+		bottom = minf(bottom, _music_dock.position.y - 8.0)
+	_toast.position = Vector2(right - _toast.size.x, bottom - _toast.size.y)
 
 
 func _toast_style(warn: bool) -> StyleBoxFlat:
@@ -1858,6 +2037,8 @@ func _rebuild_from_graph() -> void:
 		_spawn_card(String(key))
 	_suppress_archive_new = false
 	_apply_hidden()
+	# 读档 / 撤销后摆位是存档里那一份，不能被下一次互动的重排顺手推走 —— 签名就地认下来。
+	_layout_sig = _layout_signature()
 	_refresh_matrix_views()
 	_last_ending_id = String(graph.endings.keys()[0]) if not graph.endings.is_empty() else ""
 	var sid := graph.last_scene
@@ -1882,12 +2063,18 @@ func _on_stage_input(event: InputEvent) -> void:
 			if absf(k2 - _view_k) > 0.0001:
 				_view_pos = mp - (mp - _view_pos) * (k2 / _view_k)
 				_view_k = k2
+				_view_user = true
 				_apply_view()
 			accept_event()
 			return
 		if mb.button_index != MOUSE_BUTTON_LEFT:
 			return
 		if mb.pressed:
+			# 上一轮拖动如果没收到松手（切窗 / 失焦 / 事件丢失），这里先收尾。
+			# 否则画布会带着一张「悬空的卡」继续平移，看着就是「桌布在动、节点不动」。
+			if _drag_key != "":
+				_abort_card_drag()
+				return
 			_panning = true
 			_pan_from = mb.position
 			_pan_origin = _view_pos
@@ -1897,7 +2084,24 @@ func _on_stage_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseMotion and _panning:
 		_view_pos = _pan_origin + ((event as InputEventMouseMotion).position - _pan_from)
+		_view_user = true
 		_apply_view()
+
+
+## 拖动会话没收尾就遇到新的按下：把卡按当前坐标落地并清掉镜像。
+## （正常路径由 NodeCard 的松手处理；这里只兜「松手事件丢了」的那条）
+func _abort_card_drag() -> void:
+	var key := _drag_key
+	var card: NodeCard = _cards.get(key, null)
+	_drag_key = ""
+	_panning = false
+	if card != null and is_instance_valid(card):
+		card.cancel_drag()
+	else:
+		_drop_card_mirror(null)
+		_clear_drop_over()
+		if _edge_layer != null:
+			_edge_layer.clear_ghost()
 
 
 func _apply_view() -> void:
@@ -1905,6 +2109,14 @@ func _apply_view() -> void:
 		return
 	_card_layer.position = _view_pos
 	_card_layer.scale = Vector2(_view_k, _view_k)
+	_reanchor_mem_card()
+
+
+## 缩放 / 平移 / 重排都会让锚点节点在屏幕上换位置，而放映卡是**屏幕坐标**摆的 ——
+## 不重锚它就会留在原地，看起来像压在节点上（实测 448×328 的卡盖住花园卡）。
+func _reanchor_mem_card() -> void:
+	if _mem_card != null and is_instance_valid(_mem_card) and _mem_anchor_key != "":
+		_anchor_card_to(_mem_card, _mem_anchor_key)
 
 
 func _clear_selection() -> void:
@@ -2039,7 +2251,12 @@ func _mount_card_mirror(card: NodeCard) -> void:
 		return
 	if _card_mirror != null and is_instance_valid(_card_mirror):
 		_card_mirror.queue_free()
-	card.visible = false
+	# ⚠ 原件不能让 `visible = false`。Godot 的 GUI 命中判定会跳过「树里不可见」的控件：
+	# 拖动第一帧把原件隐藏之后，鼠标移动就不再投递给它（mouse_focus 失效），
+	# motion 断流 ⇒ 卡片停在原地、镜像不跟手、松手也没人处理（`_drag_key` 一直挂着）。
+	# 之后任何一次按下都落到画布手势层 ⇒ 整块画布跟着鼠标平移 ——「桌布在动，节点不动」。
+	# 改成全透明但仍在树里（NodeCard.set_ghost）：事件照收，画面交给镜像。
+	card.set_ghost(true)
 	var mirror := card.build_mirror()
 	if mirror == null:
 		return
@@ -2062,6 +2279,7 @@ func _drop_card_mirror(card: NodeCard) -> void:
 		_card_mirror.queue_free()
 	_card_mirror = null
 	if card != null and is_instance_valid(card):
+		card.set_ghost(false)
 		card.visible = graph.visible_node(graph.node(card.card_key))
 
 
@@ -2398,6 +2616,7 @@ func _center_on(card: NodeCard) -> void:
 	var c := card.visual_center()
 	_view_pos = _stage.size * 0.5 - c * _view_k
 	_card_layer.position = _view_pos
+	_view_user = true
 
 
 ## 指针下面是哪张卡（world 顺序里最上面那张：从后往前找）
@@ -2405,6 +2624,9 @@ func _card_key_at(at_global: Vector2) -> String:
 	for i in range(_card_layer.get_child_count() - 1, -1, -1):
 		var card := _card_layer.get_child(i) as NodeCard
 		if card == null or not card.visible:
+			continue
+		# 正在拖的卡忽略自己：它现在跟着指针走，命中自己会被误判成「拖到别的节点上」
+		if card.card_key == _drag_key:
 			continue
 		if card.get_global_rect().grow(-NodeCard.PAD * 0.5).has_point(at_global):
 			return card.card_key
@@ -2625,7 +2847,7 @@ func _toggle_people() -> void:
 	_people_win.name = "people_win"
 	_people_win.setup_people(graph, case_def)
 	# 定位按 Web 的 right / top 算，并且跟着**实际尺寸**走（size 含 PAD 的投影余量）
-	_people_win.position = Vector2(1280.0 - 328.0 - _people_win.size.x + SysWindow.PAD, 60.0)
+	_people_win.position = Vector2(_vw() - 328.0 - _people_win.size.x + SysWindow.PAD, 60.0)
 	_people_win.row_clicked.connect(_on_people_row)
 	_people_win.closed.connect(func(): _people_win = null)
 	_desk.add_child(_people_win)
@@ -2740,8 +2962,8 @@ func _toggle_log() -> void:
 	_log_win = LogWin.new()
 	_log_win.name = "log_win"
 	_log_win.setup_log(graph)
-	_log_win.position = Vector2(1280.0 - 14.0 - _log_win.size.x + SysWindow.PAD,
-		_desk.size.y - 96.0 - _log_win.size.y + SysWindow.PAD)
+	_log_win.position = Vector2(_vw() - 14.0 - _log_win.size.x + SysWindow.PAD,
+		_vh() - HEADER_H - 96.0 - _log_win.size.y + SysWindow.PAD)
 	_log_win.closed.connect(func(): _log_win = null)
 	_desk.add_child(_log_win)
 	_place_z(_log_win, ZR_LOG)
@@ -2783,6 +3005,8 @@ func _toggle_matrix() -> void:
 	_matrix_win.clue_dropped.connect(_on_matrix_dropped)
 	_matrix_win.inference_requested.connect(_run_inference)
 	_matrix_win.seed_dropped.connect(_on_seed_dropped)
+	# 线索卡拖动的镜像挂在桌面上（桌布自己 clip_contents，镜像挂里面拖到边缘会被裁掉）
+	_matrix_win.drag_host = _desk
 	_desk.add_child(_matrix_win)
 	_place_z(_matrix_win, ZR_WIN)
 
@@ -3277,12 +3501,10 @@ func _memory_lines(tid: String) -> Array:
 		var line := String(raw).strip_edges()
 		if line != "":
 			out.append(line)
-	for tag in case_def.tags_of(s.content):
+	for tag in case_def.nodes_of_scene(s):
 		if String(tag["kind"]) != "char":
 			continue
 		var cid := String(tag["id"])
-		if cid == "CHARS_TEC":
-			continue
 		var ch := case_def.char_of(cid)
 		if ch == null:
 			continue
@@ -3332,24 +3554,70 @@ func _anchor_memory_card(card: MemCard, tid: String) -> void:
 	_anchor_card_to(card, graph.scene_key(place.id) if place != null else "")
 
 
+## 锚定时的「锚点节点」：节点还在重排补间里飞的时候锚出来的位置是**中途位置**，
+## 补间一结束就对不上（实测 448×328 的放映卡压住花园节点）。补间收尾时按新位置重锚。
+var _mem_anchor_key := ""
+
+
 func _anchor_card_to(card: MemCard, node_key: String) -> void:
 	if card == null:
 		return
-	var area := Vector2(1280.0, 800.0 - HEADER_H)
+	_mem_anchor_key = node_key
+	var area := Vector2(_vw(), _vh() - HEADER_H)
 	var pos := Vector2(700.0, 290.0)
 	var nc := _cards.get(node_key) as NodeCard
 	if nc != null and is_instance_valid(nc) and nc.visible:
-		var target := nc.get_global_rect()
 		var origin := _desk.get_global_rect().position
-		pos.x = target.position.x - origin.x + (target.size.x - card.size.x) * 0.5
-		var above := target.position.y - origin.y - card.size.y - 14.0
-		if above >= 8.0:
-			pos.y = above
-		else:
-			pos.y = target.position.y - origin.y + target.size.y + 14.0
+		var g := nc.get_global_rect()
+		var t := Rect2(g.position - origin, g.size)
+		var cs := card.size
+		var cx := t.position.x + (t.size.x - cs.x) * 0.5
+		var cy := t.position.y + (t.size.y - cs.y) * 0.5
+		## 四方位按「上 → 下 → 右 → 左」试，取第一个既不越界、也不压住其它可见卡的位置。
+		## 720 基准下桌面只剩 668 高：放映卡（448×328）与节点都居中时，
+		## 单靠「上/下」二选一必然压住节点（上方局部 −9 越界、下方 742 越界，
+		## 钳回 332 之后正好盖住地点卡）。Web 是流式布局，没这个死角。
+		var cands: Array = [
+			Vector2(cx, t.position.y - cs.y - 14.0),
+			Vector2(cx, t.position.y + t.size.y + 14.0),
+			Vector2(t.position.x + t.size.x + 14.0, cy),
+			Vector2(t.position.x - cs.x - 14.0, cy),
+		]
+		var board := Rect2(Vector2(8, 8), area - Vector2(16, 16))
+		var picked := Vector2.INF
+		for c in cands:
+			var r := Rect2(c, cs)
+			if board.encloses(r) and not _mem_blocked(r, node_key):
+				picked = c
+				break
+		if not picked.is_finite():
+			## 四方位都塞不下：720 基准下桌面只有 668 高，448×328 的放映卡与居中节点
+			## 垂直方向正好差几像素（上方 −9、下方 742）。这时把卡压到「上方可用高」以内
+			## 再贴顶放下 —— 内容区本来就有滚动条，少 17px 视觉无感。
+			var avail_h := maxf(180.0, t.position.y - 8.0 - 14.0)
+			if avail_h < cs.y:
+				card.set_inner_height(avail_h - SysWindow.PAD * 2.0)
+				cs = card.size
+			picked = Vector2(cx, t.position.y - cs.y - 14.0)
+		pos = picked
 	pos.x = clampf(pos.x, MEM_CARD_MIN_X, area.x - card.size.x - 8.0)
 	pos.y = clampf(pos.y, 8.0, area.y - card.size.y - 8.0)
 	card.position = pos
+
+
+## 回忆卡候选位是否压住别的可见节点（浮窗不算 —— 那本就允许被压）。
+func _mem_blocked(r: Rect2, skip_key: String) -> bool:
+	var origin := _desk.get_global_rect().position
+	for k in _cards.keys():
+		if String(k) == skip_key:
+			continue
+		var c := _cards[k] as NodeCard
+		if c == null or not is_instance_valid(c) or not c.visible:
+			continue
+		var g := c.get_global_rect()
+		if r.intersects(Rect2(g.position - origin, g.size)):
+			return true
+	return false
 
 
 func _close_mem_card() -> void:
@@ -3439,17 +3707,42 @@ func _clear_archive_new() -> void:
 		_archive_badge.visible = false
 
 
+## 当前「可见节点集合」的签名。力导向只认它：集合没变 = 结构没变 = 一个坐标都不该动。
+## 对齐 Web `09-commands.js`：「开关灯只重绘（重排会让灯自己跳位置）」—— 那边只有真长出
+## 新节点的分支才 `layout()`。
+var _layout_sig := ""
+
+
+func _layout_signature() -> String:
+	var keys: Array = []
+	for key in _cards.keys():
+		if (_cards[key] as NodeCard).visible:
+			keys.append(String(key))
+	keys.sort()
+	return "|".join(PackedStringArray(keys))
+
+
 ## 布局（对齐 Web `layout()`）：**松弛一次**，不是重新排版。
 ##   - 只给「从没落过位」的节点播种（x/y < 0）；已落位的保留；
 ##   - 右键钉住的节点在松弛中完全不动（这是「把摆位留住」的唯一手段）；
-##   - 纯状态变化（点亮 / 捕获 / 选中）**不要**调这里 —— 那些只需要 `_apply_hidden()` / `refresh()`。
-func _relayout(animated := false) -> void:
-	_layout_force(animated)
-	if _opt_reveal:
-		_fit_cards()
+##   - 纯状态变化（点亮 / 捕获 / 选中）不跑力导向 —— 那些只需要 `_apply_hidden()` / `refresh()`。
+##
+## 为什么用「可见集合签名」而不是在几十个调用点上加 `if`：260 轮松弛**并不收敛**
+## （实测同一批节点连跑 8 次，单次最大位移 194 → 72 → 38 → 21 → 12 → 6.9 → 3.9 → 2.3 → 1.3px），
+## 所以每多跑一次，全画布就整体漂一次。旧版无条件跑，双击点亮手电筒都会把 8 张卡一起推走。
+## 收敛靠调用次数而不是靠这里多跑几轮：Web 也只在新节点出现时 `layout()`。
+## `force` = 用户显式要求「现在就按当前结构重排」（页眉开关）；测试伪造数据位时也用它。
+func _relayout(animated := false, force := false) -> void:
+	var sig := _layout_signature()
+	if force or sig != _layout_sig:
+		_layout_sig = sig
+		_layout_force(animated)
+		if _opt_reveal:
+			_fit_cards()
 	_refresh_crumbs()
 	_sync_header_sizes()
 	_repaint_edges()
+	_reanchor_mem_card()
 
 
 ## 力导向：斥力 30000/d²、最小间距 R_a+R_b+14、弹簧 rest 185/300/150、向心 0.0022，260 轮。
@@ -3590,6 +3883,9 @@ func _start_move_tween(key: String, card: NodeCard, p: Vector2) -> void:
 	tw.finished.connect(func() -> void:
 		_move_twens.erase(key)
 		card.position = p
+		# 锚在它身上的浮层（回忆放映卡 / 叙事卡）跟着落地重锚，否则卡片停在节点半路的位置上
+		if _mem_anchor_key == key and _mem_card != null and is_instance_valid(_mem_card):
+			_anchor_card_to(_mem_card, key)
 		_repaint_edges(), CONNECT_ONE_SHOT)
 	_move_twens[key] = tw
 	_follow_frames = maxi(_follow_frames, 21)   # ≈420ms @ 60fps（Web paintEdgesFor(420)）
@@ -3625,6 +3921,7 @@ func _fit_cards() -> void:
 		_view_pos = Vector2.ZERO
 		_card_layer.position = Vector2.ZERO
 		_card_layer.scale = Vector2.ONE
+		_view_user = false
 		return
 	var pad := 60.0
 	var k := minf((_stage.size.x - pad * 2.0) / bounds.size.x,
@@ -3634,6 +3931,7 @@ func _fit_cards() -> void:
 	_view_pos = (_stage.size - bounds.size * k) * 0.5 - bounds.position * k
 	_card_layer.position = _view_pos
 	_card_layer.scale = Vector2(k, k)
+	_view_user = false
 
 
 # ── TEC ─────────────────────────────────────────────────────────────────
@@ -4649,6 +4947,14 @@ func _shot_flow() -> void:
 	_expand_scene("SCENES_garden", true)
 	await _wait(0.5)
 	await _shot("res://docs/p0_2_garden.png")
+
+	# 开局不再直接给手电筒（对齐 Web）：截图流程走真实链路 书桌 → 抽屉 → 左侧抽屉
+	_on_card_activated("item:ITEM_shuzhuo")
+	await _wait(0.25)
+	_on_card_activated("item:ITEM_chouti")
+	await _wait(0.25)
+	_on_card_activated("loc:SCENES_choutiyi")
+	await _wait(0.25)
 
 	combos.toggle_light("item:ITEM_shoudiantong")
 	if _cards.has("item:ITEM_shoudiantong"):

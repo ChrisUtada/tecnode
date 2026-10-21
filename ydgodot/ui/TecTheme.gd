@@ -12,7 +12,9 @@ const FACE_LO := Color("eee9d7")
 const LINE := Color("2b2b26")
 const LINE2 := Color("c0bcaa")
 const TEXT := Color("2b2b26")
+## 次要文字。**任何要读的字都用它**（卡面上 6.36:1、纸面上 5.64:1，12px 也过 4.5:1）。
 const MUTED := Color("5c584a")
+## 只用于装饰（水印、占位符、禁用态）：卡面 3.27:1 / 纸面 2.90:1，**正文用它会读不清**。
 const FAINT := Color("8a8672")
 const EDGE := Color(0.290, 0.271, 0.204, 0.30)
 const EDGE_SOFT := Color(0.290, 0.271, 0.204, 0.18)
@@ -23,9 +25,23 @@ const R_WIN := 13
 const R_SM := 11
 const R_BTN := 8
 
+## ── 字号只有三档，且必须是 12 的整数倍 ──────────────────────────────────────
+## 唯一字体 `font.ttf`（VonwaonBitmap 12px）的 `unitsPerEm = 1200` ⇒ 原生格就是
+## **12px**（100 units/px），只有 12 的整数倍能整像素落笔。
+## 13 / 18 这类非整数倍会走重采样：**笔画从 1px 摊成 1~2px 的灰边，同时变粗和变糊**
+## （实测见 docs/font_13_vs_12.png —— 同一句话 12px 锐利、13px 整行发胖）。
+## 所以：
+##   12 —— 一切界面文字（按钮 / 标签 / 角标 / 卡片标题 / 窗口标题 / 连续正文）
+##   24 / 48 —— 仅装饰性大字（首字母、结局标题）
+## **不要再新增非 12 倍数的字号**，正文也不例外：可读性靠行高与字色（TEXT / MUTED）
+## 拉开层级，不靠 +1px 字号。
 const FS_BODY := 12
-const FS_TITLE := 13
-const FS_SMALL := 10
+## 连续正文沿用同一格。旧值 13 是 P3 时期从 Web 的 13px 正文直接抄的，但 Web 那边
+## 是浏览器亚像素渲染、13px 不伤字形；Godot 关着抗锯齿，13px 就是硬糊。
+## 保留这个名字只为语义区分（正文 / 标题），值必须等于 FS_BODY。
+const FS_TITLE := 12
+const FS_DISPLAY := 24
+const FS_INITIAL := 48
 
 static var _font: FontFile = null
 
@@ -39,6 +55,9 @@ static func font() -> FontFile:
 			_font.hinting = TextServer.HINTING_NONE
 			_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
 			_font.multichannel_signed_distance_field = false
+			## 固定 1x 栅格：实测过 `oversampling = 0`（跟随画布自动栅格），
+			## 1.43x 窗口下整图只有 0.33% 像素不同、边缘梯度反而略低（6.14 vs 6.17），
+			## 即「自动」既不更清晰也没变锐，不如保持这个已验证的口径。
 			_font.oversampling = 1.0
 	return _font
 
@@ -107,7 +126,7 @@ static func brand_font() -> FontVariation:
 	return _brand_font
 
 
-static func brand_label(text: String, size: int = 14, color: Color = CARD) -> Label:
+static func brand_label(text: String, size: int = FS_TITLE, color: Color = CARD) -> Label:
 	var l := label(text, size, color)
 	l.add_theme_font_override("font", brand_font())
 	return l

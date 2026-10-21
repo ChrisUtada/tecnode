@@ -1,5 +1,6 @@
 [gd_resource type="Resource" script_class="SceneDef" format=3]
 
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_lojnf"]
 [ext_resource type="Script" path="res://core/defs/SceneDef.gd" id="1_oxlfo"]
 
 [resource]
@@ -8,3 +9,7 @@ id = "SCENES_fkjl"
 title = "访客记录"
 content = "[loc:SCENES_0602] 9：00 - 10：30 [char:CHARS_zs]的清洁时间<br>6月2日 15：07 - 18：13 [char:NPC_FB]老师来访<br>………………<br>………………<br>………………<br>6月15日 9：00 - 10：30 朱穗的清洁时间<br>6月15日 17：03 傅柏老师来访<br>………………<br>………………<br>[loc:SCENES_0704]"
 desc = "记录了每日到访花园的客人。"
+node_items = PackedStringArray()
+node_chars = PackedStringArray("CHARS_zs", "NPC_FB")
+node_locs = PackedStringArray("SCENES_0602", "SCENES_0704")
+node_clues = PackedStringArray()

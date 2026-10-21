@@ -51,7 +51,7 @@ func refresh_store() -> void:
 		c.queue_free()
 	var list := items()
 	if list.is_empty():
-		var empty := TecTheme.label("（空）", TecTheme.FS_SMALL, TecTheme.FAINT)
+		var empty := TecTheme.label("（空）", TecTheme.FS_BODY, TecTheme.MUTED)
 		_rows.add_child(empty)
 		return
 	for key in list:
@@ -70,7 +70,7 @@ func _make_row(key: String) -> Control:
 	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(hb)
 
-	var label := TecTheme.label(String(n.get("label", key)), TecTheme.FS_SMALL, TecTheme.TEXT)
+	var label := TecTheme.label(String(n.get("label", key)), TecTheme.FS_BODY, TecTheme.TEXT)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.clip_text = true
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -80,20 +80,20 @@ func _make_row(key: String) -> Control:
 	if store_kind == GraphState.BAG:
 		var from_id := String(n.get("bag_from", ""))
 		if from_id != "":
-			var src := TecTheme.label("来自 " + case_def.label_of("item", from_id), TecTheme.FS_SMALL, TecTheme.FAINT)
+			var src := TecTheme.label("来自 " + case_def.label_of("item", from_id), TecTheme.FS_BODY, TecTheme.MUTED)
 			src.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			hb.add_child(src)
 
 	if store_kind == GraphState.LEDGER:
 		var to_mx := TecTheme.button("上桌布")
 		to_mx.custom_minimum_size = Vector2(54, 22)
-		to_mx.add_theme_font_size_override("font_size", 10)
+		to_mx.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 		to_mx.pressed.connect(func(): to_matrix.emit(key))
 		hb.add_child(to_mx)
 
 	var btn := TecTheme.button("取回")
 	btn.custom_minimum_size = Vector2(44, 22)
-	btn.add_theme_font_size_override("font_size", 10)
+	btn.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 	btn.pressed.connect(func(): _take(key))
 	hb.add_child(btn)
 	return row

@@ -3,23 +3,23 @@
   "b": "D:\\Games\\yd\\tecnode\\ydgodot\\docs\\p3\\godot\\start.png",
   "size": [
     1280,
-    800
+    720
   ],
   "threshold": 8,
-  "ratio_gt0": 0.1301787109375,
-  "ratio_gt8": 0.023263671875,
-  "ratio_gt16": 0.020484375,
+  "ratio_gt0": 0.8514561631944444,
+  "ratio_gt8": 0.030091145833333333,
+  "ratio_gt16": 0.017690972222222223,
   "mean_abs_rgb": [
-    1.8381,
-    1.8238,
-    1.8218
+    2.9593,
+    3.1092,
+    3.6957
   ],
   "max_channel_diff": 208,
   "mismatch_bbox": [
     0,
     12,
     1280,
-    800
+    720
   ],
   "regions": {}
 }

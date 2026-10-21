@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="SceneDef" format=3]
 
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_0tqwo"]
+[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_tohbv"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_0w0wx"]
 [ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="2_tohbv"]
 [ext_resource type="Script" path="res://core/defs/SceneDef.gd" id="3_0w0wx"]
 
@@ -15,3 +16,7 @@ title = "T.E.C-OS"
 content = "你好，[item:ITEMS_cjdcy]。<br>[item:ITEMS_ydqy]已被锁定。欢迎进入[item:ITEMS_tec]。<br>在你的权限范围内能够进入的区域，已经向你开放。<br>[char:CHARS_TEC]将协助你揭示异动区域的[item:ITEMS_turename]。<br><br>接下来你将学习如何使用T.E.C-OS的指令交互：<br>试试使用“查询 真名”命令看看会有什么效果？<br>接着使用“捕获 [item:ITEMS_cjdcy]”，你将获得你的第一个线索。<br>使用“出示 [item:ITEMS_turename] TEC”或“出示 TEC [item:ITEMS_turename]”，你将获得TEC的一些小小提示。<br>可在指令交互框中输入“查询 [item:ITEM_cmd]”获得更多帮助。<br><br>请务必注意安全，避免遭受因果污染。<br>一切就绪后，请点击进入[loc:SCENES_garden]，或者使用命令“前往 植物学家的花园”<br><br>祝你一切顺利。"
 desc = "你好，初级调查员，欢迎进入T.E.C-OS。"
 hidden_clue = SubResource("Resource_8fmy7")
+node_items = PackedStringArray("ITEMS_cjdcy", "ITEMS_ydqy", "ITEMS_tec", "ITEMS_turename", "ITEM_cmd")
+node_chars = PackedStringArray()
+node_locs = PackedStringArray("SCENES_garden")
+node_clues = PackedStringArray()

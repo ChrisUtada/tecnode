@@ -41,7 +41,7 @@ func setup_dock() -> void:
 	top.add_theme_constant_override("separation", 4)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(top)
-	_title = TecTheme.label("未播放", 12, TecTheme.TEXT)
+	_title = TecTheme.label("未播放", TecTheme.FS_BODY, TecTheme.TEXT)
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -65,7 +65,7 @@ func setup_dock() -> void:
 	_prog.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 2, TecTheme.LINE, 0))
 	v.add_child(_prog)
 
-	_time = TecTheme.label("--:-- / --:--", 9, TecTheme.MUTED)
+	_time = TecTheme.label("--:-- / --:--", TecTheme.FS_BODY, TecTheme.MUTED)
 	_time.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(_time)
 
@@ -77,7 +77,7 @@ func _mini_button(text: String, tip: String) -> Button:
 	b.custom_minimum_size = Vector2(22, 18)
 	b.size = Vector2(22, 18)
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 9)
+	b.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 	b.tooltip_text = tip
 	return b
 

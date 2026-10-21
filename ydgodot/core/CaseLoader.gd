@@ -41,7 +41,21 @@ func load_case() -> bool:
 		return false
 	case_def = r
 	_index()
+	validate_nodes()
 	return true
+
+
+## 把所有场景 / 容器物品的节点清单过一遍：写错的 id 直接打到输出面板，
+## 不让它在画布上静默消失（资源被删 / 改名后 id 失配是最常见的一种）。
+func validate_nodes() -> Array:
+	unknown_nodes.clear()
+	for s in case_def.scenes:
+		nodes_of_scene(s)
+	for it in case_def.items:
+		nodes_of_item(it)
+	if not unknown_nodes.is_empty():
+		push_warning("画布节点清单有 %d 个 id 解析不到：%s" % [unknown_nodes.size(), str(unknown_nodes)])
+	return unknown_nodes
 
 
 func _index() -> void:
@@ -132,6 +146,53 @@ func label_of(kind: String, id: String) -> String:
 func scene_title(id: String) -> String:
 	var s := scene_of(id)
 	return s.title if s != null else id
+
+
+# ── 画布节点清单（显式数据）──────────────────────────────────────────────
+## 场景 / 容器物品展开时长出哪些节点，**只读资源上的四栏 id**，不再从正文标签推。
+## 正文与画布从此互不影响：正文改写、标签删净，画布该有的东西一个不少。
+## 顺序固定 item → char → loc → clue（回忆时刻按这个序算入场偏移）。
+## 写错的 id 不会静默当空气：收进 `unknown_nodes`，测试与装载日志都会报。
+
+var unknown_nodes: Array = []     # ["SCENES_garden → item:ITEM_xxx"]
+
+func nodes_of_scene(s: SceneDef) -> Array:
+	if s == null:
+		return []
+	return _merge_nodes(s.node_items, s.node_chars, s.node_locs, s.node_clues, s.id)
+
+
+func nodes_of_item(it: ItemDef) -> Array:
+	if it == null:
+		return []
+	return _merge_nodes(it.node_items, it.node_chars, it.node_locs, it.node_clues, it.id)
+
+
+## 按容器 id 取节点清单（场景 / 时刻在前，其次容器物品）
+func container_nodes(kind: String, id: String) -> Array:
+	var k := String(kind)
+	if k == "loc" or k == "time" or k == "scene":
+		return nodes_of_scene(scene_of(id))
+	return nodes_of_item(item_of(id))
+
+
+func _merge_nodes(items_s: PackedStringArray, chars_s: PackedStringArray,
+		locs_s: PackedStringArray, clues_s: PackedStringArray, host_id: String) -> Array:
+	var out: Array = []
+	_collect_ids(out, "item", items_s, items, host_id)
+	_collect_ids(out, "char", chars_s, chars, host_id)
+	_collect_ids(out, "loc", locs_s, scenes, host_id)
+	_collect_ids(out, "clue", clues_s, clues, host_id)
+	return out
+
+
+func _collect_ids(out: Array, kind: String, ids: PackedStringArray,
+		table: Dictionary, host_id: String) -> void:
+	for id in ids:
+		if table.has(id):
+			out.append({"kind": kind, "id": String(id)})
+		else:
+			unknown_nodes.append("%s → %s:%s" % [host_id, kind, id])
 
 
 func is_time_id(id: String) -> bool:

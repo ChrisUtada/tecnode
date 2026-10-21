@@ -150,7 +150,11 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("推演器在首位", scene.dbg_icon_pos("infer").x == 18.0 and scene.dbg_icon_pos("infer").y == 16.0,
 		str(scene.dbg_icon_pos("infer")))
 	var pitch: float = float(scene.dbg_icon_pos("goto").y) - float(scene.dbg_icon_pos("infer").y)
-	check("步距 85", absf(pitch - 85.0) < 0.01, str(pitch))
+	## Web `resetIconPositions`：pitch = max(ICON_H+6, min(85, floor((H - ICON_TOP - 12) / n)))
+	## —— 桌面够高时是 85，720 基准下（desk 668）算出 80。断言跟公式走，不写死。
+	var want_pitch: float = clampf(floorf((scene._desk.size.y - 16.0 - 12.0) / 8.0), 70.0, 85.0)
+	check("步距按可用高度压缩（Web 同口径）", absf(pitch - want_pitch) < 0.01,
+		str(pitch) + " / want " + str(want_pitch))
 	var even := true
 	for i in range(1, apps.size()):
 		var gap: float = scene.dbg_icon_pos(String(apps[i])).y - scene.dbg_icon_pos(String(apps[i - 1])).y

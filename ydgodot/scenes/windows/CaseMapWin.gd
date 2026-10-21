@@ -23,8 +23,7 @@ func _build_map() -> void:
 		"每个地址对应一宗案件。\n"
 		+ "在本案捕获「真名」后，下一案的地址才会点亮。\n"
 		+ "案件窗「–」收进右下角案件卡片；「×」收进本图标。\n"
-		+ "两种情况都会自动保存，点本案那行即可展开。",
-		12, TecTheme.MUTED)
+		+ "两种情况都会自动保存，点本案那行即可展开。", TecTheme.FS_BODY, TecTheme.MUTED)
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tip.add_theme_constant_override("line_spacing", 3)
 	tip.custom_minimum_size = Vector2(content.size.x, 0)
@@ -83,7 +82,7 @@ func _make_row(c: Dictionary) -> Control:
 	glyph_box.add_theme_stylebox_override("panel",
 		TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.EDGE))
 	hb.add_child(glyph_box)
-	var glyph := TecTheme.label("▣" if known else "▢", 16,
+	var glyph := TecTheme.label("▣" if known else "▢", TecTheme.FS_BODY,
 		TecTheme.LINE if known else TecTheme.FAINT)
 	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -103,8 +102,7 @@ func _make_row(c: Dictionary) -> Control:
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(title)
 
-	var note := TecTheme.label(catalog.note_for(id) if known else String(c["note"]),
-		11, TecTheme.FAINT)
+	var note := TecTheme.label(catalog.note_for(id) if known else String(c["note"]), TecTheme.FS_BODY, TecTheme.MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.custom_minimum_size = Vector2(240, 0)
 	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -142,7 +140,7 @@ func _make_row(c: Dictionary) -> Control:
 	badge.add_theme_stylebox_override("panel", state_style)
 	hb.add_child(badge)
 
-	var state := TecTheme.label(state_text, 11,
+	var state := TecTheme.label(state_text, TecTheme.FS_BODY,
 		TecTheme.CARD if state_kind == "on" else TecTheme.MUTED)
 	state.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	state.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

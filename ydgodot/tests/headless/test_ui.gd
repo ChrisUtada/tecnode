@@ -26,13 +26,34 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 
-	check("桌面建起来了", scene != null and scene.dbg_state()["cards"] >= 2, str(scene.dbg_state()))
+	check("桌面建起来了", scene != null and scene.dbg_state()["cards"] == 1, str(scene.dbg_state()))
+	check("开局只有一张卡：未探索的起始场景（Web `17-boot.js` 同口径）",
+		_cards().size() == 1 and _cards().has("loc:SCENES_garden"), str(_cards().keys()))
 
 	scene.dbg_expand("SCENES_garden")
 	await process_frame
 	var cards: Dictionary = _cards()
-	check("展开后卡片数增加", cards.size() >= 6, str(cards.size()))
-	check("手电筒与黑影都在画布上", cards.has(TORCH) and cards.has(SHADOW))
+	check("展开后卡片数增加", cards.size() >= 5, str(cards.size()))
+	check("开局不凭空给手电筒（它在左侧抽屉里，要自己开）", not cards.has(TORCH))
+	check("黑影已上画布", cards.has(SHADOW))
+
+	# ── 容器链（P1.2）：双击书桌 → 抽屉 → 选项 → 左侧抽屉 → 手电筒 ──
+	scene.dbg_activate("item:ITEM_shuzhuo")
+	await process_frame
+	var cards2: Dictionary = _cards()
+	check("双击书桌：抽屉上画布", cards2.has("item:ITEM_chouti"))
+	check("双击书桌：笔记与台灯也上画布", cards2.has("item:ITEM_sxbj") and cards2.has("item:ITEM_taideng"))
+
+	scene.dbg_activate("item:ITEM_chouti")
+	await process_frame
+	var cards3: Dictionary = _cards()
+	check("双击抽屉（choice）：两个抽屉场景都上画布",
+		cards3.has("loc:SCENES_choutiyi") and cards3.has("loc:SCENES_choutier"))
+
+	scene.dbg_activate("loc:SCENES_choutiyi")
+	await process_frame
+	check("展开左侧抽屉：手电筒出现", _cards().has("item:ITEM_shoudiantong"))
+	cards = _cards()
 
 	# 1) 没点亮直接拖：发光门拦下
 	_drag(cards[TORCH], cards[SHADOW])
@@ -55,23 +76,6 @@ func _initialize() -> void:
 	check("尸体场景卡片已出现", _cards().has("loc:SCENES_body"))
 	check("尸体的实体卡片已出现（绷带）", _cards().has("item:ITEMS_bd"))
 
-	# ── 容器链（P1.2）：双击书桌 → 抽屉 → 选项 → 左侧抽屉 → 手电筒 ──
-	scene.dbg_activate("item:ITEM_shuzhuo")
-	await process_frame
-	var cards2: Dictionary = _cards()
-	check("双击书桌：抽屉上画布", cards2.has("item:ITEM_chouti"))
-	check("双击书桌：笔记与台灯也上画布", cards2.has("item:ITEM_sxbj") and cards2.has("item:ITEM_taideng"))
-
-	scene.dbg_activate("item:ITEM_chouti")
-	await process_frame
-	var cards3: Dictionary = _cards()
-	check("双击抽屉（choice）：两个抽屉场景都上画布",
-		cards3.has("loc:SCENES_choutiyi") and cards3.has("loc:SCENES_choutier"))
-
-	scene.dbg_activate("loc:SCENES_choutiyi")
-	await process_frame
-	check("展开左侧抽屉：手电筒出现", _cards().has("item:ITEM_shoudiantong"))
-
 	# 再双击书桌 = 收起：它的孩子被藏起来
 	scene.dbg_activate("item:ITEM_shuzhuo")
 	await process_frame
@@ -80,6 +84,10 @@ func _initialize() -> void:
 	# 抽屉有 cond 边连到场外的抽屉场景 → 按 Web 的 recomputeHidden 口径「跟场外有连线的留下」
 	check("折叠后：有场外连线的节点留在画布上", (_cards()["item:ITEM_chouti"] as NodeCard).visible == true)
 	check("折叠后：没有场外连线的节点被藏起来", (_cards()["item:ITEM_taideng"] as NodeCard).visible == false)
+	# 手电筒挂在被折叠的左侧抽屉上，随之收起（Web 同口径）；后面的用例还要用它 → 重新展开书桌
+	scene.dbg_activate("item:ITEM_shuzhuo")
+	await process_frame
+	check("重新展开书桌：手电筒回到画布", (_cards()[TORCH] as NodeCard).visible)
 
 	# ── 密码弹窗（P1.3）：木盒 → 错码 → 对码 ──
 	scene.dbg_ensure("item", "ITEMS_jzmh")
@@ -137,7 +145,7 @@ func _initialize() -> void:
 	check("页眉存在且高 52", head != null and absf(head.size.y - 52.0) < 0.5)
 	var brand := scene.get_node_or_null("header/brand") as Label
 	check("品牌字是 T.E.C-OS（14px）", brand != null and brand.text == "T.E.C-OS"
-		and brand.get_theme_font_size("font_size") == 14)
+		and brand.get_theme_font_size("font_size") == TecTheme.FS_TITLE)
 	var sub := scene.get_node_or_null("header/brand_sub") as Label
 	check("副题沿用 Web 文案", sub != null and sub.text == "节点原型 v2 · 案件 A-001")
 	var crumb := scene.get_node_or_null("header/crumb") as Label
@@ -152,6 +160,13 @@ func _initialize() -> void:
 		if c == null or absf(c.position.x - float(slots[nm])) > 0.5:
 			bad_slots.append(String(nm))
 	check("页眉七件套 x 坐标对齐 Web", bad_slots.is_empty(), str(bad_slots))
+	# 页眉拉满视口宽：不缩放之后它是自适应的，1280 口径下必须正好 1280
+	check("页眉宽 = 视口宽（自适应）", head != null and absf(head.size.x - scene._vw()) < 0.5,
+		str(head.size.x) if head != null else "null")
+	# 主窗跟着桌面长：1280×720 下画布必须仍是 1162 × 613（P3 对拍口径）
+	var stage := scene.get_node_or_null("desk/case_win/body/stage") as Control
+	check("画布 1280 口径 = 1162×613", stage != null and stage.size == Vector2(1162, 613),
+		str(stage.size) if stage != null else "null")
 	var chip := scene.get_node_or_null("header/inv_chip") as Button
 	check("证章摆在 318 / 宽 190", chip != null and absf(chip.position.x - 318.0) < 0.5
 		and absf(chip.size.x - 190.0) < 0.5)
@@ -195,7 +210,7 @@ func _initialize() -> void:
 	check("再右键取消钉住", not bool(scene.graph.node(TORCH).get("pinned", false)))
 
 	# 3) 拖到空白 = 停在原地并**写回数据**（旧版从不写回，下一次重排必然推翻）
-	var drop_blank := torch.get_global_rect().get_center() + Vector2(-40, 30)
+	var drop_blank := _blank_point_near(scene, torch)
 	_press(torch, torch.get_global_rect().get_center())
 	_motion(torch, drop_blank)
 	_release(torch, drop_blank)
@@ -204,6 +219,26 @@ func _initialize() -> void:
 		absf(float(scene.graph.node(TORCH)["x"]) - torch.position.x) < 0.5
 		and absf(float(scene.graph.node(TORCH)["y"]) - torch.position.y) < 0.5,
 		str(torch.position) + " / " + str(scene.graph.node(TORCH).get("x")))
+
+	# 3b) 纯状态互动不得重排（2026-10-21 现场问题：「每次和节点互动，整块画布的卡都会轻微偏移」）
+	#     根因：`_relayout()` 无条件跑 260 轮力导向，而这套参数**不收敛** —— 实测同一批节点连跑 8 次，
+	#     单次最大位移 194 → 72 → 38 → 21 → 12 → 6.9 → 3.9 → 2.3 → 1.3px，每跑一次全画布漂一次。
+	#     Web 只在「真长出节点」时 `layout()`（09-commands.js：「开关灯只重绘 —— 重排会让灯自己跳位置」）。
+	var pos_struct := {}
+	for k in _cards().keys():
+		pos_struct[String(k)] = (_cards()[k] as Control).position
+	scene.dbg_activate(TORCH)                 # 点亮 / 熄灭手电筒 = 纯状态变化，结构没变
+	await process_frame
+	scene._relayout()                         # 结构没变的普通重排
+	scene._relayout()
+	await process_frame
+	var drift_max := 0.0
+	for k in pos_struct.keys():
+		if _cards().has(k):
+			drift_max = maxf(drift_max, (pos_struct[k] as Vector2).distance_to((_cards()[k] as Control).position))
+	check("纯状态互动（点亮 / 普通重排）不挪任何一张卡", drift_max < 0.01, str(drift_max))
+	scene.dbg_activate(TORCH)                 # 熄回去，保持后面用例的前提（未点亮）
+	await process_frame
 
 	# 4) 落点表：线索册拒收非线索 / 证物袋什么都收（并回原位）
 	var bag_icon: Control = scene.get_node("desk/icons/icon_bag")
@@ -523,7 +558,11 @@ func _initialize() -> void:
 	var mir: NodeCard = scene._card_mirror
 	check("拖起：镜像挂在桌布上", mir != null and is_instance_valid(mir)
 		and mir.get_parent() == scene.get_node("desk"), str(mir))
-	check("拖起：原卡隐藏", not torch4.visible)
+	# 原件让位给镜像：**不能用 visible=false**（隐藏的 Control 会被 GUI 命中判定剔除，
+	# 后续 motion 投递不到它 ⇒ 拖一下就僵住、松手也收不到）。只降透明度，事件照收。
+	check("拖起：原卡让位（全透明但仍在树里）",
+		torch4.visible and torch4.is_visible_in_tree() and torch4.modulate.a < 0.01,
+		str(torch4.modulate.a) + " / visible=" + str(torch4.visible))
 	check("拖起：镜像不收输入", mir == null or mir.mouse_filter == Control.MOUSE_FILTER_IGNORE)
 	check("拖起：镜像跟着原卡",
 		mir != null and mir.global_position.is_equal_approx(torch4.get_global_position()),
@@ -553,7 +592,7 @@ func _initialize() -> void:
 	var far20: Vector2 = start20 + Vector2(480.0, -260.0)
 	scene.graph.node(TORCH)["x"] = far20.x
 	scene.graph.node(TORCH)["y"] = far20.y
-	scene._relayout(true)
+	scene._relayout(true, true)
 	var target20: Vector2 = Vector2(float(scene.graph.node(TORCH)["x"]), float(scene.graph.node(TORCH)["y"]))
 	check("重排：搬家目标离原位很远", target20.distance_to(start20) > 2.0,
 		str(target20) + " / " + str(start20))
@@ -706,7 +745,7 @@ func _initialize() -> void:
 	var far23: Vector2 = tk23.position + Vector2(420.0, -240.0)
 	scene.graph.node(TORCH)["x"] = far23.x
 	scene.graph.node(TORCH)["y"] = far23.y
-	scene._relayout(true)
+	scene._relayout(true, true)
 	await process_frame
 	check("前提：卡正处在飞行补间里", scene._move_twens.has(TORCH))
 	_press(tk23, tk23.get_global_rect().get_center())
@@ -716,7 +755,7 @@ func _initialize() -> void:
 	await create_timer(0.2).timeout
 	check("按下后卡不再自己漂", tk23.position.is_equal_approx(frozen23),
 		str(tk23.position) + " / " + str(frozen23))
-	scene._relayout()   # 数据位照旧收干净
+	scene._relayout(false, true)   # 数据位照旧收干净
 	# 窗口点击提层走 rank：日志窗按下提层后仍在 icons / 详情之下（不越 rank 盖上）
 	# 先把日志窗关到已知态（S22 里开着），再开一份新的
 	if scene._log_win != null and is_instance_valid(scene._log_win):
@@ -738,6 +777,100 @@ func _initialize() -> void:
 	scene._toggle_log()
 	await process_frame
 
+	# 24) 真实事件路由下的拖动（2026-10-21 现场问题：节点拖一下就僵住，之后整块画布跟着鼠标平移）
+	#     上面的用例都是直接调 `card._gui_input(ev)`，绕过了命中判定与 mouse_focus —— 恰好躲开了这个 bug。
+	#     这一节把事件真的推进 viewport，逐步验「跟手 / 收尾」。
+	# 前面的用例留了几扇窗口开着；真实事件会遇到「最上面的窗吃掉按下」，
+	# 先把它们收掉，让画布露出来（这一段只关心事件路由，不关心窗口）
+	scene.dbg_close_mem()
+	if scene._map_win != null and is_instance_valid(scene._map_win):
+		scene._toggle_case_map()
+	for ch in scene._desk.get_children():
+		if ch is NarrCard and (ch as Control).is_visible_in_tree():
+			ch.queue_free()
+	await process_frame
+	scene.dbg_expand("SCENES_garden")
+	await process_frame
+	# 前面的用例把卡片挪得很远；真实事件按屏幕坐标投递，先让画布回到「适应窗口」
+	scene._relayout()
+	scene._fit_view()
+	await process_frame
+	await process_frame
+	var k24 := "loc:SCENES_garden"
+	var c24: NodeCard = _cards().get(k24, null)
+	check("前提：目标卡在画布上", c24 != null and c24.visible)
+	if c24 != null:
+		var r24: Vector2 = c24.get_global_rect().get_center()
+		# 适应窗口后卡片很小、会互相压住；真实事件命中的是最上面那张，先把目标提到最前
+		c24.move_to_front()
+		await process_frame
+		var p24: Vector2 = c24.position
+		_vpush_btn(r24, true)
+		await process_frame
+		_vpush_mov(r24 + Vector2(18, 10))
+		await process_frame
+		check("真实路由：拖动中镜像挂上", scene._card_mirror != null and is_instance_valid(scene._card_mirror))
+		check("真实路由：原卡全透明（入场 pop 补间不会把透明度抢回去）",
+			c24.modulate.a < 0.01, str(c24.modulate.a))
+		_vpush_mov(r24 + Vector2(90, 52))
+		await process_frame
+		var want24: Vector2 = p24 + Vector2(90, 52) / scene._view_k
+		check("真实路由：第二段 motion 仍跟手（不是只跟第一下）",
+			c24.position.distance_to(want24) < 1.5, str(c24.position) + " / want " + str(want24))
+		_vpush_mov(r24 + Vector2(150, 88))
+		await process_frame
+		check("真实路由：第三段 motion 仍跟手",
+			c24.position.distance_to(p24 + Vector2(150, 88) / scene._view_k) < 1.5, str(c24.position))
+		_vpush_btn(r24 + Vector2(150, 88), false)
+		await process_frame
+		check("真实路由：松手清空拖动会话", scene._drag_key == "")
+		check("真实路由：松手镜像退场", scene._card_mirror == null)
+		check("真实路由：松手透明度复原", is_equal_approx(c24.modulate.a, 1.0), str(c24.modulate.a))
+		check("真实路由：松手坐标写回数据",
+			absf(float(scene.graph.node(k24)["x"]) - c24.position.x) < 0.5
+			and absf(float(scene.graph.node(k24)["y"]) - c24.position.y) < 0.5,
+			str(scene.graph.node(k24)["x"]) + " / " + str(c24.position.x))
+		# 残留会话的兜底：假装上一轮松手丢了，下一次按下应先把卡落地、不进入平移
+		scene._drag_key = k24
+		var world24: Vector2 = scene._card_layer.position
+		_vpush_btn(Vector2(420, 640), true)
+		await process_frame
+		_vpush_mov(Vector2(470, 680))
+		await process_frame
+		check("残留会话：新按下先收尾、不平移画布",
+			scene._drag_key == "" and scene._card_layer.position.is_equal_approx(world24),
+			"drag_key=" + scene._drag_key + " world=" + str(scene._card_layer.position - world24))
+		_vpush_btn(Vector2(470, 680), false)
+		await process_frame
+
+	# 25) 桌布线索卡：拖动必须真的跟手（此前只判「移动过」、位置一动不动）
+	var mw25: MatrixWin = scene.dbg_open_matrix()
+	await process_frame
+	scene.dbg_ensure("clue", "CLUES_nm")
+	scene.dbg_matrix_assign(clue_key)
+	await process_frame
+	var ch25: Control = mw25._chips.get("CLUES_nm", null) as Control
+	check("前提：桌布上有芯片", ch25 != null)
+	if ch25 != null:
+		var cp25: Vector2 = ch25.get_global_rect().get_center()
+		var cpos25: Vector2 = ch25.global_position
+		_chip_press(ch25, cp25)
+		_chip_motion(ch25, cp25 + Vector2(16, 10))
+		var mir25: Control = mw25._drag_mirror
+		check("桌布拖动：出镜像", mir25 != null and is_instance_valid(mir25))
+		check("桌布拖动：原件让位（全透明但仍在树里）",
+			ch25.is_visible_in_tree() and ch25.modulate.a < 0.01, str(ch25.modulate.a))
+		_chip_motion(ch25, cp25 + Vector2(70, 40))
+		check("桌布拖动：镜像跟手",
+			mir25 != null and mir25.global_position.is_equal_approx(cpos25 + Vector2(54, 30)),
+			str(mir25.global_position if mir25 != null else Vector2.ZERO) + " / want "
+				+ str(cpos25 + Vector2(54, 30)))
+		_chip_release(ch25, cp25 + Vector2(70, 40))
+		await process_frame
+		check("桌布内松手：镜像撤掉", mw25._drag_mirror == null)
+		check("桌布内松手：原件复原", is_equal_approx(ch25.modulate.a, 1.0), str(ch25.modulate.a))
+		check("桌布内松手：仍留在桌布", mw25._chips.has("CLUES_nm"))
+
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)
 
@@ -749,6 +882,32 @@ func _cards() -> Dictionary:
 		if c is NodeCard:
 			out[(c as NodeCard).card_key] = c
 	return out
+
+
+## 「拖到空白」用的落点：必须在**任何落点之外、也没被别的卡压住**。
+## 不能写死 `center + (-40, 30)` —— 布局会随卡片集合变（2026-10-21：开局不再预置手电筒后，
+## 它被弹簧推到证物袋窗上，那一拖直接判成「收进袋」，后面两条断言跟着崩）。
+func _blank_point_near(scene: Control, card: NodeCard) -> Vector2:
+	var base := card.get_global_rect().get_center()
+	for off in [Vector2(-40, 30), Vector2(70, 45), Vector2(-80, -55), Vector2(95, -35), Vector2(0, 90)]:
+		var p: Vector2 = base + off
+		var clear := true
+		for t in scene._drop_targets():
+			if (t["rect"] as Rect2).has_point(p):
+				clear = false
+				break
+		if not clear:
+			continue
+		for k in scene._cards.keys():
+			var c: NodeCard = scene._cards[k]
+			if c == card or not c.visible:
+				continue
+			if c.get_global_rect().has_point(p):
+				clear = false
+				break
+		if clear:
+			return p
+	return base + Vector2(-40, 30)
 
 
 func _press(card: NodeCard, pos: Vector2) -> void:
@@ -772,6 +931,25 @@ func _motion(card: NodeCard, pos: Vector2) -> void:
 	ev.global_position = pos
 	ev.button_mask = MOUSE_BUTTON_MASK_LEFT
 	card._gui_input(ev)
+
+
+## 把事件真的推进 viewport（走命中判定 + mouse_focus），与直接调 `_gui_input` 互补：
+## 后者绕过了事件投递，看不出「隐藏的 Control 收不到 motion」这类问题。
+func _vpush_btn(at: Vector2, pressed: bool) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = pressed
+	ev.position = at
+	ev.global_position = at
+	root.push_input(ev, true)
+
+
+func _vpush_mov(at: Vector2) -> void:
+	var ev := InputEventMouseMotion.new()
+	ev.position = at
+	ev.global_position = at
+	ev.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(ev, true)
 
 
 ## 拖动：`to` 可以是另一张卡（组合），也可以是桌面图标 / 窗口（落点）

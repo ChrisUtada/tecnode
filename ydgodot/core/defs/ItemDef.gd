@@ -1,6 +1,8 @@
+@tool
 class_name ItemDef
 extends Resource
 ## 物品（含「容器物品」：书桌 / 抽屉这类 content 里带标签的）。
+## ⚠ `@tool` 与四栏 `PackedStringArray` 的默认值都不能删 —— 原因见 `SceneDef.gd` 顶部注释。
 
 @export var id: String = ""
 @export var label: String = ""
@@ -18,3 +20,14 @@ extends Resource
 @export var commands: Array[CommandDef] = []
 @export var excerpts: Array[ExcerptDef] = []
 @export var hidden_clue: HiddenClueDef = null
+
+## ── 画布节点 ─────────────────────────────────────────────────────────────
+## 容器物品（书桌 / 抽屉 / 垃圾桶）展开时倒出来的东西。与场景同一套语义：
+## **只认这四栏**，正文里写了什么标签都不再决定展开出什么。四栏全空 = 不是容器。
+## 与场景同一套语义与同一套 id 存储理由（见 SceneDef 的注释）。
+## 检查器里由 `addons/case_nodes/` 提供资源选择列表，不用手打 id。
+@export_group("画布节点")
+@export var node_items: PackedStringArray = PackedStringArray()
+@export var node_chars: PackedStringArray = PackedStringArray()
+@export var node_locs: PackedStringArray = PackedStringArray()
+@export var node_clues: PackedStringArray = PackedStringArray()

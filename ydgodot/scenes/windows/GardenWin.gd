@@ -45,11 +45,11 @@ func _build_content() -> void:
 	head.add_theme_constant_override("separation", 8)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(head)
-	var t := TecTheme.label("真名留下的东西", 12, TecTheme.LINE2)
+	var t := TecTheme.label("真名留下的东西", TecTheme.FS_BODY, TecTheme.MUTED)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_child(t)
-	var note := TecTheme.label("种子：拖进花圃", 10, TecTheme.MUTED)
+	var note := TecTheme.label("种子：拖进花圃", TecTheme.FS_BODY, TecTheme.MUTED)
 	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_child(note)
 
@@ -66,7 +66,7 @@ func _build_content() -> void:
 	_field.add_child(bg)
 	content.add_child(_field)
 
-	_hint = TecTheme.label("把种子拖到这里", 13, TecTheme.MUTED)
+	_hint = TecTheme.label("把种子拖到这里", TecTheme.FS_TITLE, TecTheme.MUTED)
 	_hint.name = "garden_hint"
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -146,7 +146,7 @@ func _make_plant(idx: int, plot: Dictionary) -> Control:
 		TecTheme.flat(TecTheme.LINE if bloom else TecTheme.CARD, 6,
 			TecTheme.EDGE if bloom else TecTheme.EDGE_SOFT, 1))
 	p.add_child(chip)
-	var lab := TecTheme.label(GardenSystem.STAGE_NAMES[st], 11,
+	var lab := TecTheme.label(GardenSystem.STAGE_NAMES[st], TecTheme.FS_BODY,
 		TecTheme.TEXT if bloom else TecTheme.MUTED)
 	lab.name = "Label"
 	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -168,7 +168,7 @@ func _make_plant(idx: int, plot: Dictionary) -> Control:
 		bar.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 3, TecTheme.LINE, 0))
 		p.add_child(bar)
 	else:
-		var more := TecTheme.label("点击花朵", 10, TecTheme.LINE)
+		var more := TecTheme.label("点击花朵", TecTheme.FS_BODY, TecTheme.LINE)
 		more.position = Vector2(0, 88)
 		more.size = Vector2(PLANT_W, 16)
 		more.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -397,10 +397,10 @@ func _rebuild_narr() -> void:
 	head.add_theme_constant_override("separation", 8)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(head)
-	var t := TecTheme.label("花魄", 17, TecTheme.TEXT)
+	var t := TecTheme.label("花魄", TecTheme.FS_TITLE, TecTheme.TEXT)
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_child(t)
-	var sub := TecTheme.label("真名 · 形成说明", 10, TecTheme.MUTED)
+	var sub := TecTheme.label("真名 · 形成说明", TecTheme.FS_BODY, TecTheme.MUTED)
 	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -408,19 +408,19 @@ func _rebuild_narr() -> void:
 	var x := TecTheme.button("×")
 	x.custom_minimum_size = Vector2(24, 22)
 	x.size = Vector2(24, 22)
-	x.add_theme_font_size_override("font_size", 11)
+	x.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 	x.pressed.connect(close_narr)
 	head.add_child(x)
 
 	for i in shown:
-		var l := TecTheme.label(String(segs[i]), 13, TecTheme.LINE)
+		var l := TecTheme.label(String(segs[i]), TecTheme.FS_TITLE, TecTheme.LINE)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.custom_minimum_size = Vector2(maxf(w - 28.0, 120.0), 0)
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_child(l)
 	if shown < segs.size():
-		var more := TecTheme.label("点一下 · 继续", 10, TecTheme.MUTED)
+		var more := TecTheme.label("点一下 · 继续", TecTheme.FS_BODY, TecTheme.MUTED)
 		more.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		more.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_child(more)

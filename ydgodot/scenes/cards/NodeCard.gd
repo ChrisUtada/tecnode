@@ -95,6 +95,9 @@ var _warn := false
 var _hover := false
 var _dragging := false
 var _moved := false
+## 聚焦淡化 / 拖动让位（两者共用一条 alpha：`_apply_alpha()` 里合成，见 set_dim / set_ghost）
+var _dimmed := false
+var _ghost := false
 var _hub := false
 var _pinned := false
 var _over := false
@@ -215,7 +218,7 @@ func _build(w: float, h: float) -> void:
 	(_border as DashBorder).radius = float(TecTheme.R_SM)
 	add_child(_border)
 
-	_title = TecTheme.label("", 12, TecTheme.TEXT)
+	_title = TecTheme.label("", TecTheme.FS_TITLE, TecTheme.TEXT)
 	_title.name = "title"
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -224,35 +227,37 @@ func _build(w: float, h: float) -> void:
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_title)
 
-	_sub = TecTheme.label("", TecTheme.FS_SMALL, TecTheme.FAINT)
+	_sub = TecTheme.label("", TecTheme.FS_BODY, TecTheme.FAINT)
 	_sub.name = "sub"
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_sub)
 
-	_title.position = Vector2(PAD + 7.0, PAD + h * 0.5 - 15.0)
+	_title.position = Vector2(PAD + 7.0, PAD + h * 0.5 - 16.0)
 	_title.size = Vector2(w - 14.0, 16.0)
-	_sub.position = Vector2(PAD + 7.0, PAD + h * 0.5 + 2.0)
-	_sub.size = Vector2(w - 14.0, 14.0)
+	_sub.position = Vector2(PAD + 7.0, PAD + h * 0.5)
+	_sub.size = Vector2(w - 14.0, 16.0)
 
-	_warn_badge = TecTheme.label("无文本入口", 9, TecTheme.TEXT)
+	# 角标：字统一 12px 后跟着放大（9px 时「无文本入口」是 45px 宽，12px 要 60px）。
+	# 位置仍按 Web 的「右上 / 左上出沿」口径，只把宽度让出来。
+	_warn_badge = TecTheme.label("无文本入口", TecTheme.FS_BODY, TecTheme.TEXT)
 	_warn_badge.name = "warn"
 	_warn_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_warn_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_warn_badge.position = Vector2(PAD + w - 52.0, -1.0)
-	_warn_badge.size = Vector2(60.0, 17.0)
+	_warn_badge.position = Vector2(PAD + w - 58.0, -2.0)
+	_warn_badge.size = Vector2(66.0, 19.0)
 	_warn_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, 9,
 		TecTheme.TEXT, 2))
 	_warn_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_warn_badge.visible = false
 	add_child(_warn_badge)
 
-	_badge = TecTheme.label("新", 9, TecTheme.CARD)
+	_badge = TecTheme.label("新", TecTheme.FS_BODY, TecTheme.CARD)
 	_badge.name = "unread"
 	_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_badge.position = Vector2(PAD + w - 14.0, -1.0)
-	_badge.size = Vector2(20.0, 17.0)
+	_badge.position = Vector2(PAD + w - 14.0, -2.0)
+	_badge.size = Vector2(20.0, 19.0)
 	_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.LINE, 9,
 		TecTheme.LINE, 1))
 	_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -260,12 +265,12 @@ func _build(w: float, h: float) -> void:
 	add_child(_badge)
 
 	# 「已固定」药丸：Web 放在**左上角**，与右上角的「新」各自占位、可以同时存在
-	_pin_badge = TecTheme.label("已固定", 9, TecTheme.CARD)
+	_pin_badge = TecTheme.label("已固定", TecTheme.FS_BODY, TecTheme.CARD)
 	_pin_badge.name = "pin"
 	_pin_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_pin_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_pin_badge.position = Vector2(PAD - 2.0, -1.0)
-	_pin_badge.size = Vector2(38.0, 17.0)
+	_pin_badge.position = Vector2(PAD - 2.0, -2.0)
+	_pin_badge.size = Vector2(42.0, 19.0)
 	_pin_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.LINE, 9,
 		TecTheme.LINE, 1))
 	_pin_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -355,14 +360,18 @@ func _apply_plain_look() -> void:
 	_mat.set_shader_parameter("col_hi", TecTheme.BG if flat else Color("fbf8ee"))
 	_mat.set_shader_parameter("col_mid", TecTheme.BG if flat else Color("f5f2e8"))
 	_mat.set_shader_parameter("col_lo", TecTheme.BG if flat else Color("eee9d7"))
+	## 1px 描边：原值 0.30（shader 内 ×1.4 = 0.42，对纸面 2.12:1）比 W3C 给非文本边界的
+	## 3:1 还低，卡片就成了「浮在雾里」。0.42 → 实测 3.2:1，仍是一条发丝线而不是墨框。
 	_mat.set_shader_parameter("edge_col", Color(0, 0, 0, 0) if flat
-		else Color(0.290, 0.271, 0.204, 0.30))
+		else Color(0.290, 0.271, 0.204, 0.42))
 	_mat.set_shader_parameter("rim_col", Color(0, 0, 0, 0) if flat
 		else Color(1.0, 0.988, 0.945, 0.95))
 	_mat.set_shader_parameter("shade_col", Color(0, 0, 0, 0) if flat
 		else Color(0.306, 0.282, 0.212, 0.30))
 	_title.add_theme_color_override("font_color", TecTheme.MUTED if flat else TecTheme.TEXT)
-	_sub.add_theme_color_override("font_color", TecTheme.FAINT)
+	## 状态行（未探索 / 已探索 / 物品·亮着…）是玩家要读的字，不能用 FAINT：
+	## 卡面 3.27:1 过不了 4.5:1；MUTED 是 6.36:1。FAINT 只留给装饰。
+	_sub.add_theme_color_override("font_color", TecTheme.MUTED)
 	_border.double_line = _hub
 	_border.visible = flat or _hub
 	_border.queue_redraw()
@@ -556,6 +565,20 @@ func _click() -> void:
 var _last_click_global := Vector2.ZERO
 
 
+## 兜底收尾：松手事件没送到时由桌面调用（见 Desktop._abort_card_drag）。
+## 不跑落点判定，把卡按当前坐标直接落地，保证「拖动会话」一定能关掉。
+func cancel_drag() -> void:
+	if not _pressed and not _dragging:
+		return
+	_pressed = false
+	_dragging = false
+	var p := _clamp_pos(position)
+	position = p
+	_home = p
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+	drag_finished.emit(card_key, p, false)
+
+
 func _release_drop(at_global: Vector2) -> void:
 	# 拖拽光标随松手归还（悬停手形由 mouse_default_cursor_shape 天然接管）
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
@@ -636,7 +659,27 @@ func set_hover_state(on: bool) -> void:
 
 ## 「聚焦选中」：与选中卡无关的卡淡化（Web 04-nodes.css `.node.dim{opacity:.32}`）
 func set_dim(on: bool) -> void:
-	var target := Color(1, 1, 1, 0.32) if on else Color(1, 1, 1, 1)
+	_dimmed = on
+	_apply_alpha()
+
+
+## 拖动期间原件让位给镜像（Web 拖动时 `visibility:hidden` + #drag-layer 克隆）。
+## ⚠ 不能用 `visible = false`：Godot 的 GUI 命中判定会跳过「树里不可见」的控件，
+## 拖动第一帧之后鼠标移动就不再投递给这张卡 ⇒ 跟手断流、松手也收不到
+## （现场症状：节点拖一下就僵住，之后按哪都是整块画布在平移）。
+## 这里改成全透明 —— 事件照收，画面交给桌面上的镜像卡。
+func set_ghost(on: bool) -> void:
+	# 入场 pop 还在跑时它会把 modulate.a 逐渐补到 1，与「让位」打架 ⇒ 拖起瞬间直接掐掉
+	if on and _pop != null and _pop.is_valid():
+		_pop.kill()
+		_pop = null
+		scale = Vector2.ONE
+	_ghost = on
+	_apply_alpha()
+
+
+func _apply_alpha() -> void:
+	var target := Color(1, 1, 1, 0.0 if _ghost else (0.32 if _dimmed else 1.0))
 	if modulate != target:
 		modulate = target
 

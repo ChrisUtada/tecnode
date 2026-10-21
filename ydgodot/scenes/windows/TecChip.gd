@@ -57,12 +57,12 @@ func _build_content() -> void:
 	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(meta)
 
-	var nm := TecTheme.label("TEC // 助手", 9, TecTheme.TEXT)
+	var nm := TecTheme.label("TEC // 助手", TecTheme.FS_BODY, TecTheme.TEXT)
 	nm.clip_text = true
 	nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(nm)
 
-	_status = TecTheme.label("助手已收起 · 点此展开", 10, TecTheme.MUTED)
+	_status = TecTheme.label("助手已收起 · 点此展开", TecTheme.FS_BODY, TecTheme.MUTED)
 	_status.name = "tc_status"
 	_status.clip_text = true
 	_status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS

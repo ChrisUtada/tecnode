@@ -214,7 +214,11 @@ func _test_ui() -> void:
 	root.add_child(scene)
 	await process_frame
 	await process_frame
-	check("桌面建起来", scene != null and scene.dbg_state()["cards"] >= 2)
+	check("桌面建起来", scene != null and scene.dbg_state()["cards"] >= 1)
+	# 「现在档的物品在回忆档里应隐藏、切回来应重新可见」需要一件真实存在的物品；
+	# 开局不再预置手电筒（对齐 Web），这里自己造一把
+	scene.dbg_ensure("item", "ITEM_shoudiantong")
+	await process_frame
 
 	scene.dbg_expand("SCENES_fkjl")
 	await process_frame

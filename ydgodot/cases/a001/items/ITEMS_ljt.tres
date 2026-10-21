@@ -10,3 +10,7 @@ id = "ITEMS_ljt"
 label = "垃圾桶"
 desc = "书桌边的垃圾桶中堆积着不知从何而来的灰烬。"
 content = "[item:ITEM_shuzhuo]边的垃圾桶中堆积着不知从何而来的灰烬，像是焚烧什么留下的。数量多得让人不解。<br>在灰烬之中，有一片[item:ITEMS_wbfs]。"
+node_items = PackedStringArray("ITEM_shuzhuo", "ITEMS_wbfs")
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

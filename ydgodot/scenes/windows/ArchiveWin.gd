@@ -79,19 +79,19 @@ func _make_row(tid: String, current: bool) -> Control:
 	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(meta)
 
-	var title := TecTheme.label(case_def.time_label_of(tid), 12, TecTheme.TEXT)
+	var title := TecTheme.label(case_def.time_label_of(tid), TecTheme.FS_BODY, TecTheme.TEXT)
 	title.clip_text = true
 	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(title)
 
-	var sub := TecTheme.label(_brief_of(tid), 10, TecTheme.FAINT)
+	var sub := TecTheme.label(_brief_of(tid), TecTheme.FS_BODY, TecTheme.MUTED)
 	sub.clip_text = true
 	sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(sub)
 
-	var st := TecTheme.label(_status_of(tid, current), 10, TecTheme.FAINT)
+	var st := TecTheme.label(_status_of(tid, current), TecTheme.FS_BODY, TecTheme.MUTED)
 	st.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(st)
 	return row

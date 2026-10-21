@@ -114,6 +114,25 @@ func _initialize() -> void:
 			print("     ✗ ending ", e["id"])
 	check("结局 %d 个逐字段一致（含五感配方 / 分幕）" % jd["endings"].size(), bad == 0, "%d 个不一致" % bad)
 
+	# ── 画布节点清单（显式数据）──
+	# 节点归属只认资源上的四栏 id，正文标签不参与。写错一个 id 不会静默少一个节点：
+	# CaseLoader 把解析不到的收进 unknown_nodes，这里直接判死。
+	var loader := CaseLoader.new()
+	var ok_load := loader.load_case()
+	var bad_nodes: Array = []
+	if ok_load:
+		for s in c.scenes:
+			loader.nodes_of_scene(s)
+		for it in c.items:
+			loader.nodes_of_item(it)
+		bad_nodes = loader.unknown_nodes
+	check("画布节点清单无悬空 id", ok_load and bad_nodes.is_empty(), str(bad_nodes))
+	if ok_load:
+		var garden_nodes: Array = loader.nodes_of_scene(scenes.get("SCENES_garden"))
+		check("花园清单 6 件（正文已无标签，清单照样成立）", garden_nodes.size() == 6, str(garden_nodes.size()))
+		var drawer_nodes: Array = loader.nodes_of_item(items.get("ITEM_shuzhuo"))
+		check("书桌清单 5 项（4 物品 + 返回花园）", drawer_nodes.size() == 5, str(drawer_nodes.size()))
+
 	# ── 引用完整性（Resource 化的核心收益）──
 	var broken := []
 	for it in c.items:
@@ -179,16 +198,19 @@ func _clue_ids(h) -> Array:
 	return out
 
 
+## 正文 / 描述**不再与 JSON 档案比对**：`.tres` 已经是唯一真相源，正文改成什么样
+## 都在 Godot 检查器里直接编辑（JSON 只留作历史档案）。其余字段照旧逐字段对账。
+## 节点的归属也不再由正文标签决定 —— 那件事由下面的「节点清单可解析」守着。
 func _norm_scene(r: SceneDef) -> Dictionary:
-	return {"title": r.title, "content": r.content, "desc": r.desc, "canBePicked": r.can_be_picked,
+	return {"title": r.title, "canBePicked": r.can_be_picked,
 		"hiddenText": (r.hidden_clue.text if r.hidden_clue != null else null),
 		"hiddenIds": _clue_ids(r.hidden_clue)}
 
 
 func _norm_scene_json(d: Dictionary) -> Dictionary:
 	var h = d.get("hiddenClue", null)
-	return {"title": String(d.get("title", "")), "content": String(d.get("content", "")),
-		"desc": String(d.get("desc", "")), "canBePicked": bool(d.get("canBePicked", false)),
+	return {"title": String(d.get("title", "")),
+		"canBePicked": bool(d.get("canBePicked", false)),
 		"hiddenText": (String(h.get("text", "")) if h != null else null),
 		"hiddenIds": (h.get("ids", []) if h != null else [])}
 
@@ -201,7 +223,7 @@ func _norm_item(r: ItemDef) -> Dictionary:
 	for e in r.excerpts:
 		exs.append({"text": e.text,
 			"to": ("loc:" + e.target_scene.id) if e.target_scene != null else ("char:" + e.target_char.id)})
-	return {"label": r.label, "desc": r.desc, "content": r.content, "canBePicked": r.can_be_picked,
+	return {"label": r.label, "canBePicked": r.can_be_picked,
 		"toggleLight": r.toggle_light, "needsLitToUse": r.needs_lit_to_use,
 		"litOn": r.lit_on_message, "litOff": r.lit_off_message, "litFail": r.lit_fail_message,
 		"commands": cmds, "excerpts": exs,
@@ -217,8 +239,8 @@ func _norm_item_json(d: Dictionary) -> Dictionary:
 	for e in d.get("excerpts", []):
 		exs.append({"text": String(e.get("text", "")), "to": String(e.get("to", ""))})
 	var h = d.get("hiddenClue", null)
-	return {"label": String(d.get("label", "")), "desc": String(d.get("desc", "")),
-		"content": String(d.get("content", "")), "canBePicked": bool(d.get("canBePicked", false)),
+	return {"label": String(d.get("label", "")),
+		"canBePicked": bool(d.get("canBePicked", false)),
 		"toggleLight": bool(d.get("toggleLight", false)), "needsLitToUse": bool(d.get("needsLitToUse", false)),
 		"litOn": String(d.get("litOnMessage", "")), "litOff": String(d.get("litOffMessage", "")),
 		"litFail": String(d.get("litFailMessage", "")),
