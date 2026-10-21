@@ -726,6 +726,11 @@ const ZR_MIRROR := 40     # #drag-layer：桌面最高层（批 3 的拖动镜�
 ## 插入点之前，`move_child` 的目标下标要扣掉它自己占的 1 位。
 func _place_z(ctrl: Control, rank: int) -> void:
 	ctrl.set_meta("zrank", rank)
+	# SysWindow/MemCard 的「点击提层」也走这套 rank 表（回调在控件里，这里只负责接线），
+	# 别让标题栏一按 `move_to_front()` 就把窗顶到 icons / toast 之上，破坏批 4 的层序
+	if not bool(ctrl.get_meta("raise_hooked", false)) and ctrl.has_method("set_raise_call"):
+		ctrl.set_raise_call(Callable(self, "_on_window_raise"))
+		ctrl.set_meta("raise_hooked", true)
 	var kids := _desk.get_children()
 	var at := kids.size() - 1
 	var self_idx := kids.find(ctrl)
@@ -737,6 +742,12 @@ func _place_z(ctrl: Control, rank: int) -> void:
 			at = i - 1 if i > self_idx else i
 			break
 	_desk.move_child(ctrl, at)
+
+
+## 窗口标题栏 / 历史卡按下的提层请求：用**自己的 rank** 重新插队（同 rank 仍按顺序，
+## 重按 = 挪到同 rank 组尾部，即 Web 里后来者在上）
+func _on_window_raise(w: Control) -> void:
+	_place_z(w, int(w.get_meta("zrank", ZR_WIN)))
 
 
 func _build_icons() -> void:
@@ -1929,6 +1940,7 @@ func _spawn_card(key: String) -> NodeCard:
 	card.drop_sink = Callable(self, "_handle_card_drop")
 	card.world_rect = Rect2(Vector2.ZERO, Vector2(WORLD_W, WORLD_H))
 	card.selected.connect(_on_card_selected)
+	card.pressed.connect(_on_card_pressed)
 	card.activated.connect(_on_card_activated)
 	card.dragged.connect(_on_card_dragged)
 	card.drag_moved.connect(_on_card_drag_moved)
@@ -1982,6 +1994,12 @@ func _on_card_selected(key: String) -> void:
 		_sync_card_shell(_cards.get(key, null))
 	_apply_focus()
 	_refresh_detail()
+
+
+## 卡片按下（未拖未点都算）：把它的重排落位补间杀掉——卡冻结在指针下面，
+## 双击不会因为卡「飞走了」而落空，拖动起手也不会跟 0.34s 过渡打架
+func _on_card_pressed(key: String) -> void:
+	_kill_move(key)
 
 
 func _on_card_dragged(key: String) -> void:

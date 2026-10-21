@@ -109,6 +109,11 @@
   - 重排位置过渡（R2 / Web `.node{transition: left/top .34s cubic-bezier(.4,0,.2,1)}`）：`_relayout(animated)` —— **折叠 / 展开触发的重排**才播 0.34s cubic 过渡 + 连线逐帧跟着画（`paintEdgesFor(420)` 同口径）；普通重排保持秒到（无头回归与坐标语义都依赖「重排=即刻就位」）；新节点 / 截图流水线直接落位
   - 系统窗 z 序（R3 / Web `05-apps.css`+`06-shell.css` z-index 表）：`ZR_*` 十二档 + `_place_z()`（插到第一个更高 rank 之前、同级按打开顺序）——`case_win(1)` → pw(15)/narr(16) → log(21)/detail(22)/dock(23) → icons(24) → 普通窗(25) → chat(26) → TEC(28) → toast(30) → 镜像(40)；mouse_to_front 全部替换为 rank 插队
   - 回归：全套无头 **14 个脚本 1119 项 0 失败**；`test_ui.gd` 110 → 143（批 4 新增 33：过渡 7 · 反应表 19 · z 序 7）
+- **交互层 · 批 4.5（实机手感三修）**：✅ 已落地（差距报告 §0.6）
+  - 双击无法展开（F1）：`DBL_MS` 280 → **500ms**（浏览器 `dblclick` 默认窗口，正常节奏的两下不再被判成两次单击）
+  - 节点拖动卡顿（F2）：**按下即冻结飞行卡**——`NodeCard` 新信号 `pressed(key)`，press 分支杀掉弹回弹簧并通知 `Desktop._on_card_pressed → _kill_move` 把 0.34s 落位补间杀掉；卡停在指针下面，双击落准、拖起不再跟动画抢 `position`
+  - 点窗撞翻层序（F3）：`SysWindow` / `MemCard` 标题栏按下不再就地 `move_to_front()`（会把窗顶到 icons / toast 之上破坏批 4 层序），改 `raise_now` 回调走 `_place_z(自身 rank)` 重新插队
+  - 回归：全套无头 **14 个脚本 1125 项 0 失败**；`test_ui.gd` 143 → 149（批 4.5 新增 6）
 - **P3 视觉追平**：🔧 进行中，**全屏 diff 7.00% → 2.30%**（1280×800 / 阈值 8，计划目标 < 0.5% 且文字区外为零）
   - 对拍流水线：`tools/pixeldiff/capture_web.cjs`（CDP 无头 Edge，关 LCD 次像素）→ `--shot-p3` → `compare.py`（分区统计 + 差异图 + `start.json`）
   - 已消灭：窗框九切片烘焙（`assets/baked/win_frame.png`，`patch_margin=46`，外沿差异 **0**）、页眉几何逐坐标对齐、**页眉控件高 31 → 25/27**（Button 最小尺寸反顶 `set_size`，见 `_sync_header_sizes`）、枢纽场景双线框、图标块（渐变 150°、描边 alpha、字形高 10px、标签 4px、阴影软度）
@@ -190,7 +195,7 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 | `core/defs/` | 25 个自定义 Resource 类（`SceneDef` / `ItemDef` / `CommandDef` 六子类 / `CharDef` …） |
 | `data/` | `case-a001.json` —— **已冻结为只读档案**（迁移输入 + 对照基准，运行时不再读它） |
 | `assets/raw/` | `src/assets/` 的拷贝（字体 / 头像 / OGG / 花园序列帧） |
-| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 143）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 15）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 103）、`test_p25.gd`（音乐 / 花园 146）、`test_p26.gd`（名册 / 日志 / 图标栏 85）—— **共 1119 项** |
+| `tests/headless/` | `test_p0.gd`（逻辑 20）、`test_ui.gd`（真鼠标事件 149）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 15）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 103）、`test_p25.gd`（音乐 / 花园 146）、`test_p26.gd`（名册 / 日志 / 图标栏 85）—— **共 1125 项** |
 | `docs/` | P0 切片 6 张 + P1 新特性 15 张 + P2 案件 / TEC / 回忆 / 对话 / 音乐 / 花园 / 名册 / 日志 22 张截图，共 43 张（P3 对拍基线从这些图起步） |
 | `tools/` | P1 的 `json_to_tres.gd` 与对拍工具（待建） |
 
@@ -210,11 +215,11 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 - 详情窗：简介 / 状态 / 来源 + 四个重看按钮
 - TEC 对话 / 分析：5–8 秒进度条 + `--fast` 旁路 + 闲聊 + 档案解读 + 右下角助手卡片
 - 结局演出：分幕台词按 `delay` 落下、点击继续、遮罩收幕
-- 无头回归 **14 个脚本 1119 项**，全绿
+- 无头回归 **14 个脚本 1125 项**，全绿
 
 **没做（P4 / 后续）**
 
-- 无 —— README 以前列的三条（反应表产物 / 折叠过渡 / 系统窗 z 序）已随批 4 全部落地（差距报告 §0.5）。
+- 无 —— README 以前列的三条（反应表产物 / 折叠过渡 / 系统窗 z 序）已随批 4 全部落地（差距报告 §0.5）；实机手感三修随批 4.5 落地（§0.6）。
 
 ## 与 Web 版的已知偏差
 

@@ -689,6 +689,55 @@ func _initialize() -> void:
 	scene._hide_tec()
 	await process_frame
 
+	# 23) 手感修复三条：双击窗口放宽到 500ms（浏览器 dblclick 默认）/ 按下冻结飞行卡 /
+	#     窗口点击提层走 rank 表（不再 move_to_front 撞翻 icon/toast 之上的层级）
+	var tk23: NodeCard = _cards()[TORCH]
+	var d23: Vector2 = tk23.get_global_rect().get_center()
+	_press(tk23, d23)
+	_release(tk23, d23)
+	await create_timer(0.35).timeout
+	var lit23 := bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false))
+	_press(tk23, d23)
+	_release(tk23, d23)
+	await process_frame
+	check("双击窗口 500ms：350ms 里的第二下仍算双击",
+		bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false)) != lit23)
+	# 按下冻结：折牌式重排飞着的卡，一按就停在指针下（补间被杀、位置不再漂）
+	var far23: Vector2 = tk23.position + Vector2(420.0, -240.0)
+	scene.graph.node(TORCH)["x"] = far23.x
+	scene.graph.node(TORCH)["y"] = far23.y
+	scene._relayout(true)
+	await process_frame
+	check("前提：卡正处在飞行补间里", scene._move_twens.has(TORCH))
+	_press(tk23, tk23.get_global_rect().get_center())
+	check("按下杀掉落位补间", not scene._move_twens.has(TORCH))
+	_release(tk23, tk23.get_global_rect().get_center())
+	var frozen23: Vector2 = tk23.position
+	await create_timer(0.2).timeout
+	check("按下后卡不再自己漂", tk23.position.is_equal_approx(frozen23),
+		str(tk23.position) + " / " + str(frozen23))
+	scene._relayout()   # 数据位照旧收干净
+	# 窗口点击提层走 rank：日志窗按下提层后仍在 icons / 详情之下（不越 rank 盖上）
+	# 先把日志窗关到已知态（S22 里开着），再开一份新的
+	if scene._log_win != null and is_instance_valid(scene._log_win):
+		scene._toggle_log()   # open → close
+		await process_frame
+	scene._toggle_log()   # close → open
+	await process_frame
+	var e_icons23: Control = scene.get_node("desk/icons")
+	var d23b: Vector2 = (scene._log_win as Control).get_global_rect().get_center() - Vector2(0, 80)
+	var ev23 := InputEventMouseButton.new()
+	ev23.button_index = MOUSE_BUTTON_LEFT
+	ev23.pressed = true
+	ev23.global_position = d23b
+	(scene._log_win as Control)._on_bar_input(ev23)
+	await process_frame
+	check("窗提层后仍在 icons 之下", scene._log_win.get_index() < e_icons23.get_index(),
+		str(scene._log_win.get_index()) + " / " + str(e_icons23.get_index()))
+	check("窗提层 rank 未变", int(scene._log_win.get_meta("zrank", -1)) == 21)
+	scene._toggle_log()
+	await process_frame
+
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)
 
@@ -735,7 +784,7 @@ func _drag(from: NodeCard, to: Control) -> void:
 	_release(from, b)
 
 
-## 单击 = 选中（不激活）；双击 = 两下（280ms 窗口内）才激活 —— 与 Web 的 pointerup + dblclick 同口径
+## 单击 = 选中（不激活）；双击 = 两下（500ms 窗口内）才激活 —— 与 Web 的 pointerup + dblclick 同口径
 func _single_click(card: NodeCard) -> void:
 	var p := card.get_global_rect().get_center()
 	_press(card, p)

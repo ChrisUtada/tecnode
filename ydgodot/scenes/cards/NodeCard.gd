@@ -20,6 +20,8 @@ signal activated(key: String)
 signal combo_requested(tool_key: String, target_key: String)
 signal selected(key: String)
 signal dragged(key: String)
+## 按下（Desktop 用它把飞行中的落位补间杀掉：卡冻结在指针下，双击才落得准）
+signal pressed(key: String)
 ## 拖动过程中每帧抛一次（Desktop 用来刷连线 / 悬停落点高亮）
 signal drag_moved(key: String, at_global: Vector2)
 ## 松手：handled=true 表示被落点消费（已弹回原位）；false 表示停在原位（pos 已夹回边界）
@@ -28,9 +30,9 @@ signal pin_toggled(key: String)
 
 const PAD := 8.0
 const DRAG_THRESHOLD := 5.0
-## 双击判定窗口（Web 是浏览器 dblclick 的默认 ~500ms，这里收紧到 280ms：
-## 像素风的点选节奏本来就快，窗口太长会把「点两下看看」误判成激活）
-const DBL_MS := 280
+## 双击判定窗口（对齐浏览器 dblclick 的默认 ~500ms：之前收紧到 280ms，
+## 玩家用正常节奏点两下就经常被判成两次单击，「双击无法展开」就是这么来的）
+const DBL_MS := 500
 
 const SYMBOL := {"loc": "■ ", "item": "□ ", "char": "● ", "clue": "▲ ", "time": "◆ "}
 const KIND_NAME := {"loc": "场景", "item": "物品", "char": "人物", "clue": "线索", "time": "时刻"}
@@ -503,7 +505,13 @@ func _gui_input(event: InputEvent) -> void:
 			_home = position
 			_moved = false
 			_dragging = false
+			# 按下即定住：杀掉弹回弹簧，并通知 Desktop 杀掉重排飞行的落位补间——
+			# 卡停在指针下面，双击才不会因为卡「飞走了」而落空，拖动也不会跟动画打架
+			if _spring != null and _spring.is_valid():
+				_spring.kill()
+			_spring = null
 			move_to_front()
+			pressed.emit(card_key)
 			accept_event()
 		else:
 			if not _pressed:

@@ -322,11 +322,23 @@ func _on_bar_input(event: InputEvent) -> void:
 			_dragging = true
 			_press = event.global_position
 			_grab = position
-			move_to_front()
+			# 点击提层：Desktop 会把窗按 rank 重新插队（批 4 z 序）；不在桌面里用就地置顶兜底
+			if raise_now.is_valid():
+				raise_now.call(self)
+			else:
+				move_to_front()
 		else:
 			_dragging = false
 	elif event is InputEventMouseMotion and _dragging:
 		position = _grab + (event.global_position - _press)
+
+
+## 提层回调（Desktop._place_z 接进来）：置 true 后标题栏按下不再 move_to_front
+func set_raise_call(c: Callable) -> void:
+	raise_now = c
+
+
+var raise_now := Callable()
 
 
 ## 简单文本块（P0 用；P1 换成打字机 + 标签可点）

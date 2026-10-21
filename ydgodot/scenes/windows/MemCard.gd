@@ -258,7 +258,10 @@ func _on_card_input(event: InputEvent) -> void:
 			_dragged = false
 			_drag_press = event.global_position
 			_drag_grab = position
-			move_to_front()
+			if raise_now.is_valid():
+				raise_now.call(self)
+			else:
+				move_to_front()
 		elif _pressing:
 			_pressing = false
 			if not _dragged:
@@ -268,6 +271,7 @@ func _on_card_input(event: InputEvent) -> void:
 			_dragged = true
 		if _dragged:
 			position = _drag_grab + (event.global_position - _drag_press)
+	# 「点击提层」走 SysWindow.raise_now（Desktop._place_z 接进来的 rank 表回调）
 
 
 func _scroll_to_bottom() -> void:
