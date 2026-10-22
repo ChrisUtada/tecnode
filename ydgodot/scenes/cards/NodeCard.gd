@@ -34,7 +34,8 @@ const DRAG_THRESHOLD := 5.0
 ## 玩家用正常节奏点两下就经常被判成两次单击，「双击无法展开」就是这么来的）
 const DBL_MS := 500
 
-const SYMBOL := {"loc": "■ ", "item": "□ ", "char": "● ", "clue": "▲ ", "time": "◆ "}
+## 类型名。**卡面上不显示它** —— 类型改由左侧的类型色符号承担（见 `ui/KindGlyph.gd`），
+## 这个名字只给详情窗 `_kind_name()` 用。
 const KIND_NAME := {"loc": "场景", "item": "物品", "char": "人物", "clue": "线索", "time": "时刻"}
 const DARK_HI := Color("38372f")
 const DARK_LO := Color("1f1f19")
@@ -70,6 +71,23 @@ var card_key: String = ""
 var kind: String = ""
 var node_data: Dictionary = {}
 
+## ── 缩放分级（LOD）───────────────────────────────────────────────────────
+## 相机缩到 1x 以下时卡片被整体重采样。实测（`--zoom=` 截图取证）：
+##   0.95x 标题「注射器」还能读；0.88x 已经缺笔（读成「注器」）；0.78x 完全认不出。
+## 所以文字只在接近原生格时出现，再往下只留**类型符号** —— 方块/圆/三角对下采样
+## 是鲁棒的，字形不是。这也正好对上卡片本身的尺寸：130px 的卡缩到 0.62 只剩 80px，
+## 两行字根本摆不下。
+##   ≥ 0.86 → 类型符号 + 标题 + 三个角标
+##   < 0.86 → 只剩放大的类型符号（缩略视图看的是拓扑，不是字）
+##
+## **副标整行已删除**（原「已探索 / 未探索 · 双击展开 / 物品 · 亮着 / 线索 · 已捕获」）：
+## 这些状态本来就由边框与填充编码过一次 —— 实线=已探索、虚线+纸色=未探索、金框=亮着、
+## 深色反白=已捕获。每张卡再写一遍等于「标签通胀」：一屏五六张卡都在喊同一句话，
+## 玩家两天后就整行屏蔽了，连带把真正有用的也一起忽略。类型名同理，改由类型色符号承担。
+const LOD_TITLE := 0.86
+var _lod := 1.0
+
+
 ## 落点分派（Desktop 注入）：`func(key, at_global) -> bool`，true = 已消费 ⇒ 弹回原位。
 var drop_sink := Callable()
 ## 拖出画布时的夹回边界（world 坐标；由 Desktop 注入，见 WORLD_RECT）
@@ -78,7 +96,8 @@ var world_rect := Rect2()
 var _mat: ShaderMaterial
 var _bg: ColorRect
 var _title: Label
-var _sub: Label
+## 类型符号：常驻，既是标题左侧的小标记，也是缩略档里唯一的图形（见文件头 LOD 说明）
+var _glyph: KindGlyph
 var _badge: Label
 ## 「无文本入口」药丸（Web `badge.warn`）：与「新」同一右上槽位，先加在 DOM 里
 ## 让「新」盖上去 —— 这里按同样的子节点顺序（warn 在前、新在后）保证叠放一致。
@@ -241,16 +260,21 @@ func _build(w: float, h: float) -> void:
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_title)
 
-	_sub = TecTheme.label("", TecTheme.FS_BODY, TecTheme.FAINT)
-	_sub.name = "sub"
-	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_sub)
+	## 类型符号：常驻。标题左侧的小标记由 `_layout_glyph()` 摆位，颜色是卡上唯一的
+	## 类型色载体（`TecTheme.kind_color`）。
+	_glyph = KindGlyph.new()
+	_glyph.name = "glyph"
+	_glyph.kind = kind
+	_glyph.col = TecTheme.kind_color(kind)
+	_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_glyph)
 
-	_title.position = Vector2(PAD + 7.0, PAD + h * 0.5 - 16.0)
-	_title.size = Vector2(w - 14.0, 16.0)
-	_sub.position = Vector2(PAD + 7.0, PAD + h * 0.5)
-	_sub.size = Vector2(w - 14.0, 16.0)
+	## 单行：标题恒居卡片垂直中线（副标已删，不再分上下半格）。
+	## 左边留 14px 给类型符号，右边留 6px —— 中心偏右 4px，肉眼无感，但保证超长标题
+	## 被 ellipsis 截断时也不会压到符号上。
+	_title.position = Vector2(PAD + 14.0, PAD + h * 0.5 - 8.0)
+	_title.size = Vector2(w - 20.0, 16.0)
+	_layout_glyph()
 
 	# 角标：字统一 12px 后跟着放大（9px 时「无文本入口」是 45px 宽，12px 要 60px）。
 	# 位置仍按 Web 的「右上 / 左上出沿」口径，只把宽度让出来。
@@ -305,20 +329,8 @@ func _build(w: float, h: float) -> void:
 
 
 func refresh() -> void:
-	var sym: String = SYMBOL.get(kind, "")
-	_title.text = sym + String(node_data.get("label", card_key))
-	_sub.text = String(KIND_NAME.get(kind, kind))
-	if _container:
-		if _collapsed:
-			_sub.text = "已折叠 · 双击展开"
-		elif _explored:
-			_sub.text = "已探索"
-		else:
-			_sub.text = "未探索 · 双击展开"
-	if kind == "item" and bool(node_data.get("lit", false)):
-		_sub.text = "物品 · 亮着"
-	if kind == "clue" and bool(node_data.get("captured", false)):
-		_sub.text = "线索 · 已捕获"
+	## 卡面只有名字。类型 → 左侧类型色符号；状态 → 边框与填充（见 `_apply_plain_look`）
+	_title.text = String(node_data.get("label", card_key))
 	_apply_shell()
 
 
@@ -351,9 +363,9 @@ func _apply_shell() -> void:
 		_apply_lit_look()
 	else:
 		_apply_plain_look()
-	_badge.visible = _unread
-	_warn_badge.visible = _warn
-	_pin_badge.visible = _pinned
+	_badge.visible = _unread and _lod_show_title()
+	_warn_badge.visible = _warn and _lod_show_title()
+	_pin_badge.visible = _pinned and _lod_show_title()
 	if _glow != null:
 		_glow.visible = lit
 
@@ -364,12 +376,67 @@ func set_warn(on: bool) -> void:
 	if _warn == on:
 		return
 	_warn = on
-	_warn_badge.visible = on
+	_warn_badge.visible = on and _lod_show_title()
 
 
-## 普通态（含未探索 / 已折叠的扁平虚框）
+## 文字与角标只在「接近原生格」的倍率出现（0.88x 实测已缺笔、0.78x 完全认不出）
+func _lod_show_title() -> bool:
+	return _lod >= LOD_TITLE
+
+
+## 相机倍率回灌（Desktop 在 `_apply_view` 里统一分发）。
+## 只切可见性与标题位置，不动卡片尺寸 —— 尺寸一动，布局求解器就会跟着抖。
+func set_lod(k: float) -> void:
+	var k2 := clampf(k, 0.1, 4.0)
+	if absf(k2 - _lod) < 0.001:
+		return
+	_lod = k2
+	if _title == null or _glyph == null:
+		return                      # 还没 _build（Desktop 在 setup 之后才灌倍率）
+	var text_on := _lod_show_title()
+	_title.visible = text_on
+	_layout_glyph()
+	_badge.visible = _unread and text_on
+	_warn_badge.visible = _warn and text_on
+	_pin_badge.visible = _pinned and text_on
+
+
+## 符号两套摆法：文字档 = 标题左侧 10px 小标记；缩略档 = 铺满卡片居中。
+## 缩略档的半径放大一档（5 → 6）：卡片整体被缩了，10px 的符号在 0.62x 下只剩 6.2px。
+func _layout_glyph() -> void:
+	if _glyph == null:
+		return
+	_glyph.zoom = _lod
+	if _lod_show_title():
+		_glyph.position = Vector2(PAD + 5.0, PAD + _h * 0.5 - 5.0)
+		_glyph.size = Vector2(10.0, 10.0)
+		_glyph.radius = 5.0
+	else:
+		_glyph.position = Vector2(PAD, PAD)
+		_glyph.size = Vector2(_w, _h)
+		_glyph.radius = 6.0
+	_glyph.queue_redraw()
+
+
+## 类型色跟着**纸面深浅**走：深色反白（已捕获线索 / 拖动目标）上原色对比不足 1.5:1，
+## 符号会直接消失，必须换提亮版（`kind_color(kind, true)`）。
+func _sync_glyph_color(on_dark: bool) -> void:
+	if _glyph == null:
+		return
+	var c := TecTheme.kind_color(kind, on_dark)
+	if _glyph.col != c:
+		_glyph.col = c
+		_glyph.queue_redraw()
+
+
+## 普通态。三种「非活跃」外观靠**纸面与边框的组合**区分，卡面上一个字都不写：
+##   未探索（从没进去过）= 纸色平面 + 虚线框
+##   已折叠（进去过又收起）= 白纸 + 虚线框   ← 白纸是「已知」、虚线是「收起」
+##   已探索（展开着）      = 白纸 + 实线框
+## 副标存在时「折叠」靠文字就能认；删掉副标之后必须给它自己的组合，否则和「未探索」
+## 长得一模一样（旧代码 `flat = _container and (not _explored or _collapsed)`）。
 func _apply_plain_look() -> void:
-	var flat := _container and (not _explored or _collapsed)
+	var flat := _container and not _explored
 	_mat.set_shader_parameter("flat_fill", flat)
 	_mat.set_shader_parameter("col_hi", TecTheme.BG if flat else Color("fbf8ee"))
 	_mat.set_shader_parameter("col_mid", TecTheme.BG if flat else Color("f5f2e8"))
@@ -383,11 +450,9 @@ func _apply_plain_look() -> void:
 	_mat.set_shader_parameter("shade_col", Color(0, 0, 0, 0) if flat
 		else Color(0.306, 0.282, 0.212, 0.30))
 	_title.add_theme_color_override("font_color", TecTheme.MUTED if flat else TecTheme.TEXT)
-	## 状态行（未探索 / 已探索 / 物品·亮着…）是玩家要读的字，不能用 FAINT：
-	## 卡面 3.27:1 过不了 4.5:1；MUTED 是 6.36:1。FAINT 只留给装饰。
-	_sub.add_theme_color_override("font_color", TecTheme.MUTED)
+	_sync_glyph_color(false)
 	_border.double_line = _hub
-	_border.visible = flat or _hub
+	_border.visible = flat or _collapsed or _hub
 	_border.queue_redraw()
 	if _glow != null:
 		_glow.visible = false
@@ -404,7 +469,7 @@ func _apply_got_look() -> void:
 	_mat.set_shader_parameter("rim_col", Color(1, 1, 1, 0.28))
 	_mat.set_shader_parameter("shade_col", Color(0, 0, 0, 0.35))
 	_title.add_theme_color_override("font_color", TecTheme.CARD)
-	_sub.add_theme_color_override("font_color", TecTheme.LINE2)
+	_sync_glyph_color(true)
 	_border.visible = false
 	if _glow != null:
 		_glow.visible = false
@@ -421,7 +486,7 @@ func _apply_lit_look() -> void:
 	_mat.set_shader_parameter("rim_col", Color(1, 0.988, 0.945, 0.95))
 	_mat.set_shader_parameter("shade_col", Color(1.0, 0.769, 0.259, 0.16))
 	_title.add_theme_color_override("font_color", TecTheme.TEXT)
-	_sub.add_theme_color_override("font_color", Color("9a7b2a"))
+	_sync_glyph_color(false)
 	_border.visible = false
 	if _glow != null:
 		_glow.visible = true
@@ -438,7 +503,7 @@ func _apply_over_look() -> void:
 	_mat.set_shader_parameter("rim_col", Color(1.0, 0.988, 0.945, 0.18))
 	_mat.set_shader_parameter("shade_col", Color(0.306, 0.282, 0.212, 0.45))
 	_title.add_theme_color_override("font_color", TecTheme.CARD)
-	_sub.add_theme_color_override("font_color", TecTheme.LINE2)
+	_sync_glyph_color(true)
 	_border.visible = false
 	_badge.visible = false
 	_warn_badge.visible = false

@@ -18,6 +18,25 @@ const TEXT := Color("2b2b26")
 const MUTED := Color("5c584a")
 ## 只用于装饰（水印、占位符、禁用态）：卡面 3.27:1 / 纸面 2.90:1，**正文用它会读不清**。
 const FAINT := Color("8a8672")
+## ── 节点类型色（只涂在类型符号上）────────────────────────────────────────────
+## **颜色只占 8~10px 的图形，卡面 / 边框 / 角标一律不染。** 那里已经被状态占满了：
+## 实线=已探索、虚线=未探索、双线=枢纽、金框=点亮、深色反白=已捕获、墨环=选中。
+## 再往卡面叠一层，玩家就分不清「颜色不同是因为类型不同，还是因为状态不同」。
+##
+## 三个色的明度都压在 L*≈40–43、对卡面 ≈5:1 —— **没有谁更「跳」**；色相避开红/绿
+## 这对色盲最易混的组合（青 / 褐 / 紫 对红绿色盲仍可分）。
+##
+## ⚠ 金色 `#e3b341` 已被「点亮 = 可当工具」占用，类型色**不许再用黄**（地点若是金色，
+## 玩家会以为它能用）。红色留给错误态。线索与时刻不染（前者有「已捕获」的深色反白，
+## 后者已有 ◆ + 双线框），都用 LINE。
+const KIND_LOC := Color("4f6e74")     # 地点 · 石板青
+const KIND_ITEM := Color("8a5a3b")    # 物品 · 赭褐
+const KIND_CHAR := Color("7c4a63")    # 人物 · 绛紫
+## 深色面（回忆卡的黑标题条）上的提亮版：原色压在 #2b2b26 上对比不足 1.5:1，等于看不见。
+const KIND_LOC_DARK := Color("93b6bb")
+const KIND_ITEM_DARK := Color("c79a70")
+const KIND_CHAR_DARK := Color("c894aa")
+
 const EDGE := Color(0.290, 0.271, 0.204, 0.30)
 const EDGE_SOFT := Color(0.290, 0.271, 0.204, 0.18)
 const BEVEL_HI := Color(1.0, 0.988, 0.945, 0.95)
@@ -50,6 +69,30 @@ static var _font: FontFile = null
 
 
 ## 唯一字体：凤凰点阵体。**关抗锯齿 / 关 hinting / 关次像素** —— 像素字体的命门。
+## 类型 → 符号色。线索 / 时刻（以及任何未知类型）回落到墨色 LINE。
+## `on_dark` 给深色面用（回忆卡的黑标题条）。
+static func kind_color(kind: String, on_dark: bool = false) -> Color:
+	if on_dark:
+		match kind:
+			"loc":
+				return KIND_LOC_DARK
+			"item":
+				return KIND_ITEM_DARK
+			"char":
+				return KIND_CHAR_DARK
+			_:
+				return Color("e6e3d2")
+	match kind:
+		"loc":
+			return KIND_LOC
+		"item":
+			return KIND_ITEM
+		"char":
+			return KIND_CHAR
+		_:
+			return LINE
+
+
 static func font() -> FontFile:
 	if _font == null:
 		_font = load("res://assets/raw/font.ttf") as FontFile

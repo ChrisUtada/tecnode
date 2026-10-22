@@ -23,6 +23,9 @@ var _cur: Label = null
 var _cur_text := ""
 var _shown := 0.0
 var _play_mode := false
+## 标题条上那颗类型符号的类型（时刻 = ◆，人物对话 = ●）。颜色走深色面提亮版。
+var _kind := "time"
+var _glyph: KindGlyph
 
 var _pressing := false
 var _dragged := false
@@ -30,14 +33,16 @@ var _drag_press := Vector2.ZERO
 var _drag_grab := Vector2.ZERO
 
 
-func setup_memory(p_title: String, p_lines: Array, w: float = 330.0, h: float = 300.0) -> void:
+func setup_memory(p_title: String, p_lines: Array, w: float = 330.0, h: float = 300.0,
+		kind: String = "time") -> void:
 	var specs: Array = []
 	for raw in p_lines:
 		specs.append({"t": "narr", "text": String(raw), "who": "", "name": ""})
-	_setup_lines(p_title, specs, w, h, false)
+	_setup_lines(p_title, specs, w, h, false, kind)
 
 
-func setup_play(p_title: String, p_lines: Array, w: float = 420.0, h: float = 300.0) -> void:
+func setup_play(p_title: String, p_lines: Array, w: float = 420.0, h: float = 300.0,
+		kind: String = "char") -> void:
 	var specs: Array = []
 	for raw in p_lines:
 		if raw is Dictionary:
@@ -56,9 +61,11 @@ func setup_play(p_title: String, p_lines: Array, w: float = 420.0, h: float = 30
 	_setup_lines(p_title, specs, w, h, true)
 
 
-func _setup_lines(p_title: String, p_lines: Array, w: float, h: float, play_mode: bool) -> void:
+func _setup_lines(p_title: String, p_lines: Array, w: float, h: float, play_mode: bool,
+		kind: String = "") -> void:
 	_lines = p_lines
 	_play_mode = play_mode
+	_kind = kind if kind != "" else ("char" if play_mode else "time")
 	setup(p_title, w, h)
 	_apply_memory_skin()
 
@@ -130,6 +137,27 @@ func _apply_memory_skin() -> void:
 	var sep := get_node_or_null("sep") as ColorRect
 	if sep != null:
 		sep.color = Color("8a8672")
+	_add_kind_glyph()
+
+
+## 标题条左端的类型符号 —— 和画布卡片上那颗是同一个东西（`KindGlyph`），只是这里
+## 压在黑条上，必须用**提亮版**类型色（原色对 #2b2b26 只有 ~1.4:1，等于没画）。
+## 时刻 / 线索没有专属色，回落到米白 `#e6e3d2`（和标题同色，看得见但不抢戏）。
+func _add_kind_glyph() -> void:
+	if _glyph != null:
+		return
+	var bar := get_node_or_null("bar") as Control
+	if bar == null:
+		return
+	_glyph = KindGlyph.new()
+	_glyph.name = "mem_glyph"
+	_glyph.kind = _kind
+	_glyph.col = TecTheme.kind_color(_kind, true)
+	_glyph.position = Vector2(9.0, (bar.size.y - 10.0) * 0.5)
+	_glyph.size = Vector2(10.0, 10.0)
+	_glyph.radius = 5.0
+	_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(_glyph)
 
 
 func _play_next() -> void:

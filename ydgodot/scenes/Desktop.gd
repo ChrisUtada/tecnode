@@ -50,6 +50,19 @@ var _card_layer: Control
 var _edge_layer: EdgeLayer
 var _view_k := 1.0
 var _view_pos := Vector2.ZERO
+## ── 相机倍率 ───────────────────────────────────────────────────────────────
+## 连续缩放（不是 1x/2x 两档）：世界 2000×1300、画布只有约 1174×648，花园那 5 个
+## 节点的包围盒实测 682×851 —— **不缩到 0.62x 根本装不进一屏**，所以「只能整数倍」
+## 这条纪律在「看全貌」这件事上必须让路。代价（点阵字重采样）由 NodeCard 的 LOD
+## 分级吸收：缩到读不清的倍率时，字本来就该退场（见 `NodeCard.set_lod`）。
+const ZOOM_MIN := 0.45
+const ZOOM_MAX := 2.0
+const ZOOM_STEP := 1.12
+## 「适应窗口」只放大到 1.3：再大就是单卡特写，不是「适应」了
+const FIT_MAX := 1.3
+## 吸附带：|k−1| < 6% 直接落到 1.0 —— 100% 是点阵字唯一绝对对齐原生格的倍率，
+## 玩家从任意起点滚回来看上去「停在整」的位置，顺手就能拿到最锐利的那一档。
+const ZOOM_SNAP := 0.06
 ## 玩家是否手动动过视图（滚轮 / 拖空白 / 定位某张卡）。false = 还在「适应窗口」的
 ## 自动档上，此时窗口尺寸变化就重新 fit，否则按中心补偿（别抢玩家的镜头）。
 var _view_user := false
@@ -509,6 +522,18 @@ func _win_override() -> Vector2i:
 
 func _shot_mode() -> bool:
 	return _has_arg("--shot") or _has_arg("--shot-p2") or _has_arg("--shot-p3")
+
+
+## 调试用：`--zoom=0.62` 钉死相机倍率（截图取证 / 排查某个倍率下的 LOD 与字重）。
+## 不传返回 -1（照常 fit）。**只影响镜头，不写存档**。
+func _zoom_override() -> float:
+	for a in OS.get_cmdline_user_args() + OS.get_cmdline_args():
+		if not a.begins_with("--zoom="):
+			continue
+		var v := a.substr(7)
+		if v.is_valid_float():
+			return clampf(float(v), ZOOM_MIN, ZOOM_MAX)
+	return -1.0
 
 
 # ── 界面搭建 ────────────────────────────────────────────────────────────
@@ -2126,8 +2151,7 @@ func _rebuild_from_graph() -> void:
 
 
 # ── 画布手势（Web `15-desktop.js`）────────────────────────────────────────
-# 点空白 = 清选中；拖空白 = 平移；滚轮 = 以光标为锚在 1x / 2x 之间切换。
-# 点阵字只允许整数倍栅格：0.35~1.8 的连续缩放会把字重采样成灰边，故不再提供。
+# 点空白 = 清选中；拖空白 = 平移；滚轮 = 以光标为锚连续缩放（0.45~2.0，×1.12）。
 # 卡片自己 `MOUSE_FILTER_STOP` + `accept_event()`，所以拖节点不会漏成平移。
 
 func _on_stage_input(event: InputEvent) -> void:
@@ -2137,9 +2161,11 @@ func _on_stage_input(event: InputEvent) -> void:
 			if not mb.pressed:
 				return
 			var mp := mb.position
-			## 只允许整数倍：1x 是原生格，2x 是点阵字的 2×2 放大；3x 以上在这个
-			## 画布里已看不到更多东西，反而把单张卡撑出屏幕。
-			var k2 := 2.0 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0
+			var step := ZOOM_STEP if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / ZOOM_STEP
+			var k2 := clampf(_view_k * step, ZOOM_MIN, ZOOM_MAX)
+			## 近 100% 吸附：1.0 是点阵字唯一落在原生格上的倍率，别让玩家「差一点点」
+			if absf(k2 - 1.0) < ZOOM_SNAP:
+				k2 = 1.0
 			if absf(k2 - _view_k) > 0.0001:
 				_view_pos = mp - (mp - _view_pos) * (k2 / _view_k)
 				_view_k = k2
@@ -2189,7 +2215,22 @@ func _apply_view() -> void:
 		return
 	_card_layer.position = _view_pos
 	_card_layer.scale = Vector2(_view_k, _view_k)
+	## 低倍率下连线按 1/k 反向加粗：不补偿的话 1.3px 的实体线到 0.62x 只剩 0.8px，
+	## 会被纸纹底吃成「虚线」。补偿后屏幕上仍是 1.3px（见 EdgeLayer.set_zoom）。
+	if _edge_layer != null and is_instance_valid(_edge_layer):
+		_edge_layer.set_zoom(_view_k)
+	_apply_lod()
 	_reanchor_mem_card()
+
+
+## 把当前倍率分发给每张卡（NodeCard.set_lod 自己判档并早退，重复调用不吃性能）
+func _apply_lod() -> void:
+	if _cards.is_empty():
+		return
+	for key in _cards.keys():
+		var c: NodeCard = _cards.get(key, null)
+		if c != null and is_instance_valid(c):
+			c.set_lod(_view_k)
 
 
 ## 缩放 / 平移 / 重排都会让锚点节点在屏幕上换位置，而放映卡是**屏幕坐标**摆的 ——
@@ -2242,6 +2283,8 @@ func _spawn_card(key: String) -> NodeCard:
 	card.pin_toggled.connect(_on_card_pin_toggled)
 	_card_layer.add_child(card)
 	_cards[key] = card
+	## 新卡上画布时立刻对齐当前倍率，否则缩小状态下新出现的卡会带着「完整两行」出现
+	card.set_lod(_view_k)
 	# Web 的入场 pop：fresh 的节点初次上画布闪一下（`n.fresh` 渲染一次即被摘掉；
 	# `unread`「新」角标继续保留，直到玩家点过卡片）。截图模式里不弹（像素对拍要稳），
 	# 但 fresh 照样消费掉（两次截图的 fresh 状态必须收敛）。
@@ -3819,7 +3862,9 @@ func _relayout(animated := false, force := false) -> void:
 	if force or sig != _layout_sig:
 		_layout_sig = sig
 		_layout_force(animated)
-		if _opt_reveal:
+		## 自动档才重框；玩家自己调过镜头（滚轮 / 拖空白 / 定位某张卡）就别动他的视野，
+		## 否则每加一个节点、镜头就被拉开一次 —— 刚放大到某张卡细看时会像「被抢走」。
+		if _opt_reveal and not _view_user:
 			_fit_cards()
 	_refresh_crumbs()
 	_sync_header_sizes()
@@ -4005,13 +4050,18 @@ func _fit_cards() -> void:
 		_card_layer.scale = Vector2.ONE
 		_view_user = false
 		return
-	## 自动档只居中，不缩放。fit 出 0.35~1.3 的非整数倍会把卡片里的点阵字
-	## 和图标一起重采样；宁可让卡片多时溢出画布、由玩家拖动，也不牺牲原生像素。
-	_view_k = 1.0
-	_view_pos = (_stage.size - bounds.size) * 0.5 - bounds.position
-	_card_layer.position = _view_pos
-	_card_layer.scale = Vector2.ONE
+	## 按包围盒缩放（0.45~1.3）：节点多到一屏装不下时缩出去，才是「适应窗口」的本义。
+	## 缩出来的非整数倍由 LOD 兜住 —— 读不清的倍率下副标与角标已经退场，不会留下糊字。
+	var pad := 60.0
+	var k := minf((_stage.size.x - pad * 2.0) / bounds.size.x,
+		(_stage.size.y - pad * 2.0) / bounds.size.y)
+	_view_k = clampf(k, ZOOM_MIN, FIT_MAX)
+	var z := _zoom_override()
+	if z > 0.0:
+		_view_k = z
+	_view_pos = (_stage.size - bounds.size * _view_k) * 0.5 - bounds.position * _view_k
 	_view_user = false
+	_apply_view()
 
 
 # ── TEC ─────────────────────────────────────────────────────────────────

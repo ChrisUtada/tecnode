@@ -30,6 +30,13 @@ func _initialize() -> void:
 	check("开局只有一张卡：未探索的起始场景（Web `17-boot.js` 同口径）",
 		_cards().size() == 1 and _cards().has("loc:SCENES_garden"), str(_cards().keys()))
 
+	# 相机钉在 1x 原生格：本文件所有点击/坐标断言都是按「世界坐标 → 屏幕」1:1 写的。
+	# `_view_user = true` 同时关掉 `_relayout` 的自动 fit，否则每加一个节点镜头都会重缩。
+	scene._view_k = 1.0
+	scene._view_pos = Vector2.ZERO
+	scene._view_user = true
+	scene._apply_view()
+
 	scene.dbg_expand("SCENES_garden")
 	await process_frame
 	var cards: Dictionary = _cards()
@@ -356,8 +363,9 @@ func _initialize() -> void:
 	check("连线层存在且画了线", edges != null and edges.segment_count() > 0,
 		str(edges.segment_count()) if edges != null else "null")
 
-	# 7) 滚轮 = 以光标为锚缩放（0.35~1.8）
+	# 7) 滚轮 = 以光标为锚连续缩放（0.45~2.0，×1.12）
 	var k0: float = scene._view_k
+	var pos0: Vector2 = scene._view_pos
 	var wheel := InputEventMouseButton.new()
 	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
 	wheel.pressed = true
@@ -370,6 +378,85 @@ func _initialize() -> void:
 	wheel2.position = Vector2(500, 300)
 	scene._on_stage_input(wheel2)
 	check("滚轮缩小", absf(scene._view_k - k0) < 0.005, "%f" % scene._view_k)
+
+	# 7b) 连续缩放的下限：「看全貌」靠缩到 1x 以下，不是靠 1x/2x 两档
+	for i in 14:
+		scene._on_stage_input(wheel2)
+	check("滚轮能一直缩到 0.45（连滚 14 格）", absf(scene._view_k - 0.45) < 0.001,
+		"%f" % scene._view_k)
+	for i in 14:
+		scene._on_stage_input(wheel)
+	check("滚轮能一直放大到 2.0", absf(scene._view_k - 2.0) < 0.001, "%f" % scene._view_k)
+
+	# 7c) 卡面只有名字：类型靠左侧类型色符号，状态靠边框与填充
+	var lod_card: NodeCard = null
+	for key in _cards().keys():
+		var c: NodeCard = _cards()[key]
+		if c.visible:
+			lod_card = c
+			break
+	check("卡面没有副标节点", lod_card != null and lod_card.get_node_or_null("sub") == null,
+		"null" if lod_card == null else "sub 还在")
+	check("标题不再拼 ■□●▲ 前缀", lod_card != null
+		and not ("\u25a0" in lod_card._title.text or "\u25a1" in lod_card._title.text
+			or "\u25cf" in lod_card._title.text or "\u25b2" in lod_card._title.text),
+		"null" if lod_card == null else lod_card._title.text)
+	check("类型符号常驻且带类型色", lod_card != null and lod_card._glyph.visible
+		and lod_card._glyph.col == TecTheme.kind_color(lod_card.kind),
+		"null" if lod_card == null else "%s %s" % [lod_card._glyph.visible,
+			lod_card._glyph.col.to_html(false)])
+	scene._view_k = 0.9
+	scene._apply_view()
+	check("0.9x：标题 + 左侧小符号并存", lod_card != null and lod_card._title.visible
+		and lod_card._glyph.visible and lod_card._glyph.size.x <= 11.0,
+		"null" if lod_card == null else "%s/%.0f" % [lod_card._title.visible,
+			lod_card._glyph.size.x])
+	## 0.88x 实测标题已缺笔（「注射器」被压成「注器」）⇒ 再往下只留放大的类型符号
+	scene._view_k = 0.6
+	scene._apply_view()
+	check("0.6x：文字退场、符号放大铺满", lod_card != null and not lod_card._title.visible
+		and lod_card._glyph.visible and lod_card._glyph.size.x > 60.0,
+		"null" if lod_card == null else "%s/%.0f" % [lod_card._title.visible,
+			lod_card._glyph.size.x])
+	check("0.6x：角标退场", lod_card != null and not lod_card._pin_badge.visible
+		and not lod_card._warn_badge.visible, "badges")
+	check("0.6x：连线收到了倍率", edges != null and absf(edges._zoom - 0.6) < 0.001,
+		"%f" % edges._zoom if edges != null else "null")
+	scene._view_k = 1.0
+	scene._apply_view()
+	check("1x：标题回来、符号缩回左侧", lod_card != null and lod_card._title.visible
+		and lod_card._glyph.size.x <= 11.0,
+		"null" if lod_card == null else "%.0f" % lod_card._glyph.size.x)
+
+	# 7c2) 状态三态：副标删掉后，折叠与未探索必须能只靠「纸 + 框」区分
+	#   未探索 = 纸色平面 + 虚线框；折叠 = 白纸 + 虚线框；已探索 = 白纸 + 实线框
+	if lod_card != null:
+		lod_card.set_shell_state(true, false, false, false)
+		var unexp := [lod_card._border.visible,
+			bool(lod_card._mat.get_shader_parameter("flat_fill"))]
+		lod_card.set_shell_state(true, true, true, false)
+		var coll := [lod_card._border.visible,
+			bool(lod_card._mat.get_shader_parameter("flat_fill"))]
+		lod_card.set_shell_state(true, true, false, false)
+		var expl := [lod_card._border.visible,
+			bool(lod_card._mat.get_shader_parameter("flat_fill"))]
+		check("未探索 = 虚线 + 纸色平面", unexp[0] and unexp[1], str(unexp))
+		check("已折叠 = 虚线 + 白纸（不再和未探索同款）", coll[0] and not coll[1], str(coll))
+		check("已探索 = 实线 + 白纸", not expl[0] and not expl[1], str(expl))
+		lod_card.set_shell_state(true, true, false, false)
+	# 7d) 「适应窗口」按包围盒缩放：装不下才缩，且真的写进图层变换
+	scene._view_user = false
+	scene._fit_cards()
+	check("适应窗口落在 0.45~1.3", scene._view_k >= 0.45 - 0.001 and scene._view_k <= 1.3 + 0.001,
+		"%f" % scene._view_k)
+	check("适应窗口写进图层缩放", scene._card_layer.scale.is_equal_approx(
+		Vector2(scene._view_k, scene._view_k)), str(scene._card_layer.scale))
+	scene._view_user = true
+	# 相机还原：后面几节按投影换算点击落点，镜头被留在 2x/0.6x 上会把坐标算飞
+	scene._view_k = k0
+	scene._view_pos = pos0
+	scene._view_user = true
+	scene._apply_view()
 
 	# 8) 点空白 = 清选中 + 收起详情窗
 	var vis_card: NodeCard = null

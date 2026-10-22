@@ -158,6 +158,10 @@ func _intro_text(n: Dictionary, kind: String) -> String:
 
 func _status_text(n: Dictionary, kind: String) -> String:
 	if _graph.is_container_node(_key):
+		## 折叠要单独报：卡面副标删掉之后，「收起来了」只剩画布上「白纸 + 虚线框」
+		## 这一个很轻的形态线索（未探索是「纸色 + 虚线」），详情窗得把话说清楚。
+		if _graph.is_collapsed(String(n["id"])):
+			return "已折叠 · 双击可展开"
 		return "已探索" if _graph.explored.has(String(n["id"])) else "未探索"
 	if kind == "clue":
 		var c := _case.clue_of(String(n["id"]))
