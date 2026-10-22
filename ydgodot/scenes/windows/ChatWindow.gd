@@ -99,7 +99,7 @@ func _chat_title(entry: DialogueDef, ids: Array) -> String:
 		names.append(case_def.label_of("char", String(id)))
 	var solo := entry != null and entry.participants.size() == 1
 	var when := entry.context_when.id if entry != null and entry.context_when != null else ""
-	var head := "独白 // " if solo else "DIALOGUE // "
+	var head := "独白 · " if solo else "对话 · "
 	if when != "":
 		head += case_def.time_label_of(when) + " · "
 	return head + " × ".join(names)

@@ -122,7 +122,7 @@ func _primary(text: String) -> Button:
 
 
 func _render_name() -> void:
-	_title("APTITUDE // 调查员适性测试")
+	_title("调查员适性测试")
 	_paragraph("在接入异动区域之前，T.E.C-OS 需要登记你的信息，并完成一次简短的适性测试。")
 	var edit := LineEdit.new()
 	edit.name = "name_edit"
@@ -178,7 +178,7 @@ func _shake() -> void:
 
 
 func _render_quiz(index: int) -> void:
-	_title("APTITUDE // 调查员适性测试")
+	_title("调查员适性测试")
 	var q: Dictionary = Investigator.QUIZ[index]
 	var prog := TecTheme.label("第 %d / %d 问" % [index + 1, Investigator.QUIZ.size()],
 		TecTheme.FS_BODY, TecTheme.MUTED)
@@ -219,7 +219,7 @@ func _answer(index: int) -> void:
 
 
 func _render_avatar() -> void:
-	_title("AVATAR // 选择头像")
+	_title("选择头像")
 	_paragraph("挑一张头像印在证件上。每结识一位新人物，就会多出一张可选的头像。", TecTheme.MUTED)
 	var grid := GridContainer.new()
 	grid.columns = 3
@@ -336,7 +336,7 @@ func _back_to_avatar() -> void:
 
 
 func _render_card() -> void:
-	_title("INVESTIGATOR // 调查员证")
+	_title("调查员证")
 	var center := CenterContainer.new()
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center.add_child(build_cert(card))

@@ -10,7 +10,7 @@ var _hint: Label
 
 
 func setup_password(item_label: String, hint: String) -> void:
-	setup("LOCK // " + item_label, 200, 74, TecTheme.R_SM)
+	setup("密码锁 · " + item_label, 200, 74, TecTheme.R_SM)
 	_hint = TecTheme.label(hint if hint != "" else "输入密码（四位数字）", TecTheme.FS_BODY, TecTheme.MUTED)
 	content.add_child(_hint)
 
@@ -26,8 +26,8 @@ func setup_password(item_label: String, hint: String) -> void:
 	_input.custom_minimum_size = Vector2(96, 28)
 	_input.add_theme_font_override("font", TecTheme.font())
 	_input.add_theme_font_size_override("font_size", TecTheme.FS_TITLE)
-	_input.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, 6, TecTheme.EDGE, 1))
-	_input.add_theme_stylebox_override("focus", TecTheme.flat(TecTheme.CARD, 6, TecTheme.LINE, 1))
+	_input.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.EDGE, 1))
+	_input.add_theme_stylebox_override("focus", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.LINE, 1))
 	_input.text_submitted.connect(func(_t: String): _submit())
 	row.add_child(_input)
 

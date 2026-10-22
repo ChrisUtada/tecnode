@@ -29,7 +29,7 @@ var _meta: Label
 func setup_detail(p_graph: GraphState, p_case: CaseLoader) -> void:
 	_graph = p_graph
 	_case = p_case
-	setup("NODE // 节点详情", W, 260)
+	setup("节点详情", W, 260)
 	position = Vector2(1280.0 - PAD_R - W - SysWindow.PAD, TOP)
 	closed.connect(hide)
 	_rows = VBoxContainer.new()

@@ -8,7 +8,8 @@ signal closed
 signal minimized
 
 const PAD := 14.0
-const BAR_H := 23.0
+const BAR_H := 28.0
+const CTRL := 18.0
 ## P3 烘焙九切片：卡面 + 1px 发丝边 + 13px 圆角 + 四层 --win-shadow，由
 ## tools/pixeldiff/bake_win_frame.cjs（白/黑双底片）+ solve_alpha.py 反解 alpha 得到。
 ## 为什么不用 shader 近似：--win-shadow 是四条 box-shadow 叠加（含 22px 模糊与顶部 inset
@@ -156,7 +157,7 @@ func _build(radius: int) -> void:
 
 	var close := _mini_button("×")
 	close.name = "close"
-	close.position = Vector2(inner_w - 23.0, (BAR_H - 1.0 - 18.0) * 0.5)
+	close.position = Vector2(inner_w - 24.0, (BAR_H - 1.0 - CTRL) * 0.5)
 	close.pressed.connect(_on_close_pressed)
 	_close_btn = close
 	bar.add_child(close)
@@ -214,19 +215,13 @@ func _title_rule() -> Control:
 
 func _mini_button(text: String) -> Button:
 	var b := Button.new()
-	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.size = Vector2(18.0, 18.0)
+	b.size = Vector2(CTRL, CTRL)
 	b.custom_minimum_size = b.size
-	b.add_theme_font_override("font", TecTheme.font())
-	b.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
-	b.add_theme_color_override("font_color", TecTheme.TEXT)
-	b.add_theme_color_override("font_hover_color", TecTheme.CARD)
-	b.add_theme_color_override("font_pressed_color", TecTheme.TEXT)
 	var normal := TecTheme.flat(TecTheme.FACE_HI, 7)
 	normal.shadow_color = TecTheme.BEVEL_LO
-	normal.shadow_size = 3
-	normal.shadow_offset = Vector2(1, 2)
+	normal.shadow_size = 1
+	normal.shadow_offset = Vector2(0, 1)
 	normal.content_margin_left = 0
 	normal.content_margin_right = 0
 	normal.content_margin_top = 0
@@ -234,7 +229,27 @@ func _mini_button(text: String) -> Button:
 	b.add_theme_stylebox_override("normal", normal)
 	b.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.LINE, 7))
 	b.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, 7))
+	var glyph := TecTheme.label(text, TecTheme.FS_BODY, TecTheme.TEXT)
+	glyph.name = "glyph"
+	glyph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(glyph)
+	b.set_meta("glyph_normal", TecTheme.TEXT)
+	b.set_meta("glyph_hot", TecTheme.CARD)
+	b.mouse_entered.connect(func(): _paint_mini_glyph(b, true))
+	b.mouse_exited.connect(func(): _paint_mini_glyph(b, false))
+	b.button_down.connect(func(): _paint_mini_glyph(b, true))
+	b.button_up.connect(func(): _paint_mini_glyph(b, b.is_hovered()))
 	return b
+
+
+func _paint_mini_glyph(b: Button, hot: bool) -> void:
+	var glyph := b.get_node_or_null("glyph") as Label
+	if glyph == null:
+		return
+	glyph.add_theme_color_override("font_color", b.get_meta("glyph_hot" if hot else "glyph_normal", TecTheme.TEXT))
 
 
 ## 拖动中悬停 = 落点：Web `.bag-win.over / .clue-win.over{outline:2px dashed var(--text);outline-offset:3px}`
@@ -314,12 +329,12 @@ func resize_to(w: float, h: float) -> void:
 		if hl != null:
 			hl.size.x = iw
 		if _close_btn != null and is_instance_valid(_close_btn):
-			_close_btn.position.x = iw - 23.0
-		# 最小化按钮是 enable_controls() 后加的，resize_to() 也得把它一起推回右沿；
+			_close_btn.position.x = iw - 24.0
+		# 最小化按钮在 enable_controls() 后加的，resize_to() 也得把它一起推回右沿；
 		# 否则 1920 宽下它会停在 1280 设计坐标（1218），跟关闭按钮隔着半个屏幕。
 		var min_btn := bar.get_node_or_null("min") as Control
 		if min_btn != null:
-			min_btn.position.x = iw - 46.0
+			min_btn.position.x = iw - 47.0
 	var sep := get_node_or_null("sep") as Control
 	if sep != null:
 		sep.size.x = iw
@@ -349,7 +364,7 @@ func enable_controls(min_tip: String, close_tip: String = "", show_min := true) 
 	if show_min:
 		var min_btn := _mini_button("–")
 		min_btn.name = "min"
-		min_btn.position = Vector2(_inner_w - 46.0, (BAR_H - 1.0 - 18.0) * 0.5)
+		min_btn.position = Vector2(_inner_w - 47.0, (BAR_H - 1.0 - CTRL) * 0.5)
 		min_btn.tooltip_text = min_tip
 		min_btn.pressed.connect(func(): minimized.emit())
 		bar.add_child(min_btn)

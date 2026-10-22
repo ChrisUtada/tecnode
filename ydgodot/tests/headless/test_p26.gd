@@ -142,6 +142,23 @@ func _test_desktop(c: CaseLoader) -> void:
 	scene._save.path = TEMP_SAVE
 	scene._save_enabled = false
 
+	var win_bar := scene.get_node_or_null("desk/case_win/bar") as Control
+	check("主窗标题栏内高 27（Web 28 - 1 分隔线）",
+		win_bar != null and win_bar.size.y == 27.0,
+		str(win_bar.size) if win_bar != null else "null")
+	var close := scene.get_node_or_null("desk/case_win/bar/close") as Button
+	check("关闭按钮实际 18×18（字形不再撑高）",
+		close != null and close.size == Vector2(18, 18)
+		and close.get_combined_minimum_size() == Vector2(18, 18),
+		(str(close.size) + " / " + str(close.get_combined_minimum_size())) if close != null else "null")
+	var badge := scene.get_node_or_null("desk/icons/icon_infer/infer_badge") as PanelContainer
+	var badge_sb: StyleBoxFlat = null
+	if badge != null:
+		badge_sb = badge.get_theme_stylebox("panel") as StyleBoxFlat
+	check("图标角标是药丸（999px 半径）",
+		badge_sb != null and badge_sb.corner_radius_top_left >= 100,
+		str(badge_sb.corner_radius_top_left) if badge_sb != null else "null")
+
 	# 1) 图标栏：8 项常驻，顺序即 ICON_LAYOUT
 	var apps: Array = scene.dbg_icon_apps()
 	check("图标栏 8 项", apps.size() == 8, str(apps))
@@ -183,6 +200,9 @@ func _test_desktop(c: CaseLoader) -> void:
 	_icon_press(ic, at + Vector2(1, 1), false)
 	check("1px 抖动 = 点击", int(hits["n"]) == 1, str(hits["n"]))
 	check("点击不挪位置", ic.position == base, str(ic.position))
+	check("单击图标进入选中", bool(ic.get("_selected")))
+	scene._clear_selection()
+	check("空白点击清图标选中", not bool(ic.get("_selected")))
 
 	_icon_press(ic, at, true)
 	_icon_move(ic, at + Vector2(40, 30))
@@ -193,8 +213,10 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("拖回后坐标复原", ic.position == Vector2(18, 16), str(ic.position))
 
 	# 2b) 双击图标才开窗（单击只选中）
+	var people_ic: Control = scene.get_node("desk/icons/icon_people")
 	scene.dbg_double_click_icon("people")
 	check("双击人物图标开名册", scene.dbg_people_win() != null)
+	check("双击后图标不残留选中", not bool(people_ic.get("_selected")))
 	scene.dbg_close_people()
 	await process_frame
 	scene.dbg_double_click_icon("log")
@@ -234,7 +256,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	if lw == null:
 		scene.queue_free()
 		return
-	check("日志窗标题", lw.title == "SYS_LOGS // 因果追踪", lw.title)
+	check("日志窗标题", lw.title == "因果追踪", lw.title)
 	check("开窗清未读", scene.dbg_log_unread() == 0)
 	check("开窗收角标", scene.dbg_badge_text("log") == "")
 	# 补两条已知 kind 的行，样式断言才有靶子
@@ -315,7 +337,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	if pw == null:
 		scene.queue_free()
 		return
-	check("名册窗标题", pw.title == "ROSTER // 人物", pw.title)
+	check("名册窗标题", pw.title == "人物", pw.title)
 	await process_frame
 	var rows: Array = pw.row_ids()
 	check("名册 = met_char_ids", rows == scene.graph.met_char_ids(), str(rows))
@@ -345,8 +367,8 @@ func _test_desktop(c: CaseLoader) -> void:
 		str(scene.graph.talk_prog.get(key_lhs, 0)))
 	check("点人一行：开对话窗", scene.dbg_chat() != null)
 	if scene.dbg_chat() != null:
-		check("对话窗是这句台词", scene.dbg_chat_title().begins_with("独白 // ")
-			or scene.dbg_chat_title().begins_with("DIALOGUE // "), scene.dbg_chat_title())
+		check("对话窗是这句台词", scene.dbg_chat_title().begins_with("独白 · ")
+			or scene.dbg_chat_title().begins_with("对话 · "), scene.dbg_chat_title())
 		scene.dbg_chat_close()
 	await process_frame
 	pw.refresh_people()

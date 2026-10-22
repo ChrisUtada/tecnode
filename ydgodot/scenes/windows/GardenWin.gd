@@ -33,7 +33,7 @@ var _tick := 0.0
 func setup_garden(p_graph: GraphState, p_case: CaseLoader = null) -> void:
 	graph = p_graph
 	case_def = p_case
-	setup("GARDEN // 花园", WIN_W, BASE_INNER_H)
+	setup("花园", WIN_W, BASE_INNER_H)
 	enable_controls("", "关闭花园（生长照旧）", false)
 	_build_content()
 	refresh()

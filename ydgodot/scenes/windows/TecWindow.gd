@@ -29,7 +29,7 @@ var _line_count := 0
 
 func setup_tec() -> void:
 	_fast = OS.get_cmdline_args().has("--fast") or OS.get_cmdline_user_args().has("--fast")
-	setup("TEC // 对话", 332, 360)
+	setup("TEC 对话", 332, 360)
 	enable_controls("收起：缩成桌面右下角的助手卡片", "关闭：收起对话窗（内容保留）")
 	_build_content()
 

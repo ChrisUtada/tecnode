@@ -42,7 +42,7 @@ static func track_of(id: String) -> Dictionary:
 
 
 func setup_music() -> void:
-	setup("MUSIC // 播放器", WIN_W, WIN_H)
+	setup("播放器", WIN_W, WIN_H)
 	enable_controls("最小化到右下角播放器卡片", "关闭播放器（音乐继续）")
 	_audio = AudioStreamPlayer.new()
 	_audio.name = "audio"

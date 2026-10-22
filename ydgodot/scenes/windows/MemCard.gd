@@ -121,12 +121,12 @@ func _apply_memory_skin() -> void:
 		title.add_theme_color_override("font_color", Color("e6e3d2"))
 	var close := get_node_or_null("bar/close") as Button
 	if close != null:
-		close.add_theme_color_override("font_color", Color("e6e3d2"))
-		close.add_theme_color_override("font_hover_color", Color("e6e3d2"))
-		close.add_theme_color_override("font_pressed_color", Color("e6e3d2"))
-		close.add_theme_stylebox_override("normal", TecTheme.flat(Color("2b2b26"), 4, Color("8a8672")))
-		close.add_theme_stylebox_override("hover", TecTheme.flat(Color("3a3a33"), 4, Color("8a8672")))
-		close.add_theme_stylebox_override("pressed", TecTheme.flat(Color("1f1f19"), 4, Color("8a8672")))
+		close.set_meta("glyph_normal", Color("e6e3d2"))
+		close.set_meta("glyph_hot", Color("e6e3d2"))
+		_paint_mini_glyph(close, false)
+		close.add_theme_stylebox_override("normal", TecTheme.flat(Color("2b2b26"), 7, Color("8a8672")))
+		close.add_theme_stylebox_override("hover", TecTheme.flat(Color("3a3a33"), 7, Color("8a8672")))
+		close.add_theme_stylebox_override("pressed", TecTheme.flat(Color("1f1f19"), 7, Color("8a8672")))
 	var sep := get_node_or_null("sep") as ColorRect
 	if sep != null:
 		sep.color = Color("8a8672")

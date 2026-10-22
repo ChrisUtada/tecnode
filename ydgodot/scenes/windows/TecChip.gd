@@ -57,7 +57,7 @@ func _build_content() -> void:
 	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(meta)
 
-	var nm := TecTheme.label("TEC // 助手", TecTheme.FS_BODY, TecTheme.TEXT)
+	var nm := TecTheme.label("TEC 助手", TecTheme.FS_BODY, TecTheme.TEXT)
 	nm.clip_text = true
 	nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(nm)

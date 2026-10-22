@@ -7,7 +7,7 @@ var _text: RichTextLabel
 
 
 func setup_narr(scene_title: String, text: String, w: float = 470.0, h: float = 330.0) -> void:
-	setup("叙事 // " + scene_title, w, h, TecTheme.R_SM)
+	setup("叙事 · " + scene_title, w, h, TecTheme.R_SM)
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL

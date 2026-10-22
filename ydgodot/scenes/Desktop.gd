@@ -22,6 +22,7 @@ const MEM_CARD_MIN_X := 132.0
 ## 卡片坐标存在 world 空间里；`_card_layer` 只做「平移 + 缩放」的视口变换。
 const WORLD_W := 2000.0
 const WORLD_H := 1300.0
+const AUTOSAVE_DELAY_MSEC := 180
 
 ## 页眉几何 —— 逐项来自 Web 的计算布局（tools/pixeldiff/probe_web_rects.cjs 量的
 ## getBoundingClientRect），不是凭感觉的间距。改文案长度要同步改宽度，否则右侧按钮组会错位。
@@ -83,6 +84,7 @@ var _drag_over_card := ""
 var _card_mirror: NodeCard = null
 ## 正在拖的节点 key（原卡被隐藏期间，连线照常以它为端点）
 var _drag_key := ""
+var _edges_dirty := false
 ## 收纳行拖拽会话（见 _process）
 var _sdrag_key := ""
 var _sdrag_from := ""
@@ -114,6 +116,8 @@ var _last_ending_id := ""
 var _flash_supply_note := false
 var _save: SaveSystem = null
 var _save_enabled := true
+var _autosave_pending := false
+var _autosave_due_msec := 0
 var _storage_before: Dictionary = {}
 var _investigator: Dictionary = {}
 var _inv_path := Investigator.PATH
@@ -251,7 +255,7 @@ func _layout_header_right(vw: float) -> void:
 
 
 ## 主窗铺满「桌面 − 左侧图标列」。宽度/高度都用实际视口算，1280×720 下正好落在
-## 原来的 1164(内宽) × 638(内高)、画布 1162 × 613，与 Web 版 P3 对拍口径一致
+## 原来的 1164(内宽) × 638(内高)、画布 1162 × 608，与 Web 版 P3 对拍口径一致
 ## （`test_ui` 有断言钉住这两个数）。
 func _resize_case_window(vw: float, vh: float) -> void:
 	if _case_win == null or not is_instance_valid(_case_win):
@@ -340,8 +344,13 @@ func _notification(what: int) -> void:
 ## 为什么不用 Control 的 drag&drop：那套只搬数据、画不了跟手的幽灵；
 ## 而画布拖动本来就是我们自己算的指针手势，两边口径要一致。
 func _process(_dt: float) -> void:
+	if _autosave_pending and Time.get_ticks_msec() >= _autosave_due_msec:
+		_autosave()
+	var edges_due := _edges_dirty
 	if _follow_frames > 0:
 		_follow_frames -= 1
+		edges_due = true
+	if edges_due:
 		_repaint_edges()
 	# 锚点节点还在重排补间里飞：浮层每帧重锚，跟着它一起走（Web 是每次 render 重算锚点）。
 	# 只在补间期间做 —— 落地后重锚交给 `_start_move_tween` 的 finished，免得跟玩家拖窗口打架。
@@ -445,19 +454,16 @@ func _finish_sdrag(at: Vector2) -> void:
 			return
 		if graph.restash(key, from, to):
 			_refresh_storage_wins()
-			_refresh_matrix_views()
 			_apply_hidden()
 			_show_toast("「%s」搬到%s" % [String(n["label"]), "证物袋" if to == GraphState.BAG else "线索册"])
 			_commit(before)
 		return
 	if _drop_on_matrix_icon(at) and String(n["kind"]) == "clue":
 		_assign_to_matrix(key)
-		_refresh_storage_wins()
 		return
 	if _matrix_win != null and is_instance_valid(_matrix_win) \
 		and _matrix_win.board_global_rect().has_point(at) and String(n["kind"]) == "clue":
 		_assign_to_matrix(key)
-		_refresh_storage_wins()
 		return
 	if not _stage.get_global_rect().has_point(at):
 		# 落在画布之外：什么都不做，东西留在原处（不吞节点）
@@ -728,18 +734,37 @@ func _sync_header_sizes() -> void:
 func _check_tex(on: bool) -> ImageTexture:
 	var img := Image.create(13, 13, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
+	var radius := 2
+	var inside := PackedByteArray()
+	inside.resize(13 * 13)
+	for y in range(13):
+		for x in range(13):
+			var cx := clampi(x, radius, 12 - radius)
+			var cy := clampi(y, radius, 12 - radius)
+			var dx := x - cx
+			var dy := y - cy
+			inside[y * 13 + x] = 1 if dx * dx + dy * dy <= radius * radius else 0
 	if on:
-		img.fill_rect(Rect2i(0, 0, 13, 13), Color("eeeada"))
+		for y in range(13):
+			for x in range(13):
+				if inside[y * 13 + x] == 1:
+					img.set_pixel(x, y, Color("e6e3d2"))
 		var steps := [[3, 6], [4, 7], [5, 8], [6, 9], [7, 8], [8, 7], [9, 6], [10, 5]]
 		for s in steps:
 			img.set_pixel(int(s[0]), int(s[1]), TecTheme.LINE)
 			img.set_pixel(int(s[0]), int(s[1]) + 1, TecTheme.LINE)
 	else:
-		img.fill_rect(Rect2i(0, 0, 13, 13), Color(0, 0, 0, 0))
-		img.fill_rect(Rect2i(0, 0, 13, 1), TecTheme.CARD)
-		img.fill_rect(Rect2i(0, 12, 13, 1), TecTheme.CARD)
-		img.fill_rect(Rect2i(0, 0, 1, 13), TecTheme.CARD)
-		img.fill_rect(Rect2i(12, 0, 1, 13), TecTheme.CARD)
+		var neighbors := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+		for y in range(13):
+			for x in range(13):
+				if inside[y * 13 + x] == 0:
+					continue
+				for d in neighbors:
+					var nx: int = x + d.x
+					var ny: int = y + d.y
+					if nx < 0 or nx > 12 or ny < 0 or ny > 12 or inside[ny * 13 + nx] == 0:
+						img.set_pixel(x, y, TecTheme.CARD)
+						break
 	return ImageTexture.create_from_image(img)
 
 
@@ -1010,14 +1035,14 @@ func _build_icons() -> void:
 	_reset_icon_positions()
 
 
-## 角标基件（Web `.desk-icon .badge`：右上角、深底浅字、6px 圆角）
+## 角标基件（Web `.desk-icon .badge`：右上角、深底浅字、999px 药丸）
 func _make_badge(parent: Control, badge_name: String, text: String = "") -> PanelContainer:
 	if parent == null:
 		return null
 	var badge := PanelContainer.new()
 	badge.name = badge_name
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := TecTheme.flat(TecTheme.LINE, 6, TecTheme.LINE)
+	var sb := TecTheme.flat(TecTheme.LINE, TecTheme.R_PILL, TecTheme.LINE)
 	sb.content_margin_left = 5
 	sb.content_margin_right = 5
 	sb.content_margin_top = 1
@@ -1107,8 +1132,8 @@ func _icon_by_app(app: String) -> Button:
 ## 播放器是唯一例外（Web 里传了 onQuick，单击即开）。
 func _on_icon_pressed(app: String, icon: DeskIcon) -> void:
 	if app == "music":
-		_select_icon(icon)
 		_toggle_music_win()
+		_clear_icon_selection()
 		return
 	var now := Time.get_ticks_msec()
 	if _icon_last_app == app and now - _icon_last_ms <= 300:
@@ -1127,6 +1152,12 @@ func _select_icon(icon: DeskIcon) -> void:
 	_icon_sel = icon
 	if icon != null and is_instance_valid(icon):
 		icon.set_selected(true)
+
+
+func _clear_icon_selection() -> void:
+	if _icon_sel != null and is_instance_valid(_icon_sel):
+		_icon_sel.set_selected(false)
+	_icon_sel = null
 
 
 func _open_icon_app(app: String) -> void:
@@ -1149,6 +1180,7 @@ func _open_icon_app(app: String) -> void:
 			_toggle_case_map()
 		"garden":
 			_open_garden()
+	_clear_icon_selection()
 
 
 func _build_map_badge() -> void:
@@ -1530,7 +1562,7 @@ func _case_title() -> String:
 
 
 func _case_window_title() -> String:
-	return CaseCatalog.code_of(_active_case) + " // " + _case_title()
+	return "案件 " + CaseCatalog.code_of(_active_case).trim_prefix("CASE ") + " · " + _case_title()
 
 
 func _update_case_chrome() -> void:
@@ -1898,7 +1930,7 @@ func _open_cert_review() -> void:
 		_cert_win = null
 	var w := SysWindow.new()
 	w.name = "cert_win"
-	w.setup("INVESTIGATOR // 调查员证", 340, 540)
+	w.setup("调查员证", 340, 540)
 	w.position = Vector2(470, 40)
 	_desk.add_child(w)
 	_place_z(w, ZR_WIN)
@@ -1959,10 +1991,18 @@ func _hide_toast() -> void:
 # ── 撤销 / 存档 ─────────────────────────────────────────────────────────
 
 func _autosave() -> void:
+	_autosave_pending = false
 	if _save == null or not _save_enabled:
 		return
 	if not _save.save_to_disk():
 		push_warning("自动存档失败：" + _save.last_error)
+
+
+func _queue_autosave() -> void:
+	if _save == null or not _save_enabled:
+		return
+	_autosave_pending = true
+	_autosave_due_msec = Time.get_ticks_msec() + AUTOSAVE_DELAY_MSEC
 
 
 ## 动作开始前拍一张；动作结束后状态真的变了才入撤销栈并写盘
@@ -1971,8 +2011,8 @@ func _commit(before: Dictionary) -> void:
 		return
 	if JSON.stringify(before) == JSON.stringify(_save.snapshot()):
 		return
-	_save.push_history(before)
-	_autosave()
+	_save.push_history_snapshot(before)
+	_queue_autosave()
 	_refresh_app_icons()
 	_refresh_detail()
 	_refresh_people_win()
@@ -2160,6 +2200,7 @@ func _reanchor_mem_card() -> void:
 
 
 func _clear_selection() -> void:
+	_clear_icon_selection()
 	if _selected == "":
 		return
 	_selected = ""
@@ -2278,7 +2319,7 @@ func _on_card_drag_moved(key: String, at_global: Vector2) -> void:
 		_edge_layer.set_ghost(card.visual_center(), world_at)
 	_sync_card_mirror(card)
 	_update_drop_over(at_global)
-	_repaint_edges()
+	_edges_dirty = true
 
 
 ## ── 拖动镜像（Web #drag-layer）──────────────────────────────────────────
@@ -2331,6 +2372,7 @@ func _on_card_drag_finished(key: String, pos: Vector2, handled: bool) -> void:
 	_clear_drop_over()
 	if _edge_layer != null:
 		_edge_layer.clear_ghost()
+	_repaint_edges()
 	var n := graph.node(key)
 	if n.is_empty():
 		return
@@ -2346,6 +2388,7 @@ func _on_card_drag_finished(key: String, pos: Vector2, handled: bool) -> void:
 ## 重画连线（Web `paintEdges()`）：端点取 `visual_center()`，四种边各自配色 / 线宽 / 虚线。
 ## 聚焦选中开着时，与选中节点无关的边降到 12% 不透明（Web 的 `opacity .12`）。
 func _repaint_edges() -> void:
+	_edges_dirty = false
 	if _edge_layer == null or graph == null:
 		return
 	var focus_sel := _selected if (_opt_focus and _selected != "" and graph.nodes.has(_selected)) else ""
@@ -2612,7 +2655,6 @@ func _store_into(where: String, key: String) -> void:
 		return
 	_apply_hidden()
 	_refresh_storage_wins()
-	_refresh_matrix_views()
 	_show_toast("「%s」收进%s" % [String(n.get("label", "")),
 		"证物袋" if where == GraphState.BAG else "线索册"])
 	_commit(before)
@@ -2828,7 +2870,7 @@ func _toggle_storage(kind: String) -> void:
 			return
 		_bag_win = StorageWin.new()
 		_bag_win.name = "bag_win"
-		_bag_win.setup_store("EVIDENCE BAG // 证物袋", GraphState.BAG, graph, case_def)
+		_bag_win.setup_store("证物袋", GraphState.BAG, graph, case_def)
 		_bag_win.position = Vector2(150, 300)
 		_bag_win.will_take.connect(_on_storage_will_take)
 		_bag_win.took.connect(_on_storage_took)
@@ -2843,7 +2885,7 @@ func _toggle_storage(kind: String) -> void:
 		return
 	_ledger_win = StorageWin.new()
 	_ledger_win.name = "clue_win"
-	_ledger_win.setup_store("CLUE LEDGER // 线索册", GraphState.LEDGER, graph, case_def)
+	_ledger_win.setup_store("线索册", GraphState.LEDGER, graph, case_def)
 	_ledger_win.position = Vector2(410, 300)
 	_ledger_win.will_take.connect(_on_storage_will_take)
 	_ledger_win.took.connect(_on_storage_took)
@@ -3523,7 +3565,7 @@ func _open_time_card(tid: String) -> void:
 	_close_mem_card()
 	_mem_card = MemCard.new()
 	_mem_card.name = "mem_card"
-	_mem_card.setup_memory("MEMORY // " + case_def.time_label_of(tid), _memory_lines(tid))
+	_mem_card.setup_memory("记忆 · " + case_def.time_label_of(tid), _memory_lines(tid))
 	_mem_card.closed.connect(_on_mem_closed)
 	_desk.add_child(_mem_card)
 	_anchor_memory_card(_mem_card, tid)
@@ -3581,7 +3623,7 @@ func _open_memory_play(mem: MemoryDef, where_key: String) -> void:
 	_mem_card.name = "mem_card"
 	var title := mem.title if mem.title != "" else mem.id
 	_log("想起了一段回忆：%s" % title, "sys")
-	_mem_card.setup_play("MEMORY // " + title, _memory_play_lines(mem), 420, 300)
+	_mem_card.setup_play("记忆 · " + title, _memory_play_lines(mem), 420, 300)
 	_mem_card.closed.connect(_on_mem_closed)
 	_desk.add_child(_mem_card)
 	_anchor_card_to(_mem_card, where_key)
@@ -5334,6 +5376,7 @@ func _ensure_card(kind: String, id: String) -> void:
 
 
 func quit_app() -> void:
+	_autosave()
 	if _shot_mode() and FileAccess.file_exists(_progress_path):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(_progress_path))
 	get_tree().quit()

@@ -95,7 +95,7 @@ func _test_desktop() -> void:
 	check("桌面案件窗默认展开", bool(info["open"]))
 	check("桌面无 dock", not bool(info["dock_visible"]))
 	check("桌面无关闭角标", not bool(info["badge_visible"]))
-	check("桌面标题含 CASE A-001", String(info["title"]).contains("CASE A-001"), String(info["title"]))
+	check("桌面标题含案件 A-001", String(info["title"]).contains("案件 A-001"), String(info["title"]))
 	check("桌面进度为临时路径", info["progress_path"] == TEMP_PROGRESS)
 
 	var map: CaseMapWin = scene.dbg_open_case_map()

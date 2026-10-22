@@ -26,6 +26,7 @@ const BEVEL_LO := Color(0.337, 0.314, 0.235, 0.32)
 const R_WIN := 13
 const R_SM := 11
 const R_BTN := 8
+const R_PILL := 999
 
 ## ── 字号只有三档，且必须是 12 的整数倍 ──────────────────────────────────────
 ## 唯一字体 `font.ttf`（VonwaonBitmap 12px）的 `unitsPerEm = 1200` ⇒ 原生格就是

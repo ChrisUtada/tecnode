@@ -190,7 +190,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	if w == null:
 		scene.queue_free()
 		return
-	check("播放器标题", w.title == "MUSIC // 播放器", w.title)
+	check("播放器标题", w.title == "播放器", w.title)
 	check("播放器位置", w.position == Vector2(906, 414), str(w.position))
 	check("播放器宽度", w.size.x == 360.0, str(w.size))
 	var st: Dictionary = scene.dbg_music_state()
@@ -270,7 +270,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	if g == null or garden == null or matrix == null:
 		scene.queue_free()
 		return
-	check("花园窗标题", garden.title == "GARDEN // 花园", garden.title)
+	check("花园窗标题", garden.title == "花园", garden.title)
 	check("花园宽 520", garden.size.x == 548.0, str(garden.size))
 	var field: Rect2 = garden.field_global_rect()
 	check("花圃有宽度", field.size.x > 400.0 and field.size.y == 260.0, str(field))

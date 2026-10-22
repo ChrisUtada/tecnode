@@ -45,7 +45,11 @@ const GLOW_SIZE := Vector2(220, 220)
 
 ## 程序化生成光晕贴图：两圈高斯叠起来，靠近卡片边缘最亮、往外淡出。
 ## 对像素画风来说这比真高斯更"干净"（没有灰阶噪点），也省一张资产。
+static var _glow_cache: Texture2D
+
 static func _glow_texture() -> Texture2D:
+	if _glow_cache != null:
+		return _glow_cache
 	var n := 96
 	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
 	var c := float(n - 1) * 0.5
@@ -59,7 +63,8 @@ static func _glow_texture() -> Texture2D:
 			if r > 1.0:
 				a = 0.0
 			img.set_pixel(x, y, Color(1.0, 0.827, 0.431, clampf(a, 0.0, 0.6)))
-	return ImageTexture.create_from_image(img)
+	_glow_cache = ImageTexture.create_from_image(img)
+	return _glow_cache
 
 var card_key: String = ""
 var kind: String = ""
@@ -164,6 +169,15 @@ class DashBorder extends Control:
 			Vector2(r.position.x + radius, r.end.y), color, 1.0, dash, true, false)
 
 
+func _ready() -> void:
+	if _warn_badge != null:
+		_warn_badge.size = Vector2(72.0, 20.0)
+	if _badge != null:
+		_badge.size = Vector2(22.0, 20.0)
+	if _pin_badge != null:
+		_pin_badge.size = Vector2(48.0, 20.0)
+
+
 func setup(p_key: String, p_kind: String, p_data: Dictionary, w: float, h: float) -> void:
 	card_key = p_key
 	kind = p_kind
@@ -244,9 +258,9 @@ func _build(w: float, h: float) -> void:
 	_warn_badge.name = "warn"
 	_warn_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_warn_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_warn_badge.position = Vector2(PAD + w - 58.0, -2.0)
-	_warn_badge.size = Vector2(66.0, 19.0)
-	_warn_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, 9,
+	_warn_badge.position = Vector2(PAD + w - 64.0, -2.0)
+	_warn_badge.size = Vector2(72.0, 20.0)
+	_warn_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, TecTheme.R_PILL,
 		TecTheme.TEXT, 2))
 	_warn_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_warn_badge.visible = false
@@ -256,9 +270,9 @@ func _build(w: float, h: float) -> void:
 	_badge.name = "unread"
 	_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_badge.position = Vector2(PAD + w - 14.0, -2.0)
-	_badge.size = Vector2(20.0, 19.0)
-	_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.LINE, 9,
+	_badge.position = Vector2(PAD + w - 16.0, -2.0)
+	_badge.size = Vector2(22.0, 20.0)
+	_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.LINE, TecTheme.R_PILL,
 		TecTheme.LINE, 1))
 	_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_badge.visible = false
@@ -270,8 +284,8 @@ func _build(w: float, h: float) -> void:
 	_pin_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_pin_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_pin_badge.position = Vector2(PAD - 2.0, -2.0)
-	_pin_badge.size = Vector2(42.0, 19.0)
-	_pin_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.LINE, 9,
+	_pin_badge.size = Vector2(48.0, 20.0)
+	_pin_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.LINE, TecTheme.R_PILL,
 		TecTheme.LINE, 1))
 	_pin_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_pin_badge.visible = false

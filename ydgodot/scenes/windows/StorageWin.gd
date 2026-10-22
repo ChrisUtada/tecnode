@@ -16,6 +16,7 @@ var store_kind: String = GraphState.BAG
 var graph: GraphState
 var case_def: CaseLoader
 var _rows: VBoxContainer
+var _list_sig := ""
 
 
 func setup_store(p_title: String, p_kind: String, p_graph: GraphState, p_case: CaseLoader, w: float = 240.0, h: float = 220.0) -> void:
@@ -47,9 +48,18 @@ func items() -> Array:
 func refresh_store() -> void:
 	if _rows == null:
 		return
-	for c in _rows.get_children():
-		c.queue_free()
 	var list := items()
+	var sig := "v1:"
+	for key in list:
+		var n := graph.node(String(key))
+		sig += String(key) + String.chr(31) + String(n.get("label", "")) + String.chr(31) \
+			+ String(n.get("bag_from", "")) + String.chr(30)
+	if sig == _list_sig:
+		return
+	_list_sig = sig
+	for c in _rows.get_children():
+		_rows.remove_child(c)
+		c.queue_free()
 	if list.is_empty():
 		var empty := TecTheme.label("（空）", TecTheme.FS_BODY, TecTheme.MUTED)
 		_rows.add_child(empty)
@@ -63,7 +73,7 @@ func _make_row(key: String) -> Control:
 	var n := graph.node(key)
 	var row := PanelContainer.new()
 	row.name = "row_" + key.replace(":", "_")
-	row.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.CARD, 6, TecTheme.EDGE, 1))
+	row.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.EDGE, 1))
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
 	row.gui_input.connect(func(ev: InputEvent): _on_row_input(ev, key))
 	var hb := HBoxContainer.new()

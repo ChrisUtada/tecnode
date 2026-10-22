@@ -118,6 +118,8 @@ func _initialize() -> void:
 	await process_frame
 	var bag := scene.get_node_or_null("desk/bag_win")
 	check("证物袋窗能打开", bag != null)
+	check("证物袋标题仅中文", bag != null and (bag as StorageWin).title == "证物袋",
+		(bag as StorageWin).title if bag != null else "")
 	check("袋里列出台灯", bag != null and (bag as StorageWin).items().has("item:ITEM_taideng"))
 
 	scene.dbg_ensure("clue", "CLUES_nm")
@@ -130,6 +132,8 @@ func _initialize() -> void:
 	await process_frame
 	var ledger := scene.get_node_or_null("desk/clue_win")
 	check("线索册窗能打开", ledger != null)
+	check("线索册标题仅中文", ledger != null and (ledger as StorageWin).title == "线索册",
+		(ledger as StorageWin).title if ledger != null else "")
 	check("册里列出线索", ledger != null and (ledger as StorageWin).items().has("clue:CLUES_nm"))
 	check("台灯不在册里（册只收线索）",
 		ledger != null and not (ledger as StorageWin).items().has("item:ITEM_taideng"))
@@ -163,9 +167,15 @@ func _initialize() -> void:
 	# 页眉拉满视口宽：不缩放之后它是自适应的，1280 口径下必须正好 1280
 	check("页眉宽 = 视口宽（自适应）", head != null and absf(head.size.x - scene._vw()) < 0.5,
 		str(head.size.x) if head != null else "null")
-	# 主窗跟着桌面长：1280×720 下画布必须仍是 1162 × 613（P3 对拍口径）
+	var tog := scene.get_node_or_null("header/tog_合成消耗") as Button
+	var tog_img: Image = tog.icon.get_image() if tog != null and tog.icon != null else null
+	check("页眉 checkbox 13×13 圆角", tog_img != null
+		and tog_img.get_size() == Vector2i(13, 13)
+		and tog_img.get_pixel(0, 0).a == 0.0 and tog_img.get_pixel(2, 0).a > 0.0,
+		str(tog_img.get_size()) if tog_img != null else "null")
+	# 主窗跟着桌面长：1280×720 下画布必须是 1162 × 608（Web 标题栏 28px 口径）
 	var stage := scene.get_node_or_null("desk/case_win/body/stage") as Control
-	check("画布 1280 口径 = 1162×613", stage != null and stage.size == Vector2(1162, 613),
+	check("画布 1280 口径 = 1162×608", stage != null and stage.size == Vector2(1162, 608),
 		str(stage.size) if stage != null else "null")
 	var chip := scene.get_node_or_null("header/inv_chip") as Button
 	check("证章摆在 318 / 宽 190", chip != null and absf(chip.position.x - 318.0) < 0.5
@@ -179,6 +189,10 @@ func _initialize() -> void:
 	var hub_card: NodeCard = _cards().get("loc:SCENES_garden")
 	var border := hub_card.get_node_or_null("border") as Control
 	check("枢纽场景走双线框", border != null and border.visible and bool(border.get("double_line")))
+	var unread_sb := hub_card._badge.get_theme_stylebox("normal") as StyleBoxFlat
+	check("卡片「新」角标 22×20 药丸", hub_card._badge.size == Vector2(22, 20)
+		and unread_sb != null and unread_sb.corner_radius_top_left >= 100,
+		str(hub_card._badge.size))
 
 	# ── P0 交互（2026-10-21）：单击/双击分流 · 右键钉住 · 位置写回 · 落点表 · 连线 · 缩放 · 详情窗 ──
 	var all2: Dictionary = _cards()
@@ -251,12 +265,61 @@ func _initialize() -> void:
 	check("拖到线索册图标：非线索被拒", not scene.graph.stored.has(TORCH))
 	await create_timer(0.45).timeout        # spring_back 是 300ms 缓出
 	check("拒收后回原位", torch.position.distance_to(pos_before) < 1.5, str(torch.position))
+	var edges_bag: EdgeLayer = scene.get_node("desk/case_win/body/stage/cards/edges")
+	var drop_card: NodeCard = null
+	for e in scene.graph.edges:
+		var ka := String(e["a"])
+		var kb := String(e["b"])
+		for raw_key in [ka, kb]:
+			var other_key := kb if raw_key == ka else ka
+			var c := _cards().get(raw_key) as NodeCard
+			var other := _cards().get(other_key) as NodeCard
+			if c == null or other == null or c == torch or not c.visible or not other.visible:
+				continue
+			if String(scene.graph.node(raw_key).get("kind", "")) != "item":
+				continue
+			if scene.graph.is_container_node(raw_key):
+				continue
+			drop_card = c
+			break
+		if drop_card != null:
+			break
+	check("找到一张带连线的物品卡", drop_card != null)
+	var store_at := drop_card.get_global_rect().get_center()
+	_press(drop_card, store_at)
+	_motion(drop_card, store_at + Vector2(12, 8))
+	_motion(drop_card, bag_icon.get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	var had_edge := false
+	var edge_start := drop_card.visual_center()
+	for raw in edges_bag._segments:
+		var seg0: Dictionary = raw
+		if (seg0["a"] as Vector2).is_equal_approx(edge_start) \
+			or (seg0["b"] as Vector2).is_equal_approx(edge_start):
+			had_edge = true
+			break
+	check("收纳前物品有连线", had_edge)
+	_release(drop_card, bag_icon.get_global_rect().get_center())
+	var drop_center := drop_card.visual_center()
+	var stale_edge := false
+	for raw in edges_bag._segments:
+		var seg1: Dictionary = raw
+		if (seg1["a"] as Vector2).is_equal_approx(drop_center) \
+			or (seg1["b"] as Vector2).is_equal_approx(drop_center):
+			stale_edge = true
+			break
+	check("收进袋后旧连线立即断开", not stale_edge)
+	await process_frame
+	await process_frame
+	check("拖到证物袋图标：收进袋",
+		String(scene.graph.stored.get(drop_card.card_key, "")) == GraphState.BAG,
+		String(scene.graph.stored.get(drop_card.card_key, "")))
+	check("收进袋后卡片离场", not drop_card.visible)
 	_drag(torch, bag_icon)
 	await process_frame
-	await process_frame
-	check("拖到证物袋图标：收进袋", String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG,
+	check("手电筒也收进袋", String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG,
 		String(scene.graph.stored.get(TORCH, "")))
-	check("收进袋后卡片离场", not torch.visible)
 
 	# 4b) 落点表完整性：id 一律来自 11 项白名单
 	#     Web 的 nodeDropTargets() 是 10 项，推演桌布在松手处单独判一遍（11 个元素）；

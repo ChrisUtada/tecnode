@@ -60,7 +60,7 @@ func setup_matrix(p_graph: GraphState, p_case: CaseLoader) -> void:
 	graph = p_graph
 	case_def = p_case
 	var fast := OS.get_cmdline_args().has("--fast") or OS.get_cmdline_user_args().has("--fast")
-	setup("INFERENCE // 逻辑阵列", 580, 476)
+	setup("逻辑阵列", 580, 476)
 	_rite_duration = 0.08 if fast else RITE_SEC
 	body.clip_contents = true
 

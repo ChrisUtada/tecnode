@@ -18,13 +18,14 @@ var graph: GraphState
 var _scroll: ScrollContainer
 var _list: VBoxContainer
 var _rows: Array[Control] = []
+var _log_sig := ""
 
 
 ## h 是 **body 高**。Web `.log-win .log-body{max-height:340px}`，body 还要扣掉标题栏 23
 ## 与上下 20 —— 传 383 才对应 340 的列表区。
 func setup_log(p_graph: GraphState, w: float = 320.0, h: float = 383.0) -> void:
 	graph = p_graph
-	setup("SYS_LOGS // 因果追踪", w, h)
+	setup("因果追踪", w, h)
 	_scroll = ScrollContainer.new()
 	_scroll.name = "log_scroll"
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -43,11 +44,18 @@ func setup_log(p_graph: GraphState, w: float = 320.0, h: float = 383.0) -> void:
 func refresh_log() -> void:
 	if _list == null:
 		return
+	var entries: Array = graph.logs if graph != null else []
+	var sig := "v1:" + str(entries.size()) + ":"
+	for e in entries:
+		sig += String((e as Dictionary).get("kind", "")) + String.chr(31) \
+			+ String((e as Dictionary).get("text", "")) + String.chr(30)
+	if sig == _log_sig:
+		return
+	_log_sig = sig
 	for c in _list.get_children():
 		_list.remove_child(c)
 		c.queue_free()
 	_rows.clear()
-	var entries: Array = graph.logs if graph != null else []
 	if entries.is_empty():
 		var empty := TecTheme.label("（还没有记录）", TecTheme.FS_BODY, TecTheme.MUTED)
 		_list.add_child(empty)

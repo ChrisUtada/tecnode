@@ -209,6 +209,14 @@ func push_history(snap: Dictionary = {}) -> void:
 		history.pop_front()
 
 
+func push_history_snapshot(snap: Dictionary) -> void:
+	if snap.is_empty():
+		return
+	history.append(snap)
+	while history.size() > HISTORY_MAX:
+		history.pop_front()
+
+
 func can_undo() -> bool:
 	return not history.is_empty()
 

@@ -75,7 +75,7 @@ func _test_desktop() -> void:
 	info = scene.dbg_tec_info()
 	check("TEC 窗可打开", bool(info["visible"]))
 	check("打开后卡片隐藏", not bool(info["chip_visible"]))
-	check("TEC 窗标题", scene.dbg_tec_win().title == "TEC // 对话", scene.dbg_tec_win().title)
+	check("TEC 窗标题", scene.dbg_tec_win().title == "TEC 对话", scene.dbg_tec_win().title)
 	check("TEC 头像 60×60", scene.dbg_tec_win().avatar_global_rect().size.x >= 60.0,
 		str(scene.dbg_tec_win().avatar_global_rect().size))
 

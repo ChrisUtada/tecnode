@@ -15,7 +15,7 @@ var _rows: VBoxContainer
 func setup_archive(p_graph: GraphState, p_case: CaseLoader, w: float = 300.0, h: float = 330.0) -> void:
 	graph = p_graph
 	case_def = p_case
-	setup("ARCHIVE // 档案", w, h)
+	setup("档案", w, h)
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "archive_scroll"
@@ -53,9 +53,9 @@ func _make_row(tid: String, current: bool) -> Control:
 	row.name = "row_" + tid
 	row.custom_minimum_size = Vector2(0, 46)
 	row.focus_mode = Control.FOCUS_NONE
-	row.add_theme_stylebox_override("normal", TecTheme.flat(Color(0, 0, 0, 0), 6, Color(0, 0, 0, 0), 0))
-	row.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, 6, Color(0, 0, 0, 0), 0))
-	row.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, 6, Color(0, 0, 0, 0), 0))
+	row.add_theme_stylebox_override("normal", TecTheme.flat(Color(0, 0, 0, 0), TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
+	row.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
+	row.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
 	row.pressed.connect(_on_row_pressed.bind(tid))
 
 	var pad := MarginContainer.new()

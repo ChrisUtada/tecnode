@@ -193,7 +193,7 @@ func _test_desktop(c: CaseLoader) -> void:
 		return
 	var state: Dictionary = scene.dbg_chat_state()
 	check("对话窗 id", String(state["id"]) == "DLG_0704_zs_lhs", str(state["id"]))
-	check("对话窗标题带日期与两人", scene.dbg_chat_title() == "DIALOGUE // 7月4日 · 朱穗 × 陆珩松",
+	check("对话窗标题带日期与两人", scene.dbg_chat_title() == "对话 · 7月4日 · 朱穗 × 陆珩松",
 		scene.dbg_chat_title())
 	check("初始两行参与者已加入", (state["joined"] as Array).size() == 2, str(state["joined"]))
 	check("对话窗贴右上", chat.position == Vector2(858, 58), str(chat.position))
@@ -244,7 +244,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("独白窗打开", chat != null)
 	if chat != null:
 		state = scene.dbg_chat_state()
-		check("独白标题", scene.dbg_chat_title() == "独白 // 陆珩松", scene.dbg_chat_title())
+		check("独白标题", scene.dbg_chat_title() == "独白 · 陆珩松", scene.dbg_chat_title())
 		check("独白 id", String(state["id"]) == "DLG_lhs_alone", str(state["id"]))
 		check("独白一人", String(state["id"]) == "DLG_lhs_alone"
 			and (state["participants"] as Array).size() == 1)
@@ -258,7 +258,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	chat = scene.dbg_chat()
 	check("三人剧本开窗", chat != null)
 	if chat != null:
-		check("三人剧本标题无日期", scene.dbg_chat_title() == "DIALOGUE // 朱穗 × 傅柏",
+		check("三人剧本标题无日期", scene.dbg_chat_title() == "对话 · 朱穗 × 傅柏",
 			scene.dbg_chat_title())
 		scene.dbg_chat_finish()
 		scene.dbg_chat_advance()

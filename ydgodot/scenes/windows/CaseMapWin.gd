@@ -14,7 +14,7 @@ func setup_map(p_catalog: CaseCatalog, p_current: String, p_open: bool) -> void:
 	catalog = p_catalog
 	current_id = p_current
 	case_open = p_open
-	setup("CASE MAP // 案件地图", 430, 390)
+	setup("案件地图", 430, 390)
 	_build_map()
 
 
@@ -129,10 +129,9 @@ func _make_row(c: Dictionary) -> Control:
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var state_style := TecTheme.flat(
 		TecTheme.LINE if state_kind == "on" else TecTheme.CARD,
-		TecTheme.R_BTN,
+		TecTheme.R_PILL,
 		TecTheme.LINE if state_kind == "on" else TecTheme.EDGE_SOFT,
 		1)
-	state_style.set_corner_radius_all(12)
 	state_style.content_margin_left = 8
 	state_style.content_margin_right = 8
 	if state_kind == "lock" or state_kind == "pend":

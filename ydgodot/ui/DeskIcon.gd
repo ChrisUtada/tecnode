@@ -203,7 +203,7 @@ func _apply_style() -> void:
 	_mat.set_shader_parameter("shade_col", Color(0, 0, 0, 0.55) if dark else TecTheme.BEVEL_LO)
 	# 按下 / 选中态在 CSS 里只有 inset 阴影，没有外圈高光
 	_mat.set_shader_parameter("glow_col", Color(0, 0, 0, 0) if dark else TecTheme.BEVEL_HI)
-	_icon.modulate = TecTheme.CARD if dark else Color.WHITE
+	_icon.modulate = TecTheme.CARD if dark else TecTheme.LINE
 	_label.add_theme_color_override("font_color", TecTheme.CARD if dark else TecTheme.MUTED)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = TecTheme.LINE if dark else Color(0, 0, 0, 0)

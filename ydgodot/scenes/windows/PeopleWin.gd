@@ -21,6 +21,7 @@ var graph: GraphState
 var case_def: CaseLoader
 var _list: VBoxContainer
 var _scroll: ScrollContainer
+var _list_sig := ""
 
 
 ## h 是 **body 高**（SysWindow 会再加 PAD*2）。Web `.people-win .syswin-body{max-height:356px}`，
@@ -28,7 +29,7 @@ var _scroll: ScrollContainer
 func setup_people(p_graph: GraphState, p_case: CaseLoader, w: float = 324.0, h: float = 399.0) -> void:
 	graph = p_graph
 	case_def = p_case
-	setup("ROSTER // 人物", w, h)
+	setup("人物", w, h)
 	_scroll = ScrollContainer.new()
 	_scroll.name = "people_scroll"
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -46,10 +47,18 @@ func setup_people(p_graph: GraphState, p_case: CaseLoader, w: float = 324.0, h: 
 func refresh_people() -> void:
 	if _list == null:
 		return
+	var ids: Array = graph.met_char_ids() if graph != null else []
+	var sig := "v1:"
+	for id in ids:
+		var pr: Dictionary = graph.char_progress(String(id))
+		sig += String(id) + String.chr(31) + str(int(pr.get("prog", 0))) + "/" \
+			+ str(int(pr.get("total", 0))) + String.chr(30)
+	if sig == _list_sig:
+		return
+	_list_sig = sig
 	for c in _list.get_children():
 		_list.remove_child(c)
 		c.queue_free()
-	var ids: Array = graph.met_char_ids() if graph != null else []
 	if ids.is_empty():
 		var empty := TecTheme.label("（还没有结识任何人）展开场景、读一读文本，就会记下遇到的人",
 			TecTheme.FS_BODY, TecTheme.MUTED)
