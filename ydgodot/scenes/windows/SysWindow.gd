@@ -299,6 +299,7 @@ func resize_to(w: float, h: float) -> void:
 	var iw := maxf(320.0, w)
 	var ih := maxf(160.0, h)
 	custom_minimum_size = Vector2(320.0 + PAD * 2.0, 160.0 + PAD * 2.0)
+	_inner_w = iw
 	size = Vector2(iw + PAD * 2.0, ih + PAD * 2.0)
 	_sync_frame(Vector2(iw, ih))
 	if _mat != null:
@@ -314,6 +315,11 @@ func resize_to(w: float, h: float) -> void:
 			hl.size.x = iw
 		if _close_btn != null and is_instance_valid(_close_btn):
 			_close_btn.position.x = iw - 23.0
+		# 最小化按钮是 enable_controls() 后加的，resize_to() 也得把它一起推回右沿；
+		# 否则 1920 宽下它会停在 1280 设计坐标（1218），跟关闭按钮隔着半个屏幕。
+		var min_btn := bar.get_node_or_null("min") as Control
+		if min_btn != null:
+			min_btn.position.x = iw - 46.0
 	var sep := get_node_or_null("sep") as Control
 	if sep != null:
 		sep.size.x = iw

@@ -25,6 +25,10 @@ var _press_pos := Vector2.ZERO
 var _drag_origin := Vector2.ZERO
 var _moved := false
 var _bounds := Rect2(Vector2.ZERO, Vector2(1280, 668))
+var _root_size := ROOT_SIZE
+var _glyph_size := GLYPH_SIZE
+var _glyph_pad := GLYPH_PAD
+var _compact := false
 
 
 func setup(p_text: String, p_icon: String) -> void:
@@ -78,10 +82,36 @@ func setup(p_text: String, p_icon: String) -> void:
 	_label.size = Vector2(ROOT_SIZE, 14)
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_label)
+	# 紧凑模式会藏掉文字标签，名称仍要能从 tooltip 读出来。
+	tooltip_text = p_text
 
 	mouse_entered.connect(_on_hover.bind(true))
 	mouse_exited.connect(_on_hover.bind(false))
 	_apply_style()
+
+
+## 矮窗口 / 图标多时切紧凑：不缩 44px 图标本体（避免 SVG 重采样发糊），
+## 只收掉外圈 10px 留白与文字标签，把每个图标高度从 69 压到 48。
+func set_compact(on: bool) -> void:
+	if _compact == on:
+		return
+	_compact = on
+	_root_size = 48.0 if on else ROOT_SIZE
+	_glyph_size = GLYPH_SIZE
+	_glyph_pad = 2.0 if on else GLYPH_PAD
+	custom_minimum_size = Vector2(_root_size, _root_size)
+	size = custom_minimum_size
+	_glyph.position = Vector2(0, -_glyph_pad)
+	_glyph.size = Vector2(_root_size, _root_size)
+	_mat.set_shader_parameter("rect_size", Vector2(_root_size, _root_size))
+	_mat.set_shader_parameter("pad", _glyph_pad)
+	_icon.position = Vector2(_glyph_pad, _glyph_pad)
+	_icon.size = Vector2(_glyph_size, _glyph_size)
+	_label.visible = not on
+	for ch in get_children():
+		if ch is PanelContainer and String(ch.name).ends_with("badge"):
+			(ch as Control).position.x = _root_size - 20.0
+	queue_redraw()
 
 
 ## 拖动范围 = 桌面矩形（Web：`clamp(0, desktop.w - 64)`）
@@ -122,8 +152,8 @@ func _gui_input(event: InputEvent) -> void:
 			_moved = true
 			move_to_front()
 		var p := _drag_origin + d
-		var max_x := maxf(_bounds.size.x - ROOT_SIZE, 0.0)
-		var max_y := maxf(_bounds.size.y - ROOT_SIZE, 0.0)
+		var max_x := maxf(_bounds.size.x - _root_size, 0.0)
+		var max_y := maxf(_bounds.size.y - _root_size, 0.0)
 		position = Vector2(clampf(p.x, 0.0, max_x), clampf(p.y, 0.0, max_y))
 		accept_event()
 
@@ -158,7 +188,7 @@ func _draw() -> void:
 	sb.set_border_width_all(2)
 	sb.border_color = TecTheme.LINE
 	sb.set_corner_radius_all(12)
-	draw_style_box(sb, Rect2(Vector2(0, -GLYPH_PAD), Vector2(ROOT_SIZE, ROOT_SIZE)))
+	draw_style_box(sb, Rect2(Vector2(0, -_glyph_pad), Vector2(_root_size, _root_size)))
 
 
 func _apply_style() -> void:

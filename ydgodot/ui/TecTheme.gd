@@ -6,6 +6,8 @@ extends RefCounted
 ## 免得同一种米白在十个文件里各写一遍、又各自跑偏。
 
 const BG := Color("e9e5d6")
+## 画布纸面：比 BG 略亮，对齐原来 stage_paper.png 的中心色（约 #ebe8db）。
+const PAPER := Color("ebe8db")
 const CARD := Color("f5f2e8")
 const FACE_HI := Color("fbf8ee")
 const FACE_LO := Color("eee9d7")

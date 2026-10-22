@@ -69,7 +69,7 @@
   - 旁白：开花后点花株开正文，按句 / 逗号切段（约 150 字/段），点击补字或翻页，面板随内容伸缩；正文取 `TRUE_E.message`（371 字），旧档缺 `garden` 且有 TRUE_E 时自动补种子
   - 回归：`test_p25.gd` 146 项（花园核心 / 老档迁移 / 播放器与 dock / 图标收放 / 种子投放 / 拖动 / 旁白 / 存档）
 - **交互层 · P0 八项**：✅ 已落地（2026-10-21 夜，差距清单见 `docs/INTERACTION_GAP_REPORT.md` §0.1，实证截图 `docs/p0_canvas.png`）
-  - 世界层：卡片活在 2000×1300 的 world 空间（`_card_layer.size`），只承担平移 + 以光标为锚的缩放（0.35–1.8）；坐标基准统一走 `NodeCard.visual_rect()`（含 8px 阴影余量），布局 / 连线端点 / 命中判定三处共用
+  - 世界层：卡片活在 2000×1300 的 world 空间（`_card_layer.size`），只承担平移 + 整数档缩放（1x 原生 / 2x 整块放大）；坐标基准统一走 `NodeCard.visual_rect()`（含 8px 阴影余量），布局 / 连线端点 / 命中判定三处共用
   - 连线 `EdgeLayer`：二次贝塞尔采 24 段，四种样式照抄 `04-nodes.css`（entity 1.3px `#8a8672` / move 1.6px 实线 / cond 1.6px 虚线 5-4 / tried 1px 虚线 3-4 @55%），虚线按弧长手工切；`tried` 单独读 `graph.tried`，不混进 `graph.edges` 污染弹簧与度数
   - 单击 / 双击分离：按下只记位置，松手未位移 = 选中，280ms 内第二下 = 激活（拖动也开始选中）
   - 位置写回：松手写 `n["x"]/n["y"]` 并夹回 world 边界 + `_commit()`（旧版从不写回，下一次重排必然推翻玩家摆位）
@@ -130,7 +130,11 @@
   为什么放弃「Win95 整体放大」：`font.ttf` 是 VonwaonBitmap 12px 点阵字，只在 12 / 24 / 36px 落得下原字格。1920×1080 的可用区（1920×1040）算出的等比系数是 **1.444x** —— 非整数倍，整屏字重采样后同时变粗变糊（证据 `docs/font_scale.png`）。
   **点阵字体 + 任意缩放无解**，只能二选一：锁整数倍（1080p 只剩 1x，界面小一圈）或干脆不缩放。本项目选后者。
 - **窗口**：`_setup_window_scale()` 铺满 `screen_get_usable_rect()`，最小 960×560；`--win=1920x1040` 可钉死尺寸（排查某个尺寸下布局崩了、或换截图口径都用它）。
-- **布局自适应**：`_layout_root()` 挂在 `NOTIFICATION_RESIZED` 上 —— 页眉拉满视口宽、工具组贴右（flex `margin-left:auto` 语义）、主窗按「视口 − 86 图标列 − 2×PAD」重算、toast 与贴右浮窗重新对边。画布若还在「适应窗口」自动档（`_view_user == false`）就重新 fit，玩家手动调过镜头则只做中心补偿。
+- **布局自适应**：`_layout_root()` 挂在 `NOTIFICATION_RESIZED` 上 —— 页眉拉满视口宽、工具组贴右（flex `margin-left:auto` 语义）、主窗按「视口 − 86 图标列 − 2×PAD」重算、toast 与贴右浮窗重新对边。画布若还在「适应窗口」自动档（`_view_user == false`）就重新居中（**1x，不缩小不放大**），玩家手动调过镜头则只做中心补偿；卡片超出视口时拖画布平移。
+- **滚轮 = 1x / 2x 整数档**：`_on_stage_input()` 不再产生 0.35–1.8 的连续缩放。1x 是原生像素，2x 是 2×2 整数块；两者都不会让点阵字/图标落在半像素上。
+- **纸纹按物理像素生成**：主窗画布用 `ui/shaders/paper.gdshader`，窗口变大只增加采样面积；`stage_paper.png`（1162×693 的 800p 整图）保留作视觉基准，不再挂载，避免 720p 下被纵向压 80px。
+- **矮窗图标列**：960×560 下 8 个「图标 + 标签」放不下时，`_reset_icon_positions()` 自动切紧凑模式——44px 图标本体不重采样，只收外圈留白并隐藏标签（名称走 tooltip）；动态增加到 10 个图标也不会被桌布裁掉。
+- **主窗右上按钮跟宽**：`SysWindow.resize_to()` 同步推最小化/关闭按钮到右沿；1920 宽下不会再停在 1280 设计坐标（1218）而跟关闭按钮隔半个屏幕。
 - **字号三档，且必须是 12 的倍数**：`FS_BODY = 12`（一切界面文字）、`FS_TITLE = 12`（正文沿用同一格）、`FS_DISPLAY = 24` / `FS_INITIAL = 48`（仅装饰大字）。13px 是 1.083 倍重采样，中文会整行发胖（证据 `docs/font_13_vs_12.png`）。**不许再写非 12 倍数的字号**；可读性靠行高与字色拉开层级，不靠 +1px。
 - **1x 栅格**：`TecTheme.font()` 固定 `oversampling = 1.0` —— 逻辑尺寸既然等于物理像素，1x 就是原生格，再叠自动栅格只会引入误差。
 - **字色纪律**：要读的字一律 `MUTED`（卡面 6.36:1 / 纸面 5.64:1）或 `TEXT`；`FAINT`（3.27:1）只用于装饰（水印 "?"、锁定图标、placeholder）；`LINE2` 只能压在深色面上（黑条 7.46:1，卡面仅 1.70:1）。
@@ -211,7 +215,7 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 | `addons/case_nodes/` | **编辑器插件**：四栏「画布节点」在检查器里显示成一行摘要（`物品 · 6 项` + 「编辑…」），点开是弹出窗口 —— 四个 tab（物品 / 人物 / 地点 / 线索），可「＋ 添加」挑 .tres、可直接拖资源进来、可调序 / 解绑、失效引用标红。**不用手打 id**。检查器里刻意只放一行：它每次刷新都会重建控件，把列表画在那里会卡（实测索引也从「load 全部案件资源」改成「读 .tres 文本」，1313 ms → 136 ms） |
 | `data/` | `case-a001.json` —— **已冻结为只读档案**（迁移输入 + 对照基准，运行时不再读它；正文已不参与对账） |
 | `assets/raw/` | `src/assets/` 的拷贝（字体 / 头像 / OGG / 花园序列帧） |
-| `tests/headless/` | `test_p0.gd`（逻辑 23）、`test_ui.gd`（真鼠标事件 170）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 18）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 103）、`test_p25.gd`（音乐 / 花园 146）、`test_p26.gd`（名册 / 日志 / 图标栏 85）—— **共 1152 项** |
+| `tests/headless/` | `test_p0.gd`（逻辑 23）、`test_ui.gd`（真鼠标事件 172）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 18）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 61）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 84）、`test_p23.gd`（回忆系统 164）、`test_p24.gd`（多人对话 / 独白 103）、`test_p25.gd`（音乐 / 花园 146）、`test_p26.gd`（名册 / 日志 / 图标栏 85）—— **共 1154 项** |
 | `docs/` | P0 切片 6 张 + P1 新特性 15 张 + P2 案件 / TEC / 回忆 / 对话 / 音乐 / 花园 / 名册 / 日志 22 张截图，共 43 张（P3 对拍基线从这些图起步） |
 | `tools/` | `json_to_tres.gd`（JSON → `.tres`）、`migrate_node_lists.gd`（把正文标签冻结成节点清单，一次性）、对拍工具 |
 
@@ -225,7 +229,7 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 - **`SceneDef` / `ItemDef` 必须 `@tool`，四栏默认值必须写 `PackedStringArray()`**：非 tool 脚本在编辑器里走 `PlaceholderScriptInstance`，它的 `set()` 按「默认值类型」校验 —— 默认值写 `[]` 会变成无类型 `Array`，`.tres` 里的 `PackedStringArray` 值被整条丢弃（检查器四栏全空、游戏里却正常）。删了 `@tool` 或改回 `= []` 就会复发
 - 图状态：展开场景长出实体节点、幂等、`entity` / `move` / `cond` 边、收纳三态、快照撤销
 - 组合与命令：发光工具门（未点亮拦下、不记 tried）、`useItem` 命中、`onSuccess.scene` 揭示、反应表五段通道
-- 画布：world/view 分离（2000×1300）、力导向布局、以光标为锚缩放 0.35–1.8、平移、位置写回与边界夹回
+- 画布：world/view 分离（2000×1300）、力导向布局、以光标为锚的 1x/2x 整数缩放、平移、位置写回与边界夹回
 - 连线：四种边（entity / move / cond / tried），二次贝塞尔 24 段采样，虚线按弧长切
 - 节点交互：单击选中 / 双击激活 / 右键钉住 / 拖动（5px 阈值+镜像）/ `spring_back()` 弹回
 - 交互细节：hover 手形与阴影（N8）/ 入场 pop（V4）/ 无文本入口药丸（V5）/ dim .32（V6）/ 场景命令前置（N7）
@@ -234,7 +238,7 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 - 详情窗：简介 / 状态 / 来源 + 四个重看按钮
 - TEC 对话 / 分析：5–8 秒进度条 + `--fast` 旁路 + 闲聊 + 档案解读 + 右下角助手卡片
 - 结局演出：分幕台词按 `delay` 落下、点击继续、遮罩收幕
-- 无头回归 **14 个脚本 1152 项**，全绿
+- 无头回归 **14 个脚本 1154 项**，全绿
 
 **没做（P4 / 后续）**
 

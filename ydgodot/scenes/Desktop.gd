@@ -58,6 +58,7 @@ var _pan_origin := Vector2.ZERO
 var _opt_focus := true          # 页眉「聚焦选中」
 var _opt_reveal := true         # 页眉「新节点自动居中」
 var _crumb: Label
+var _brand_sub: Label
 var _hdr_sized: Array = []      # [Control, Vector2]：页眉控件的目标尺寸，见 _sync_header_sizes()
 var _hdr_right: Array = []      # [Control, float]：贴右控件的「距右边缘」距离，见 _layout_header_right()
 var _toast: PanelContainer
@@ -93,6 +94,7 @@ var _sdrag_label := ""
 var _icon_sel: DeskIcon = null
 var _icon_last_app := ""
 var _icon_last_ms := -100000
+var _icon_layout_h := -1.0
 var _cmds: CommandSystem
 var _pw_pop: PasswordPop = null
 var _pw_ctx: Dictionary = {}
@@ -210,13 +212,33 @@ func _layout_root() -> void:
 	var vh := _vh()
 	if _head != null and is_instance_valid(_head):
 		_head.size = Vector2(vw, HEADER_H)
+	_layout_header_left(vw)
 	_layout_header_right(vw)
 	if _desk != null and is_instance_valid(_desk):
 		_desk.position = Vector2(0, HEADER_H)
 		_desk.size = Vector2(vw, vh - HEADER_H)
 	_resize_case_window(vw, vh)
+	if _desk.size.y != _icon_layout_h:
+		_icon_layout_h = _desk.size.y
+		_reset_icon_positions()
 	_place_toast_anchor()
 	_relayout_edge_windows(vw)
+
+
+## 窄窗口先收左半边：工具组固定 596px（670..1266），窗口宽到 1150 以下时
+## 证章会和工具组叠上。按右组左沿反推，逐级隐藏面包屑/副题，并把证章挪到品牌后。
+func _layout_header_left(vw: float) -> void:
+	if _brand_sub == null or _inv_chip == null or _crumb == null:
+		return
+	if not is_instance_valid(_brand_sub) or not is_instance_valid(_inv_chip) \
+			or not is_instance_valid(_crumb):
+		return
+	var right_left := vw - (DESIGN_W - 670.0)
+	var show_crumb := right_left >= HDR_X_CRUMB + HDR_W_CRUMB + 12.0
+	var show_sub := right_left >= HDR_X_CHIP + HDR_W_CHIP + 12.0
+	_crumb.visible = show_crumb
+	_brand_sub.visible = show_sub
+	_inv_chip.position.x = HDR_X_CHIP if show_sub else HDR_X_SUB
 
 
 ## 页眉工具组是 flex 的 `margin-left:auto`：贴右，不贴左。坐标表按 1280 量出来的，
@@ -587,6 +609,7 @@ func _build_header() -> void:
 	sub.position = Vector2(HDR_X_SUB, 0.0)
 	sub.size = Vector2(206.0, HEADER_H)
 	sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_brand_sub = sub
 	head.add_child(sub)
 
 	# 调查员证章（`#inv-chip`）：11px、奶油 1px 描边、**无圆角**、内边距 4/8
@@ -828,12 +851,15 @@ func _build_case_window() -> void:
 	_stage.gui_input.connect(_on_stage_input)
 	_case_win.body.add_child(_stage)
 
-	var stage_bg := TextureRect.new()
+	## 纸纹用 shader 按物理像素生成：窗口尺寸变化时只增加/减少采样面积，
+	## 不会把一张固定尺寸的整图拉伸。`stage_paper.png` 保留作视觉基准，不再挂载。
+	var stage_bg := ColorRect.new()
 	stage_bg.name = "stage_bg"
-	stage_bg.texture = load("res://assets/baked/stage_paper.png")
-	stage_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	stage_bg.stretch_mode = TextureRect.STRETCH_SCALE
-	stage_bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	stage_bg.color = Color.WHITE
+	var paper_mat := ShaderMaterial.new()
+	paper_mat.shader = load("res://ui/shaders/paper.gdshader")
+	paper_mat.set_shader_parameter("paper_col", TecTheme.PAPER)
+	stage_bg.material = paper_mat
 	stage_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	stage_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stage.add_child(stage_bg)
@@ -858,6 +884,8 @@ const ICON_LEFT := 18.0
 const ICON_TOP := 16.0
 const ICON_PITCH := 85.0
 const ICON_MIN_PITCH := 70.0
+const ICON_NORMAL_H := 69.0
+const ICON_COMPACT_H := 48.0
 ## 常驻 8 项：顺序即 Web `ICON_LAYOUT` 的顺序（人物排在线索册之后、日志排在 TEC 之后）
 const ICON_DEFS := [
 	["推演器", "infer", "star"],
@@ -1029,8 +1057,18 @@ func _reset_icon_positions() -> void:
 			list.append(c)
 	if list.is_empty():
 		return
-	var pitch := clampf(floorf((_desk.size.y - ICON_TOP - 12.0) / float(list.size())),
+	var desk_h := _desk.size.y
+	var n := list.size()
+	var normal_pitch := clampf(floorf((desk_h - ICON_TOP - 12.0) / float(n)),
 		ICON_MIN_PITCH, ICON_PITCH)
+	# 加高到放不下 8/10 个「图标 + 标签」时切紧凑：图标本体仍是 44px，
+	# 只收掉外圈留白和标签，避免 960×560 最后一项被桌布裁掉。
+	var compact := ICON_TOP + float(n - 1) * normal_pitch + ICON_NORMAL_H > desk_h + 0.5
+	for b in list:
+		(b as DeskIcon).set_compact(compact)
+	var pitch := clampf(floorf((desk_h - ICON_TOP - 12.0) / float(n)),
+		ICON_COMPACT_H if compact else ICON_MIN_PITCH,
+		64.0 if compact else ICON_PITCH)
 	# 顺序：常驻 8 项按 ICON_DEFS，动态的（播放器 / 花园）排在后面
 	var order: Array = []
 	for d in ICON_DEFS:
@@ -2048,7 +2086,8 @@ func _rebuild_from_graph() -> void:
 
 
 # ── 画布手势（Web `15-desktop.js`）────────────────────────────────────────
-# 点空白 = 清选中；拖空白 = 平移；滚轮 = 以光标为锚缩放（0.35~1.8）。
+# 点空白 = 清选中；拖空白 = 平移；滚轮 = 以光标为锚在 1x / 2x 之间切换。
+# 点阵字只允许整数倍栅格：0.35~1.8 的连续缩放会把字重采样成灰边，故不再提供。
 # 卡片自己 `MOUSE_FILTER_STOP` + `accept_event()`，所以拖节点不会漏成平移。
 
 func _on_stage_input(event: InputEvent) -> void:
@@ -2058,8 +2097,9 @@ func _on_stage_input(event: InputEvent) -> void:
 			if not mb.pressed:
 				return
 			var mp := mb.position
-			var step := 1.12 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.12
-			var k2 := clampf(_view_k * step, 0.35, 1.8)
+			## 只允许整数倍：1x 是原生格，2x 是点阵字的 2×2 放大；3x 以上在这个
+			## 画布里已看不到更多东西，反而把单张卡撑出屏幕。
+			var k2 := 2.0 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0
 			if absf(k2 - _view_k) > 0.0001:
 				_view_pos = mp - (mp - _view_pos) * (k2 / _view_k)
 				_view_k = k2
@@ -3923,14 +3963,12 @@ func _fit_cards() -> void:
 		_card_layer.scale = Vector2.ONE
 		_view_user = false
 		return
-	var pad := 60.0
-	var k := minf((_stage.size.x - pad * 2.0) / bounds.size.x,
-		(_stage.size.y - pad * 2.0) / bounds.size.y)
-	k = clampf(k, 0.35, 1.3)
-	_view_k = k
-	_view_pos = (_stage.size - bounds.size * k) * 0.5 - bounds.position * k
+	## 自动档只居中，不缩放。fit 出 0.35~1.3 的非整数倍会把卡片里的点阵字
+	## 和图标一起重采样；宁可让卡片多时溢出画布、由玩家拖动，也不牺牲原生像素。
+	_view_k = 1.0
+	_view_pos = (_stage.size - bounds.size) * 0.5 - bounds.position
 	_card_layer.position = _view_pos
-	_card_layer.scale = Vector2(k, k)
+	_card_layer.scale = Vector2.ONE
 	_view_user = false
 
 

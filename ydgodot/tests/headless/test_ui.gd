@@ -224,6 +224,8 @@ func _initialize() -> void:
 	#     根因：`_relayout()` 无条件跑 260 轮力导向，而这套参数**不收敛** —— 实测同一批节点连跑 8 次，
 	#     单次最大位移 194 → 72 → 38 → 21 → 12 → 6.9 → 3.9 → 2.3 → 1.3px，每跑一次全画布漂一次。
 	#     Web 只在「真长出节点」时 `layout()`（09-commands.js：「开关灯只重绘 —— 重排会让灯自己跳位置」）。
+	#     前面折叠 / 展开的 0.34s 落位补间可能还在飞，先等它落地，否则快照拍到的是动画中间态。
+	await create_timer(0.45).timeout
 	var pos_struct := {}
 	for k in _cards().keys():
 		pos_struct[String(k)] = (_cards()[k] as Control).position
@@ -796,12 +798,19 @@ func _initialize() -> void:
 	scene._fit_view()
 	await process_frame
 	await process_frame
+	# 1x 相机下卡片不再被缩小，前一轮重排的落位补间若还在飞，r24 会在按下前
+	# 从指针底下漂走；等补间全部落地再取屏幕坐标。
+	await create_timer(0.45).timeout
 	var k24 := "loc:SCENES_garden"
 	var c24: NodeCard = _cards().get(k24, null)
 	check("前提：目标卡在画布上", c24 != null and c24.visible)
 	if c24 != null:
+		# 1x 的「适应窗口」只居中不缩小；卡片多时目标可能落在画布外。
+		# 这里只测事件路由，先把目标卡平移到画布中央，保证按点真的落在它身上。
+		scene._center_on(c24)
+		await process_frame
 		var r24: Vector2 = c24.get_global_rect().get_center()
-		# 适应窗口后卡片很小、会互相压住；真实事件命中的是最上面那张，先把目标提到最前
+		# 1x 下卡片会互相压住；真实事件命中的是最上面那张，先把目标提到最前
 		c24.move_to_front()
 		await process_frame
 		var p24: Vector2 = c24.position
@@ -833,14 +842,15 @@ func _initialize() -> void:
 		# 残留会话的兜底：假装上一轮松手丢了，下一次按下应先把卡落地、不进入平移
 		scene._drag_key = k24
 		var world24: Vector2 = scene._card_layer.position
-		_vpush_btn(Vector2(420, 640), true)
+		var blank24: Vector2 = _empty_canvas_point(scene)
+		_vpush_btn(blank24, true)
 		await process_frame
-		_vpush_mov(Vector2(470, 680))
+		_vpush_mov(blank24 + Vector2(50, 40))
 		await process_frame
 		check("残留会话：新按下先收尾、不平移画布",
 			scene._drag_key == "" and scene._card_layer.position.is_equal_approx(world24),
 			"drag_key=" + scene._drag_key + " world=" + str(scene._card_layer.position - world24))
-		_vpush_btn(Vector2(470, 680), false)
+		_vpush_btn(blank24 + Vector2(50, 40), false)
 		await process_frame
 
 	# 25) 桌布线索卡：拖动必须真的跟手（此前只判「移动过」、位置一动不动）
@@ -882,6 +892,28 @@ func _cards() -> Dictionary:
 		if c is NodeCard:
 			out[(c as NodeCard).card_key] = c
 	return out
+
+
+## 画布上任意一个「没有卡片、没有落点窗口」的点。1x 相机下卡片可能铺满画布，
+## 不能再写死一个坐标当空白。
+func _empty_canvas_point(scene: Control) -> Vector2:
+	var r: Rect2 = scene._stage.get_global_rect()
+	var y := r.position.y + 12.0
+	while y < r.end.y - 12.0:
+		var x := r.position.x + 12.0
+		while x < r.end.x - 12.0:
+			var p := Vector2(x, y)
+			var clear: bool = scene._card_key_at(p) == ""
+			if clear:
+				for t in scene._drop_targets():
+					if (t["rect"] as Rect2).has_point(p):
+						clear = false
+						break
+			if clear:
+				return p
+			x += 28.0
+		y += 24.0
+	return r.get_center()
 
 
 ## 「拖到空白」用的落点：必须在**任何落点之外、也没被别的卡压住**。
