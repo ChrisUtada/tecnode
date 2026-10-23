@@ -11,8 +11,9 @@
 
 ## 0. 一句话结论
 
-玩家反馈的 4 个问题里，**2 个是真 bug（文字、层叠），1 个是时序设计（叙事/详情），1 个是既定设计需要话术优化（证物袋）**；
-专项排查另外发现 **10 条 P1、15 条 P2**，最伤的三类是：**窗口能被拖丢**、**事件冒泡乱触发**、**坐标写死 1280 口径导致小窗口下窗体开出屏幕**。
+第一轮反馈的 4 个问题里，**2 个是真 bug（文字、层叠），1 个是时序设计（叙事/详情），1 个是既定设计需要话术优化（证物袋）**；
+第二轮反馈的 3 个问题里，**连线残留是 P0 真 bug（组合消耗的僵尸卡 + 推演窗遮罩用透明度代替可见性）、案件窗最小化是 P0 真 bug（右下角卡片定位在裁切区外、从未可见）、最小化部件不可拖动属实（三个部件都无拖动手势）**。
+两轮专项排查共另外发现 **P0 1 条（重置后镜头不复位）、P1 15 条、P2 25 条**，最伤的四类是：**会丢东西/丢状态**、**事件冒泡乱触发**、**坐标写死 1280 口径**、**撤销/读档的连带刷新有漏**。
 
 ---
 
@@ -94,6 +95,66 @@ Web 原版同样拒收（`06-storage.js:73`），且 Web 是**静默弹回**，G
 4. **测试改写**：`test_ui.gd` §22（:982-1006）/§23（:1009-1054）锁的正是旧口径
    （「后开的日志压不过地图」「提层后仍在 icons 之下」），需按新语义重写断言。
 
+### U5 · 连线有时候不消失 / 有时候只有连线没有节点（P0，真 bug）
+
+两个现象，**两条不同的根因**，都已定位：
+
+**① 连线不消失 = 组合消耗留下僵尸卡**：
+
+- `CommandSystem.gd:156-158`：useItem 成功且「合成消耗」开着时，`graph.delete_node(have_key)` 把工具节点从**数据层**删掉；
+- 但**卡片层没人收尸**：`_on_card_combo` 成功分支（`Desktop.gd:3668-3694`）与 `_apply_outcome`（`Desktop.gd:3093-3122`）都不处理 `res["consumed"]`——卡片还在 `_cards` 里、`visible=true`；
+- 同时 `GraphState.delete_node`（`GraphState.gd:150-161`）**不清 `tried`**，`"a>b"` 虚线痕迹键永久残留。
+
+⇒ 僵尸卡 + 残留 tried 键，每次重绘都继续画线。撤销/读档走 `_rebuild_from_graph` 会顺带清掉——所以表现为「**有时候**不消失」。附带损害：力导向布局把僵尸卡当活节点播种，可见集合签名也一直把它算进去。
+
+**② 只有连线没有节点 = 推演窗遮罩用透明度代替可见性**：
+
+- `Desktop._sync_matrix_occlusion`（`Desktop.gd:3389-3407`）：被矩阵窗盖住 60% 的卡用 `modulate.a = 0` + 禁输入来「藏」——故意不动 `visible`，怕触发重排；
+- 但 `_repaint_edges` 的过滤只看 `card.visible`（`Desktop.gd:2667`），alpha=0 的卡照样通过过滤 ⇒ **端点不可见、连线照画**。
+  开着推演器时任何一次重绘（选中/聚焦/重排）都会把这些孤儿线画出来。
+
+**方案**：
+
+1. 新增 `_despawn_card(key)`（杀补间 → 移出 `_cards` → `queue_free` → 顺带清 `_selected`/`_drag_key`），
+   在 `_on_card_combo` 与 `_apply_outcome` 里遍历 `res["consumed"]` 调用。
+2. `GraphState.delete_node` 顺手清掉 `tried` 中含该 key 的条目（否则节点日后再上画时旧虚线还魂）。
+3. `_repaint_edges` 的可见性过滤改为单一来源：`graph.visible_node(...)` **且** `card.modulate.a > 0`（把矩阵遮罩态排除）。
+4. 收口：`_commit()` 固定调一个 `_sync_canvas()`（清理 `_cards` 里 graph 已不存在的 key + `_apply_hidden()`），
+   让任何改图路径——包括未来新增——都不可能漏重绘。
+
+### U6 · 案件窗最小化「没到右下角」（P0，真 bug）
+
+**接线没接反**：`Desktop.gd:993-995` —— `× → _park_case("icon")`（收进案件地图）、`– → _park_case("dock")`（右下角案件卡片），
+与提示文案语义一致。**真正的 bug 是右下角卡片从来不可见**：
+
+- `case_dock` 定位写死 `Vector2(1094, 678)` 且全项目只赋值一次（`Desktop.gd:1661`），`_layout_root()` 从不重排它；
+- `_desk` 高 = 视口高 − 52，1280×720 下是 **668**，且 `_desk.clip_contents = true` ⇒ 卡片整张（y 678..734）**在裁切区外**。
+
+⇒ 最小化后窗口凭空消失，唯一找回入口只剩地图图标——玩家的体感「最小化 = 进了案件地图」就是这么来的。
+（实证：`docs/p2_2_case_dock.png` 右下角空无一物；同流程的 MusicDock 可见，因为它走 `_place_music_windows()` 重排。）
+
+**方案**：仿 `_place_music_windows()` 把 `case_dock` 纳入 `_layout_root()` 的重排（贴右下现算）。
+注意 `docs/p2_2_case_dock.png` 是现有对拍基准图，修复后需重拍（且是变好）。
+
+### U7 · 最小化部件都无法移动（P1，功能缺失）
+
+三个最小化部件全部是「绝对定位 + 纯点击」，没有任何拖动手势：
+
+| 部件 | 类型 | 现状 | 恢复路径 |
+|---|---|---|---|
+| `case_dock` 案件卡片 | 裸 `Button`（`Desktop.gd:1657-1716`） | 无 `_gui_input`，只有 `pressed`；定位写死（且越界，见 U6） | 点击 `_reopen_case()` ✅（卡片可见时） |
+| `MusicDock` 音乐坞 | `MusicDock.gd:82-85` | `gui_input` 左键按下即恢复，无 motion 分支 | 点击 `_restore_music()` ✅ |
+| `TecChip` TEC 胶囊 | `TecChip.gd`（extends Button） | 类内无输入处理，只有 `pressed → _open_tec` | 点击 `_open_tec()` ✅ |
+
+**方案**：
+
+1. 抽一个共用的「小部件拖动」行为，照搬 `DeskIcon` 的成熟模式（`DeskIcon.gd:132-164`）：
+   按下记原点 → motion 超 5px 进拖动 → 钳到 `_desk` 矩形 → 松手若拖过则吞掉点击
+   （Button 在拖完松手时会再发一次 `pressed`，必须自管输入——DeskIcon 踩过这个坑）。
+2. **防吸回**：`MusicDock`/`TecChip` 每次 resize 被 `_place_music_windows()`/`_place_floating_windows()` 重算——
+   加拖动后要给部件记「玩家拖过」标记（参照 `_view_user` 口径），resize 时只夹取越界轴、不收走玩家摆位。
+3. `_place_toast_anchor()` 读这两个部件位置做避让（`Desktop.gd:2199-2208`），拖动支持后避让天然成立，不用改。
+
 ---
 
 ## 2. 专项排查新发现（源码核实，未在既有文档中记录）
@@ -133,6 +194,35 @@ Web 原版同样拒收（`06-storage.js:73`），且 Web 是**静默弹回**，G
 | W24 | 丢释放事件的残余态：旧卡的 ghost 透明态不被复位时，留下一张**隐形但可点**的卡 | `NodeCard.gd:821-834`；`Desktop.gd:2397-2399` |
 | W25 | 拖动中的组合目标被聚焦淡化压到 0.32 alpha，over 反白只剩一层灰，高亮难读 | `Desktop.gd:2327-2333`；`NodeCard.gd:831-834` |
 
+### 第二轮：状态一致性排查（S 组，撤销/读档/换案的连带刷新）
+
+| # | 级别 | 问题 | 证据 |
+|---|---|---|---|
+| S1 | **P0** | **「重置」与「换案」后镜头不复位**：`_view_user/_view_k/_view_pos` 任何地方都不复位，`_fit_cards()` 有 `not _view_user` 闸门——玩家动过一次相机，重置后唯一节点可以整屏不可见，且「适应窗口」收在调试面板里 ⇒ 玩家判定「重置把案子清空了」 | `Desktop.gd:2392`、`:4148`、`:1986`、`:808` |
+| S2 | P1 | 读档后镜头停在 (0,0)@1.0 不做 fit：`_rebuild_from_graph()` respawn 后不调 `_apply_view`/`_fit_cards`，x>1162 的节点开局即在视口外 | `Desktop.gd:2318-2370` |
+| S3 | P1 | **DetailWin 持有旧 graph 跨重置/换案**：`_new_runtime()` 清了全部会话窗唯独漏它；`setup_detail()` 存着旧 GraphState 引用——重置后详情窗读旧图、显示陈旧状态，直到玩家手动点 × | `Desktop.gd:1920-1983`；`DetailWin.gd:29-31` |
+| S4 | P1 | **任何撤销/读档都会销毁音乐播放器**：`_rebuild_from_graph()` 无条件 `queue_free` `_music_win`/`_music_dock`，撤销一个无关操作（如点亮手电）就把正在播的歌掐了（Web 的 undo 不碰 audio，Godot 独有过失） | `Desktop.gd:2332-2337` |
+| S5 | P1 | **结局遮罩亮起期间退出游戏 → 真名种子永久丢失**：种子只在玩家点击收幕时发放；存档里结局已记但 `garden.seed=false`，老档迁移分支够不到（新档永远带 garden 字段）；唯一自救是再按一次推演，但没有任何提示 | `Desktop.gd:1641-1654`；`GardenSystem.gd:44-45`；`SaveSystem.gd:94` |
+| S6 | P1 | **切换时刻不把镜头对焦到回忆发生地点**：Web `applyTimeNow` 换档后 `centerOnNode(memPlace)`；Godot `_select_time()` 无等价动作——地点在视口外时切档后画布空白，放映卡退回默认位 | `Desktop.gd:3816-3836`；Web `03-utils.js:155-172` |
+| S7 | P2 | 撤销/收起案件静默掐断进行中的 TEC 分析：5–8 秒等待作废，transcript 留半截「（接收…，开始分析…）」，无任何反馈 | `Desktop.gd:2356`、`:1880-1893` |
+| S8 | P2 | **玩家知识不接力**：Web 撤销时用当前值合并 unread/cardSeen/debuted（「认识了就是认识了」）；Godot 整表覆盖 ⇒ 撤销能复活已点掉的「新」角标、重播已看过的放映卡、摘掉人物登场 | `SaveSystem.gd:121-123`；Web `02-state.js:41-52` |
+| S9 | P2 | 撤销无条件清掉档案图标「新」角标且不再补标（respawn 期间 `_suppress_archive_new=true`） | `Desktop.gd:2353-2361` |
+| S10 | P2 | 撤销后推演桌布的遮挡淡出不重算（`_matrix_faded` 残留、新卡 alpha 全 1，被压卡片全部显形） | `Desktop.gd:2318-2370` vs `:3389-3416` |
+| S11 | P2 | 案件收起后详情窗不收（内容陈旧）；袋/册/花园窗仍可写进度——Web 的 `ledgerTake/bagTake/gardenPlant` 都有 `requireCase()` 闸，Godot 没有 | `Desktop.gd:1880-1896`；`StorageWin.gd:163-170` |
+| S12 | P2 | 对话窗开着时点名册/双击人物，toast 误报「暂无对话文本」（其实是不叠第二扇窗） | `Desktop.gd:3269-3270`、`:3249-3251` |
+| S13 | P2 | 「重看对话」只重放基础 talkQueue，漏 sceneTalks 场景限定台词 | `Desktop.gd:2783`；`GraphState.gd:430-450` |
+| S14 | P2 | `_catalog.last` 只写不读，重开游戏永远回 A-001（「回到上次案件」是休眠功能，当前仅一案暂无症状） | `Desktop.gd:156`、`:1825-1827`；`CaseCatalog.gd:163-164` |
+| S15 | P2 | 存档 `format` 字段只写不校验，将来改格式时旧档被静默按新格式解析 | `SaveSystem.gd:11`、`:76-81` |
+| S16 | P2 | 撤销/读档后 fresh 被消费，新节点不再重演入场 pop（纯表现层，「新」角标不受影响） | `Desktop.gd:2511-2515` |
+
+### 第二轮确认「没问题」的项（免得重复报）
+
+- 撤销覆盖面：拖动/收纳/展开/点亮/捕获/对话进度/TEC 分析/桌布归位/下种均进栈；计数角标每次 `_commit` 全量重算，无漏记。
+- TEC 闲聊、切时刻、花园挪株不进撤销栈；无 redo——均与 Web 一致。
+- EndingOverlay 冻结/恢复正确（全屏 STOP + z 100）。
+- 180ms 合并写盘 + 退出时 flush，正常退出不丢档。
+- 换案清理（`_new_runtime`）对卡片/连线/日志/会话窗是彻底的，唯一漏网的是 S3 的 DetailWin。
+
 ### 排查中确认「没问题」的易疑项（免得重复报）
 
 - 滚轮悬停卡片上：事件正常冒泡到画布缩放。
@@ -148,13 +238,14 @@ Web 原版同样拒收（`06-storage.js:73`），且 Web 是**静默弹回**，G
 
 | 批次 | 内容 | 涉及 | 主要文件 | 完成标志 |
 |---|---|---|---|---|
-| 1 | **止损：不许丢东西** | U4③ W3 W4 W24 | `SysWindow.gd`、`Desktop.gd` | 窗口拖不出可恢复区；幽灵牌跟手；无隐形卡残留 |
-| 2 | **小分辨率布点** | W5 W22 | `Desktop.gd`、各窗默认位 | 960×560 下所有窗体完整可及；钳制线全部改为读桌布实际矩形 |
-| 3 | **窗口层叠语义** | U4①② W1 W6 | `Desktop.gd`（rank 合并）、`SysWindow.gd`、`TecWindow.gd`、`DetailWin.gd`、`test_ui.gd` §22/23 | 后开在上、点击任意处提层；拖 TEC 标题栏不闲聊；详情窗关了不复活；断言按新口径改写且全绿 |
+| 1 | **止损：不许丢东西/丢状态** | U5 U6 S1 W3 W4 W24 | `Desktop.gd`、`GraphState.gd`、`EdgeLayer.gd`、`SysWindow.gd` | 消耗节点即删卡删虚线；遮罩卡不出线；case_dock 右下可见；窗口拖不出可恢复区；重置后镜头回中 |
+| 2 | **小分辨率布点** | W5 W22 | `Desktop.gd`、各窗默认位 | 960×560 下所有窗体完整可及；钳制线全部改读桌布实际矩形 |
+| 3 | **窗口层叠语义** | U4①② W1 W6 S3 | `Desktop.gd`（rank 合并）、`SysWindow.gd`、`TecWindow.gd`、`DetailWin.gd`、`test_ui.gd` §22/23 | 后开在上、点击任意处提层；拖 TEC 标题栏不闲聊；详情窗关了不复活、换案不读旧图；断言按新口径全绿 |
 | 4 | **文字与缩放** | U1 W10 W13 W14 | `KindGlyph.gd`、`Desktop.gd`（fit 吸附/开局 k）、`NodeCard.gd` | 字牌 12/24 档；开局 1.0；0.95 以下才切符号；镜像随缩放 |
-| 5 | **叙事/详情时序** | U2 W17 W21 | `NarrCard.gd`、`Desktop.gd`（`_refresh_detail` 闸）、`DetailWin.gd` | 叙事播完（或点击补全）后详情整段出现；打字中不插队 |
+| 5 | **叙事/详情时序** | U2 W17 W21 S6 | `NarrCard.gd`、`Desktop.gd`（`_refresh_detail` 闸）、`DetailWin.gd` | 叙事播完（或点击补全）后详情整段出现；打字中不插队；切时刻镜头对焦回忆地点 |
 | 6 | **收纳规则与反馈** | U3 W2 W16 W23 W25 | `Desktop.gd`、话术文案 | 容器话术改「现场收不走」；拖回原窗不再误取回；无效落点有反馈；淡化不压高亮 |
-| 7 | **手感收口** | W7 W8 W9 W11 W12 W15 W18 W19 W20 | 各对应文件 | 高亮=命中同一张卡；TEC/Chat 超高滚动；Esc 关窗；平移有界；双击节奏统一 500ms |
+| 7 | **最小化部件与手感收口** | U7 W7 W8 W9 W11 W12 W15 W18 W19 W20 | `Desktop.gd`、`MusicDock.gd`、`TecChip.gd`、各对应文件 | 三个最小化部件可拖且 resize 不吸回；高亮=命中同一张卡；TEC/Chat 超高滚动；Esc 关窗；平移有界；双击节奏统一 500ms |
+| 8 | **状态一致性** | S2 S4 S5 S7–S16 | `Desktop.gd`、`SaveSystem.gd`、`GraphState.gd` | 读档 fit 镜头；撤销不掐音乐；结局种子不丢；知识不随撤销回滚；归档角标/遮挡淡出撤销后正确重建 |
 
 每批验收统一走：全套无头测试（现 1250 项基线，15 个脚本）→ 960×560 / 1280×720 / 1920×1080 三档真机过一遍 → 必要时补断言（W3/W24 这类无头钩子测不到的路径，要补**真事件路由**用例，`INTERACTION_GAP_REPORT.md` §0.7 已踩过一次这个坑）。
 
@@ -167,6 +258,8 @@ Web 原版同样拒收（`06-storage.js:73`），且 Web 是**静默弹回**，G
    建议：叙事类保留低半档，其余窗口合并为一带。
 3. **W11 键盘**：本轮只做 Esc 关最上层窗 + Ctrl+Z 撤销，还是一次补齐快捷键表？
 4. **U1 缩放糊字**：最小档（吸附+LOD，推荐先做）之外，是否要重测 `oversampling=0` 的彻底档？
+5. **S5 真名种子**：改为「结局触发即写档（收幕只是演出）」，还是退出时检测补发？推荐前者，种子是进度不是演出。
+6. **S8 玩家知识接力**：确认对齐 Web 口径（撤销用当前值合并 unread/cardSeen/debuted，不回滚）。
 
 ---
 
