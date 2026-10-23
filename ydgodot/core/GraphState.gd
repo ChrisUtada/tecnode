@@ -5,10 +5,12 @@ extends RefCounted
 ## 与 Web 版 `02-state.js` 的最小同构子集：节点表 / 边表 / 已探索 / 已捕获 / 点亮 / 分析进度。
 ## P0 只保留切片需要的字段；P1 补齐快照、撤销栈、收纳、时间档等。
 
-const SCENE_W := 152.0
-const SCENE_H := 54.0
-const ENT_W := 130.0
-const ENT_H := 46.0
+## P2：卡片尺寸收进 8px 网格。场景 160×56、实体 128×48 ——
+## 视觉框（NodeCard 的 position + 8px PAD）落在网格上时，卡片本身也正好对齐。
+const SCENE_W := 160.0
+const SCENE_H := 56.0
+const ENT_W := 128.0
+const ENT_H := 48.0
 
 const PRESENT_TIME := "present"
 const MEM_CAST_DX := 60.0

@@ -92,6 +92,14 @@ func _test_intro_ui() -> void:
 	await process_frame
 	check("开场停在第 0 步：姓名", w.dbg_step() == "name", str(w.dbg_step()))
 	check("标题是适性测试", w.dbg_title() == "调查员适性测试", w.dbg_title())
+	check("A4 开场浮层有 3px 硬影", w._panel_shadow != null and w._panel_shadow.visible)
+	if w._panel_shadow != null:
+		check("A4 开场影偏移 = OFFSET_SHADOW",
+			w._panel_shadow.position.is_equal_approx(w._panel.position + SysWindow.OFFSET_SHADOW),
+			str(w._panel_shadow.position))
+		check("A4 开场影尺寸 = 面板", w._panel_shadow.size.is_equal_approx(w._panel.size),
+			str(w._panel_shadow.size))
+		check("A4 开场影在面板之下", w._panel_shadow.get_index() < w._panel.get_index())
 	w.dbg_begin()
 	check("空姓名不进入问答", w.dbg_step() == "name")
 	w.dbg_set_name("林雾")

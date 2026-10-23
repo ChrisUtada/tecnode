@@ -167,10 +167,10 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("推演器在首位", scene.dbg_icon_pos("infer").x == 18.0 and scene.dbg_icon_pos("infer").y == 16.0,
 		str(scene.dbg_icon_pos("infer")))
 	var pitch: float = float(scene.dbg_icon_pos("goto").y) - float(scene.dbg_icon_pos("infer").y)
-	## Web `resetIconPositions`：pitch = max(ICON_H+6, min(85, floor((H - ICON_TOP - 12) / n)))
-	## —— 桌面够高时是 85，720 基准下（desk 668）算出 80。断言跟公式走，不写死。
-	var want_pitch: float = clampf(floorf((scene._desk.size.y - 16.0 - 12.0) / 8.0), 70.0, 85.0)
-	check("步距按可用高度压缩（Web 同口径）", absf(pitch - want_pitch) < 0.01,
+	## P2：常驻档按「64px 槽 + 12px 间距」= 76；只有 960×560 放不下时才切紧凑。
+	## 720 基准（desk 668）8 项总高 612，仍走常驻档。
+	var want_pitch := 76.0
+	check("步距按 P2 图标秩序 = 64 + 12", absf(pitch - want_pitch) < 0.01,
 		str(pitch) + " / want " + str(want_pitch))
 	var even := true
 	for i in range(1, apps.size()):
@@ -236,6 +236,17 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("收进证物袋", scene.dbg_store(GraphState.BAG))
 	await process_frame
 	check("证物袋角标 1 件", scene.dbg_badge_text("bag") == "1 件", scene.dbg_badge_text("bag"))
+	var bag_ic := scene.get_node_or_null("desk/icons/icon_bag") as DeskIcon
+	var bag_badge := scene.get_node_or_null("desk/icons/icon_bag/bag_badge") as Control
+	check("E2 徽章右沿贴在图标外 2px",
+		bag_ic != null and bag_badge != null
+			and absf(bag_badge.position.x + bag_badge.size.x
+				- (bag_ic._icon.position.x + DeskIcon.GLYPH_SIZE + 2.0)) < 0.6,
+		"null" if bag_badge == null else str(bag_badge.position + bag_badge.size))
+	check("E2 徽章顶沿贴在图标外 2px",
+		bag_ic != null and bag_badge != null
+			and absf(bag_badge.position.y - (bag_ic._icon.position.y - 2.0)) < 0.01,
+		"null" if bag_badge == null else str(bag_badge.position.y))
 
 	var clue_key: String = scene.dbg_ensure("clue", "CLUES_CBKW")
 	scene.dbg_select(clue_key)

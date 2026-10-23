@@ -23,6 +23,7 @@ const MEM_CARD_MIN_X := 132.0
 const WORLD_W := 2000.0
 const WORLD_H := 1300.0
 const AUTOSAVE_DELAY_MSEC := 180
+const TecWatermarkScript := preload("res://ui/TecWatermark.gd")
 
 ## 页眉几何 —— 逐项来自 Web 的计算布局（tools/pixeldiff/probe_web_rects.cjs 量的
 ## getBoundingClientRect），不是凭感觉的间距。改文案长度要同步改宽度，否则右侧按钮组会错位。
@@ -37,6 +38,12 @@ const HDR_BTN_Y := 11.5
 const HDR_BTN_H := 27.0
 const HDR_TOG_Y := 12.5
 const HDR_TOG_H := 25.0
+## A1：右侧只留一个正式「撤销」和一个「调试」入口；其余 5 项进弹出面板。
+const HDR_X_DEBUG := 1202.0
+const HDR_W_DEBUG := 64.0
+const HDR_X_UNDO := 1144.0
+const HDR_W_UNDO := 50.0
+const DEBUG_POP_W := 196.0
 
 var case_def: CaseLoader
 var graph: GraphState
@@ -73,11 +80,17 @@ var _opt_focus := true          # 页眉「聚焦选中」
 var _opt_reveal := true         # 页眉「新节点自动居中」
 var _crumb: Label
 var _brand_sub: Label
+var _debug_btn: Button
+var _debug_pop: PanelContainer
+var _debug_scrim: Control
 var _hdr_sized: Array = []      # [Control, Vector2]：页眉控件的目标尺寸，见 _sync_header_sizes()
 var _hdr_right: Array = []      # [Control, float]：贴右控件的「距右边缘」距离，见 _layout_header_right()
 var _toast: PanelContainer
 var _toast_label: Label
 var _toast_timer: SceneTreeTimer
+var _toast_queue: Array[Dictionary] = []
+var _toast_active := false
+var _toast_tween: Tween
 var _case_win: SysWindow
 var _tec: TecWindow
 var _tec_chip: TecChip
@@ -116,6 +129,7 @@ var _pw_ctx: Dictionary = {}
 var _bag_win: StorageWin = null
 var _ledger_win: StorageWin = null
 var _matrix_win: MatrixWin = null
+var _matrix_faded: Array = []      # A7：被矩阵窗盖住的卡片，关窗 / 拖动时恢复
 var _archive_win: ArchiveWin = null
 var _mem_card: MemCard = null
 var _chat_win: ChatWindow = null
@@ -231,6 +245,7 @@ func _layout_root() -> void:
 		_head.size = Vector2(vw, HEADER_H)
 	_layout_header_left(vw)
 	_layout_header_right(vw)
+	_layout_debug_panel()
 	if _desk != null and is_instance_valid(_desk):
 		_desk.position = Vector2(0, HEADER_H)
 		_desk.size = Vector2(vw, vh - HEADER_H)
@@ -239,6 +254,8 @@ func _layout_root() -> void:
 		_icon_layout_h = _desk.size.y
 		_reset_icon_positions()
 	_place_toast_anchor()
+	_place_music_windows()
+	_place_floating_windows()
 	_relayout_edge_windows(vw)
 
 
@@ -595,6 +612,7 @@ func _build_ui() -> void:
 	setup_ending()
 
 	_build_toast()
+	_build_debug_panel()
 
 	## 界面建完才开自适应：_build_ui 期间主窗/浮层还没影，重排会空转。
 	_ui_built = true
@@ -671,30 +689,21 @@ func _build_header() -> void:
 	_crumb.clip_text = true
 	head.add_child(_crumb)
 
-	# 工具组：三个开关 + 四个按钮，x / 宽度全部按量出来的坐标摆。
-	# 这一组贴**右**（Web 是 flex 的 margin-left:auto）：窗口变宽时整体右移，
-	# 左边空出来的地方留给面包屑，不会在中间飘着。
-	var togs := [["合成消耗", 670.0, 86.0], ["聚焦选中", 763.0, 86.0], ["新节点自动居中", 856.0, 122.0]]
-	for item in togs:
-		var b := _make_toggle(String(item[0]))
-		head.add_child(b)
-		_place_hdr(b, Vector2(float(item[1]), HDR_TOG_Y), Vector2(float(item[2]), HDR_TOG_H), true)
-	var btns := [["适应窗口", 985.0, 74.0, false], ["撤销", 1066.0, 50.0, false],
-		["重置", 1123.0, 50.0, false], ["检查可达性", 1180.0, 86.0, true]]
-	for item in btns:
-		var b := TecTheme.header_button(String(item[0]), bool(item[3]))
-		b.name = "btn_" + String(item[0])
-		head.add_child(b)
-		_place_hdr(b, Vector2(float(item[1]), HDR_BTN_Y), Vector2(float(item[2]), HDR_BTN_H), true)
-		var label := String(item[0])
-		if label == "适应窗口":
-			b.pressed.connect(_fit_view)
-		elif label == "撤销":
-			b.pressed.connect(_undo)
-		elif label == "重置":
-			b.pressed.connect(_reset_case)
-		else:
-			b.pressed.connect(_check_reachability)
+	# A1：右侧只留正式操作。三个调试开关 + 适应窗口 / 重置 / 检查可达性
+	# 全部收进「调试」弹出面板，避免系统界面第一眼像开发工具条。
+	var undo := TecTheme.header_button("撤销", true)
+	undo.name = "btn_撤销"
+	head.add_child(undo)
+	_place_hdr(undo, Vector2(HDR_X_UNDO, HDR_BTN_Y), Vector2(HDR_W_UNDO, HDR_BTN_H), true)
+	undo.pressed.connect(_undo)
+
+	_debug_btn = TecTheme.header_button("调试")
+	_debug_btn.name = "btn_调试"
+	_debug_btn.toggle_mode = true
+	head.add_child(_debug_btn)
+	_place_hdr(_debug_btn, Vector2(HDR_X_DEBUG, HDR_BTN_Y),
+		Vector2(HDR_W_DEBUG, HDR_BTN_H), true)
+	_debug_btn.toggled.connect(_on_debug_toggled)
 	_refresh_crumbs()
 	call_deferred("_sync_header_sizes")
 
@@ -746,6 +755,105 @@ func _sync_header_sizes() -> void:
 		var c: Control = pair[0]
 		if is_instance_valid(c) and c.size != pair[1]:
 			c.size = pair[1]
+
+
+## 「调试」弹出面板：黑底 + 奶油字，跟页眉同一套 header_button 语法。
+## 点击面板外任意位置由全屏 scrim 关闭；开关留在面板里连续调，动作按钮点完收起。
+func _build_debug_panel() -> void:
+	_debug_scrim = Control.new()
+	_debug_scrim.name = "debug_scrim"
+	_debug_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_debug_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_debug_scrim.z_index = 90
+	_debug_scrim.gui_input.connect(_on_debug_scrim_input)
+	_debug_scrim.visible = false
+	add_child(_debug_scrim)
+
+	_debug_pop = PanelContainer.new()
+	_debug_pop.name = "debug_pop"
+	_debug_pop.custom_minimum_size = Vector2(DEBUG_POP_W, 0)
+	_debug_pop.mouse_filter = Control.MOUSE_FILTER_STOP
+	_debug_pop.z_index = 91
+	var sb := TecTheme.flat(TecTheme.LINE, TecTheme.R_SM, TecTheme.CARD, 1)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	_debug_pop.add_theme_stylebox_override("panel", sb)
+	_debug_pop.visible = false
+	add_child(_debug_pop)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 4)
+	_debug_pop.add_child(col)
+
+	var cap := TecTheme.label("调试 / DEBUG", TecTheme.FS_BODY, TecTheme.white(0.62))
+	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(cap)
+
+	for text in ["合成消耗", "聚焦选中", "新节点自动居中"]:
+		var t := _make_toggle(text)
+		t.custom_minimum_size = Vector2(0, HDR_TOG_H)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		t.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		col.add_child(t)
+
+	var rule := ColorRect.new()
+	rule.color = TecTheme.white(0.16)
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(rule)
+
+	var actions := [["适应窗口", _fit_view], ["重置", _reset_case], ["检查可达性", _check_reachability]]
+	for item in actions:
+		var b := TecTheme.header_button(String(item[0]))
+		b.name = "dbg_btn_" + String(item[0])
+		b.custom_minimum_size = Vector2(0, HDR_BTN_H)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.pressed.connect(item[1])
+		b.pressed.connect(_close_debug_panel)
+		col.add_child(b)
+
+
+func _on_debug_toggled(on: bool) -> void:
+	if on:
+		_open_debug_panel()
+	else:
+		_close_debug_panel()
+
+
+func _open_debug_panel() -> void:
+	if _debug_pop == null or _debug_scrim == null:
+		return
+	_debug_scrim.visible = true
+	_debug_pop.visible = true
+	_debug_pop.reset_size()
+	_layout_debug_panel()
+	if _debug_btn != null and not _debug_btn.button_pressed:
+		_debug_btn.set_pressed_no_signal(true)
+
+
+func _close_debug_panel() -> void:
+	if _debug_pop != null:
+		_debug_pop.visible = false
+	if _debug_scrim != null:
+		_debug_scrim.visible = false
+	if _debug_btn != null and _debug_btn.button_pressed:
+		_debug_btn.set_pressed_no_signal(false)
+
+
+func _on_debug_scrim_input(ev: InputEvent) -> void:
+	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and ev.pressed:
+		_close_debug_panel()
+
+
+func _layout_debug_panel() -> void:
+	if _debug_pop == null or not _debug_pop.visible:
+		return
+	var sz := _debug_pop.get_combined_minimum_size()
+	_debug_pop.size = Vector2(DEBUG_POP_W, sz.y)
+	_debug_pop.position = Vector2(_vw() - 14.0 - DEBUG_POP_W, HEADER_H + 6.0)
 
 
 ## 13×13 勾选框：奶油底 + 墨色勾（Web 的 `accent-color:#e6e3d2` 渲染出来就是这个样子）。
@@ -907,6 +1015,13 @@ func _build_case_window() -> void:
 	stage_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stage.add_child(stage_bg)
 
+	## E1：空旷画布的视线锚点。水印必须画在 stage 内（desk 中央被主窗盖住），
+	## 又在卡片层之前，窗口多时自然被卡片遮掉。
+	var watermark := TecWatermarkScript.new()
+	watermark.name = "desk_watermark"
+	watermark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_stage.add_child(watermark)
+
 	_card_layer = Control.new()
 	_card_layer.name = "cards"
 	_card_layer.size = Vector2(WORLD_W, WORLD_H)
@@ -925,10 +1040,11 @@ func _build_case_window() -> void:
 ## 拖动只改位置，**不进撤销栈、重置不回位**（与 Web 一致）。
 const ICON_LEFT := 18.0
 const ICON_TOP := 16.0
-const ICON_PITCH := 85.0
-const ICON_MIN_PITCH := 70.0
-const ICON_NORMAL_H := 69.0
-const ICON_COMPACT_H := 48.0
+## P2：常驻图标按「64px 槽 + 12px 间距」等距（48px 线稿必须保持 1:1，不能缩到 44 重采样）。
+## 960×560 放不下时切紧凑槽 52px，间距按剩余高度压到 8~12px。
+const ICON_PITCH := 76.0
+const ICON_MIN_PITCH := 68.0
+const ICON_COMPACT_PITCH := 64.0
 ## 常驻 8 项：顺序即 Web `ICON_LAYOUT` 的顺序（人物排在线索册之后、日志排在 TEC 之后）
 const ICON_DEFS := [
 	["推演器", "infer", "star"],
@@ -1071,9 +1187,10 @@ func _make_badge(parent: Control, badge_name: String, text: String = "") -> Pane
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	badge.add_child(l)
-	badge.position = Vector2(44, -6)
 	badge.visible = false
 	parent.add_child(badge)
+	if parent is DeskIcon:
+		(parent as DeskIcon).place_badges()
 	return badge
 
 
@@ -1088,6 +1205,8 @@ func _set_badge(badge: PanelContainer, text: String) -> void:
 	var lab: Label = badge.get_node_or_null("Label")
 	if lab != null:
 		lab.text = text
+	if badge.get_parent() is DeskIcon:
+		(badge.get_parent() as DeskIcon).place_badges()
 
 
 ## 按当前可见图标数重排（Web `resetIconPositions()`）—— 图标增减时才调，
@@ -1102,16 +1221,16 @@ func _reset_icon_positions() -> void:
 		return
 	var desk_h := _desk.size.y
 	var n := list.size()
-	var normal_pitch := clampf(floorf((desk_h - ICON_TOP - 12.0) / float(n)),
-		ICON_MIN_PITCH, ICON_PITCH)
-	# 加高到放不下 8/10 个「图标 + 标签」时切紧凑：图标本体仍是 44px，
-	# 只收掉外圈留白和标签，避免 960×560 最后一项被桌布裁掉。
-	var compact := ICON_TOP + float(n - 1) * normal_pitch + ICON_NORMAL_H > desk_h + 0.5
+	# 先按可用高度压到 ≥68px；压到 68 以下才切紧凑（图标本体仍是 48px，只藏标签）。
+	# 这样第 9 个图标出现时只收间距，不会让整栏标签一起消失。
+	var fit_pitch := minf(ICON_PITCH, floorf((desk_h - ICON_TOP - 12.0) / float(n)))
+	var compact := fit_pitch < ICON_MIN_PITCH
 	for b in list:
 		(b as DeskIcon).set_compact(compact)
-	var pitch := clampf(floorf((desk_h - ICON_TOP - 12.0) / float(n)),
-		ICON_COMPACT_H if compact else ICON_MIN_PITCH,
-		64.0 if compact else ICON_PITCH)
+	var pitch := fit_pitch
+	if compact:
+		pitch = minf(ICON_COMPACT_PITCH,
+			floorf((desk_h - ICON_TOP - 12.0) / float(n)))
 	# 顺序：常驻 8 项按 ICON_DEFS，动态的（播放器 / 花园）排在后面
 	var order: Array = []
 	for d in ICON_DEFS:
@@ -1122,7 +1241,9 @@ func _reset_icon_positions() -> void:
 		if not order.has(b):
 			order.append(b)
 	for i in order.size():
-		(order[i] as DeskIcon).position = Vector2(ICON_LEFT, ICON_TOP + float(i) * pitch)
+		var ic := order[i] as DeskIcon
+		ic.position = Vector2(ICON_LEFT, ICON_TOP + float(i) * pitch)
+		ic.place_badges()
 
 
 ## 图标层（`desk/icons`）：只做分组，不排版。
@@ -1305,11 +1426,11 @@ func _open_music() -> void:
 		_music_win = MusicWin.new()
 		_music_win.name = "music_win"
 		_music_win.setup_music()
-		_music_win.position = Vector2(906, 414)
 		_music_win.closed.connect(_on_music_closed)
 		_music_win.minimized.connect(_minimize_music)
 		_music_win.progress_changed.connect(_on_music_progress)
 		_desk.add_child(_music_win)
+		_place_music_windows()
 	_place_z(_music_win, ZR_WIN)
 	_music_win.visible = true
 	if _music_dock != null:
@@ -1322,13 +1443,50 @@ func _ensure_music_dock() -> MusicDock:
 	_music_dock = MusicDock.new()
 	_music_dock.name = "music_dock"
 	_music_dock.setup_dock()
-	_music_dock.position = Vector2(1026, 532)
 	_music_dock.restore_requested.connect(_restore_music)
 	_music_dock.toggle_requested.connect(_toggle_music)
 	_music_dock.stop_requested.connect(_stop_music)
 	_desk.add_child(_music_dock)
 	_music_dock.visible = false
+	_place_music_windows()
 	return _music_dock
+
+
+## 播放器与 dock 的默认落点按 1280×720 量的 906/414、1026/532；
+## 缩到 960×560 时只把越界的那一轴拉回右下安全区，不改变 1280 的既有构图。
+func _place_music_windows() -> void:
+	var desk_h := _desk.size.y if _desk != null and is_instance_valid(_desk) else _vh() - HEADER_H
+	if _music_win != null and is_instance_valid(_music_win):
+		_music_win.position = Vector2(
+			minf(906.0, _vw() - 14.0 - _music_win.size.x),
+			minf(414.0, desk_h - 12.0 - _music_win.size.y))
+	if _music_dock != null and is_instance_valid(_music_dock):
+		_music_dock.position = Vector2(
+			minf(1026.0, _vw() - 16.0 - _music_dock.size.x),
+			minf(532.0, desk_h - 16.0 - _music_dock.size.y))
+
+
+## 1280 下的浮窗坐标是量出来的；小窗口只收越界的那一轴，避免 TEC / 对话窗
+## 在 960×560 里整扇跑到屏幕外。夹取基于 `size`，窗口长高后同样成立。
+func _place_floating_windows() -> void:
+	var desk_h := _desk.size.y if _desk != null and is_instance_valid(_desk) else _vh() - HEADER_H
+	var vw := _vw()
+	if _tec != null and is_instance_valid(_tec):
+		_tec.position = Vector2(minf(906.0, vw - 14.0 - _tec.size.x),
+			minf(264.0, desk_h - 14.0 - _tec.size.y))
+	if _tec_chip != null and is_instance_valid(_tec_chip):
+		_tec_chip.position = Vector2(minf(1068.0, vw - 16.0 - _tec_chip.size.x),
+			minf(608.0, desk_h - 4.0 - _tec_chip.size.y))
+	if _archive_win != null and is_instance_valid(_archive_win):
+		_archive_win.position = Vector2(minf(458.0, vw - 14.0 - _archive_win.size.x),
+			minf(84.0, desk_h - 14.0 - _archive_win.size.y))
+	if _chat_win != null and is_instance_valid(_chat_win):
+		## 对话窗在 1280 本来就是贴右 4px 的 858，别拿 14px 去夹它。
+		_chat_win.position = Vector2(minf(858.0, vw - 4.0 - _chat_win.size.x),
+			minf(58.0, desk_h - 14.0 - _chat_win.size.y))
+	if _garden_win != null and is_instance_valid(_garden_win):
+		_garden_win.position = Vector2(minf(380.0, vw - 14.0 - _garden_win.size.x),
+			minf(58.0, desk_h - 14.0 - _garden_win.size.y))
 
 
 func _minimize_music() -> void:
@@ -1394,13 +1552,13 @@ func _open_garden() -> void:
 	_garden_win = GardenWin.new()
 	_garden_win.name = "garden_win"
 	_garden_win.setup_garden(graph, case_def)
-	_garden_win.position = Vector2(380, 58)
 	_garden_win.closed.connect(func(): _garden_win = null)
 	_garden_win.plant_moved.connect(func(_idx): _autosave())
 	_garden_win.garden_changed.connect(_on_garden_changed)
 	_garden_win.plot_bloomed.connect(_on_garden_bloomed)
 	_desk.add_child(_garden_win)
 	_place_z(_garden_win, ZR_WIN)
+	_place_floating_windows()
 
 
 func _on_garden_changed() -> void:
@@ -1764,6 +1922,7 @@ func _new_runtime() -> void:
 	_archive_win = null
 	_clear_archive_new()
 	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_restore_matrix_occlusion()
 		_matrix_win.queue_free()
 	_matrix_win = null
 	if _bag_win != null and is_instance_valid(_bag_win):
@@ -1954,15 +2113,55 @@ func _open_cert_review() -> void:
 
 
 func _show_toast(text: String, warn: bool = false) -> void:
+	## 首条立即显示（测试与即时反馈都依赖这一点）；正在显示 / 淡出时的后续消息排队，
+	## 不再用新消息粗暴顶掉旧消息——玩家往往会连点两下，前一句没读完就换字更易漏信息。
+	if _toast_active:
+		_toast_queue.append({"text": text, "warn": warn})
+		return
+	_show_toast_now(text, warn)
+
+
+func _show_toast_now(text: String, warn: bool) -> void:
+	_toast_active = true
 	_toast_label.text = text
 	_toast.add_theme_stylebox_override("panel", _toast_style(warn))
+	_toast.modulate.a = 1.0
 	_toast.visible = true
 	_toast.reset_size()
 	_place_toast_anchor()
-	if _toast_timer != null:
-		_toast_timer.timeout.disconnect(_hide_toast)
-	_toast_timer = get_tree().create_timer(2.2)
-	_toast_timer.timeout.connect(_hide_toast)
+	_stop_toast_timer()
+	_toast_timer = get_tree().create_timer(2.4)
+	_toast_timer.timeout.connect(_fade_toast)
+
+
+func _fade_toast() -> void:
+	if not _toast_active:
+		return
+	_stop_toast_timer()
+	if _toast_tween != null and _toast_tween.is_valid():
+		_toast_tween.kill()
+	_toast_tween = create_tween()
+	_toast_tween.set_trans(Tween.TRANS_LINEAR)
+	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.18)
+	_toast_tween.finished.connect(_after_toast_fade)
+
+
+func _after_toast_fade() -> void:
+	_toast.visible = false
+	_toast.modulate.a = 1.0
+	_toast_active = false
+	if _toast_queue.is_empty():
+		return
+	var next: Dictionary = _toast_queue.pop_front()
+	_show_toast_now(String(next.get("text", "")), bool(next.get("warn", false)))
+
+
+func _stop_toast_timer() -> void:
+	if _toast_timer == null:
+		return
+	if _toast_timer.timeout.is_connected(_fade_toast):
+		_toast_timer.timeout.disconnect(_fade_toast)
+	_toast_timer = null
 
 
 ## toast 停**右下角**，不压底部正中：底部正中是叙事卡 / 详情卡的下沉落点
@@ -1996,6 +2195,13 @@ func _toast_style(warn: bool) -> StyleBoxFlat:
 
 
 func _hide_toast() -> void:
+	_stop_toast_timer()
+	if _toast_tween != null and _toast_tween.is_valid():
+		_toast_tween.kill()
+	_toast_tween = null
+	_toast_queue.clear()
+	_toast_active = false
+	_toast.modulate.a = 1.0
 	_toast.visible = false
 
 
@@ -3088,8 +3294,13 @@ func _refresh_log_win() -> void:
 
 
 ## 写一条案卷（口径见 GraphState.add_log 上方）。窗关着时累未读 —— Web `logUnread`。
+## 带内部 key 的调试条目（`item:ITEMS_x` / `loc:SCENES_y`）不进玩家案卷，
+## 只落 `user://tec-debug.log`，避免日志窗出现「组合 item:IT」这种破句。
 func _log(text: String, kind: String = "") -> void:
 	if graph == null or text == "":
+		return
+	if _has_internal_key(text):
+		_append_debug_log(text, kind)
 		return
 	graph.add_log(text, kind)
 	if _log_win != null and is_instance_valid(_log_win):
@@ -3099,12 +3310,32 @@ func _log(text: String, kind: String = "") -> void:
 	_set_badge(_log_badge, str(_log_unread))
 
 
+func _has_internal_key(text: String) -> bool:
+	var re := RegEx.new()
+	if re.compile("(?i)(?:^|[\\s（「『【\\[,，：])(?:item|clue|char|loc|scene|time|dlg|npcs?|scenes|chars|items|clues):[a-z0-9_]+") != OK:
+		return false
+	return re.search(text) != null
+
+
+func _append_debug_log(text: String, kind: String) -> void:
+	var path := "user://tec-debug.log"
+	var f := FileAccess.open(path, FileAccess.READ_WRITE)
+	if f == null:
+		f = FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return
+	f.seek_end()
+	f.store_line("[%s]%s %s" % [Time.get_datetime_string_from_system(false, true),
+		(" " + kind) if kind != "" else "", text])
+
+
 # ── 推演桌布（五感槽位 / 归位 / 长按推演）──────────────────────────────
 
 func _toggle_matrix() -> void:
 	if not _require_case():
 		return
 	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_restore_matrix_occlusion()
 		_matrix_win.queue_free()
 		_matrix_win = null
 		return
@@ -3118,8 +3349,43 @@ func _toggle_matrix() -> void:
 	_matrix_win.seed_dropped.connect(_on_seed_dropped)
 	# 线索卡拖动的镜像挂在桌面上（桌布自己 clip_contents，镜像挂里面拖到边缘会被裁掉）
 	_matrix_win.drag_host = _desk
+	_matrix_win.item_rect_changed.connect(_sync_matrix_occlusion)
 	_desk.add_child(_matrix_win)
 	_place_z(_matrix_win, ZR_WIN)
+	_sync_matrix_occlusion.call_deferred()
+
+
+## A7：矩阵窗会把正下方的卡片遮得只剩一条白边，看起来像窗口漏了一块。
+## 只对「大部分面积都被窗盖住」的卡片淡出；拖窗时实时重算，关窗恢复。
+## 用 modulate 而非 visible：_layout_force 只排可见卡片，隐藏会让别的卡重排。
+func _sync_matrix_occlusion() -> void:
+	_restore_matrix_occlusion()
+	if _matrix_win == null or not is_instance_valid(_matrix_win) or not _matrix_win.visible:
+		return
+	var win := Rect2(_matrix_win.global_position, _matrix_win.size)
+	for key in _cards.keys():
+		var c: NodeCard = _cards[key]
+		if c == null or not is_instance_valid(c) or not c.visible or c.modulate.a <= 0.0:
+			continue
+		var box := Rect2(c.global_position, c.size)
+		var hit := win.intersection(box)
+		var area := box.size.x * box.size.y
+		if area <= 0.0:
+			continue
+		if hit.size.x * hit.size.y < area * 0.6:
+			continue
+		c.modulate.a = 0.0
+		c.process_mode = Node.PROCESS_MODE_DISABLED
+		_matrix_faded.append(key)
+
+
+func _restore_matrix_occlusion() -> void:
+	for key in _matrix_faded:
+		var c: NodeCard = _cards.get(String(key), null)
+		if c != null and is_instance_valid(c):
+			c.modulate.a = 1.0
+			c.process_mode = Node.PROCESS_MODE_INHERIT
+	_matrix_faded.clear()
 
 
 ## 画布 / 册子 → 桌布。感官自动取线索自身的 sense（与 Web 的 assignClue 一致）。
@@ -3350,6 +3616,9 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 		_show_toast("「%s」已折叠：先双击展开，或把节点拖到证物袋" % String(tn.get("label", "")), true)
 		return
 	var before := _save.snapshot()
+	# 标签要在 use_item 之前取：工具可能被消耗并从图中移除，事后再拿只剩内部 key。
+	var tool_label := String(graph.node(tool_key).get("label", tool_key))
+	var target_label := String(tn.get("label", target_key))
 	if _try_memory_combo(tool_key, target_key, before):
 		return
 	if _try_dialogue_combo(tool_key, target_key):
@@ -3370,8 +3639,6 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 		return
 	if res.get("ok", false):
 		# 组合成功**不弹提示条**（Web 刻意）：结果靠画面自证，正文与「获得 / 消耗」只进案卷（C8）
-		var tool_label := String(graph.node(tool_key).get("label", tool_key))
-		var target_label := String(tn.get("label", target_key))
 		var bits := "组合 %s ⇒ %s：%s" % [tool_label, target_label, String(res.get("message", ""))]
 		var gained: Array = []
 		for k in res.get("reveal", []):
@@ -3468,11 +3735,11 @@ func _toggle_archive() -> void:
 	_archive_win = ArchiveWin.new()
 	_archive_win.name = "archive_win"
 	_archive_win.setup_archive(graph, case_def)
-	_archive_win.position = Vector2(458, 84)
 	_archive_win.time_selected.connect(_on_archive_time)
 	_archive_win.closed.connect(func(): _archive_win = null)
 	_desk.add_child(_archive_win)
 	_place_z(_archive_win, ZR_WIN)
+	_place_floating_windows()
 	_clear_archive_new()
 	for sid in graph.timeline_known():
 		graph.clear_fresh(graph.scene_key(String(sid)))
@@ -3761,8 +4028,8 @@ func _open_chat(entry: DialogueDef, ids: Array) -> bool:
 	_chat_win.setup_chat(entry, ids, case_def)
 	_chat_win.closed.connect(_on_chat_closed)
 	_desk.add_child(_chat_win)
-	_chat_win.position = Vector2(858, 58)
 	_place_z(_chat_win, ZR_CHAT)
+	_place_floating_windows()
 	return true
 
 
@@ -3856,6 +4123,7 @@ func _relayout(animated := false, force := false) -> void:
 	_sync_header_sizes()
 	_repaint_edges()
 	_reanchor_mem_card()
+	_sync_matrix_occlusion()
 
 
 ## 力导向：斥力 30000/d²、最小间距 R_a+R_b+14、弹簧 rest 185/300/150、向心 0.0022，260 轮。
@@ -3968,7 +4236,11 @@ func _layout_force(animated: bool = false) -> void:
 			n["x"] = p.x
 			n["y"] = p.y
 			continue
-		p = Vector2(clampf(p.x, 60.0, WORLD_W - 220.0), clampf(p.y, 50.0, WORLD_H - 120.0))
+		## P2：自动摆卡落 8px 网格。边界也取 8 的倍数，保证靠边时仍对齐；
+		## 手动拖动不改（玩家摆位以手感为准，不强行吸格）。
+		p = Vector2(clampf(p.x, 64.0, WORLD_W - 224.0),
+			clampf(p.y, 56.0, WORLD_H - 120.0))
+		p = p.snapped(Vector2(8, 8))
 		n["x"] = p.x
 		n["y"] = p.y
 		var before_pos: Vector2 = card.position   # 先记原位：set_home_silent 只改锚点不挪卡

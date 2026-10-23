@@ -119,7 +119,8 @@ func _make_row(text: String, kind: String) -> Control:
 	sb.border_width_bottom = 1
 	sb.border_color = TecTheme.LINE2
 	sb.content_margin_left = 5
-	sb.content_margin_right = 5
+	## 右侧留出滚动条宽度 + 4px：原来 5px 会把最后一行文字压在滚动条下面。
+	sb.content_margin_right = 12
 	sb.content_margin_top = 4
 	sb.content_margin_bottom = 4
 	if kind == "err":
@@ -136,7 +137,9 @@ func _make_row(text: String, kind: String) -> Control:
 	lab.scroll_active = false
 	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	lab.custom_minimum_size = Vector2(body.size.x - 12.0, 0)
+	## 不再写死 `body.size.x - 12`：固定宽度加行内边距会超过 ScrollContainer
+	## 的可视宽度，最后一行被裁。让 VBox 决定宽度，换行由 autowrap 处理。
+	lab.custom_minimum_size = Vector2(0, 0)
 	lab.add_theme_font_override("normal_font", TecTheme.font())
 	lab.add_theme_font_size_override("normal_font_size", TecTheme.FS_BODY)
 	lab.add_theme_constant_override("line_separation", 5)

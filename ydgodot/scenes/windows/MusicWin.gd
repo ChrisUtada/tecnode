@@ -12,6 +12,7 @@ const TRACKS := [
 ]
 const WIN_W := 332.0
 const WIN_H := 214.0
+const TransportButton := preload("res://ui/TransportButton.gd")
 
 var _audio: AudioStreamPlayer
 var _current := ""
@@ -22,8 +23,8 @@ var _list: VBoxContainer
 var _player: VBoxContainer
 var _prog: ProgressBar
 var _time_label: Label
-var _play_btn: Button
-var _stop_btn: Button
+var _play_btn: TransportButton
+var _stop_btn: TransportButton
 var _emit_acc := 0.0
 
 
@@ -110,20 +111,17 @@ func _build_content() -> void:
 	ctrl.alignment = BoxContainer.ALIGNMENT_END
 	ctrl.add_theme_constant_override("separation", 6)
 	_player.add_child(ctrl)
-	_play_btn = _icon_button("▶", "播放 / 暂停")
+	_play_btn = _icon_button("play", "播放 / 暂停")
 	_play_btn.pressed.connect(toggle_current)
 	ctrl.add_child(_play_btn)
-	_stop_btn = _icon_button("■", "停止")
+	_stop_btn = _icon_button("stop", "停止")
 	_stop_btn.pressed.connect(stop)
 	ctrl.add_child(_stop_btn)
 
 
-func _icon_button(text: String, tip: String) -> Button:
-	var b := TecTheme.button(text)
-	b.custom_minimum_size = Vector2(34, 26)
-	b.size = Vector2(34, 26)
-	b.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
-	b.tooltip_text = tip
+func _icon_button(mode: String, tip: String) -> TransportButton:
+	var b := TransportButton.new()
+	b.setup_transport(mode, tip)
 	return b
 
 
@@ -234,7 +232,7 @@ func _refresh() -> void:
 				TecTheme.NONE if cur else TecTheme.NONE, 0))
 	_player.visible = _current != ""
 	if _play_btn != null:
-		_play_btn.text = "❚❚" if is_playing() else "▶"
+		_play_btn.set_mode("pause" if is_playing() else "play")
 	_refresh_progress()
 
 

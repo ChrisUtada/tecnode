@@ -37,4 +37,4 @@ theme/default_font_subpixel_positioning=0
 textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-environment/defaults/default_clear_color=Color(0.937255, 0.937255, 0.937255, 1)
+environment/defaults/default_clear_color=Color(0.768627, 0.8, 0.776471, 1)

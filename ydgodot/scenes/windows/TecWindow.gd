@@ -10,8 +10,10 @@ const MIN_SEC := 5.0
 const MAX_SEC := 8.0
 
 var _lines: VBoxContainer
+var _scroll: ScrollContainer
+var _empty: Label
+var _status: Label
 var _analysis: PanelContainer
-var _analysis_label: Label
 var _bar: ProgressBar
 var _avatar: TextureRect
 var _hint: Label
@@ -35,17 +37,16 @@ func setup_tec() -> void:
 
 func _build_content() -> void:
 	content.add_theme_constant_override("separation", 0)
-	var row := HBoxContainer.new()
-	row.name = "tec_body"
-	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 10)
-	content.add_child(row)
+	var head := HBoxContainer.new()
+	head.name = "tec_head"
+	head.add_theme_constant_override("separation", 10)
+	content.add_child(head)
 
 	var av_col := VBoxContainer.new()
 	av_col.custom_minimum_size = Vector2(74, 0)
 	av_col.alignment = BoxContainer.ALIGNMENT_BEGIN
 	av_col.add_theme_constant_override("separation", 5)
-	row.add_child(av_col)
+	head.add_child(av_col)
 
 	var av_box := PanelContainer.new()
 	av_box.custom_minimum_size = Vector2(60, 60)
@@ -70,44 +71,32 @@ func _build_content() -> void:
 	av_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	av_col.add_child(av_label)
 
-	var main := VBoxContainer.new()
-	main.name = "tec_main"
-	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main.mouse_filter = Control.MOUSE_FILTER_PASS
-	main.add_theme_constant_override("separation", 6)
-	row.add_child(main)
+	var info := VBoxContainer.new()
+	info.name = "tec_info"
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	info.add_theme_constant_override("separation", 5)
+	info.mouse_filter = Control.MOUSE_FILTER_PASS
+	head.add_child(info)
 
-	_lines = VBoxContainer.new()
-	_lines.name = "tec_lines"
-	_lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_lines.add_theme_constant_override("separation", 0)
-	_lines.mouse_filter = Control.MOUSE_FILTER_PASS
-	main.add_child(_lines)
+	_status = TecTheme.label(_idle_text(), TecTheme.FS_BODY, TecTheme.MUTED)
+	_status.name = "tec_status"
+	_status.clip_text = true
+	_status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info.add_child(_status)
 
 	_analysis = PanelContainer.new()
 	_analysis.name = "tec_analyzing"
 	_analysis.visible = false
 	_analysis.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var box := TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.EDGE_SOFT)
-	box.content_margin_left = 9
-	box.content_margin_right = 9
-	box.content_margin_top = 7
-	box.content_margin_bottom = 7
+	var box := TecTheme.flat(TecTheme.NONE, 0, TecTheme.NONE, 0)
+	box.content_margin_left = 0
+	box.content_margin_right = 0
+	box.content_margin_top = 4
+	box.content_margin_bottom = 0
 	_analysis.add_theme_stylebox_override("panel", box)
-	main.add_child(_analysis)
-
-	var acol := VBoxContainer.new()
-	acol.add_theme_constant_override("separation", 6)
-	acol.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_analysis.add_child(acol)
-
-	_analysis_label = TecTheme.label("", TecTheme.FS_BODY, TecTheme.MUTED)
-	_analysis_label.name = "tec_analysis_label"
-	_analysis_label.clip_text = true
-	_analysis_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_analysis_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	acol.add_child(_analysis_label)
+	info.add_child(_analysis)
 
 	_bar = ProgressBar.new()
 	_bar.name = "tec_bar"
@@ -121,16 +110,77 @@ func _build_content() -> void:
 	var fill := TecTheme.flat(TecTheme.LINE, 0, TecTheme.LINE, 0)
 	_bar.add_theme_stylebox_override("background", bg)
 	_bar.add_theme_stylebox_override("fill", fill)
-	acol.add_child(_bar)
+	_analysis.add_child(_bar)
+
+	var rule := ColorRect.new()
+	rule.name = "tec_rule"
+	rule.color = TecTheme.EDGE_SOFT
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(rule)
+
+	var area := Control.new()
+	area.name = "tec_area"
+	area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	area.clip_contents = true
+	area.mouse_filter = Control.MOUSE_FILTER_PASS
+	content.add_child(area)
+
+	_scroll = ScrollContainer.new()
+	_scroll.name = "tec_scroll"
+	_scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	area.add_child(_scroll)
+
+	_lines = VBoxContainer.new()
+	_lines.name = "tec_lines"
+	_lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lines.add_theme_constant_override("separation", 0)
+	_lines.mouse_filter = Control.MOUSE_FILTER_PASS
+	_scroll.add_child(_lines)
+
+	_empty = TecTheme.label("把节点拖到我身上，我来看看。\n点这里可以闲聊。",
+		TecTheme.FS_BODY, TecTheme.INK_FAINT)
+	_empty.name = "tec_empty"
+	_empty.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_empty.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	area.add_child(_empty)
+
+	var foot_rule := ColorRect.new()
+	foot_rule.name = "tec_foot_rule"
+	foot_rule.color = TecTheme.EDGE_SOFT
+	foot_rule.custom_minimum_size = Vector2(0, 1)
+	foot_rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	foot_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(foot_rule)
+
+	var foot_pad := Control.new()
+	foot_pad.name = "tec_foot_pad"
+	foot_pad.custom_minimum_size = Vector2(0, 17)
+	foot_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(foot_pad)
 
 	_hint = TecTheme.label("拖节点到我身上分析 · 点框内任意位置闲聊", TecTheme.FS_BODY, TecTheme.MUTED)
 	_hint.name = "tec_hint"
+	_hint.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_hint.offset_top = -16
+	_hint.offset_bottom = 0
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	## 提示行放**整行页脚**，不再塞在 224px 的对话列里：12px 下一行要 252px，
-	## 挤在列里必然折成两行、第二行被 body 裁掉（10px 时刚好一行）。
-	content.add_child(_hint)
+	## 提示行锚在 body 底部：窗口在隐藏状态改高时也能立刻跟到底边，
+	## 不依赖 VBox 的延迟排序（测试会检查 hint 始终在窗内）。
+	body.add_child(_hint)
+
+
+func _idle_text() -> String:
+	return "待命 · 拖一个节点到我身上"
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -148,6 +198,8 @@ func append_line(text: String, color: Color = TecTheme.TEXT) -> void:
 	var l := TecTheme.narrative_label(text, color)
 	_lines.add_child(l)
 	l.start_typing()
+	if _empty != null:
+		_empty.visible = false
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0, 6)
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -160,6 +212,14 @@ func append_line(text: String, color: Color = TecTheme.TEXT) -> void:
 	_lines.add_child(sep)
 	_line_count += 1
 	call_deferred("_fit_height")
+	_scroll_to_end()
+
+
+func _scroll_to_end() -> void:
+	if _scroll == null or not is_instance_valid(_scroll):
+		return
+	await get_tree().process_frame
+	_scroll.set_deferred("scroll_vertical", 1 << 20)
 
 
 func _fit_height() -> void:
@@ -169,7 +229,7 @@ func _fit_height() -> void:
 		await tree_entered
 	await get_tree().process_frame
 	var content_h := content_min_height()
-	var target := maxf(240.0, SysWindow.BAR_H + 20.0 + content_h)
+	var target := clampf(maxf(240.0, SysWindow.BAR_H + 20.0 + content_h), 240.0, 360.0)
 	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:
 		set_inner_height(target)
 
@@ -190,7 +250,9 @@ func analyze(target: String, label: String = "") -> bool:
 	_elapsed = 0.0
 	_duration = 0.05 if _fast else randf_range(MIN_SEC, MAX_SEC)
 	_bar.value = 0
-	_analysis_label.text = "分析中 · " + _target_label
+	if _status != null:
+		_status.text = "分析中 · " + _target_label
+		_status.add_theme_color_override("font_color", TecTheme.TEXT)
 	_analysis.visible = true
 	call_deferred("_fit_height")
 	analysis_started.emit(_target, _target_label)
@@ -216,6 +278,9 @@ func _finish_analysis() -> void:
 	set_process(false)
 	_analysis.visible = false
 	_done_count += 1
+	if _status != null:
+		_status.text = _idle_text()
+		_status.add_theme_color_override("font_color", TecTheme.MUTED)
 	call_deferred("_fit_height")
 	analysis_done.emit(_target)
 
@@ -232,6 +297,9 @@ func cancel_analysis() -> void:
 	_analyzing = false
 	set_process(false)
 	_analysis.visible = false
+	if _status != null:
+		_status.text = _idle_text()
+		_status.add_theme_color_override("font_color", TecTheme.MUTED)
 	call_deferred("_fit_height")
 
 
@@ -240,6 +308,8 @@ func reset_tec() -> void:
 	for c in _lines.get_children():
 		_lines.remove_child(c)
 		c.queue_free()
+	if _empty != null:
+		_empty.visible = true
 	_line_count = 0
 	_done_count = 0
 	_target = ""

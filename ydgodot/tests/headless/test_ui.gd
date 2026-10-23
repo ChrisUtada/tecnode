@@ -101,8 +101,15 @@ func _initialize() -> void:
 	await process_frame
 	scene.dbg_pw_open("item:ITEMS_jzmh")
 	await process_frame
-	var pop := scene.get_node_or_null("desk/pw_pop")
+	var pop := scene.get_node_or_null("desk/pw_pop") as SysWindow
 	check("双击木盒：LOCK 弹窗出现", pop != null)
+	if pop != null:
+		check("A4 密码浮层 opt-in 硬影", pop.offset_shadow and pop._offset_shadow != null)
+		if pop._offset_shadow != null:
+			check("A4 密码影偏移 = OFFSET_SHADOW",
+				pop._offset_shadow.position.is_equal_approx(Vector2(SysWindow.PAD, SysWindow.PAD)
+					+ SysWindow.OFFSET_SHADOW), str(pop._offset_shadow.position))
+			check("A4 密码影在窗体内容之下", pop._offset_shadow.get_index() < pop.get_child_count() - 1)
 	scene.dbg_password("item:ITEMS_jzmh", "1111")
 	await process_frame
 	check("密码错：弹窗还在", scene.get_node_or_null("desk/pw_pop") != null)
@@ -162,24 +169,36 @@ func _initialize() -> void:
 	var crumb := scene.get_node_or_null("header/crumb") as Label
 	check("面包屑用计数口径", crumb != null and crumb.text.begins_with("节点 ")
 		and crumb.text.contains("已探索场景"))
-	# 工具组七个控件：x 坐标必须与 Web 量出来的一致（多一个少一个都会错位）
-	var slots := {"tog_合成消耗": 670.0, "tog_聚焦选中": 763.0, "tog_新节点自动居中": 856.0,
-		"btn_适应窗口": 985.0, "btn_撤销": 1066.0, "btn_重置": 1123.0, "btn_检查可达性": 1180.0}
+	# A1：右侧只留正式「撤销」+「调试」入口；调试项不再摊在页眉上。
+	var slots := {"btn_撤销": 1144.0, "btn_调试": 1202.0}
 	var bad_slots: Array = []
 	for nm in slots.keys():
 		var c := scene.get_node_or_null("header/" + String(nm)) as Control
 		if c == null or absf(c.position.x - float(slots[nm])) > 0.5:
 			bad_slots.append(String(nm))
-	check("页眉七件套 x 坐标对齐 Web", bad_slots.is_empty(), str(bad_slots))
+	check("页眉只留撤销 / 调试两个入口", bad_slots.is_empty(), str(bad_slots))
 	# 页眉拉满视口宽：不缩放之后它是自适应的，1280 口径下必须正好 1280
 	check("页眉宽 = 视口宽（自适应）", head != null and absf(head.size.x - scene._vw()) < 0.5,
 		str(head.size.x) if head != null else "null")
-	var tog := scene.get_node_or_null("header/tog_合成消耗") as Button
+	scene._open_debug_panel()
+	await process_frame
+	var dbg_pop := scene.get_node_or_null("debug_pop") as Control
+	check("调试面板可打开", dbg_pop != null and dbg_pop.visible)
+	var dbg_togs := ["tog_合成消耗", "tog_聚焦选中", "tog_新节点自动居中"]
+	var dbg_actions := ["dbg_btn_适应窗口", "dbg_btn_重置", "dbg_btn_检查可达性"]
+	var missing: Array = []
+	for nm in dbg_togs + dbg_actions:
+		if scene.find_child(String(nm), true, false) == null:
+			missing.append(String(nm))
+	check("调试开关 / 动作都在弹出面板里", missing.is_empty(), str(missing))
+	var tog := scene.find_child("tog_合成消耗", true, false) as Button
 	var tog_img: Image = tog.icon.get_image() if tog != null and tog.icon != null else null
 	check("页眉 checkbox 13×13 圆角", tog_img != null
 		and tog_img.get_size() == Vector2i(13, 13)
 		and tog_img.get_pixel(0, 0).a == 0.0 and tog_img.get_pixel(2, 0).a > 0.0,
 		str(tog_img.get_size()) if tog_img != null else "null")
+	scene._close_debug_panel()
+	check("调试面板可关闭", dbg_pop != null and not dbg_pop.visible)
 	# 主窗跟着桌面长：1280×720 下画布必须是 1162 × 608（Web 标题栏 28px 口径）
 	var stage := scene.get_node_or_null("desk/case_win/body/stage") as Control
 	check("画布 1280 口径 = 1162×608", stage != null and stage.size == Vector2(1162, 608),
@@ -484,7 +503,7 @@ func _initialize() -> void:
 			and absf(tl.position.y - (dmid - NodeCard.TITLE_INK_CY)) < 0.01,
 		"顶边 %.2f / 期望 %.2f / valign %d" % [
 			tl.position.y, dmid - NodeCard.TITLE_INK_CY, tl.vertical_alignment])
-	check("符号边长 = GLYPH_BOX（16 = 圆形字牌外径）",
+	check("符号边长 = GLYPH_BOX（18 = 圆形字牌外径）",
 		absf(g.size.x - NodeCard.GLYPH_BOX) < 0.01 and absf(g.size.y - NodeCard.GLYPH_BOX) < 0.01,
 		"%.1f×%.1f" % [g.size.x, g.size.y])
 	demo.queue_free()
@@ -492,13 +511,15 @@ func _initialize() -> void:
 
 	## 7c1c) 字牌笔画必须留缝：字号按圈内径的 ~2/3 取，笔画高度 < 内径。
 	## （旧版文字档画 12px：CJK 墨高 16 > 内径 13.8，直接顶到弧线上。）
-	var gpx := KindGlyph.glyph_font_px(8.0, 1.0)
+	var glyph_r := NodeCard.GLYPH_BOX * 0.5
+	var gpx := KindGlyph.glyph_font_px(glyph_r, 1.0)
 	var gfont := TecTheme.font()
 	var gink := gfont.get_ascent(gpx) + gfont.get_descent(gpx)
-	check("字牌字号收在 9~10px（旧版文字档 12px 顶圈）",
-		gpx >= 9 and gpx <= 10, "px %d" % gpx)
+	var ginner := NodeCard.GLYPH_BOX - 2.0 * 1.1
+	check("字牌字号提到 10px（旧版文字档 12px 顶圈）",
+		gpx >= 10 and gpx <= 10, "px %d" % gpx)
 	check("字牌笔画高度 < 圈内径（四边留缝）",
-		gink < 16.0 - 2.0 * 1.1, "墨高 %.1f / 内径 %.1f" % [gink, 16.0 - 2.2])
+		gink < ginner, "墨高 %.1f / 内径 %.1f" % [gink, ginner])
 
 	## 7c1d) 打字机必须**全程按全文**占位：`visible_characters` 会让 Label 只在
 	## 剩余字里算最小高度，窗体会塌成一行、正文溢出框外（用户反馈）。
@@ -791,6 +812,8 @@ func _initialize() -> void:
 	var injected: Array[CommandDef] = [tcmd]
 	var gdef = scene.case_def.scene_of("SCENES_garden")
 	gdef.commands = injected
+	# P2 Toast 排队：上一条还在屏上时新文案不会立即顶替，先清掉再验证命令命中。
+	scene._hide_toast()
 	_double_click(_cards()["loc:SCENES_garden"] as NodeCard)
 	await process_frame
 	check("带命令场景双击：先跑命令（toast 命中）",
@@ -1223,6 +1246,13 @@ func _initialize() -> void:
 	var clear_col = ProjectSettings.get_setting("rendering/environment/defaults/default_clear_color")
 	check("默认清屏色同步桌面色",
 		clear_col is Color and (clear_col as Color).is_equal_approx(TecTheme.DESK_GRAY), str(clear_col))
+	var wm := scene.get_node_or_null("desk/case_win/body/stage/desk_watermark") as Control
+	var cards_layer := scene.get_node_or_null("desk/case_win/body/stage/cards") as Control
+	check("E1 画布水印存在且不吃鼠标",
+		wm != null and wm.mouse_filter == Control.MOUSE_FILTER_IGNORE)
+	check("E1 水印在卡片层之下",
+		wm != null and cards_layer != null and wm.get_index() < cards_layer.get_index(),
+		"null" if wm == null or cards_layer == null else "%d / %d" % [wm.get_index(), cards_layer.get_index()])
 
 	# ── 单色改版 P4.2：按钮语法统一 ──────────────────────────────────────────
 	# 参考图（System 6 Control Panel）只有两枚键：Set = 白底 + 1px 黑键线；
@@ -1299,6 +1329,19 @@ func _initialize() -> void:
 		p42_c2 != null and p42_c2.get_node_or_null("keyline") == null
 			and (p42_c2.get_theme_stylebox("panel") as StyleBoxFlat).border_color.is_equal_approx(TecTheme.INK_FAINT),
 		"null" if p42_c2 == null else str(p42_c2.get_theme_stylebox("panel")))
+
+	# E4：同屏一条、后来者排队；清场时队列一起丢掉，避免截图流程留下尾巴。
+	scene._hide_toast()
+	scene._show_toast("队列一")
+	check("E4 首条立即显示", scene._toast_label.text == "队列一" and scene._toast.visible)
+	scene._show_toast("队列二")
+	check("E4 第二条排队不抢屏", scene._toast_label.text == "队列一"
+		and scene._toast_queue.size() == 1, str(scene._toast_queue))
+	scene._hide_toast()
+	check("E4 清场同时清队列", not scene._toast.visible and scene._toast_queue.is_empty())
+	scene._show_toast("队列三")
+	check("E4 清场后新消息立即显示", scene._toast_label.text == "队列三" and scene._toast.visible)
+	scene._hide_toast()
 
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)

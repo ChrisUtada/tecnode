@@ -39,7 +39,8 @@ func setup_people(p_graph: GraphState, p_case: CaseLoader, w: float = 324.0, h: 
 	_list = VBoxContainer.new()
 	_list.name = "people_list"
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_list.add_theme_constant_override("separation", 4)
+	## 6 行 × (48 头像 + 上下 4) + 5 × 2 = 346，默认 body 351 内完整露出。
+	_list.add_theme_constant_override("separation", 2)
 	_scroll.add_child(_list)
 	refresh_people()
 
@@ -137,6 +138,10 @@ func _make_row(id: String) -> Control:
 		box.add_child(ds)
 
 	var st := TecTheme.label(state, TecTheme.FS_BODY, TecTheme.TEXT if done else TecTheme.MUTED)
+	st.clip_text = true
+	st.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	st.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	st.tooltip_text = state
 	st.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hb.add_child(st)
 	return row
@@ -146,9 +151,9 @@ func _row_style(hover: bool) -> StyleBoxFlat:
 	var sb := TecTheme.flat(TecTheme.BG if hover else TecTheme.NONE, TecTheme.R_BTN,
 		TecTheme.NONE if not hover else TecTheme.NONE)
 	sb.content_margin_left = 8
-	sb.content_margin_right = 8
-	sb.content_margin_top = 6
-	sb.content_margin_bottom = 6
+	sb.content_margin_right = 6
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
 	return sb
 
 

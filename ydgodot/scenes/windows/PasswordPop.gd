@@ -10,6 +10,7 @@ var _hint: Label
 
 
 func setup_password(item_label: String, hint: String) -> void:
+	offset_shadow = true
 	setup("密码锁 · " + item_label, 200, 74, TecTheme.R_SM)
 	_hint = TecTheme.label(hint if hint != "" else "输入密码（四位数字）", TecTheme.FS_BODY, TecTheme.MUTED)
 	content.add_child(_hint)

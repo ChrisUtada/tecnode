@@ -196,11 +196,14 @@ func _test_desktop(c: CaseLoader) -> void:
 	var st: Dictionary = scene.dbg_music_state()
 	check("播放器一首曲目", int(st["rows"]) == 1, str(st))
 	check("初始未播放", String(st["current"]) == "" and not bool(st["playing"]))
+	check("E3 播放键是 18×18 自绘键", w._play_btn.size == Vector2(18, 18)
+		and w._play_btn._mode == "play", str(w._play_btn.size))
 
 	check("播放 Air", scene.dbg_music_play("Air_Bach"))
 	await process_frame
 	st = scene.dbg_music_state()
 	check("正在播放", bool(st["playing"]) and not bool(st["paused"]), str(st))
+	check("E3 播放中图标切成暂停", w._play_btn._mode == "pause", w._play_btn._mode)
 	check("曲目 id", String(st["current"]) == "Air_Bach")
 	check("曲目时长", float(st["duration"]) > 0.0, str(st["duration"]))
 	w.seek_ratio(0.5)
@@ -210,6 +213,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("同曲再点暂停", not scene.dbg_music_toggle())
 	st = scene.dbg_music_state()
 	check("暂停状态", bool(st["paused"]) and not bool(st["playing"]), str(st))
+	check("E3 暂停后图标切回播放", w._play_btn._mode == "play", w._play_btn._mode)
 	check("再点续播", scene.dbg_music_toggle())
 	st = scene.dbg_music_state()
 	check("续播状态", bool(st["playing"]) and not bool(st["paused"]))
@@ -235,6 +239,9 @@ func _test_desktop(c: CaseLoader) -> void:
 	if dock != null:
 		check("dock 位置", dock.position == Vector2(1026, 532), str(dock.position))
 		check("dock 曲名", String(dock.state().get("title", "")) == "Air (Bach)")
+		check("E3 dock 键也是 18×18 且同步播放中",
+			dock._toggle_btn.size == Vector2(18, 18) and dock._toggle_btn._mode == "pause",
+			str(dock._toggle_btn.size))
 	check("收起后音频继续", bool(st["playing"]))
 	scene.dbg_restore_music()
 	st = scene.dbg_music_state()
@@ -296,6 +303,8 @@ func _test_desktop(c: CaseLoader) -> void:
 	var base_h := garden.size.y
 	var now := GardenSystem.now_ms_now()
 	check("回拨生长时间", scene.dbg_touch_garden_plot(0, now - 181000))
+	# P2 Toast 改为同屏一条、后来者排队：先清掉上一条，下面才能立即断言开花提示。
+	scene._hide_toast()
 	garden._process(1.1)
 	await process_frame
 	gs = garden.dbg_state()

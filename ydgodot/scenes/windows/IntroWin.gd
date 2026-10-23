@@ -21,6 +21,7 @@ var _pool: Array = []
 var _names: Dictionary = {}
 var _locked := 0
 var _panel: PanelContainer
+var _panel_shadow: ColorRect
 var _box: VBoxContainer
 var _name_edit: LineEdit = null
 
@@ -44,10 +45,17 @@ func _build() -> void:
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(dim)
 
+	_panel_shadow = ColorRect.new()
+	_panel_shadow.name = "panel_shadow"
+	_panel_shadow.color = TecTheme.shadow(1.0)
+	_panel_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_panel_shadow)
+
 	_panel = PanelContainer.new()
 	_panel.name = "panel"
 	_panel.add_theme_stylebox_override("panel", TecTheme.window_style())
 	_panel.custom_minimum_size = Vector2(WIDTH, 0)
+	_panel.resized.connect(_sync_panel_shadow)
 	add_child(_panel)
 
 	var margin := MarginContainer.new()
@@ -90,6 +98,15 @@ func _fit() -> void:
 	_panel.reset_size()
 	_panel.position = Vector2((1280.0 - _panel.size.x) * 0.5, TOP)
 	_panel.pivot_offset = _panel.size * 0.5
+	_sync_panel_shadow()
+
+
+## 面板的最终尺寸要等子容器布局完才定；只靠 `_fit()` 会留下 3px 的旧影。
+func _sync_panel_shadow() -> void:
+	if _panel == null or _panel_shadow == null:
+		return
+	_panel_shadow.position = _panel.position + SysWindow.OFFSET_SHADOW
+	_panel_shadow.size = _panel.size
 
 
 func _title(text: String) -> void:

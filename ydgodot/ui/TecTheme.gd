@@ -37,16 +37,16 @@ const MUTED := INK_MUTED
 const INK_FAINT := Color("8c8c8c")
 const FAINT := INK_FAINT
 
-## 外壳底板：图标栏、窗体之外那一圈桌面（`desk_bg`）。**平涂一块灰**，
-## 比画布的 `#8A8A8A` 浅一档 —— 外壳若比画布深，黑色图标就压不住了。
+## 外壳底板：图标栏、窗体之外那一圈桌面（`desk_bg`）。P2 起是**灰青**，
+## 介于纸面与画布之间 —— 外壳读作「框」，又不像纯白那样抢窗体的亮度。
 ## `BG_HI` / `BG_LO` 是旧「竖向渐变」的上下端，桌底改平涂后**已无引用**，
 ## 名字留着给将来的「升起面 / 凹陷面」用。
-const BG := Color("ffffff")
-const BG_HI := Color("ffffff")
-const BG_LO := Color("ffffff")
-## 纸面（纯白）。**画布本身已不再用它**（改成下面的 DESK_GRAY 平涂），
+const BG := Color("DCE2DD")
+const BG_HI := Color("DCE2DD")
+const BG_LO := Color("DCE2DD")
+## 纸面（仪器灰青冷白 #EDF1EE）。**画布本身已不再用它**（改成下面的 DESK_GRAY 平涂），
 ## 留作「需要一张纸」的局部：卡片内页、摘录底、回忆叙事框。
-const PAPER := Color("ffffff")
+const PAPER := Color("EDF1EE")
 
 ## 画布桌面（`stage_bg`）：**中性灰平涂，不铺网点**。
 ## 为什么平涂：桌面是屏上最大的一块面积，任何纹理都会被读成噪点。
@@ -55,24 +55,19 @@ const PAPER := Color("ffffff")
 ## 真正有效的是**降对比**，或者干脆不要。参考图看着「均匀的灰」，物理上也是网点，
 ## 但两色对比只有 6%，肉眼读作平涂 —— 这层窗户纸不值得在 1x 屏上复刻。
 ##
-## 亮度取 #8a8a8a 而非参考图的 #808080：参考图是 CRT，有余晖加成；
-## 现代屏上 #808080 会发闷。对卡片白 3.2:1 —— 白卡浮得起来，
-## 又不至于压过卡片上的类型专色。
-##
-## P4.1 修订：**纯白 → #F6F6F6**。满屏纯白比参考图的 CRT 底亮得多，
-## 长时间盯着「全屏最亮」会累；降一档到 96% 后，白窗体仍是全屏最亮的一块，
-## 「窗浮在桌上」的关系没变（1.09:1 只够读作分层，不够读作深灰）。
-const DESK_GRAY := Color("efefef")
+## P2 纸色改版：`#EFEFEF → #C4CCC6`。桌面加深后与纸面 `#EDF1EE` 的明度差
+## 从 1.09:1 拉到约 1.43:1，窗/桌层次更清楚，同时全屏不再有纯白大面积。
+const DESK_GRAY := Color("C4CCC6")
 
 ## ── 2. 面 ─────────────────────────────────────────────────────────────────────
-## 卡面（纯白）。**它是「比桌布白」的那一层**，白窗压灰桌的关系靠它撑住 ——
-## 对桌布 #8A8A8A 是 3.2:1，这是「窗口浮起来」的全部依据。
-const CARD := Color("ffffff")
+## 卡面（纸面 #EDF1EE）。**它是「比桌布亮」的那一层**，窗压桌的关系靠它撑住 ——
+## 对桌布 #C4CCC6 约 1.43:1，这是「窗口浮起来」的全部依据。
+const CARD := Color("EDF1EE")
 ## 浅面两档：悬停（更亮）/ 按下（更暗）。
-const FACE_HI := Color("ffffff")
-const FACE_LO := Color("ffffff")
+const FACE_HI := Color("EDF1EE")
+const FACE_LO := Color("EDF1EE")
 ## 升起的浅面：证件底板、按钮浮起的底。
-const FACE_RISE := Color("ffffff")
+const FACE_RISE := Color("EDF1EE")
 
 ## 深色反白面（已捕获线索 / 拖动目标 / 回忆卡标题条）。
 const FACE_DARK_HI := Color("333333")
@@ -161,14 +156,14 @@ const SPOT_DANGER := Color("c0392b")
 
 ## ── 回忆态（P4 起**不再做旧纸**）──────────────────────────────────────────────
 ## 原来是四档暖米黄（`#e2deca → #ccc7ad`），代表「这张卡来自过去」。
-## 在纯白桌面上它成了**整屏唯一一片暖色**，一眼就把 1-bit 破掉 —— 而且「做旧」本身就是
-## 拟物（模仿纸张老化）。现在回忆卡与普通窗一样是白面，区别只靠**框更粗**：
+## 在灰青桌面上它成了**整屏唯一一片暖色**，一眼就把 1-bit 破掉 —— 而且「做旧」本身就是
+## 拟物（模仿纸张老化）。现在回忆卡与普通窗一样是纸面，区别只靠**框更粗**：
 ## 3px（回忆）/ 2px（普通窗）/ 1px（节点卡）。
 ## 四个名字保留：`MemCard` 仍按它们的语义取色，将来想恢复米黄只改这一处。
-const MEM_HI := Color("ffffff")
-const MEM_MID := Color("ffffff")
-const MEM_LO := Color("ffffff")
-const MEM_SAY_BG := Color("ffffff")
+const MEM_HI := Color("EDF1EE")
+const MEM_MID := Color("EDF1EE")
+const MEM_LO := Color("EDF1EE")
+const MEM_SAY_BG := Color("EDF1EE")
 
 ## 圆角**分级**（P4.1 修订）——不是一刀切全直角。
 ## 参考图（System 6 / Mac OS 8）里圆角是**按零件分的**：
@@ -321,7 +316,7 @@ static func flat(bg: Color, radius: int, border_col: Color = EDGE, border_w: int
 static func window_style() -> StyleBoxFlat:
 	## **没有投影**。14px 模糊阴影是「窗体浮在纸上」的语法；参考图里的窗口是
 	## 一层 2px 黑框直接压在桌面上的**平面**，层次来自框的粗细，不来自影子。
-	## 去掉之后窗口与桌面靠 2px 边 + 纯白面区分，1x 下边界反而更硬更清楚。
+	## 去掉之后窗口与桌面靠 2px 边 + 纸面区分，1x 下边界反而更硬更清楚。
 	return flat(CARD, R_WIN)
 
 

@@ -101,11 +101,23 @@ func set_compact(on: bool) -> void:
 	_icon.position = Vector2((_root_size - GLYPH_SIZE) * 0.5, 2.0 if on else GLYPH_TOP)
 	_icon.size = Vector2(GLYPH_SIZE, GLYPH_SIZE)
 	_label.visible = not on
-	for ch in get_children():
-		if ch is PanelContainer and String(ch.name).ends_with("badge"):
-			(ch as Control).position.x = _root_size - 20.0
+	place_badges()
 	_apply_style()
 	queue_redraw()
+
+
+## 徽章统一贴在**图标本体**右上角外 2px（不是距根节点边），紧凑模式也不漂。
+## 宽度取实时最小尺寸，这样「1」和「12」右沿都能对齐。
+func place_badges() -> void:
+	if _icon == null:
+		return
+	var right := _icon.position.x + GLYPH_SIZE + 2.0
+	var top := _icon.position.y - 2.0
+	for ch in get_children():
+		if ch is PanelContainer and String(ch.name).ends_with("badge"):
+			var b := ch as Control
+			b.reset_size()
+			b.position = Vector2(right - b.size.x, top)
 
 
 ## 拖动范围 = 桌面矩形（Web：`clamp(0, desktop.w - 64)`）

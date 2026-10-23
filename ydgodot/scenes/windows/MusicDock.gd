@@ -9,12 +9,13 @@ signal stop_requested
 
 const DOCK_W := 238.0
 const DOCK_H := 60.0
+const TransportButton := preload("res://ui/TransportButton.gd")
 
 var _title: Label
 var _prog: ProgressBar
 var _time: Label
-var _toggle_btn: Button
-var _close_btn: Button
+var _toggle_btn: TransportButton
+var _close_btn: TransportButton
 var _state: Dictionary = {}
 
 
@@ -46,10 +47,10 @@ func setup_dock() -> void:
 	_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top.add_child(_title)
-	_toggle_btn = _mini_button("▶", "播放 / 暂停")
+	_toggle_btn = _mini_button("play", "播放 / 暂停")
 	_toggle_btn.pressed.connect(func(): toggle_requested.emit())
 	top.add_child(_toggle_btn)
-	_close_btn = _mini_button("■", "停止")
+	_close_btn = _mini_button("stop", "停止")
 	_close_btn.pressed.connect(func(): stop_requested.emit())
 	top.add_child(_close_btn)
 
@@ -72,13 +73,9 @@ func setup_dock() -> void:
 	gui_input.connect(_on_gui_input)
 
 
-func _mini_button(text: String, tip: String) -> Button:
-	var b := TecTheme.button(text)
-	b.custom_minimum_size = Vector2(22, 18)
-	b.size = Vector2(22, 18)
-	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
-	b.tooltip_text = tip
+func _mini_button(mode: String, tip: String) -> TransportButton:
+	var b := TransportButton.new()
+	b.setup_transport(mode, tip)
 	return b
 
 
@@ -94,9 +91,11 @@ func update_state(s: Dictionary) -> void:
 	var cur := float(s.get("time", 0.0))
 	_prog.value = clampf(cur / dur, 0.0, 1.0) * 100.0 if dur > 0.0 else 0.0
 	_time.text = "%s / %s" % [_fmt(cur), _fmt(dur)]
-	_toggle_btn.text = "❚❚" if bool(s.get("playing", false)) else "▶"
+	_toggle_btn.set_mode("pause" if bool(s.get("playing", false)) else "play")
 	_toggle_btn.disabled = String(s.get("current", "")) == ""
 	_close_btn.disabled = String(s.get("current", "")) == ""
+	_toggle_btn.queue_redraw()
+	_close_btn.queue_redraw()
 
 
 func _fmt(s: float) -> String:

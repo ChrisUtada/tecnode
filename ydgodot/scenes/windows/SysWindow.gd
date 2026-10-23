@@ -10,6 +10,11 @@ signal minimized
 const PAD := 14.0
 const BAR_H := 28.0
 const CTRL := 18.0
+## 1-bit 浮层投影：右下 3px 的纯黑实块（System 1–6 的菜单/弹窗语法）。
+## 只由浮层显式打开；普通窗口保持平面，避免满屏黑边。
+const OFFSET_SHADOW := Vector2(3, 3)
+var offset_shadow := false
+var _offset_shadow: ColorRect
 ## P3 烘焙九切片：卡面 + 1px 发丝边 + 13px 圆角 + 四层 --win-shadow，由
 ## tools/pixeldiff/bake_win_frame.cjs（白/黑双底片）+ solve_alpha.py 反解 alpha 得到。
 ## 为什么不用 shader 近似：--win-shadow 是四条 box-shadow 叠加（含 22px 模糊与顶部 inset
@@ -78,6 +83,15 @@ func _frame_fill() -> Color:
 ## 位置仍从 `PAD` 起算、尺寸扣掉两倍 `PAD`，所以调用方的坐标一个都不用改
 ## —— 窗框依旧落在原来的 PAD 处，只是外面那圈「投影 / 圆角」没了。
 func _build_shader_bg(radius: int) -> void:
+	if offset_shadow:
+		_offset_shadow = ColorRect.new()
+		_offset_shadow.name = "offset_shadow"
+		_offset_shadow.color = TecTheme.shadow(1.0)
+		_offset_shadow.position = Vector2(PAD, PAD) + OFFSET_SHADOW
+		_offset_shadow.size = Vector2(size.x - PAD * 2.0, size.y - PAD * 2.0)
+		_offset_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_offset_shadow)
+
 	var bg := Panel.new()
 	bg.name = "bg"
 	bg.position = Vector2(PAD, PAD)
@@ -351,6 +365,9 @@ func _sync_frame(inner: Vector2) -> void:
 	var bg := get_node_or_null("bg") as Control
 	if bg != null:
 		bg.size = inner
+	if _offset_shadow != null and is_instance_valid(_offset_shadow):
+		_offset_shadow.position = bg.position + OFFSET_SHADOW if bg != null else Vector2(PAD, PAD) + OFFSET_SHADOW
+		_offset_shadow.size = inner
 
 
 func enable_case_controls() -> void:

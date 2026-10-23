@@ -16,6 +16,7 @@ var store_kind: String = GraphState.BAG
 var graph: GraphState
 var case_def: CaseLoader
 var _rows: VBoxContainer
+var _scroll: ScrollContainer
 var _list_sig := ""
 
 
@@ -25,11 +26,19 @@ func setup_store(p_title: String, p_kind: String, p_graph: GraphState, p_case: C
 	case_def = p_case
 	setup(p_title, w, h)
 
+	content.add_theme_constant_override("separation", 0)
+	_scroll = ScrollContainer.new()
+	_scroll.name = "store_scroll"
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(_scroll)
+
 	_rows = VBoxContainer.new()
 	_rows.name = "rows"
 	_rows.add_theme_constant_override("separation", 4)
 	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_child(_rows)
+	_scroll.add_child(_rows)
 	refresh_store()
 
 
@@ -73,39 +82,73 @@ func _make_row(key: String) -> Control:
 	var n := graph.node(key)
 	var row := PanelContainer.new()
 	row.name = "row_" + key.replace(":", "_")
-	row.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.EDGE, 1))
+	row.custom_minimum_size = Vector2(0, 30)
+	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.EDGE, 1)
+	## 条目内边距：左右 6 / 上下 4。按钮不再贴住右边框。
+	sb.content_margin_left = 6
+	sb.content_margin_right = 6
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	row.add_theme_stylebox_override("panel", sb)
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
 	row.gui_input.connect(func(ev: InputEvent): _on_row_input(ev, key))
 	var hb := HBoxContainer.new()
+	hb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_theme_constant_override("separation", 6)
 	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(hb)
 
-	var label := TecTheme.label(String(n.get("label", key)), TecTheme.FS_BODY, TecTheme.TEXT)
+	var text_col := VBoxContainer.new()
+	text_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	text_col.add_theme_constant_override("separation", 1)
+	text_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hb.add_child(text_col)
+
+	var label_text := String(n.get("label", key))
+	var label := TecTheme.label(label_text, TecTheme.FS_BODY, TecTheme.TEXT)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.tooltip_text = label_text
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hb.add_child(label)
+	text_col.add_child(label)
 
-	# 袋清单标注来源（Web 版 bagFrom 口径）
+	# 袋清单标注来源（Web 版 bagFrom 口径）。放第二行：长来源只在自己的
+	# 文本列里省略，不会把「取回 / 上桌布」挤出条目。
 	if store_kind == GraphState.BAG:
 		var from_id := String(n.get("bag_from", ""))
 		if from_id != "":
-			var src := TecTheme.label("来自 " + case_def.label_of("item", from_id), TecTheme.FS_BODY, TecTheme.MUTED)
+			var from_text := "来自 " + case_def.label_of("item", from_id)
+			var src := TecTheme.label(from_text, TecTheme.FS_BODY, TecTheme.MUTED)
+			src.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			src.clip_text = true
+			src.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			src.tooltip_text = from_text
 			src.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			hb.add_child(src)
+			text_col.add_child(src)
+
+	var actions := HBoxContainer.new()
+	actions.size_flags_horizontal = Control.SIZE_SHRINK_END
+	actions.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	actions.add_theme_constant_override("separation", 4)
+	actions.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hb.add_child(actions)
 
 	if store_kind == GraphState.LEDGER:
 		var to_mx := TecTheme.button("上桌布")
 		to_mx.custom_minimum_size = Vector2(54, 22)
+		to_mx.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		to_mx.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 		to_mx.pressed.connect(func(): to_matrix.emit(key))
-		hb.add_child(to_mx)
+		actions.add_child(to_mx)
 
 	var btn := TecTheme.button("取回")
 	btn.custom_minimum_size = Vector2(44, 22)
+	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	btn.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 	btn.pressed.connect(func(): _take(key))
-	hb.add_child(btn)
+	actions.add_child(btn)
 	return row
 
 
