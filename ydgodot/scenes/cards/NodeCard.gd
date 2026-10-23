@@ -758,8 +758,10 @@ func _clamp_pos(p: Vector2) -> Vector2:
 		return p
 	var lim_x := world_rect.size.x - size.x
 	var lim_y := world_rect.size.y - size.y
-	return Vector2(clampf(p.x, 0.0, maxf(lim_x, 0.0)),
-		clampf(p.y, 0.0, maxf(lim_y, 0.0)))
+	## C3：松手落 8px 网格。先吸格再夹回边界，靠边时以边界为准。
+	var q := p.snapped(Vector2(8, 8))
+	return Vector2(clampf(q.x, 0.0, maxf(lim_x, 0.0)),
+		clampf(q.y, 0.0, maxf(lim_y, 0.0)))
 
 
 ## 弹回按下时的位置（三次缓出 300ms，对齐 Web 的 springBack）

@@ -328,6 +328,10 @@ func _initialize() -> void:
 		absf(float(scene.graph.node(TORCH)["x"]) - torch.position.x) < 0.5
 		and absf(float(scene.graph.node(TORCH)["y"]) - torch.position.y) < 0.5,
 		str(torch.position) + " / " + str(scene.graph.node(TORCH).get("x")))
+	check("C3 手动拖卡落 8px 网格",
+		absf(torch.position.x - roundf(torch.position.x / 8.0) * 8.0) < 0.01
+		and absf(torch.position.y - roundf(torch.position.y / 8.0) * 8.0) < 0.01,
+		str(torch.position))
 
 	# 3b) 纯状态互动不得重排（2026-10-21 现场问题：「每次和节点互动，整块画布的卡都会轻微偏移」）
 	#     根因：`_relayout()` 无条件跑 260 轮力导向，而这套参数**不收敛** —— 实测同一批节点连跑 8 次，

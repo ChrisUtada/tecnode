@@ -4310,7 +4310,7 @@ func _layout_force(animated: bool = false) -> void:
 			n["y"] = p.y
 			continue
 		## P2：自动摆卡落 8px 网格。边界也取 8 的倍数，保证靠边时仍对齐；
-		## 手动拖动不改（玩家摆位以手感为准，不强行吸格）。
+		## 手动拖动的落点由 `NodeCard._clamp_pos()` 同样吸到 8px 网格（C3）。
 		p = Vector2(clampf(p.x, 64.0, WORLD_W - 224.0),
 			clampf(p.y, 56.0, WORLD_H - 120.0))
 		p = p.snapped(Vector2(8, 8))
