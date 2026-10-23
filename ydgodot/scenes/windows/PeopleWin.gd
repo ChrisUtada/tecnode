@@ -155,6 +155,9 @@ func _row_style(hover: bool) -> StyleBoxFlat:
 		TecTheme.NONE, 0)
 	sb.border_color = TecTheme.edge(0.18)
 	sb.border_width_bottom = 1
+	## D2：发丝线左右各缩 8px（负 expand margin 只影响绘制，不动内容排版）。
+	sb.expand_margin_left = -8.0
+	sb.expand_margin_right = -8.0
 	sb.content_margin_left = 8
 	sb.content_margin_right = 8
 	sb.content_margin_top = 4

@@ -379,6 +379,9 @@ func _test_desktop(c: CaseLoader) -> void:
 			and tec_sb.border_width_right == 0
 			and tec_sb.border_color.is_equal_approx(TecTheme.edge(0.18)),
 		str(tec_sb))
+	check("D2 名册发丝线左右缩进 8px",
+		tec_sb != null and tec_sb.expand_margin_left == -8.0
+			and tec_sb.expand_margin_right == -8.0, str(tec_sb))
 
 	# 点常驻行 = 打开各自的窗
 	scene.dbg_people_row("CHARS_TEC")

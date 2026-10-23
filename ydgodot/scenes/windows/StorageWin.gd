@@ -84,10 +84,13 @@ func _make_row(key: String) -> Control:
 	row.name = "row_" + key.replace(":", "_")
 	row.custom_minimum_size = Vector2(0, 30)
 	row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	## D2：清单行不再做成独立盒子，只留底部 1px 发丝线；左右内容缩进 8。
+	## D2：清单行不再做成独立盒子，只留底部 1px 发丝线；左右内容缩进 8，
+	## 发丝线也各缩 8（负 expand margin 只影响绘制，不动内容排版）。
 	var sb := TecTheme.flat(TecTheme.NONE, 0, TecTheme.NONE, 0)
 	sb.border_color = TecTheme.edge(0.18)
 	sb.border_width_bottom = 1
+	sb.expand_margin_left = -8.0
+	sb.expand_margin_right = -8.0
 	sb.content_margin_left = 8
 	sb.content_margin_right = 8
 	sb.content_margin_top = 4

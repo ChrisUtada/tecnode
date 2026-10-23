@@ -162,6 +162,9 @@ func _initialize() -> void:
 			and bag_sb.border_width_right == 0
 			and bag_sb.border_color.is_equal_approx(TecTheme.edge(0.18)),
 		str(bag_sb))
+	check("D2 证物袋发丝线左右缩进 8px",
+		bag_sb != null and bag_sb.expand_margin_left == -8.0
+			and bag_sb.expand_margin_right == -8.0, str(bag_sb))
 
 	scene.dbg_ensure("clue", "CLUES_nm")
 	await process_frame
@@ -219,6 +222,12 @@ func _initialize() -> void:
 	await process_frame
 	var dbg_pop := scene.get_node_or_null("debug_pop") as Control
 	check("调试面板可打开", dbg_pop != null and dbg_pop.visible)
+	var dbg_shadow := scene.get_node_or_null("debug_shadow") as ColorRect
+	check("A4 调试菜单 3px 偏移影",
+		dbg_shadow != null and dbg_shadow.visible
+			and dbg_shadow.position.is_equal_approx(dbg_pop.position + SysWindow.OFFSET_SHADOW)
+			and dbg_shadow.size.is_equal_approx(dbg_pop.size),
+		"null" if dbg_shadow == null else str(dbg_shadow.position) + " / " + str(dbg_pop.position))
 	var dbg_togs := ["tog_合成消耗", "tog_聚焦选中", "tog_新节点自动居中"]
 	var dbg_actions := ["dbg_btn_适应窗口", "dbg_btn_重置", "dbg_btn_检查可达性"]
 	var missing: Array = []
@@ -234,6 +243,7 @@ func _initialize() -> void:
 		str(tog_img.get_size()) if tog_img != null else "null")
 	scene._close_debug_panel()
 	check("调试面板可关闭", dbg_pop != null and not dbg_pop.visible)
+	check("A4 调试影随面板隐藏", dbg_shadow == null or not dbg_shadow.visible)
 	# 主窗跟着桌面长：1280×720 下画布必须是 1162 × 608（Web 标题栏 28px 口径）
 	var stage := scene.get_node_or_null("desk/case_win/body/stage") as Control
 	check("画布 1280 口径 = 1162×608", stage != null and stage.size == Vector2(1162, 608),
@@ -1428,11 +1438,17 @@ func _initialize() -> void:
 		toast_sb != null and toast_sb.bg_color.is_equal_approx(TecTheme.LINE)
 			and toast_sb.corner_radius_top_left >= 100,
 		str(toast_sb))
+	check("A4 Toast 3px 偏移影",
+		scene._toast_shadow != null and scene._toast_shadow.visible
+			and scene._toast_shadow.position.is_equal_approx(scene._toast.position + SysWindow.OFFSET_SHADOW)
+			and scene._toast_shadow.size.is_equal_approx(scene._toast.size),
+		"null" if scene._toast_shadow == null else str(scene._toast_shadow.position))
 	scene._show_toast("队列二")
 	check("E4 第二条排队不抢屏", scene._toast_label.text == "队列一"
 		and scene._toast_queue.size() == 1, str(scene._toast_queue))
 	scene._hide_toast()
 	check("E4 清场同时清队列", not scene._toast.visible and scene._toast_queue.is_empty())
+	check("A4 Toast 影随清场隐藏", scene._toast_shadow == null or not scene._toast_shadow.visible)
 	scene._show_toast("队列三")
 	check("E4 清场后新消息立即显示", scene._toast_label.text == "队列三" and scene._toast.visible)
 	scene._hide_toast()

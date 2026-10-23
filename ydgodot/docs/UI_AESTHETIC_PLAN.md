@@ -9,7 +9,7 @@
 > 本文档处理的是**体系级审美**——层次、秩序、纪律、气质。
 > 优先级：**P0 = 明显的视觉事故**；**P1 = 破坏体系一致性**；**P2 = 审美提升（从「能用」到「讲究」）**。
 > 状态：**A1–A7 / B1–B2 / C1–C3 / D1–D3 / E1–E4 / F1 已落地（2026-10-23）**；全套无头测试
-> **15 个脚本 1340 项 0 失败**，`tools/mono_audit.py --check` 通过。落地批次与偏差见 §6。
+> **15 个脚本 1346 项 0 失败**，`tools/mono_audit.py --check` 通过。落地批次与偏差见 §6。
 
 ---
 
@@ -222,10 +222,10 @@ System 6 的经典语法：激活窗标题栏有条纹、非激活窗标题栏�
 | 1 | A5 A6 A7 D3 | ✅ | TEC 三段落固定节奏（头像 60 + 名字 / 状态 → 1px 线 → 对话区 → 底部提示）；档案 / 名册 / 证物袋行固定几何、行内按钮收进右栏；矩阵窗遮挡改用 `modulate` 淡出，关窗恢复；`Desktop._log()` 把含内部 key 的条目写进 `user://tec-debug.log`，不进玩家案卷 |
 | 2 | A1 | ✅ | 页眉只剩品牌 / 证章 / 撤销 / 「调试」；七个开关收进调试抽屉，统一 `header_button` 语法 |
 | 3 | B1 B2 | ✅ | `ui/AvatarFrame.gd`：方角 + 1px INK 键线 + `BG` 底，替换 TEC 窗 / 助卡片 / 聊天 / 回忆 / 名册 / 头像选择 / 推演执行者 7 处；证件照保留「外框 + 6px 卡纸」的装裱语法；音乐曲目行改纸底键线，播放中只加粗键线 + 行尾实心方块 |
-| 4 | A2 A3 A4 | ✅ | 激活态跟随 `_desk` 实际层序（叙事卡 / 回忆卡不参与）；弹窗统一 `R_WIN / R_SM`，开场弹窗按视口居中、详情窗按视口贴右沿；`SysWindow.offset_shadow` 只给浮层（密码、选择头像等）用 3px 实心偏移影 |
+| 4 | A2 A3 A4 | ✅ | 激活态跟随 `_desk` 实际层序（叙事卡 / 回忆卡不参与）；弹窗统一 `R_WIN / R_SM`，开场弹窗按视口居中、详情窗按视口贴右沿；`SysWindow.offset_shadow` 给密码 / 选择头像等浮层，调试菜单与 Toast 也补了 3px 实心偏移影 |
 | 5 | C1 C2 C3 | ✅ | 「新」角标 = 卡上缘居中 20×18 纸底药丸；`EdgeLayer.STYLE` 一处定义四态，拖动线 2px + 箭头；自动摆卡落 8px 网格，宽度固定为场景 160 / 实体 128 两档，类型字牌 10px |
 | 5.5 | F1 | ✅ | 纸 `#EDF1EE` / 桌 `#C4CCC6` / 壳 `#DCE2DD`；`project.godot` 的 clear color 同步；`stage_paper.png` / `win_frame.png` 已不挂载，无需按旧白重烘 |
-| 6 | D1 D2 | ✅ | 新增 `TecTheme.section_bar()`（黑条白字 h4），音乐窗「曲目」先落地；列表行 1px `edge(0.18)` 发丝线、截断 tooltip、空态 `INK_FAINT` |
+| 6 | D1 D2 | ✅ | 新增 `TecTheme.section_bar()`（黑条白字 h4），音乐窗「曲目」先落地；列表行 1px `edge(0.18)` 发丝线（左右缩进 8px）、截断 tooltip、空态 `INK_FAINT` |
 | 7 | E1–E4 | ✅ | 画布水印（`TecWatermark`，在卡片层之下）；Dock 44 格与 −2,−2 徽章；`TransportButton` 18×18 自绘播放键；Toast 同屏 1 条 + 队列、右下 16px |
 
 **保留的两处刻意偏差**
@@ -235,6 +235,6 @@ System 6 的经典语法：激活窗标题栏有条纹、非激活窗标题栏�
 
 **验收证据**
 
-- 无头：`15 个脚本 1340 项 0 失败`；`tools/mono_audit.py --check` 通过。
+- 无头：`15 个脚本 1346 项 0 失败`；`tools/mono_audit.py --check` 通过。
 - 截图：`docs/aesthetic/desktop_960x560.png`、`desktop_1280x720.png`、`desktop_1920x1080.png`
   三档整体；同目录另有 `tec_*` / `music_*` / `people_*` / `log_*` / `archive_*` / `intro_*` 关键窗体三档对拍。
