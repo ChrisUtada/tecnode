@@ -92,6 +92,8 @@ const DIVIDER := Color("000000")
 const LINE2 := DIVIDER
 ## 「试过但没成」的连线（EdgeLayer 第四态）。
 const EDGE_TRIED := Color("000000")
+## 可连未试的连线（30% 黑）：条件/选项边已存在但还没走过。
+const EDGE_UNTRIED := Color(0, 0, 0, 0.3)
 ## 上缘高光（纯白 95%）—— 柔和浮雕感的来源。
 const BEVEL_HI := Color(1, 1, 1, 0.95)
 const BEVEL_LO := Color(0, 0, 0, 0.32)
@@ -365,6 +367,26 @@ static func label(text: String, size: int = FS_BODY, color: Color = TEXT) -> Lab
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	return l
+
+
+## D1 · 小节标题（h4 级）：**黑条白字**，方角、满宽、12px。
+## 四级层级里它排在窗标题（字距 + 横纹）与正文之间；只在同一扇窗确实分成
+## 「小节」时使用（例如音乐窗的曲目 / 播放），不要当成第二行窗口标题。
+## 注释 / 占位继续走 `INK_FAINT`，正文走 `TEXT` —— 层级靠反白与明度，不靠字号。
+static func section_bar(text: String) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.name = "section_bar"
+	var sb := flat(INK, 0, INK, 0)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 3
+	p.add_theme_stylebox_override("panel", sb)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var l := label(text, FS_BODY, TEXT_ON_DARK)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(l)
+	return p
 
 
 static func narrative_label(text: String = "", color: Color = TEXT) -> TypewriterLabel:

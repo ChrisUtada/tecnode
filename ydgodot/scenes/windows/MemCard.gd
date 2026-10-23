@@ -7,12 +7,11 @@ extends SysWindow
 const CHAR_MS := 45.0
 const MARGIN := 14.0
 const TALK_COLOR := TecTheme.INK_MUTED
-const SAY_BG := TecTheme.MEM_SAY_BG
-const SAY_EDGE := TecTheme.INK_FAINT
 const AVATAR_ART := {
 	"CHARS_TEC": "res://assets/raw/tec-avatar.png",
 	"CHARS_EXEC": "res://assets/raw/executor-avatar.png",
 }
+const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var _line_box: VBoxContainer
 var _lines: Array = []
@@ -24,6 +23,10 @@ var _play_mode := false
 ## 标题条上那颗类型符号的类型（时刻 = 时，人物对话 = 人）。颜色走深色面提亮版。
 var _kind := "time"
 var _glyph: KindGlyph
+
+## A2：记忆放映卡是内容卡，不参与系统窗的激活态竞争。
+func participates_in_activation() -> bool:
+	return false
 
 var _pressing := false
 var _dragged := false
@@ -218,28 +221,11 @@ func _build_say(spec: Dictionary, text: String) -> Array:
 
 
 func _say_avatar(who: String, name: String) -> Control:
-	var frame := PanelContainer.new()
+	var frame := AvatarFrameScript.new()
 	frame.name = "mem_say_avatar"
-	frame.custom_minimum_size = Vector2(40, 40)
 	frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	frame.clip_contents = true
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.add_theme_stylebox_override("panel", TecTheme.flat(SAY_BG, TecTheme.R_SM, SAY_EDGE))
-	var art := String(AVATAR_ART.get(who, ""))
-	if art != "" and ResourceLoader.exists(art):
-		var tex := TextureRect.new()
-		tex.texture = load(art)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		frame.add_child(tex)
-	else:
-		var ini := TecTheme.label(name.substr(0, 1) if name != "" else "?", TecTheme.FS_DISPLAY, TALK_COLOR)
-		ini.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		ini.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		ini.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		frame.add_child(ini)
+	frame.setup(String(AVATAR_ART.get(who, "")), 40.0,
+		name.substr(0, 1) if name != "" else "?", TALK_COLOR)
 	return frame
 
 

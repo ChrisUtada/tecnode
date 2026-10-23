@@ -44,11 +44,11 @@ func refresh_archive() -> void:
 	known.reverse()
 	var ids: Array = [GraphState.PRESENT_TIME]
 	ids.append_array(known)
-	for tid in ids:
-		_rows.add_child(_make_row(String(tid), String(tid) == cur))
+	for i in ids.size():
+		_rows.add_child(_make_row(String(ids[i]), String(ids[i]) == cur, i == ids.size() - 1))
 
 
-func _make_row(tid: String, current: bool) -> Control:
+func _make_row(tid: String, current: bool, last: bool = false) -> Control:
 	var row := Button.new()
 	row.name = "row_" + tid
 	row.custom_minimum_size = Vector2(0, 46)
@@ -79,21 +79,36 @@ func _make_row(tid: String, current: bool) -> Control:
 	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(meta)
 
-	var title := TecTheme.label(case_def.time_label_of(tid), TecTheme.FS_BODY, TecTheme.TEXT)
+	var title_text := case_def.time_label_of(tid)
+	var title := TecTheme.label(title_text, TecTheme.FS_BODY, TecTheme.TEXT)
 	title.clip_text = true
 	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title.tooltip_text = title_text
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(title)
 
-	var sub := TecTheme.label(_brief_of(tid), TecTheme.FS_BODY, TecTheme.MUTED)
+	var brief := _brief_of(tid)
+	var sub := TecTheme.label(brief, TecTheme.FS_BODY, TecTheme.MUTED)
 	sub.clip_text = true
 	sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	sub.tooltip_text = brief
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(sub)
 
 	var st := TecTheme.label(_status_of(tid, current), TecTheme.FS_BODY, TecTheme.MUTED)
 	st.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(st)
+	if not last:
+		var sep := ColorRect.new()
+		sep.name = "sep"
+		sep.color = TecTheme.edge(0.18)
+		sep.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		sep.offset_left = 8
+		sep.offset_right = -8
+		sep.offset_top = -1
+		sep.offset_bottom = 0
+		sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(sep)
 	return row
 
 

@@ -242,6 +242,16 @@ func _test_ui() -> void:
 		and String(rows[2]["sub"]).contains("傅柏"), String(rows[2]["sub"]) if rows.size() > 2 else "")
 	check("现在档标「当前」", rows.size() > 0 and String(rows[0]["status"]) == "当前")
 	check("未看过的档没有回顾标记", rows.size() > 2 and String(rows[2]["status"]) == "")
+	var first_row := win.find_child("row_present", true, false) as Control
+	var sep: ColorRect = null
+	if first_row != null:
+		sep = first_row.get_node_or_null("sep") as ColorRect
+	var sep_ok := sep != null and sep.size.y == 1.0 and sep.offset_left == 8.0 \
+		and sep.offset_right == -8.0 and sep.color.is_equal_approx(TecTheme.edge(0.18))
+	check("D2 档案行间 1px 发丝线（左右缩进 8px）", sep_ok,
+		"null" if sep == null else str(sep.size) + " / " + str(sep.position))
+	var last_row := win.find_child("row_SCENES_0602", true, false) as Control
+	check("D2 档案末行不拖尾线", last_row != null and last_row.get_node_or_null("sep") == null)
 
 	check("档案里点 6/2 能换档", scene.dbg_archive_press("SCENES_0602"))
 	await process_frame

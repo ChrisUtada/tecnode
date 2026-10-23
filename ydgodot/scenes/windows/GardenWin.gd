@@ -66,7 +66,7 @@ func _build_content() -> void:
 	_field.add_child(bg)
 	content.add_child(_field)
 
-	_hint = TecTheme.label("把种子拖到这里", TecTheme.FS_TITLE, TecTheme.MUTED)
+	_hint = TecTheme.label("把种子拖到这里", TecTheme.FS_TITLE, TecTheme.FAINT)
 	_hint.name = "garden_hint"
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

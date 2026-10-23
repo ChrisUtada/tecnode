@@ -16,6 +16,7 @@ const AVATAR := {
 	"CHARS_TEC": "res://assets/raw/tec-avatar.png",
 	"CHARS_EXEC": "res://assets/raw/executor-avatar.png",
 }
+const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var graph: GraphState
 var case_def: CaseLoader
@@ -62,7 +63,7 @@ func refresh_people() -> void:
 		c.queue_free()
 	if ids.is_empty():
 		var empty := TecTheme.label("（还没有结识任何人）展开场景、读一读文本，就会记下遇到的人",
-			TecTheme.FS_BODY, TecTheme.MUTED)
+			TecTheme.FS_BODY, TecTheme.FAINT)
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empty.custom_minimum_size = Vector2(body.size.x - 10.0, 0)
 		_list.add_child(empty)
@@ -127,6 +128,7 @@ func _make_row(id: String) -> Control:
 	var lb := TecTheme.label(nm, TecTheme.FS_TITLE, TecTheme.TEXT)
 	lb.clip_text = true
 	lb.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	lb.tooltip_text = nm
 	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(lb)
 
@@ -134,6 +136,7 @@ func _make_row(id: String) -> Control:
 		var ds := TecTheme.label(desc, TecTheme.FS_BODY, TecTheme.MUTED)
 		ds.clip_text = true
 		ds.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		ds.tooltip_text = desc
 		ds.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(ds)
 
@@ -148,10 +151,12 @@ func _make_row(id: String) -> Control:
 
 
 func _row_style(hover: bool) -> StyleBoxFlat:
-	var sb := TecTheme.flat(TecTheme.BG if hover else TecTheme.NONE, TecTheme.R_BTN,
-		TecTheme.NONE if not hover else TecTheme.NONE)
+	var sb := TecTheme.flat(TecTheme.BG if hover else TecTheme.NONE, 0,
+		TecTheme.NONE, 0)
+	sb.border_color = TecTheme.edge(0.18)
+	sb.border_width_bottom = 1
 	sb.content_margin_left = 8
-	sb.content_margin_right = 6
+	sb.content_margin_right = 8
 	sb.content_margin_top = 4
 	sb.content_margin_bottom = 4
 	return sb
@@ -159,30 +164,10 @@ func _row_style(hover: bool) -> StyleBoxFlat:
 
 ## 48×48 头像位：有素材放像素图，没有放首字（Web `.people-win .goto-item .av`）
 func _make_avatar(id: String, name_text: String) -> Control:
-	var frame := PanelContainer.new()
+	var frame := AvatarFrameScript.new()
 	frame.name = "av"
-	frame.custom_minimum_size = Vector2(48, 48)
-	frame.size = Vector2(48, 48)
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.add_theme_stylebox_override("panel",
-		TecTheme.flat(TecTheme.BG, TecTheme.R_SM, TecTheme.EDGE, 1))
-	var path := String(AVATAR.get(id, ""))
-	if path != "" and ResourceLoader.exists(path):
-		var tr := TextureRect.new()
-		tr.texture = load(path)
-		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tr.stretch_mode = TextureRect.STRETCH_SCALE
-		tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		frame.add_child(tr)
-	else:
-		var c := CenterContainer.new()
-		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		frame.add_child(c)
-		var ini := TecTheme.label(name_text.substr(0, 1) if name_text != "" else "?", TecTheme.FS_DISPLAY, TecTheme.MUTED)
-		ini.name = "ini"
-		ini.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		c.add_child(ini)
+	frame.setup(String(AVATAR.get(id, "")), 48.0,
+		name_text.substr(0, 1) if name_text != "" else "?")
 	return frame
 
 

@@ -78,11 +78,28 @@ func _test_desktop() -> void:
 	check("TEC 窗标题", scene.dbg_tec_win().title == "TEC 对话", scene.dbg_tec_win().title)
 	check("TEC 头像 60×60", scene.dbg_tec_win().avatar_global_rect().size.x >= 60.0,
 		str(scene.dbg_tec_win().avatar_global_rect().size))
+	var tec_av := scene.dbg_tec_win().find_child("tec_avatar", true, false) as PanelContainer
+	var tec_av_sb := tec_av.get_theme_stylebox("panel") as StyleBoxFlat if tec_av != null else null
+	check("B1 TEC 头像框：60×60 方角 + 1px 键线 + BG",
+		tec_av != null and tec_av.custom_minimum_size == Vector2(60, 60)
+			and tec_av_sb != null
+			and tec_av_sb.corner_radius_top_left == 0
+			and tec_av_sb.border_width_left == 1
+			and tec_av_sb.border_color.is_equal_approx(TecTheme.EDGE)
+			and tec_av_sb.bg_color.is_equal_approx(TecTheme.BG),
+		str(tec_av_sb))
 
 	scene.dbg_tec_talk()
 	var lines: Array = scene.dbg_tec_win().dbg_lines()
 	check("闲聊第一条", lines.size() == 1 and String(lines[0]) == scene.case_def.char_of("CHARS_TEC").talk_queue[0],
 		str(lines))
+	# A5 截图辅助：演示 / 截图时一次揭示完，避免画面停在半个字上。
+	scene.dbg_tec_win().finish_typing()
+	var typing_left := false
+	for c in scene.dbg_tec_win()._lines.get_children():
+		if c is TypewriterLabel and (c as TypewriterLabel).visible_characters != -1:
+			typing_left = true
+	check("A5 finish_typing 一次揭示完", not typing_left)
 	check("闲聊进度 1", int(scene.graph.tec_prog.get("_def", 0)) == 1)
 	scene.dbg_tec_talk()
 	scene.dbg_tec_talk()

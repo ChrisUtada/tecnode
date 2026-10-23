@@ -44,6 +44,23 @@ func _initialize() -> void:
 	check("开局不凭空给手电筒（它在左侧抽屉里，要自己开）", not cards.has(TORCH))
 	check("黑影已上画布", cards.has(SHADOW))
 
+	# C3：卡片落 8px 网格；宽度只有「场景 160 / 实体 128」两档。
+	var off_grid: Array = []
+	for k in cards.keys():
+		var c := cards[k] as NodeCard
+		if c != null and c.visible \
+			and (absf(c.position.x - roundf(c.position.x / 8.0) * 8.0) > 0.01
+				or absf(c.position.y - roundf(c.position.y / 8.0) * 8.0) > 0.01):
+			off_grid.append(String(k) + "@" + str(c.position))
+	check("C3 自动摆卡落 8px 网格", off_grid.is_empty(), str(off_grid))
+	var scene_card := cards["loc:SCENES_garden"] as NodeCard
+	var ent_card := cards[SHADOW] as NodeCard
+	check("C3 卡片宽度档：场景 160 / 实体 128",
+		scene_card != null and ent_card != null
+			and absf(scene_card._w - GraphState.SCENE_W) < 0.01
+			and absf(ent_card._w - GraphState.ENT_W) < 0.01,
+		"%.0f / %.0f" % [scene_card._w if scene_card else -1, ent_card._w if ent_card else -1])
+
 	# ── 容器链（P1.2）：双击书桌 → 抽屉 → 选项 → 左侧抽屉 → 手电筒 ──
 	scene.dbg_activate("item:ITEM_shuzhuo")
 	await process_frame
@@ -135,6 +152,16 @@ func _initialize() -> void:
 	check("证物袋标题仅中文", bag != null and (bag as StorageWin).title == "证物袋",
 		(bag as StorageWin).title if bag != null else "")
 	check("袋里列出台灯", bag != null and (bag as StorageWin).items().has("item:ITEM_taideng"))
+	var bag_row := (bag as StorageWin).find_child("row_item_ITEM_taideng", true, false) as PanelContainer
+	var bag_sb := bag_row.get_theme_stylebox("panel") as StyleBoxFlat if bag_row != null else null
+	check("D2 证物袋行：仅底部 1px 发丝线，无盒框",
+		bag_sb != null
+			and bag_sb.border_width_bottom == 1
+			and bag_sb.border_width_top == 0
+			and bag_sb.border_width_left == 0
+			and bag_sb.border_width_right == 0
+			and bag_sb.border_color.is_equal_approx(TecTheme.edge(0.18)),
+		str(bag_sb))
 
 	scene.dbg_ensure("clue", "CLUES_nm")
 	await process_frame
@@ -157,6 +184,14 @@ func _initialize() -> void:
 	await process_frame
 	check("从册里取回：线索重新可见", (_cards()["clue:CLUES_nm"] as NodeCard).visible == true)
 	check("取回后册里少了一条", not (ledger as StorageWin).items().has("clue:CLUES_nm"))
+	# A2：收起两扇存储窗，把激活态还给案件主窗，下面才能继续按 2px 激活框验窗框。
+	scene.dbg_open_storage("BAG")
+	scene.dbg_open_storage("LEDGER")
+	if scene._detail_win != null and is_instance_valid(scene._detail_win):
+		scene._detail_win.hide()
+	await process_frame
+	check("A2：存储 / 详情窗收起后案件主窗恢复激活",
+		(scene.get_node("desk/case_win") as SysWindow).is_window_active())
 
 	# ── P3 页眉 / 窗框：把「对拍追平」的成果钉成契约，免得以后某次改版又把人赶回起点 ──
 	var head := scene.get_node_or_null("header")
@@ -228,12 +263,21 @@ func _initialize() -> void:
 	var hub_card: NodeCard = _cards().get("loc:SCENES_garden")
 	var border := hub_card.get_node_or_null("border") as Control
 	check("枢纽场景走双线框", border != null and border.visible and bool(border.get("double_line")))
-	# P4.1：角标回到「22×20 小药丸」—— 参考图里状态牌就是圆头的，
-	# 直角牌在满屏圆角按钮之间读作「一块贴纸」。
+	# C1：黑色圆点退场，改成纸底墨字 + 1px 键线的小药丸，挂在卡片上缘居中。
 	var unread_sb := hub_card._badge.get_theme_stylebox("normal") as StyleBoxFlat
-	check("卡片「新」角标 22×20 小药丸", hub_card._badge.size == Vector2(22, 20)
-		and unread_sb != null and unread_sb.corner_radius_top_left >= 100,
-		str(hub_card._badge.size) + " r=" + (str(unread_sb.corner_radius_top_left) if unread_sb else "null"))
+	check("C1「新」角标 20×18 纸底墨字 + 1px 键线",
+		hub_card._badge.size == Vector2(20, 18)
+			and unread_sb != null
+			and unread_sb.bg_color.is_equal_approx(TecTheme.CARD)
+			and unread_sb.border_width_left == 1
+			and unread_sb.border_color.is_equal_approx(TecTheme.EDGE)
+			and unread_sb.corner_radius_top_left >= 100
+			and hub_card._badge.get_theme_color("font_color").is_equal_approx(TecTheme.TEXT),
+		str(hub_card._badge.size) + " " + str(unread_sb))
+	check("C1「新」角标挂在卡上缘居中",
+		hub_card._badge.position.is_equal_approx(
+			Vector2(NodeCard.PAD + (hub_card._w - 20.0) * 0.5, -2.0)),
+		str(hub_card._badge.position))
 
 	# ── P0 交互（2026-10-21）：单击/双击分流 · 右键钉住 · 位置写回 · 落点表 · 连线 · 缩放 · 详情窗 ──
 	var all2: Dictionary = _cards()
@@ -396,6 +440,26 @@ func _initialize() -> void:
 	var edges: EdgeLayer = scene.get_node_or_null("desk/case_win/body/stage/cards/edges") as EdgeLayer
 	check("连线层存在且画了线", edges != null and edges.segment_count() > 0,
 		str(edges.segment_count()) if edges != null else "null")
+	var edge_style := EdgeLayer.STYLE
+	check("C2 已连通边：1px 实线",
+		float(edge_style["entity"]["width"]) == 1.0
+			and float(edge_style["move"]["width"]) == 1.0
+			and float(edge_style["move"]["dash"]) == 0.0
+			and (edge_style["move"]["color"] as Color).is_equal_approx(TecTheme.INK),
+		str(edge_style["move"]))
+	check("C2 可连未试边：1px 灰线",
+		float(edge_style["cond"]["width"]) == 1.0
+			and float(edge_style["cond"]["dash"]) == 0.0
+			and (edge_style["cond"]["color"] as Color).is_equal_approx(TecTheme.EDGE_UNTRIED),
+		str(edge_style["cond"]))
+	check("C2 试过未成边：1px 虚线",
+		float(edge_style["tried"]["width"]) == 1.0
+			and float(edge_style["tried"]["dash"]) > 0.0
+			and (edge_style["tried"]["color"] as Color).is_equal_approx(TecTheme.EDGE_TRIED),
+		str(edge_style["tried"]))
+	check("C2 拖动线：2px 实线 + 箭头",
+		EdgeLayer.GHOST_WIDTH == 2.0 and EdgeLayer.GHOST_ARROW > 0.0,
+		"%s / %s" % [EdgeLayer.GHOST_WIDTH, EdgeLayer.GHOST_ARROW])
 
 	# 7) 滚轮 = 以光标为锚连续缩放（0.45~2.0，×1.12）
 	var k0: float = scene._view_k
@@ -638,6 +702,12 @@ func _initialize() -> void:
 		var body_txt: String = dw._compose(scene.graph.node(vis_card.card_key))
 		check("详情窗有简介段", body_txt.contains("D:"))
 		check("详情窗不剧透关系", not body_txt.contains("装着") and not body_txt.contains("指向它"))
+		# A3：详情窗贴右沿按视口现算，不再写死 1280。
+		dw.place_right(960.0)
+		check("A3 960 宽详情窗贴右沿",
+			absf(dw.position.x + SysWindow.PAD + DetailWin.W - (960.0 - DetailWin.PAD_R)) < 0.01,
+			"%s / size %s" % [dw.position, dw.size])
+		dw.place_right()
 
 	# 10) 反应表：把物品拖给人物要能说出话来（14 条反应表此前完全不可达）
 	var item_key: String = scene.dbg_ensure("item", "ITEMS_changji")
@@ -1016,6 +1086,19 @@ func _initialize() -> void:
 		str(e_log.get_index()) + " / " + str(e_map.get_index()))
 	check("z：icons(24) 在普通窗之下", e_icons.get_index() < e_map.get_index())
 	check("z：icons(24) 在日志(21) 之上", e_log.get_index() < e_icons.get_index())
+	# A2：激活态跟随实际层序 —— 低 rank 的日志晚开也不抢地图的激活标题栏
+	var map_w := e_map as SysWindow
+	var log_w := e_log as SysWindow
+	check("A2：最高可见窗（地图）为激活态", map_w.is_window_active())
+	check("A2：低 rank 日志窗为非激活态", not log_w.is_window_active())
+	check("A2：激活窗保留标题横纹", (map_w._rules[0] as Control).visible)
+	check("A2：非激活窗收起标题横纹", not (log_w._rules[0] as Control).visible)
+	var map_sb := (map_w.get_node("bg") as Panel).get_theme_stylebox("panel") as StyleBoxFlat
+	var log_sb := (log_w.get_node("bg") as Panel).get_theme_stylebox("panel") as StyleBoxFlat
+	check("A2：激活窗 2px 框", map_sb.border_width_top == 2, str(map_sb.border_width_top))
+	check("A2：非激活窗 1px 框", log_sb.border_width_top == 1, str(log_sb.border_width_top))
+	check("A2：非激活标题降到 INK_FAINT",
+		log_w._title_label.get_theme_color("font_color") == TecTheme.INK_FAINT)
 	scene._ensure_detail()
 	await process_frame
 	var e_detail: Control = scene._detail_win
@@ -1025,8 +1108,14 @@ func _initialize() -> void:
 	await process_frame
 	check("z：TEC(28) 盖住先开的地图(25)", scene._map_win.get_index() < scene._tec.get_index())
 	check("z：toast(30) 在 TEC(28) 之上", scene._tec.get_index() < desk22.get_node("toast").get_index())
+	check("A2：TEC 开窗后接管激活态", (scene._tec as SysWindow).is_window_active())
+	check("A2：地图转非激活", not map_w.is_window_active())
+	check("A2：地图框降回 1px", map_sb.border_width_top == 1, str(map_sb.border_width_top))
 	scene._hide_tec()
 	await process_frame
+	check("A2：TEC 收起后地图恢复激活", map_w.is_window_active())
+	check("A2：收起后的 TEC 为非激活", not (scene._tec as SysWindow).is_window_active())
+	check("A2：地图框恢复 2px", map_sb.border_width_top == 2, str(map_sb.border_width_top))
 
 	# 23) 手感修复三条：双击窗口放宽到 500ms（浏览器 dblclick 默认）/ 按下冻结飞行卡 /
 	#     窗口点击提层走 rank 表（不再 move_to_front 撞翻 icon/toast 之上的层级）
@@ -1334,6 +1423,11 @@ func _initialize() -> void:
 	scene._hide_toast()
 	scene._show_toast("队列一")
 	check("E4 首条立即显示", scene._toast_label.text == "队列一" and scene._toast.visible)
+	var toast_sb := scene._toast.get_theme_stylebox("panel") as StyleBoxFlat
+	check("E4 Toast = 黑底药丸",
+		toast_sb != null and toast_sb.bg_color.is_equal_approx(TecTheme.LINE)
+			and toast_sb.corner_radius_top_left >= 100,
+		str(toast_sb))
 	scene._show_toast("队列二")
 	check("E4 第二条排队不抢屏", scene._toast_label.text == "队列一"
 		and scene._toast_queue.size() == 1, str(scene._toast_queue))

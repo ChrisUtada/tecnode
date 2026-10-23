@@ -6,6 +6,11 @@ var _text: TypewriterLabel
 var _width := 470.0
 
 
+## A2：叙事卡是内容卡，不参与系统窗的激活态竞争。
+func participates_in_activation() -> bool:
+	return false
+
+
 func setup_narr(scene_title: String, text: String, w: float = 470.0, h: float = 330.0) -> void:
 	_width = w
 	setup("叙事 · " + scene_title, w, h, TecTheme.R_SM)

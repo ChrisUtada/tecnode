@@ -30,6 +30,7 @@ const ANCHORS := {
 ## 1-bit 里「错误 / 试错」由**线型**承担：虚线（0.42 alpha 的黑虚线 = 浅灰虚线）。
 ## 变量名保留 RED 以免大改调用点，但值已是墨黑。
 const RED := TecTheme.INK
+const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var graph: GraphState
 var case_def: CaseLoader
@@ -104,22 +105,12 @@ func _build_executor() -> void:
 	_exec.gui_input.connect(_on_exec_input)
 	_board.add_child(_exec)
 
-	var frame := PanelContainer.new()
+	var frame := AvatarFrameScript.new()
 	frame.name = "frame"
 	frame.position = Vector2(6, 6)
-	frame.size = Vector2(72, 72)
-	var sb := TecTheme.flat(TecTheme.FACE_HI, TecTheme.R_SM, TecTheme.EDGE, 1)
-	frame.add_theme_stylebox_override("panel", sb)
+	frame.setup("res://assets/raw/executor-avatar.png", 72.0, "E")
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_exec.add_child(frame)
-
-	var avatar := TextureRect.new()
-	avatar.name = "avatar"
-	avatar.texture = load("res://assets/raw/executor-avatar.png")
-	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	avatar.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.add_child(avatar)
 
 
 func _build_seed_pop() -> void:

@@ -9,6 +9,7 @@ const AVATAR_ART := {
 	"CHARS_EXEC": "res://assets/raw/executor-avatar.png",
 	"CHARS_TEC": "res://assets/raw/tec-avatar.png",
 }
+const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var store_path := Investigator.PATH
 var card: Dictionary = {}
@@ -96,9 +97,22 @@ func _clear() -> void:
 
 func _fit() -> void:
 	_panel.reset_size()
-	_panel.position = Vector2((1280.0 - _panel.size.x) * 0.5, TOP)
+	## 按当前视口居中，而不是按 1280 设计稿：960 宽时弹窗会偏右、1920 时偏左。
+	## `size.x` 在 NOTIFICATION_RESIZED 里已是新宽度；未入树时才回落到视口 / 设计稿。
+	var vw := size.x
+	if vw <= 0.0 and is_inside_tree():
+		vw = get_viewport_rect().size.x
+	if vw <= 0.0:
+		vw = 1280.0
+	_panel.position = Vector2((vw - _panel.size.x) * 0.5, TOP)
 	_panel.pivot_offset = _panel.size * 0.5
 	_sync_panel_shadow()
+
+
+## 全屏遮罩跟随视口缩放：窗口从 960 拖到 1920 时，面板始终停在正中。
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and _panel != null:
+		_fit()
 
 
 ## 面板的最终尺寸要等子容器布局完才定；只靠 `_fit()` 会留下 3px 的旧影。
@@ -305,21 +319,9 @@ func _locked_button() -> Control:
 
 
 func _avatar_face(id: String, px: float) -> Control:
-	if AVATAR_ART.has(id):
-		var tex := TextureRect.new()
-		tex.texture = load(String(AVATAR_ART[id]))
-		tex.custom_minimum_size = Vector2(px, px)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		return tex
-	var l := TecTheme.label(_initial_of(id), TecTheme.FS_DISPLAY, TecTheme.MUTED)
-	l.custom_minimum_size = Vector2(px, px)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return l
+	var frame := AvatarFrameScript.new()
+	frame.setup(String(AVATAR_ART.get(id, "")), px, _initial_of(id))
+	return frame
 
 
 func _initial_of(id: String) -> String:
@@ -407,7 +409,7 @@ static func build_cert(c: Dictionary) -> Control:
 	sec1.add_child(photo_center)
 	var photo := PanelContainer.new()
 	photo.custom_minimum_size = Vector2(156, 156)
-	photo.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE))
+	photo.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.BG, 0, TecTheme.EDGE))
 	photo_center.add_child(photo)
 	var pm := MarginContainer.new()
 	pm.add_theme_constant_override("margin_left", 6)

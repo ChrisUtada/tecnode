@@ -2,11 +2,11 @@ class_name EdgeLayer
 extends Control
 ## 画布连线（Web `paintEdges()` 的 Godot 版）。
 ##
-## 四种边与 CSS 一一对应：
-##   entity  1.3px `#8a8672`           （物品 / 人物挂在场景上）
-##   move    1.6px `#2b2b26` 实线       （移动：场景 → 场景）
-##   cond    1.6px `#2b2b26` 虚线 5-4   （条件：需要某状态才通）
-##   tried   1px   `#b8b49e` 虚线 3-4 @55%（试过但没成的组合）
+## C2 图例（一处实现，四种状态）：
+##   已连通/已探索：1px 实线（INK）—— entity / move
+##   可连未试：    1px 灰线（EDGE_UNTRIED = edge(0.3)）—— cond
+##   试过未成：    1px 虚线（EDGE_TRIED）—— tried
+##   拖动中：      2px 实线 + 末端箭头（ghost）
 ##
 ## 形状：二次贝塞尔，中点抬升 `min(70, |dx| × 0.16)`（Web 的 `Q` 控制点）。
 ## Godot 没有 SVG path，用 24 段采样；虚线按弧长手工切段。
@@ -15,21 +15,21 @@ extends Control
 ## 于是平移 / 缩放自动跟随，不需要每帧换算屏幕坐标。
 
 const SEGMENTS := 24
+const GHOST_WIDTH := 2.0
+const GHOST_ARROW := 7.0
 
-## 1-bit：**四态全是纯黑**，强度只由「线宽 + 线型」表达 —— 这跟卡片/窗体的做法是同一条规律。
-## 原来靠 alpha（0.55）和灰值（#8C8C8C）分强弱，在纯白底上灰色线会被读成「没画好」，
-## 而不是「这条关系弱」。参考图里也没有灰线，只有 1px 与 2px 的黑线。
+## 1-bit：强度只由「线宽 + 线型」表达。cond 是唯一允许的灰线，语义是「可连但未试」。
 const STYLE := {
 	"entity": {"color": TecTheme.INK, "width": 1.0, "dash": 0.0, "gap": 0.0, "alpha": 1.0},
-	"move": {"color": TecTheme.INK, "width": 2.0, "dash": 0.0, "gap": 0.0, "alpha": 1.0},
-	"cond": {"color": TecTheme.INK, "width": 2.0, "dash": 5.0, "gap": 4.0, "alpha": 1.0},
-	"tried": {"color": TecTheme.INK, "width": 1.0, "dash": 2.0, "gap": 5.0, "alpha": 1.0},
+	"move": {"color": TecTheme.INK, "width": 1.0, "dash": 0.0, "gap": 0.0, "alpha": 1.0},
+	"cond": {"color": TecTheme.EDGE_UNTRIED, "width": 1.0, "dash": 0.0, "gap": 0.0, "alpha": 1.0},
+	"tried": {"color": TecTheme.EDGE_TRIED, "width": 1.0, "dash": 4.0, "gap": 4.0, "alpha": 1.0},
 }
 
 ## [{a: Vector2, b: Vector2, kind: String, dim: bool}]
 var _segments: Array = []
 ## 拖动幽灵线（Web `08-interact.js:63`）：`{a, b}` 或空。从被拖节点的中心直连指针，
-## 2px `#2b2b26` 虚线 6-5、`opacity .85` —— 直线（不走贝塞尔）。
+## C2 改为 2px 实线 + 末端箭头 —— 直线（不走贝塞尔）。
 var _ghost := {}
 ## 相机倍率：线宽与虚线节奏都按 1/k 反向补偿，屏幕上恒为 1.0~1.6px。
 ## 不补偿的话，1.3px 的实体线在 0.62x 下只剩 0.8px（被纸纹底吃成虚影），
@@ -106,8 +106,23 @@ func _draw() -> void:
 			draw_polyline(pts, col, _w(float(st["width"])), true)
 	# 幽灵线最后画，压在既有连线上面（Web 是 appendChild 到同一个 svg，天然在最上层）
 	if not _ghost.is_empty():
-		var line := PackedVector2Array([_ghost["a"], _ghost["b"]])
-		_draw_dashed(line, TecTheme.scrim(0.85), _w(2.0), _w(6.0), _w(5.0))
+		_draw_ghost(_ghost["a"], _ghost["b"])
+
+
+## C2 拖动线：2px 实线，末端画两笔箭头；都按相机倍率反补，屏幕上尺寸恒定。
+func _draw_ghost(a: Vector2, b: Vector2) -> void:
+	var col := TecTheme.INK
+	var width := _w(GHOST_WIDTH)
+	draw_line(a, b, col, width, true)
+	var delta := b - a
+	if delta.length() < 0.5:
+		return
+	var dir := delta.normalized()
+	var side := Vector2(-dir.y, dir.x)
+	var wing := _w(GHOST_ARROW)
+	var tip := b
+	draw_line(tip, tip - dir * wing + side * wing * 0.55, col, width, true)
+	draw_line(tip, tip - dir * wing - side * wing * 0.55, col, width, true)
 
 
 ## 二次贝塞尔：控制点抬升 = min(70, |dx| × 0.16)

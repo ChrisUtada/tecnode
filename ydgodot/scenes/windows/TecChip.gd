@@ -1,6 +1,8 @@
 class_name TecChip
 extends Button
 
+const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
+
 var _status: Label
 var _bar: ProgressBar
 var _dot: PanelContainer
@@ -31,21 +33,11 @@ func _build_content() -> void:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(row)
 
-	var av_box := PanelContainer.new()
-	av_box.custom_minimum_size = Vector2(32, 32)
-	av_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	av_box.clip_contents = true
-	av_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	av_box.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.FACE_HI, TecTheme.R_BTN, TecTheme.EDGE))
-	row.add_child(av_box)
-
-	var av := TextureRect.new()
-	av.texture = load("res://assets/raw/tec-avatar.png")
-	av.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	av.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	av.custom_minimum_size = Vector2(32, 32)
-	av.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	av_box.add_child(av)
+	var av := AvatarFrameScript.new()
+	av.name = "tec_chip_avatar"
+	av.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	av.setup("res://assets/raw/tec-avatar.png", 32.0, "T")
+	row.add_child(av)
 
 	var meta := VBoxContainer.new()
 	meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL

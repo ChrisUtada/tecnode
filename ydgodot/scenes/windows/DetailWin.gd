@@ -30,13 +30,24 @@ func setup_detail(p_graph: GraphState, p_case: CaseLoader) -> void:
 	_graph = p_graph
 	_case = p_case
 	setup("节点详情", W, 260)
-	position = Vector2(1280.0 - PAD_R - W - SysWindow.PAD, TOP)
+	place_right()
 	closed.connect(hide)
 	_rows = VBoxContainer.new()
 	_rows.name = "rows"
 	_rows.add_theme_constant_override("separation", 6)
 	_rows.custom_minimum_size = Vector2(W - 24.0 - 24.0, 0)
 	content.add_child(_rows)
+
+
+## 贴右上角：右沿按当前视口现算（960 / 1280 / 1920 都贴边）。
+## 传 `vw` 时用调用方给的宽度（Desktop 布局已算好，避免和视口更新错一拍）。
+func place_right(vw: float = -1.0) -> void:
+	var w := vw
+	if w <= 0.0 and is_inside_tree():
+		w = get_viewport_rect().size.x
+	if w <= 0.0:
+		w = 1280.0
+	position = Vector2(w - PAD_R - W - SysWindow.PAD, TOP)
 
 
 ## 选中变化 / 图状态变化都调这里；内容逐字没变就不重建（免得滚动位置跳回顶部）

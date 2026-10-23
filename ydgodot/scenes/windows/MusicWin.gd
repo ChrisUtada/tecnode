@@ -18,7 +18,7 @@ var _audio: AudioStreamPlayer
 var _current := ""
 var _paused := false
 var _rows: Dictionary = {}
-var _head: Label
+var _head: Control
 var _list: VBoxContainer
 var _player: VBoxContainer
 var _prog: ProgressBar
@@ -53,7 +53,8 @@ func setup_music() -> void:
 
 
 func _build_content() -> void:
-	_head = TecTheme.label("内置音乐 · %d 首" % TRACKS.size(), TecTheme.FS_BODY, TecTheme.MUTED)
+	## D1：曲目列表是一个小节，标题用黑条白字（h4），与窗标题的横纹语法拉开一档。
+	_head = TecTheme.section_bar("曲目 · %d 首" % TRACKS.size())
 	content.add_child(_head)
 
 	_list = VBoxContainer.new()
@@ -64,18 +65,43 @@ func _build_content() -> void:
 		var id := String(t["id"])
 		var row := Button.new()
 		row.name = "row_" + id
-		row.text = String(t["title"])
+		row.text = ""
 		row.custom_minimum_size = Vector2(0, 32)
 		row.focus_mode = Control.FOCUS_NONE
-		row.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		row.add_theme_font_size_override("font_size", TecTheme.FS_TITLE)
-		row.add_theme_color_override("font_hover_color", TecTheme.TEXT)
-		row.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.NONE, TecTheme.R_BTN, TecTheme.NONE, 0))
-		row.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.NONE, 0))
-		row.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, TecTheme.R_BTN, TecTheme.NONE, 0))
+		row.tooltip_text = String(t["title"])
 		row.pressed.connect(func(): play_track(id))
 		_list.add_child(row)
-		_rows[id] = row
+		# B2：曲目行不再整条填黑。纸底 + 1px 键线，左侧音符 glyph；
+		# 当前曲目只加粗键线，播放 / 暂停由行尾 6px 方块（实心 / 空心）表达。
+		var pad := MarginContainer.new()
+		pad.name = "pad"
+		pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		pad.add_theme_constant_override("margin_left", 7)
+		pad.add_theme_constant_override("margin_right", 7)
+		pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(pad)
+		var line := HBoxContainer.new()
+		line.name = "line"
+		line.add_theme_constant_override("separation", 6)
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pad.add_child(line)
+		var glyph := NoteGlyph.new()
+		glyph.name = "glyph"
+		glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		line.add_child(glyph)
+		var label := TecTheme.label(String(t["title"]), TecTheme.FS_BODY, TecTheme.TEXT)
+		label.name = "title"
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		label.clip_text = true
+		label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.add_child(label)
+		var mark := PlayMark.new()
+		mark.name = "mark"
+		mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		line.add_child(mark)
+		_rows[id] = {"button": row, "glyph": glyph, "title": label, "mark": mark}
 
 	_player = VBoxContainer.new()
 	_player.name = "music_player"
@@ -223,17 +249,82 @@ func _on_prog_input(event: InputEvent) -> void:
 
 func _refresh() -> void:
 	for id in _rows.keys():
-		var row: Button = _rows[id]
+		var rec: Dictionary = _rows[id]
+		var row: Button = rec["button"]
 		var cur := String(id) == _current
-		row.add_theme_color_override("font_color", TecTheme.CARD if cur else TecTheme.TEXT)
-		row.add_theme_color_override("font_pressed_color", TecTheme.CARD if cur else TecTheme.TEXT)
-		row.add_theme_stylebox_override("normal",
-			TecTheme.flat(TecTheme.LINE if cur else TecTheme.NONE, TecTheme.R_BTN,
-				TecTheme.NONE if cur else TecTheme.NONE, 0))
+		row.add_theme_stylebox_override("normal", _row_style(cur, false))
+		row.add_theme_stylebox_override("hover", _row_style(cur, true))
+		row.add_theme_stylebox_override("pressed", _row_style(cur, false, true))
+		(rec["glyph"] as NoteGlyph).set_inked(cur)
+		(rec["title"] as Label).add_theme_color_override("font_color",
+			TecTheme.TEXT if cur else TecTheme.INK_MUTED)
+		(rec["mark"] as PlayMark).set_state(cur, cur and is_playing())
 	_player.visible = _current != ""
 	if _play_btn != null:
 		_play_btn.set_mode("pause" if is_playing() else "play")
 	_refresh_progress()
+
+
+func _row_style(cur: bool, hover: bool, pressed := false) -> StyleBoxFlat:
+	var bg := TecTheme.FACE_LO if pressed else (TecTheme.BG if hover else TecTheme.CARD)
+	var edge := TecTheme.INK if (cur or hover or pressed) else TecTheme.EDGE
+	var width := 2 if (cur or hover or pressed) else 1
+	var sb := TecTheme.flat(bg, TecTheme.R_BTN, edge, width)
+	sb.content_margin_left = 0
+	sb.content_margin_right = 0
+	sb.content_margin_top = 0
+	sb.content_margin_bottom = 0
+	return sb
+
+
+## 八分音符：4×3 符头 + 1px 符干 + 斜旗。自绘而不是吃字体，避免缺字 / 基线漂移。
+class NoteGlyph extends Control:
+	var inked := false
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(12, 12)
+		size = custom_minimum_size
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func set_inked(on: bool) -> void:
+		if inked == on:
+			return
+		inked = on
+		queue_redraw()
+
+	func _draw() -> void:
+		var ink := TecTheme.INK if inked else TecTheme.MUTED
+		draw_rect(Rect2(1, 8, 4, 3), ink)
+		draw_line(Vector2(5, 9), Vector2(5, 1), ink, 1.0)
+		draw_line(Vector2(5, 1), Vector2(9, 3), ink, 1.0)
+		draw_line(Vector2(9, 3), Vector2(9, 5), ink, 1.0)
+
+
+## 行尾播放标记：实心 = 正在播放，空心 = 当前曲目但暂停。
+class PlayMark extends Control:
+	var playing := false
+	var shown := false
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(6, 6)
+		size = custom_minimum_size
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func set_state(on: bool, play: bool) -> void:
+		if shown == on and playing == play:
+			return
+		shown = on
+		playing = play
+		queue_redraw()
+
+	func _draw() -> void:
+		if not shown:
+			return
+		var r := Rect2(0, 0, 6, 6)
+		if playing:
+			draw_rect(r, TecTheme.INK)
+		else:
+			draw_rect(r, TecTheme.INK, false, 1.0)
 
 
 func _refresh_progress() -> void:

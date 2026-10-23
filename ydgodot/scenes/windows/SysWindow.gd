@@ -37,6 +37,9 @@ var _inner_w := 0.0
 var _close_btn: Button
 var _over := false
 var _over_ring: Control = null
+## A2：激活窗有条纹标题栏 + 2px 框；非激活窗只留空标题栏 + 1px 框。
+var _active := true
+var _rules: Array[Control] = []
 
 
 func setup(p_title: String, w: float, h: float, radius: int = TecTheme.R_WIN) -> void:
@@ -137,6 +140,7 @@ func _build(radius: int) -> void:
 	bar.add_child(title_row)
 
 	var left_rule := _title_rule()
+	_rules.append(left_rule)
 	title_row.add_child(left_rule)
 	_title_label = TecTheme.label(title, TecTheme.FS_BODY, TecTheme.TEXT)
 	_title_label.name = "win_title"
@@ -152,7 +156,9 @@ func _build(radius: int) -> void:
 	_title_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title_row.add_child(_title_label)
-	title_row.add_child(_title_rule())
+	var right_rule := _title_rule()
+	_rules.append(right_rule)
+	title_row.add_child(right_rule)
 
 	var sep := ColorRect.new()
 	sep.name = "sep"
@@ -305,6 +311,35 @@ func set_title(t: String) -> void:
 	title = t
 	if _title_label != null:
 		_title_label.text = t
+
+
+## A2：与 System 6 一致 —— 激活窗的标题栏有三道横纹、2px 框；
+## 非激活窗收起横纹、框降为 1px，标题降到 INK_FAINT。只改视觉，不动几何。
+func set_active(on: bool) -> void:
+	if _active == on:
+		return
+	_active = on
+	for rule in _rules:
+		if rule != null and is_instance_valid(rule):
+			rule.visible = on
+	if _title_label != null:
+		_title_label.add_theme_color_override("font_color",
+			TecTheme.TEXT if on else TecTheme.INK_FAINT)
+	var bg := get_node_or_null("bg") as Panel
+	if bg != null:
+		var sb := bg.get_theme_stylebox("panel") as StyleBoxFlat
+		if sb != null:
+			sb.set_border_width_all(2 if on else 1)
+
+
+func is_window_active() -> bool:
+	return _active
+
+
+## A2：只有「系统窗」参与激活态竞争。叙事卡 / 记忆卡虽然复用窗框，
+## 但它们是内容卡，抢走激活标题栏会让真正开着的窗突然变灰。
+func participates_in_activation() -> bool:
+	return true
 
 
 ## 只改内高，宽度与顶边不动；对话窗按内容长高 / 缩回时用。

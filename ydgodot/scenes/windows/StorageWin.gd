@@ -70,7 +70,7 @@ func refresh_store() -> void:
 		_rows.remove_child(c)
 		c.queue_free()
 	if list.is_empty():
-		var empty := TecTheme.label("（空）", TecTheme.FS_BODY, TecTheme.MUTED)
+		var empty := TecTheme.label("空。", TecTheme.FS_BODY, TecTheme.FAINT)
 		_rows.add_child(empty)
 		return
 	for key in list:
@@ -83,10 +83,13 @@ func _make_row(key: String) -> Control:
 	var row := PanelContainer.new()
 	row.name = "row_" + key.replace(":", "_")
 	row.custom_minimum_size = Vector2(0, 30)
-	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.EDGE, 1)
-	## 条目内边距：左右 6 / 上下 4。按钮不再贴住右边框。
-	sb.content_margin_left = 6
-	sb.content_margin_right = 6
+	row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	## D2：清单行不再做成独立盒子，只留底部 1px 发丝线；左右内容缩进 8。
+	var sb := TecTheme.flat(TecTheme.NONE, 0, TecTheme.NONE, 0)
+	sb.border_color = TecTheme.edge(0.18)
+	sb.border_width_bottom = 1
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
 	sb.content_margin_top = 4
 	sb.content_margin_bottom = 4
 	row.add_theme_stylebox_override("panel", sb)

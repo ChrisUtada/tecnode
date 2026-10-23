@@ -8,6 +8,7 @@ signal talk_requested
 
 const MIN_SEC := 5.0
 const MAX_SEC := 8.0
+const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var _lines: VBoxContainer
 var _scroll: ScrollContainer
@@ -15,7 +16,7 @@ var _empty: Label
 var _status: Label
 var _analysis: PanelContainer
 var _bar: ProgressBar
-var _avatar: TextureRect
+var _avatar: Control
 var _hint: Label
 
 var _analyzing := false
@@ -48,23 +49,14 @@ func _build_content() -> void:
 	av_col.add_theme_constant_override("separation", 5)
 	head.add_child(av_col)
 
-	var av_box := PanelContainer.new()
-	av_box.custom_minimum_size = Vector2(60, 60)
-	av_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	av_box.clip_contents = true
-	av_box.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.FACE_HI, TecTheme.R_SM, TecTheme.EDGE))
-	av_col.add_child(av_box)
-
-	_avatar = TextureRect.new()
+	_avatar = AvatarFrameScript.new()
 	_avatar.name = "tec_avatar"
-	_avatar.texture = load("res://assets/raw/tec-avatar.png")
-	_avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_avatar.custom_minimum_size = Vector2(60, 60)
+	_avatar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_avatar.setup("res://assets/raw/tec-avatar.png", 60.0, "T")
 	_avatar.mouse_filter = Control.MOUSE_FILTER_STOP
 	_avatar.tooltip_text = "TEC 助手：拖节点到我身上分析，点对话窗任意位置闲聊"
 	_avatar.gui_input.connect(_on_talk_input)
-	av_box.add_child(_avatar)
+	av_col.add_child(_avatar)
 
 	var av_label := TecTheme.label("TEC", TecTheme.FS_BODY, TecTheme.MUTED)
 	av_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -181,6 +173,13 @@ func _build_content() -> void:
 
 func _idle_text() -> String:
 	return "待命 · 拖一个节点到我身上"
+
+
+## 截图 / 演示用：把已落下的台词一次性揭示完，避免画面停在半个字上。
+func finish_typing() -> void:
+	for c in _lines.get_children():
+		if c is TypewriterLabel:
+			(c as TypewriterLabel).finish_typing()
 
 
 func _gui_input(event: InputEvent) -> void:

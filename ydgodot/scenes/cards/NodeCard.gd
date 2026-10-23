@@ -221,7 +221,7 @@ func _ready() -> void:
 	if _warn_badge != null:
 		_warn_badge.size = Vector2(72.0, 20.0)
 	if _badge != null:
-		_badge.size = Vector2(22.0, 20.0)
+		_badge.size = Vector2(20.0, 18.0)
 	if _pin_badge != null:
 		_pin_badge.size = Vector2(48.0, 20.0)
 
@@ -316,14 +316,15 @@ func _build(w: float, h: float) -> void:
 	_warn_badge.visible = false
 	add_child(_warn_badge)
 
-	_badge = TecTheme.label("新", TecTheme.FS_BODY, TecTheme.CARD)
+	# C1：纸底墨字的小药丸，挂在卡片上缘居中；比 Dock 未读点更轻，不再压住卡角。
+	_badge = TecTheme.label("新", TecTheme.FS_BODY, TecTheme.TEXT)
 	_badge.name = "unread"
 	_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_badge.position = Vector2(PAD + w - 16.0, -2.0)
-	_badge.size = Vector2(22.0, 20.0)
-	_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.LINE, TecTheme.R_PILL,
-		TecTheme.LINE, 1))
+	_badge.position = Vector2(PAD + (w - 20.0) * 0.5, -2.0)
+	_badge.size = Vector2(20.0, 18.0)
+	_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, TecTheme.R_PILL,
+		TecTheme.EDGE, 1))
 	_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_badge.visible = false
 	add_child(_badge)

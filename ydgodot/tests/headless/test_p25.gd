@@ -198,6 +198,25 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("初始未播放", String(st["current"]) == "" and not bool(st["playing"]))
 	check("E3 播放键是 18×18 自绘键", w._play_btn.size == Vector2(18, 18)
 		and w._play_btn._mode == "play", str(w._play_btn.size))
+	# D1：曲目列表的小节标题是黑条白字（h4），且排在列表之上。
+	var head_bar := w._head as PanelContainer
+	var head_sb := head_bar.get_theme_stylebox("panel") as StyleBoxFlat if head_bar != null else null
+	var head_lab := head_bar.get_child(0) as Label if head_bar != null and head_bar.get_child_count() > 0 else null
+	check("D1 曲目小节 = 黑条白字",
+		head_sb != null and head_sb.bg_color.is_equal_approx(TecTheme.INK)
+			and head_lab != null and not head_lab.text.is_empty()
+			and head_lab.get_theme_color("font_color").is_equal_approx(TecTheme.TEXT_ON_DARK),
+		str(head_sb) + " / " + (head_lab.text if head_lab != null else "null"))
+	check("D1 小节条在曲目列表之上", head_bar != null and w._list != null
+		and head_bar.get_index() < w._list.get_index())
+	var rec: Dictionary = w._rows["Air_Bach"]
+	var row_btn := rec["button"] as Button
+	var row_sb := row_btn.get_theme_stylebox("normal") as StyleBoxFlat
+	check("B2 曲目行是纸底 + 1px 键线（不是黑药丸）",
+		row_sb.bg_color.is_equal_approx(TecTheme.CARD) and row_sb.border_width_top == 1,
+		str(row_sb.bg_color) + " / " + str(row_sb.border_width_top))
+	check("B2 曲目行有音符 glyph", (rec["glyph"] as Control).size == Vector2(12, 12))
+	check("B2 未播放时不亮标记", not bool(rec["mark"].shown))
 
 	check("播放 Air", scene.dbg_music_play("Air_Bach"))
 	await process_frame
@@ -206,6 +225,12 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("E3 播放中图标切成暂停", w._play_btn._mode == "pause", w._play_btn._mode)
 	check("曲目 id", String(st["current"]) == "Air_Bach")
 	check("曲目时长", float(st["duration"]) > 0.0, str(st["duration"]))
+	row_sb = row_btn.get_theme_stylebox("normal") as StyleBoxFlat
+	check("B2 播放中仍是纸底，只加粗键线",
+		row_sb.bg_color.is_equal_approx(TecTheme.CARD) and row_sb.border_width_top == 2,
+		str(row_sb.bg_color) + " / " + str(row_sb.border_width_top))
+	check("B2 播放中行尾方块实心", bool(rec["mark"].shown) and bool(rec["mark"].playing))
+	check("B2 当前曲目音符转墨色", bool(rec["glyph"].inked))
 	w.seek_ratio(0.5)
 	await process_frame
 	st = scene.dbg_music_state()
@@ -214,6 +239,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	st = scene.dbg_music_state()
 	check("暂停状态", bool(st["paused"]) and not bool(st["playing"]), str(st))
 	check("E3 暂停后图标切回播放", w._play_btn._mode == "play", w._play_btn._mode)
+	check("B2 暂停时行尾方块转空心", bool(rec["mark"].shown) and not bool(rec["mark"].playing))
 	check("再点续播", scene.dbg_music_toggle())
 	st = scene.dbg_music_state()
 	check("续播状态", bool(st["playing"]) and not bool(st["paused"]))

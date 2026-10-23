@@ -8,6 +8,7 @@ const AVATAR_ART := {
 	"CHARS_TEC": "res://assets/raw/tec-avatar.png",
 	"CHARS_EXEC": "res://assets/raw/executor-avatar.png",
 }
+const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var session: DialogueSession
 var case_def: CaseLoader
@@ -186,28 +187,11 @@ func _say_row(who_id: String, who_name: String, text: String) -> Array:
 
 
 func _say_avatar(who_id: String, who_name: String) -> Control:
-	var frame := PanelContainer.new()
+	var frame := AvatarFrameScript.new()
 	frame.name = "chat_av"
-	frame.custom_minimum_size = Vector2(30, 30)
 	frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	frame.clip_contents = true
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.BG, TecTheme.R_SM, TecTheme.EDGE))
-	var art := String(AVATAR_ART.get(who_id, ""))
-	if art != "" and ResourceLoader.exists(art):
-		var tex := TextureRect.new()
-		tex.texture = load(art)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		frame.add_child(tex)
-	else:
-		var ini := TecTheme.label(who_name.substr(0, 1) if who_name != "" else "?", TecTheme.FS_TITLE, TecTheme.MUTED)
-		ini.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		ini.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		ini.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		frame.add_child(ini)
+	frame.setup(String(AVATAR_ART.get(who_id, "")), 30.0,
+		who_name.substr(0, 1) if who_name != "" else "?")
 	return frame
 
 

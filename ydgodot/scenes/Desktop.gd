@@ -126,6 +126,7 @@ var _icon_layout_h := -1.0
 var _cmds: CommandSystem
 var _pw_pop: PasswordPop = null
 var _pw_ctx: Dictionary = {}
+var _active_win: SysWindow = null     # A2：当前最上层的激活窗
 var _bag_win: StorageWin = null
 var _ledger_win: StorageWin = null
 var _matrix_win: MatrixWin = null
@@ -250,6 +251,8 @@ func _layout_root() -> void:
 		_desk.position = Vector2(0, HEADER_H)
 		_desk.size = Vector2(vw, vh - HEADER_H)
 	_resize_case_window(vw, vh)
+	if _detail_win != null and is_instance_valid(_detail_win):
+		_detail_win.place_right(vw)
 	if _desk.size.y != _icon_layout_h:
 		_icon_layout_h = _desk.size.y
 		_reset_icon_positions()
@@ -1084,6 +1087,10 @@ func _place_z(ctrl: Control, rank: int) -> void:
 	if not bool(ctrl.get_meta("raise_hooked", false)) and ctrl.has_method("set_raise_call"):
 		ctrl.set_raise_call(Callable(self, "_on_window_raise"))
 		ctrl.set_meta("raise_hooked", true)
+	if ctrl is SysWindow and not bool(ctrl.get_meta("active_hooked", false)):
+		ctrl.visibility_changed.connect(_refresh_window_activation)
+		ctrl.tree_exited.connect(_refresh_window_activation)
+		ctrl.set_meta("active_hooked", true)
 	var kids := _desk.get_children()
 	var at := kids.size() - 1
 	var self_idx := kids.find(ctrl)
@@ -1095,12 +1102,35 @@ func _place_z(ctrl: Control, rank: int) -> void:
 			at = i - 1 if i > self_idx else i
 			break
 	_desk.move_child(ctrl, at)
+	_refresh_window_activation()
 
 
 ## 窗口标题栏 / 历史卡按下的提层请求：用**自己的 rank** 重新插队（同 rank 仍按顺序，
 ## 重按 = 挪到同 rank 组尾部，即 Web 里后来者在上）
 func _on_window_raise(w: Control) -> void:
 	_place_z(w, int(w.get_meta("zrank", ZR_WIN)))
+
+
+## A2：激活态只看**实际层序**，不看谁最后被点击 —— 低 rank 的窗口即使后开 / 重按，
+## 也不会在视觉上压过高 rank 的窗，不能让它抢走「激活」标题栏。
+## 从 `_desk` 子序末尾往前找第一扇可见系统窗；隐藏、最小化、关窗后自动把
+## 激活态交还给仍露在最上面的那扇。
+func _refresh_window_activation() -> void:
+	if _desk == null or not is_instance_valid(_desk):
+		return
+	var top: SysWindow = null
+	for i in range(_desk.get_child_count() - 1, -1, -1):
+		var c := _desk.get_child(i) as SysWindow
+		if c != null and is_instance_valid(c) and c.visible and c.participates_in_activation():
+			top = c
+			break
+	# 逐窗落态：新建窗默认是激活态，只在 top 未变时提前 return 会把它漏成「双激活」。
+	# 叙事卡 / 记忆卡不参与，保持它们自己的默认外观，不在这里被改成灰标题。
+	for i in _desk.get_child_count():
+		var w := _desk.get_child(i) as SysWindow
+		if w != null and is_instance_valid(w) and w.participates_in_activation():
+			w.set_active(w == top)
+	_active_win = top
 
 
 func _build_icons() -> void:
@@ -1703,7 +1733,7 @@ func _build_toast() -> void:
 	_toast.name = "toast"
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = TecTheme.LINE
-	sb.set_corner_radius_all(TecTheme.R_BTN)
+	sb.set_corner_radius_all(TecTheme.R_PILL)
 	sb.content_margin_left = 16
 	sb.content_margin_right = 16
 	sb.content_margin_top = 9
@@ -2183,7 +2213,7 @@ func _place_toast_anchor() -> void:
 func _toast_style(warn: bool) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = TecTheme.LINE
-	sb.set_corner_radius_all(TecTheme.R_BTN)
+	sb.set_corner_radius_all(TecTheme.R_PILL)
 	sb.content_margin_left = 16
 	sb.content_margin_right = 16
 	sb.content_margin_top = 9
@@ -2727,6 +2757,7 @@ func _ensure_detail() -> DetailWin:
 	_detail_win.play_monologue.connect(func(id: String): _open_monologue(id))
 	_detail_win.play_music.connect(_open_music)
 	_desk.add_child(_detail_win)
+	_detail_win.place_right(_vw())
 	_place_z(_detail_win, ZR_DETAIL)
 	return _detail_win
 
@@ -5508,6 +5539,7 @@ func _shot_p2_flow() -> void:
 	_open_tec()
 	_tec_talk()
 	_tec_talk()
+	_tec.finish_typing()
 	_hide_toast()
 	await _wait(0.35)
 	await _shot("res://docs/p2_5_tec_chat.png")

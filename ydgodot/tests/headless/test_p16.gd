@@ -100,6 +100,15 @@ func _test_intro_ui() -> void:
 		check("A4 开场影尺寸 = 面板", w._panel_shadow.size.is_equal_approx(w._panel.size),
 			str(w._panel_shadow.size))
 		check("A4 开场影在面板之下", w._panel_shadow.get_index() < w._panel.get_index())
+	# A3：弹窗按视口居中，不再写死 1280。
+	w.size = Vector2(960, 560)
+	w._fit()
+	var panel := w.find_child("panel", true, false) as Control
+	check("A3 960 宽开场弹窗居中",
+		panel != null and absf(panel.position.x + panel.size.x * 0.5 - 480.0) < 1.0,
+		str(panel.position) if panel != null else "null")
+	w.size = Vector2(1280, 720)
+	w._fit()
 	w.dbg_begin()
 	check("空姓名不进入问答", w.dbg_step() == "name")
 	w.dbg_set_name("林雾")

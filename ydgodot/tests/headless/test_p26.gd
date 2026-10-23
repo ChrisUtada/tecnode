@@ -359,6 +359,26 @@ func _test_desktop(c: CaseLoader) -> void:
 		pw.row_state("CHARS_TEC") + " / " + pw.row_state("CHARS_EXEC"))
 	check("状态词不带计数", not pw.row_state("CHARS_luhengs").contains("/"),
 		pw.row_state("CHARS_luhengs"))
+	var av := pw.find_child("av", true, false) as PanelContainer
+	var av_sb := av.get_theme_stylebox("panel") as StyleBoxFlat if av != null else null
+	check("B1 名册头像框：48×48 方角 + 1px 键线 + BG",
+		av != null and av.custom_minimum_size == Vector2(48, 48)
+			and av_sb != null
+			and av_sb.corner_radius_top_left == 0
+			and av_sb.border_width_left == 1
+			and av_sb.border_color.is_equal_approx(TecTheme.EDGE)
+			and av_sb.bg_color.is_equal_approx(TecTheme.BG),
+		str(av_sb))
+	var tec_row := pw.find_child("row_CHARS_TEC", true, false) as PanelContainer
+	var tec_sb := tec_row.get_theme_stylebox("panel") as StyleBoxFlat if tec_row != null else null
+	check("D2 名册行：仅底部 1px 发丝线",
+		tec_sb != null
+			and tec_sb.border_width_bottom == 1
+			and tec_sb.border_width_top == 0
+			and tec_sb.border_width_left == 0
+			and tec_sb.border_width_right == 0
+			and tec_sb.border_color.is_equal_approx(TecTheme.edge(0.18)),
+		str(tec_sb))
 
 	# 点常驻行 = 打开各自的窗
 	scene.dbg_people_row("CHARS_TEC")
