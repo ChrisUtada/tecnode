@@ -10,14 +10,23 @@ extends Button
 signal clicked
 
 const ROOT_SIZE := 64.0
-const GLYPH_SIZE := 44.0
-const GLYPH_PAD := 10.0
+## 图标**显示尺寸 48**（原来 44）。
+## 图标源是 24×24 的 1px 线稿，`.import` 里 `svg/scale = 2.0` 把它栅格化成 **48×48**
+## （线宽 2px）—— 48 与显示尺寸 1:1，NEAREST 完全不重采样，线宽处处相等。
+## 之前是「24px 纹理 + 44px 显示」= 1.83 倍非整数放大，1px 线被抽成 1px/2px 交替，
+## 那才是「图标看着发毛」的原因；而把它重画成粗线点阵（P4 初版）又丢了细节。
+const GLYPH_SIZE := 48.0
+## 图标上沿 / 标签上沿 / 标签高：1 + 48 + 15 = 64 = ROOT_SIZE，一格刚好塞满。
+## 旧值是 `GLYPH_PAD 10`（给「图标后面那块底板」留的出血），底板在 P4.2 被删了，
+## 那 10px 出血就成了图标与标签之间一道说不清的空隙。
+const GLYPH_TOP := 1.0
+const LABEL_TOP := 49.0
+const LABEL_H := 15.0
 const DRAG_THRESHOLD := 5.0
 
 var _glyph: ColorRect
 var _icon: TextureRect
 var _label: Label
-var _mat: ShaderMaterial
 var _selected := false
 var _down := false
 var _over := false
@@ -26,8 +35,6 @@ var _drag_origin := Vector2.ZERO
 var _moved := false
 var _bounds := Rect2(Vector2.ZERO, Vector2(1280, 668))
 var _root_size := ROOT_SIZE
-var _glyph_size := GLYPH_SIZE
-var _glyph_pad := GLYPH_PAD
 var _compact := false
 
 
@@ -40,28 +47,17 @@ func setup(p_text: String, p_icon: String) -> void:
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		add_theme_stylebox_override(state, StyleBoxEmpty.new())
 
+	## 图标本体**永远不垫底板**（P4.2）。参考图（Mac OS 8 桌面）里按下的图标
+	## 只有**标签条反白**，图标本身仍是「黑线稿直接躺在桌面上」。
+	## 我们之前在图标后面画一块 44×44 的黑圆角块 —— 于是屏上同时出现
+	## 「黑方块 + 黑标签条」两个黑块，中间还夹一道白缝，这就是用户说的
+	## 「多一个框出来的全黑」。底板与它的 shader 一起删掉，`_glyph` 只剩容器职责。
 	_glyph = ColorRect.new()
 	_glyph.name = "glyph"
-	_glyph.position = Vector2(0, -GLYPH_PAD)
+	_glyph.position = Vector2.ZERO
 	_glyph.size = Vector2(ROOT_SIZE, ROOT_SIZE)
+	_glyph.color = TecTheme.NONE
 	_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_mat = ShaderMaterial.new()
-	_mat.shader = load("res://ui/shaders/surface.gdshader")
-	_mat.set_shader_parameter("rect_size", Vector2(ROOT_SIZE, ROOT_SIZE))
-	_mat.set_shader_parameter("pad", GLYPH_PAD)
-	_mat.set_shader_parameter("radius", 11.0)
-	# 阴影按 Web `.desk-icon .icon-glyph{box-shadow:var(--raise)}`（暗影 3/4 模糊 10）。
-	# 「模糊」在这里是距离上的软边长度、不是 CSS 的高斯半径，所以数值要按对拍扫：
-	# 暗影 11.0 / 偏移 2,3，高光 5.5 / 偏移 -2,-3（照 CSS 数字直填会糊一大圈）。
-	_mat.set_shader_parameter("shade_soft", 11.0)
-	_mat.set_shader_parameter("shade_offset", Vector2(2, 3))
-	# 图标块四周有余量，把 CSS `--raise` 的第二盏（左上暖白高光）也画出来：
-	# 不画的话，块的上/左两侧就是暗影压出来的灰，而 Web 那边是被提亮到比底色还亮。
-	_mat.set_shader_parameter("glow_col", TecTheme.BEVEL_HI)
-	_mat.set_shader_parameter("glow_soft", 5.5)
-	_mat.set_shader_parameter("glow_offset", Vector2(-2, -3))
-	_glyph.material = _mat
-	_glyph.color = Color.WHITE
 	add_child(_glyph)
 
 	_icon = TextureRect.new()
@@ -69,7 +65,7 @@ func setup(p_text: String, p_icon: String) -> void:
 	_icon.texture = load(p_icon)
 	_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
-	_icon.position = Vector2(10, GLYPH_PAD)
+	_icon.position = Vector2((ROOT_SIZE - GLYPH_SIZE) * 0.5, GLYPH_TOP)
 	_icon.size = Vector2(GLYPH_SIZE, GLYPH_SIZE)
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_glyph.add_child(_icon)
@@ -78,8 +74,8 @@ func setup(p_text: String, p_icon: String) -> void:
 	_label.name = "label"
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_label.position = Vector2(0, 45)
-	_label.size = Vector2(ROOT_SIZE, 14)
+	_label.position = Vector2(0, LABEL_TOP)
+	_label.size = Vector2(ROOT_SIZE, LABEL_H)
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_label)
 	# 紧凑模式会藏掉文字标签，名称仍要能从 tooltip 读出来。
@@ -90,27 +86,25 @@ func setup(p_text: String, p_icon: String) -> void:
 	_apply_style()
 
 
-## 矮窗口 / 图标多时切紧凑：不缩 44px 图标本体（避免 SVG 重采样发糊），
-## 只收掉外圈 10px 留白与文字标签，把每个图标高度从 69 压到 48。
+## 矮窗口 / 图标多时切紧凑：不缩 48px 图标本体（避免 SVG 重采样发糊），
+## 只收掉外圈留白与文字标签，把每个图标高度从 64 压到 52。
 func set_compact(on: bool) -> void:
 	if _compact == on:
 		return
 	_compact = on
-	_root_size = 48.0 if on else ROOT_SIZE
-	_glyph_size = GLYPH_SIZE
-	_glyph_pad = 2.0 if on else GLYPH_PAD
+	## 紧凑模式的外框必须容得下 48px 图标 + 上下各 2px 留白（52），
+	## 原来写死 48 会让图标横向溢出。文字标签仍是唯一的可压缩项。
+	_root_size = 52.0 if on else ROOT_SIZE
 	custom_minimum_size = Vector2(_root_size, _root_size)
 	size = custom_minimum_size
-	_glyph.position = Vector2(0, -_glyph_pad)
 	_glyph.size = Vector2(_root_size, _root_size)
-	_mat.set_shader_parameter("rect_size", Vector2(_root_size, _root_size))
-	_mat.set_shader_parameter("pad", _glyph_pad)
-	_icon.position = Vector2(_glyph_pad, _glyph_pad)
-	_icon.size = Vector2(_glyph_size, _glyph_size)
+	_icon.position = Vector2((_root_size - GLYPH_SIZE) * 0.5, 2.0 if on else GLYPH_TOP)
+	_icon.size = Vector2(GLYPH_SIZE, GLYPH_SIZE)
 	_label.visible = not on
 	for ch in get_children():
 		if ch is PanelContainer and String(ch.name).ends_with("badge"):
 			(ch as Control).position.x = _root_size - 20.0
+	_apply_style()
 	queue_redraw()
 
 
@@ -163,12 +157,12 @@ func set_selected(on: bool) -> void:
 	_apply_style()
 
 
-func _on_hover(on: bool) -> void:
-	# `.desk-icon:hover .icon-glyph` 把两盏阴影各放大一档
-	_mat.set_shader_parameter("shade_soft", 10.0 if on else 7.0)
-	_mat.set_shader_parameter("shade_offset", Vector2(3, 4) if on else Vector2(2, 3))
-	_mat.set_shader_parameter("glow_soft", 10.0 if on else 7.0)
-	_mat.set_shader_parameter("glow_offset", Vector2(-3, -4) if on else Vector2(-2, -3))
+func _on_hover(_on: bool) -> void:
+	## **悬停不再改外观**。原来这里在放大两盏 shader 阴影的 soft/offset ——
+	## 而 P3 起 shade_col/glow_col 都是 NONE，调参已经是空转。
+	## 1-bit 桌面图标没有「浮起」这回事：指针移上去只需要光标变手形（已由
+	## `mouse_default_cursor_shape` 负责），底板与图标一律不动。
+	pass
 
 
 ## 拖动中悬停 = 落点：Web `.desk-icon.over .icon-glyph` 与按下态同一套暗底 + 2px 描边
@@ -181,36 +175,55 @@ func set_over(on: bool) -> void:
 
 
 func _draw() -> void:
-	if not _over:
+	## 两种场合要一道键线框：
+	##   拖动落点（`_over`）—— 告诉玩家「松手就放这儿」；
+	##   紧凑模式下被选中 —— 那个模式把文字标签收掉了，没有标签可反白，
+	##   不给框就**完全看不出选中**（底板删掉之后这里曾是空的）。
+	var framed := _over or (_compact and (_selected or _down))
+	if not framed:
 		return
+	## 键线一律 **1px**（与全站按钮同一条线宽）。原来是 2px 硬框 ——
+	## 满屏 1px 之间突然出现一根 2px，读作「另一套零件」。
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0, 0, 0, 0)
-	sb.set_border_width_all(2)
-	sb.border_color = TecTheme.LINE
-	sb.set_corner_radius_all(12)
-	draw_style_box(sb, Rect2(Vector2(0, -_glyph_pad), Vector2(_root_size, _root_size)))
+	sb.bg_color = TecTheme.NONE
+	sb.set_border_width_all(1)
+	sb.border_color = TecTheme.INK
+	sb.set_corner_radius_all(TecTheme.R_SM)
+	draw_style_box(sb, Rect2(_icon.position - Vector2(2, 2),
+		Vector2(GLYPH_SIZE + 4.0, GLYPH_SIZE + 4.0)))
 
 
+## 按下 / 选中时**只反白标签条**：一条贴着文字的实心黑条 + 白字（参考图里就是这样）。
+## 图标本体不动 —— 它是黑线稿，压在灰桌面上，反白会需要一块底板，而底板正是要删的东西。
 func _apply_style() -> void:
-	if _mat == null:
+	## `set_selected` 有可能在 `setup()` 之前被调到（桌面重建时先选后建），别崩。
+	if _label == null or _icon == null:
 		return
-	var dark := _selected or _down or _over
-	_mat.set_shader_parameter("col_hi", Color("38372f") if dark else TecTheme.FACE_HI)
-	_mat.set_shader_parameter("col_mid", TecTheme.LINE if dark else TecTheme.CARD)
-	_mat.set_shader_parameter("col_lo", Color("1f1f19") if dark else TecTheme.FACE_LO)
-	_mat.set_shader_parameter("edge_col", TecTheme.LINE if dark else TecTheme.EDGE)
-	_mat.set_shader_parameter("rim_col", Color(1, 1, 1, 0.30) if dark else TecTheme.BEVEL_HI)
-	_mat.set_shader_parameter("shade_col", Color(0, 0, 0, 0.55) if dark else TecTheme.BEVEL_LO)
-	# 按下 / 选中态在 CSS 里只有 inset 阴影，没有外圈高光
-	_mat.set_shader_parameter("glow_col", Color(0, 0, 0, 0) if dark else TecTheme.BEVEL_HI)
-	_icon.modulate = TecTheme.CARD if dark else TecTheme.LINE
+	var dark := _selected or _down
+	_icon.modulate = TecTheme.LINE
 	_label.add_theme_color_override("font_color", TecTheme.CARD if dark else TecTheme.MUTED)
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = TecTheme.LINE if dark else Color(0, 0, 0, 0)
+	sb.bg_color = TecTheme.INK if dark else TecTheme.NONE
 	sb.set_border_width_all(0)
-	sb.set_corner_radius_all(8)
-	sb.content_margin_left = 6
-	sb.content_margin_right = 6
-	sb.content_margin_top = 1
-	sb.content_margin_bottom = 1
+	## **直角**：参考图的标签块是个硬边小方条，圆角会把它读成「按钮」。
+	sb.set_corner_radius_all(0)
+	sb.content_margin_left = 4
+	sb.content_margin_right = 4
+	sb.content_margin_top = 0
+	sb.content_margin_bottom = 0
 	_label.add_theme_stylebox_override("normal", sb)
+	_place_label(dark)
+	queue_redraw()
+
+
+## 黑条按文字的**实际宽度**收紧（参考图里那条黑比图标窄、贴着字）。
+## 铺满 64px 的整条黑在两个字的名字上会读成「一条横幅」，不像被选中的标签。
+func _place_label(dark: bool) -> void:
+	var w := _root_size
+	if dark:
+		var f := TecTheme.font()
+		if f != null:
+			var tw := f.get_string_size(_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, TecTheme.FS_BODY).x
+			w = minf(ceilf(tw) + 8.0, _root_size)
+	_label.size = Vector2(w, LABEL_H)
+	_label.position = Vector2(floorf((_root_size - w) * 0.5), LABEL_TOP)

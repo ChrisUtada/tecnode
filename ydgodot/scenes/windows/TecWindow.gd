@@ -9,7 +9,6 @@ signal talk_requested
 const MIN_SEC := 5.0
 const MAX_SEC := 8.0
 
-var _scroll: ScrollContainer
 var _lines: VBoxContainer
 var _analysis: PanelContainer
 var _analysis_label: Label
@@ -52,7 +51,7 @@ func _build_content() -> void:
 	av_box.custom_minimum_size = Vector2(60, 60)
 	av_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	av_box.clip_contents = true
-	av_box.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.FACE_HI, 12, TecTheme.EDGE))
+	av_box.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.FACE_HI, TecTheme.R_SM, TecTheme.EDGE))
 	av_col.add_child(av_box)
 
 	_avatar = TextureRect.new()
@@ -79,21 +78,12 @@ func _build_content() -> void:
 	main.add_theme_constant_override("separation", 6)
 	row.add_child(main)
 
-	_scroll = ScrollContainer.new()
-	_scroll.name = "tec_scroll"
-	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
-	_scroll.gui_input.connect(_on_talk_input)
-	main.add_child(_scroll)
-
 	_lines = VBoxContainer.new()
 	_lines.name = "tec_lines"
 	_lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lines.add_theme_constant_override("separation", 0)
 	_lines.mouse_filter = Control.MOUSE_FILTER_PASS
-	_scroll.add_child(_lines)
+	main.add_child(_lines)
 
 	_analysis = PanelContainer.new()
 	_analysis.name = "tec_analyzing"
@@ -127,8 +117,8 @@ func _build_content() -> void:
 	_bar.show_percentage = false
 	_bar.custom_minimum_size = Vector2(0, 6)
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var bg := TecTheme.flat(TecTheme.FACE_LO, 4, TecTheme.FACE_LO, 0)
-	var fill := TecTheme.flat(TecTheme.LINE, 4, TecTheme.LINE, 0)
+	var bg := TecTheme.flat(TecTheme.FACE_LO, 0, TecTheme.FACE_LO, 0)
+	var fill := TecTheme.flat(TecTheme.LINE, 0, TecTheme.LINE, 0)
 	_bar.add_theme_stylebox_override("background", bg)
 	_bar.add_theme_stylebox_override("fill", fill)
 	acol.add_child(_bar)
@@ -155,11 +145,9 @@ func _on_talk_input(event: InputEvent) -> void:
 func append_line(text: String, color: Color = TecTheme.TEXT) -> void:
 	if text == "":
 		return
-	var l := TecTheme.label(text, TecTheme.FS_BODY, color)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var l := TecTheme.narrative_label(text, color)
 	_lines.add_child(l)
+	l.start_typing()
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0, 6)
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -171,12 +159,19 @@ func append_line(text: String, color: Color = TecTheme.TEXT) -> void:
 	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_lines.add_child(sep)
 	_line_count += 1
-	_scroll_to_bottom()
+	call_deferred("_fit_height")
 
 
-func _scroll_to_bottom() -> void:
-	if _scroll != null:
-		_scroll.set_deferred("scroll_vertical", 1_000_000)
+func _fit_height() -> void:
+	if content == null:
+		return
+	if not is_inside_tree():
+		await tree_entered
+	await get_tree().process_frame
+	var content_h := content_min_height()
+	var target := maxf(240.0, SysWindow.BAR_H + 20.0 + content_h)
+	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:
+		set_inner_height(target)
 
 
 func is_analyzing() -> bool:
@@ -197,6 +192,7 @@ func analyze(target: String, label: String = "") -> bool:
 	_bar.value = 0
 	_analysis_label.text = "分析中 · " + _target_label
 	_analysis.visible = true
+	call_deferred("_fit_height")
 	analysis_started.emit(_target, _target_label)
 	append_line("（接收「%s」，开始分析…）" % _target_label)
 	set_process(true)
@@ -220,6 +216,7 @@ func _finish_analysis() -> void:
 	set_process(false)
 	_analysis.visible = false
 	_done_count += 1
+	call_deferred("_fit_height")
 	analysis_done.emit(_target)
 
 
@@ -235,6 +232,7 @@ func cancel_analysis() -> void:
 	_analyzing = false
 	set_process(false)
 	_analysis.visible = false
+	call_deferred("_fit_height")
 
 
 func reset_tec() -> void:
@@ -247,6 +245,7 @@ func reset_tec() -> void:
 	_target = ""
 	_target_label = ""
 	_bar.value = 0
+	call_deferred("_fit_height")
 
 
 func done_count() -> int:

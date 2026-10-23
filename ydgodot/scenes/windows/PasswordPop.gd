@@ -26,7 +26,7 @@ func setup_password(item_label: String, hint: String) -> void:
 	_input.custom_minimum_size = Vector2(96, 28)
 	_input.add_theme_font_override("font", TecTheme.font())
 	_input.add_theme_font_size_override("font_size", TecTheme.FS_TITLE)
-	_input.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.EDGE, 1))
+	_input.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.EDGE_SOFT, 1))
 	_input.add_theme_stylebox_override("focus", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.LINE, 1))
 	_input.text_submitted.connect(func(_t: String): _submit())
 	row.add_child(_input)

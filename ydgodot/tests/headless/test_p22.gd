@@ -136,6 +136,11 @@ func _test_desktop() -> void:
 	await process_frame
 	info = scene.dbg_tec_info()
 	check("分析完成", not bool(info["win"]["analyzing"]))
+	var tec_win: TecWindow = scene.dbg_tec_win()
+	check("TEC 窗包住页脚", tec_win != null
+		and tec_win.get_global_rect().encloses(tec_win._hint.get_global_rect()),
+		"null" if tec_win == null else "%s / %s" % [
+			tec_win.get_global_rect(), tec_win._hint.get_global_rect()])
 	check("捕获尸体隐藏线索", (scene.graph.captured as Dictionary).has("CLUES_V_luheng"))
 	check("尸体档案进度 1", int(scene.graph.tec_prog.get("SCENES_body", 0)) == 1)
 	check("卡片点未读圆点", bool(info["dot"]) and chip.dbg_state()["dot"])

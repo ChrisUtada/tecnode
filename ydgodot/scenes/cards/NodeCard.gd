@@ -30,6 +30,21 @@ signal pin_toggled(key: String)
 
 const PAD := 8.0
 const DRAG_THRESHOLD := 5.0
+## 文字档类型符号的边长，以及「符号 → 首字」的间距。符号必须**贴着文字**走：
+## 旧摆法是把它钉在卡片左边缘 5px 处、标题另外居中，两字标题（「书桌」「门锁」）时
+## 两者之间空出一大片，符号看着像掉在框外、又挤着卡边（见 `_layout_title`）。
+## 边长取 **9**（≈ 字面 3/4）：试过 11（= 字号 − 1），方块几乎与字面等高，下沿压到字脚、
+## 看着比文字「低半格」；缩到 9 后上下各留 1~2px，读作标记而不是第二个字。
+const GLYPH_BOX := 16.0
+const GLYPH_GAP := 6.0
+## 标题 Label 的固定高度（单行，副标已删）
+const TITLE_H := 16.0
+## **墨迹中心距标题矩形顶边的高度**（16px 高的标题框里，12px CJK 墨迹约 11.7px、中心在
+## 顶边下 5.0~5.5px）。标题用 `VERTICAL_ALIGNMENT_TOP` 而不是 CENTER —— CENTER 让 Godot
+## 去居中「行盒」（行高 12 + line_spacing 3），实测同一条规则在不同倍率/DPI 下墨迹会漂 1.6px，
+## 方块只能对着某一档去调，换台机器或换个缩放就又歪了（用户两次反馈「偏上 / 偏下」都源于此）。
+## 顶部对齐后墨迹从固定高度垂下，倍率 0.94~1.7 实测只漂 0.7px，方块便能稳稳对着卡中线。
+const TITLE_INK_CY := 5.0
 ## 双击判定窗口（对齐浏览器 dblclick 的默认 ~500ms：之前收紧到 280ms，
 ## 玩家用正常节奏点两下就经常被判成两次单击，「双击无法展开」就是这么来的）
 const DBL_MS := 500
@@ -37,8 +52,8 @@ const DBL_MS := 500
 ## 类型名。**卡面上不显示它** —— 类型改由左侧的类型色符号承担（见 `ui/KindGlyph.gd`），
 ## 这个名字只给详情窗 `_kind_name()` 用。
 const KIND_NAME := {"loc": "场景", "item": "物品", "char": "人物", "clue": "线索", "time": "时刻"}
-const DARK_HI := Color("38372f")
-const DARK_LO := Color("1f1f19")
+const DARK_HI := TecTheme.FACE_DARK_HI
+const DARK_LO := TecTheme.FACE_DARK_LO
 ## 点亮态的光晕直径。Web 的 `#glow` 是 560×560 挂在节点上，这里按卡片尺寸取一个
 ## 「近身一圈」的尺寸就够 —— 太大会把相邻节点糊成一片（一屏常有 10+ 张卡）。
 const GLOW_SIZE := Vector2(220, 220)
@@ -63,7 +78,7 @@ static func _glow_texture() -> Texture2D:
 				+ 0.30 * exp(-pow((r - 0.42) * 2.6, 2.0))
 			if r > 1.0:
 				a = 0.0
-			img.set_pixel(x, y, Color(1.0, 0.827, 0.431, clampf(a, 0.0, 0.6)))
+			img.set_pixel(x, y, Color(TecTheme.SPOT_LIT_HALO, clampf(a, 0.0, 0.6)))
 	_glow_cache = ImageTexture.create_from_image(img)
 	return _glow_cache
 
@@ -139,7 +154,7 @@ var _pop: Tween = null
 class DashBorder extends Control:
 	var rect := Rect2()
 	var radius := 11.0
-	var color := Color(0.29, 0.27, 0.20, 0.55)
+	var color := TecTheme.CARD_DASH
 	## 枢纽场景用 CSS 的 `3px double`：外 1px 线、1px 空隙、内 1px 线。
 	## 不能拿虚线凑 —— 两者语义不同（虚线=未探索，双线=枢纽），在 Web 里也是两套规则。
 	var double_line := false
@@ -147,28 +162,41 @@ class DashBorder extends Control:
 	## CSS 的 outline 画在**边框盒之外**、留 2px 空隙，所以这里用 `rect.grow(4)` 画 2px 实线，
 	## 实际占掉 2~4px 那一圈（视觉框离卡片外沿还有 8px 的 PAD，够放）。
 	var sel_line := false
+	## 点亮态：**2px 实线粗框**。金框 + 金晕在纯白纸上不成立（对白 1.86:1，等于消失），
+	## 1-bit 里「更粗的线」就是「更强的强调」—— 粗细是这套语言里唯一的强度轴。
+	var thick_line := false
 
 	func _draw_sel() -> void:
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0, 0, 0, 0)
+		sb.bg_color = TecTheme.NONE
 		sb.set_border_width_all(2)
-		sb.border_color = Color("2b2b26")
-		sb.set_corner_radius_all(int(maxf(radius, 1.0)) + 2)
+		sb.border_color = TecTheme.INK
+		sb.set_corner_radius_all(0)
+		## AA **开着**（P4.1）：卡片恢复了 5px 圆角，弧段没有 AA 就是一圈锯齿；
+		## 正交直线本来就落在整数像素上，AA 不会把它们抹灰 —— 只有拐角变柔。
 		sb.anti_aliasing = true
 		draw_style_box(sb, rect.grow(4.0))
 
 	func _ring(r: Rect2, rad: float) -> void:
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0, 0, 0, 0)
+		sb.bg_color = TecTheme.NONE
 		sb.set_border_width_all(1)
-		sb.border_color = Color("2b2b26")
-		sb.set_corner_radius_all(int(maxf(rad, 1.0)))
+		sb.border_color = TecTheme.INK
+		sb.set_corner_radius_all(0)
+		## AA **开着**（P4.1）：卡片恢复了 5px 圆角，弧段没有 AA 就是一圈锯齿；
+		## 正交直线本来就落在整数像素上，AA 不会把它们抹灰 —— 只有拐角变柔。
 		sb.anti_aliasing = true
 		draw_style_box(sb, r)
 
 	func _draw() -> void:
 		if sel_line:
 			_draw_sel()
+			return
+		if thick_line:
+			## 1px 环画两遍 + 1px 内缩再画一遍：StyleBoxFlat 的 1px 边框在 1x 屏上
+			## 刚好一个物理像素，重复叠加即可得到视觉 2px，不必引入非整数线宽。
+			_ring(rect, radius)
+			_ring(rect.grow(-1.0), radius)
 			return
 		if double_line:
 			_ring(rect, radius)
@@ -219,7 +247,7 @@ func _build(w: float, h: float) -> void:
 	_mat.shader = load("res://ui/shaders/surface.gdshader")
 	_mat.set_shader_parameter("rect_size", Vector2(w + PAD * 2.0, h + PAD * 2.0))
 	_mat.set_shader_parameter("pad", PAD)
-	_mat.set_shader_parameter("radius", float(TecTheme.R_SM))
+	_mat.set_shader_parameter("radius", float(TecTheme.R_CARD))
 	_mat.set_shader_parameter("shade_soft", 7.0)
 
 	_bg = ColorRect.new()
@@ -248,13 +276,13 @@ func _build(w: float, h: float) -> void:
 	_border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_border.visible = false
 	(_border as DashBorder).rect = Rect2(Vector2(PAD, PAD), Vector2(w, h))
-	(_border as DashBorder).radius = float(TecTheme.R_SM)
+	(_border as DashBorder).radius = float(TecTheme.R_CARD)
 	add_child(_border)
 
 	_title = TecTheme.label("", TecTheme.FS_TITLE, TecTheme.TEXT)
 	_title.name = "title"
-	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_title.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_title.clip_text = true
 	_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -270,10 +298,7 @@ func _build(w: float, h: float) -> void:
 	add_child(_glyph)
 
 	## 单行：标题恒居卡片垂直中线（副标已删，不再分上下半格）。
-	## 左边留 14px 给类型符号，右边留 6px —— 中心偏右 4px，肉眼无感，但保证超长标题
-	## 被 ellipsis 截断时也不会压到符号上。
-	_title.position = Vector2(PAD + 14.0, PAD + h * 0.5 - 8.0)
-	_title.size = Vector2(w - 20.0, 16.0)
+	## 水平位置不写死 —— 符号与文字作为一组居中，交给 `_layout_title()` 按实测字宽算。
 	_layout_glyph()
 
 	# 角标：字统一 12px 后跟着放大（9px 时「无文本入口」是 45px 宽，12px 要 60px）。
@@ -321,7 +346,7 @@ func _build(w: float, h: float) -> void:
 	_sel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_sel.visible = false
 	(_sel as DashBorder).rect = Rect2(Vector2(PAD, PAD), Vector2(w, h))
-	(_sel as DashBorder).radius = float(TecTheme.R_SM)
+	(_sel as DashBorder).radius = float(TecTheme.R_CARD)
 	(_sel as DashBorder).sel_line = true
 	add_child(_sel)
 
@@ -329,8 +354,9 @@ func _build(w: float, h: float) -> void:
 
 
 func refresh() -> void:
-	## 卡面只有名字。类型 → 左侧类型色符号；状态 → 边框与填充（见 `_apply_plain_look`）
+	## 卡面只有名字。类型 → 标题左侧类型色符号；状态 → 边框与填充（见 `_apply_plain_look`）
 	_title.text = String(node_data.get("label", card_key))
+	_layout_title()            # 文字宽度变了，符号要重贴到首字左边
 	_apply_shell()
 
 
@@ -366,8 +392,10 @@ func _apply_shell() -> void:
 	_badge.visible = _unread and _lod_show_title()
 	_warn_badge.visible = _warn and _lod_show_title()
 	_pin_badge.visible = _pinned and _lod_show_title()
+	## 1-bit 不再有「发光」—— `_glow` 是径向无极渐变，在纯白纸上是整套硬边语言里
+	## 唯一一块软调子，留着就破功。点亮的强调改由 `_border.thick_line`（2px 黑粗框）承担。
 	if _glow != null:
-		_glow.visible = lit
+		_glow.visible = false
 
 
 ## 「无文本入口」谓词每帧在 Desktop 算（is_no_entry），这里只负责显示态回灌
@@ -401,21 +429,55 @@ func set_lod(k: float) -> void:
 	_pin_badge.visible = _pinned and text_on
 
 
-## 符号两套摆法：文字档 = 标题左侧 10px 小标记；缩略档 = 铺满卡片居中。
-## 缩略档的半径放大一档（5 → 6）：卡片整体被缩了，10px 的符号在 0.62x 下只剩 6.2px。
+## 符号两套摆法：文字档 = 紧贴标题首字左侧的 9px 小标记（整组居中、竖向对墨迹中心，
+## 见 `_layout_title`）；缩略档 = 铺满卡片居中。
+## 文字档：方块上下各留 1~2px 嵌在字面里（9 = 12px 字面的 3/4）。
+## 缩略档的半径放大一档（4.5 → 6）：卡片整体被缩了，9px 的符号在 0.62x 下只剩 5.6px。
 func _layout_glyph() -> void:
 	if _glyph == null:
 		return
 	_glyph.zoom = _lod
 	if _lod_show_title():
-		_glyph.position = Vector2(PAD + 5.0, PAD + _h * 0.5 - 5.0)
-		_glyph.size = Vector2(10.0, 10.0)
-		_glyph.radius = 5.0
-	else:
-		_glyph.position = Vector2(PAD, PAD)
-		_glyph.size = Vector2(_w, _h)
-		_glyph.radius = 6.0
+		_layout_title()
+		return
+	_glyph.position = Vector2(PAD, PAD)
+	_glyph.size = Vector2(_w, _h)
+	_glyph.radius = minf(_w, _h) * 0.34
 	_glyph.queue_redraw()
+
+
+## 文字档摆位：把**符号 + 标题当成一个整体**在卡片里水平居中，符号紧贴首字。
+## 上一版是「符号钉死在 PAD+5、标题独立居中」——短标题时符号孤零零挂在左边卡沿上，
+## 与文字之间空出一大片，既压边又看不出它跟哪个字是一组。
+## 文字宽度按当前字形实测（`get_string_size`），超长时整组吃满可用宽度、交给 ellipsis 截断。
+func _layout_title() -> void:
+	if _title == null or _glyph == null:
+		return
+	if not _lod_show_title():
+		_title.visible = false
+		return
+	_title.visible = true
+	var pad_x := PAD + 6.0                 # 符号最左不越过卡沿内缩 6px
+	var avail := _w - 12.0
+	var font := _title.get_theme_font("font")
+	var fsize := _title.get_theme_font_size("font_size")
+	var text_w := font.get_string_size(_title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x
+	var max_text := maxf(avail - GLYPH_BOX - GLYPH_GAP, 1.0)
+	text_w = minf(text_w, max_text)
+	var group_w := GLYPH_BOX + GLYPH_GAP + text_w
+	var left := pad_x + maxf((avail - group_w) * 0.5, 0.0)
+	## 竖向：方块中心 = 卡中线；标题矩形从「卡中线 − TITLE_INK_CY」起排（TOP 对齐），
+	## 墨迹中心因此落在卡中线上 —— 两者同一基准，见 TITLE_INK_CY
+	var mid_y := PAD + _h * 0.5
+	_glyph.position = Vector2(left, mid_y - GLYPH_BOX * 0.5)
+	_glyph.size = Vector2(GLYPH_BOX, GLYPH_BOX)
+	_glyph.radius = GLYPH_BOX * 0.5
+	_glyph.zoom = _lod
+	_glyph.queue_redraw()
+	## 标题左对齐贴着符号：居中排版会让文字在剩余宽度里再居中一次，符号就又飘走了
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_title.position = Vector2(left + GLYPH_BOX + GLYPH_GAP, mid_y - TITLE_INK_CY)
+	_title.size = Vector2(maxf(pad_x + avail - _title.position.x, 1.0), TITLE_H)
 
 
 ## 类型色跟着**纸面深浅**走：深色反白（已捕获线索 / 拖动目标）上原色对比不足 1.5:1，
@@ -437,20 +499,21 @@ func _sync_glyph_color(on_dark: bool) -> void:
 ## 长得一模一样（旧代码 `flat = _container and (not _explored or _collapsed)`）。
 func _apply_plain_look() -> void:
 	var flat := _container and not _explored
+	## 1-bit：**整卡平涂，只有 1px 黑边**。原先的 hi→mid→lo 三段渐变、上缘奶油白高光、
+	## 右下柔光投影，全是「纸面浮雕」的语法 —— 在纯白桌面上它们只会把卡片抹成一团雾，
+	## 而不是让卡片浮起来。1-bit 的层次只有两条：**线宽**（1px / 2px / 双线）
+	## 与 **线型**（实线 / 虚线）。所以这里把面拉平、把影和高光关掉。
+	var face: Color = TecTheme.BG if flat else TecTheme.CARD
 	_mat.set_shader_parameter("flat_fill", flat)
-	_mat.set_shader_parameter("col_hi", TecTheme.BG if flat else Color("fbf8ee"))
-	_mat.set_shader_parameter("col_mid", TecTheme.BG if flat else Color("f5f2e8"))
-	_mat.set_shader_parameter("col_lo", TecTheme.BG if flat else Color("eee9d7"))
-	## 1px 描边：原值 0.30（shader 内 ×1.4 = 0.42，对纸面 2.12:1）比 W3C 给非文本边界的
-	## 3:1 还低，卡片就成了「浮在雾里」。0.42 → 实测 3.2:1，仍是一条发丝线而不是墨框。
-	_mat.set_shader_parameter("edge_col", Color(0, 0, 0, 0) if flat
-		else Color(0.290, 0.271, 0.204, 0.42))
-	_mat.set_shader_parameter("rim_col", Color(0, 0, 0, 0) if flat
-		else Color(1.0, 0.988, 0.945, 0.95))
-	_mat.set_shader_parameter("shade_col", Color(0, 0, 0, 0) if flat
-		else Color(0.306, 0.282, 0.212, 0.30))
+	_mat.set_shader_parameter("col_hi", face)
+	_mat.set_shader_parameter("col_mid", face)
+	_mat.set_shader_parameter("col_lo", face)
+	_mat.set_shader_parameter("edge_col", TecTheme.NONE if flat else TecTheme.INK)
+	_mat.set_shader_parameter("rim_col", TecTheme.NONE)
+	_mat.set_shader_parameter("shade_col", TecTheme.NONE)
 	_title.add_theme_color_override("font_color", TecTheme.MUTED if flat else TecTheme.TEXT)
 	_sync_glyph_color(false)
+	_border.thick_line = false
 	_border.double_line = _hub
 	_border.visible = flat or _collapsed or _hub
 	_border.queue_redraw()
@@ -462,12 +525,14 @@ func _apply_plain_look() -> void:
 ## 内嵌阴影 + 顶上 1px 白边。已捕获的线索「翻到背面」，一眼能和没读过的区分开。
 func _apply_got_look() -> void:
 	_mat.set_shader_parameter("flat_fill", false)
-	_mat.set_shader_parameter("col_hi", DARK_HI)
-	_mat.set_shader_parameter("col_mid", DARK_HI.lerp(DARK_LO, 0.55))
-	_mat.set_shader_parameter("col_lo", DARK_LO)
-	_mat.set_shader_parameter("edge_col", Color(0, 0, 0, 0))
-	_mat.set_shader_parameter("rim_col", Color(1, 1, 1, 0.28))
-	_mat.set_shader_parameter("shade_col", Color(0, 0, 0, 0.35))
+	## 反白面取**纯黑**：`#333`→`#1a1a1a` 的三段渐变在 1-bit 里是三个不同的灰，
+	## 等于把「已捕获」画成「一张脏纸」。这里只有黑与白。
+	_mat.set_shader_parameter("col_hi", TecTheme.INK)
+	_mat.set_shader_parameter("col_mid", TecTheme.INK)
+	_mat.set_shader_parameter("col_lo", TecTheme.INK)
+	_mat.set_shader_parameter("edge_col", TecTheme.NONE)
+	_mat.set_shader_parameter("rim_col", TecTheme.NONE)
+	_mat.set_shader_parameter("shade_col", TecTheme.NONE)
 	_title.add_theme_color_override("font_color", TecTheme.CARD)
 	_sync_glyph_color(true)
 	_border.visible = false
@@ -478,30 +543,36 @@ func _apply_got_look() -> void:
 ## Web `.node.lit`：金框 `#e3b341` + 暖白底 `#fffbeb` + 双层外发光。
 ## 发光用贴图光晕近似（CSS 是 `0 0 14px 3px` + `0 0 46px 14px` 两层叠加）。
 func _apply_lit_look() -> void:
+	## 1-bit 的「点亮」：**白底 + 2px 黑粗框**（而不是金框 + 金晕）。
+	## 金色 `#e3b341` 对白只有 1.86:1，换到白纸上连自己的轮廓都画不出来；
+	## 而 2px 对 1px 是这套语言里一眼可辨的强度差。卡面仍是白的 —— 强调交给线，不交给色块。
 	_mat.set_shader_parameter("flat_fill", false)
-	_mat.set_shader_parameter("col_hi", Color("fffdf6"))
-	_mat.set_shader_parameter("col_mid", Color("fffbeb"))
-	_mat.set_shader_parameter("col_lo", Color("fcf0cd"))
-	_mat.set_shader_parameter("edge_col", Color("e3b341"))
-	_mat.set_shader_parameter("rim_col", Color(1, 0.988, 0.945, 0.95))
-	_mat.set_shader_parameter("shade_col", Color(1.0, 0.769, 0.259, 0.16))
+	_mat.set_shader_parameter("col_hi", TecTheme.CARD)
+	_mat.set_shader_parameter("col_mid", TecTheme.CARD)
+	_mat.set_shader_parameter("col_lo", TecTheme.CARD)
+	_mat.set_shader_parameter("edge_col", TecTheme.NONE)
+	_mat.set_shader_parameter("rim_col", TecTheme.NONE)
+	_mat.set_shader_parameter("shade_col", TecTheme.NONE)
 	_title.add_theme_color_override("font_color", TecTheme.TEXT)
 	_sync_glyph_color(false)
-	_border.visible = false
+	_border.thick_line = true
+	_border.double_line = false
+	_border.visible = true
+	_border.queue_redraw()
 	if _glow != null:
-		_glow.visible = true
+		_glow.visible = false
 
 
 ## Web `.node.over{background:linear-gradient(150deg,#38372f,#1f1f19);color:var(--card);transform:scale(1.06)}`
 ## —— 拖动的**目标节点**整块反白。缩放 1.06 需要 pivot，会牵动连线端点，P0 先只做反白。
 func _apply_over_look() -> void:
 	_mat.set_shader_parameter("flat_fill", false)
-	_mat.set_shader_parameter("col_hi", DARK_HI)
-	_mat.set_shader_parameter("col_mid", DARK_HI.lerp(DARK_LO, 0.5))
-	_mat.set_shader_parameter("col_lo", DARK_LO)
-	_mat.set_shader_parameter("edge_col", Color(0, 0, 0, 0))
-	_mat.set_shader_parameter("rim_col", Color(1.0, 0.988, 0.945, 0.18))
-	_mat.set_shader_parameter("shade_col", Color(0.306, 0.282, 0.212, 0.45))
+	_mat.set_shader_parameter("col_hi", TecTheme.INK)
+	_mat.set_shader_parameter("col_mid", TecTheme.INK)
+	_mat.set_shader_parameter("col_lo", TecTheme.INK)
+	_mat.set_shader_parameter("edge_col", TecTheme.NONE)
+	_mat.set_shader_parameter("rim_col", TecTheme.NONE)
+	_mat.set_shader_parameter("shade_col", TecTheme.NONE)
 	_title.add_theme_color_override("font_color", TecTheme.CARD)
 	_sync_glyph_color(true)
 	_border.visible = false

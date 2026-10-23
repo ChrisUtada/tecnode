@@ -201,6 +201,8 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("首行已贴出", int(state["lines"]) == 1 and chat.line_count() == 1, str(state["lines"]))
 	check("打字未完成", chat.is_typing())
 	check("打字机 45ms/字", ChatWindow.CHAR_MS == 45.0, str(ChatWindow.CHAR_MS))
+	check("对话窗无滚动条", chat.find_children("*", "ScrollContainer", true, false).is_empty())
+	check("对话窗预排全文行", chat._rows.size() == int(state["total"]), str(chat._rows.size()))
 	var first_text := String(scene.dbg_dialogues().by_id("DLG_0704_zs_lhs").script_lines[0].text)
 	check("首行是旁白原文", chat.current_text() == first_text, chat.current_text())
 	check("补全本句", scene.dbg_chat_advance())
@@ -208,6 +210,16 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("再点出朱穗台词", scene.dbg_chat_advance() and chat.line_count() == 2)
 	scene.dbg_chat_finish()
 	check("台词行已贴出", chat.line_count() == 2)
+	await process_frame
+	await process_frame
+	var last_root: Control = chat._rows[chat._rows.size() - 1]["root"]
+	check("对话窗包住预排全文", chat.get_global_rect().encloses(last_root.get_global_rect()),
+		"%s / %s" % [chat.get_global_rect(), last_root.get_global_rect()])
+	var chat_bg := chat.get_node_or_null("bg") as Control
+	check("对话窗底板随内容增高", chat_bg != null
+		and chat_bg.size.y >= chat.body.size.y + SysWindow.BAR_H + 20.0,
+		"null" if chat_bg == null else "%.0f / %.0f" % [
+			chat_bg.size.y, chat.body.size.y + SysWindow.BAR_H + 20.0])
 
 	check("切时刻关对话窗", scene.dbg_set_time("SCENES_0602") and scene.dbg_chat() == null)
 	await process_frame

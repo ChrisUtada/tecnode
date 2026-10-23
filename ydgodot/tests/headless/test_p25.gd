@@ -311,6 +311,10 @@ func _test_desktop(c: CaseLoader) -> void:
 	gs = garden.dbg_state()
 	check("旁白首段", int(gs["narr_index"]) == 0 and int(gs["narr_shown"]) == 1, str(gs))
 	check("旁白增高窗", garden.size.y > base_h, "%s / %s" % [str(garden.size.y), str(base_h)])
+	check("旁白完整落在窗内", garden._narr != null
+		and garden.get_global_rect().encloses(garden._narr.get_global_rect()),
+		"null" if garden._narr == null else "%s / %s" % [
+			garden.get_global_rect(), garden._narr.get_global_rect()])
 	var segs := GardenSystem.narr_segments(GardenSystem.true_ending_message(c))
 	check("旁白可继续", garden.dbg_advance_narr())
 	gs = garden.dbg_state()

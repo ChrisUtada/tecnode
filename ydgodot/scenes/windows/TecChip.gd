@@ -13,9 +13,6 @@ func setup_chip() -> void:
 	focus_mode = Control.FOCUS_NONE
 	tooltip_text = "TEC 已收起：单击展开对话窗"
 	var normal := TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN)
-	normal.shadow_color = Color(0.306, 0.282, 0.212, 0.24)
-	normal.shadow_size = 8
-	normal.shadow_offset = Vector2(3, 5)
 	add_theme_stylebox_override("normal", normal)
 	add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_WIN))
 	add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, TecTheme.R_WIN))
@@ -77,9 +74,9 @@ func _build_content() -> void:
 	_bar.show_percentage = false
 	_bar.custom_minimum_size = Vector2(0, 4)
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bar.modulate = Color(1, 1, 1, 0)
-	_bar.add_theme_stylebox_override("background", TecTheme.flat(TecTheme.FACE_LO, 3, TecTheme.FACE_LO, 0))
-	_bar.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 3, TecTheme.LINE, 0))
+	_bar.modulate = TecTheme.white(0.0)
+	_bar.add_theme_stylebox_override("background", TecTheme.flat(TecTheme.FACE_LO, 0, TecTheme.FACE_LO, 0))
+	_bar.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 0, TecTheme.LINE, 0))
 	meta.add_child(_bar)
 
 
@@ -90,20 +87,20 @@ func _add_dot() -> void:
 	_dot.position = Vector2(181, -4)
 	_dot.visible = false
 	_dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := TecTheme.flat(TecTheme.LINE, 6, TecTheme.LINE, 0)
+	var sb := TecTheme.flat(TecTheme.LINE, TecTheme.R_PILL, TecTheme.LINE, 0)
 	_dot.add_theme_stylebox_override("panel", sb)
 	add_child(_dot)
 
 
 func set_idle(dot: bool = false) -> void:
 	_bar.value = 0
-	_bar.modulate = Color(1, 1, 1, 0)
+	_bar.modulate = TecTheme.white(0.0)
 	_dot.visible = dot
 	_status.text = "分析完成 · 点此展开" if dot else "助手已收起 · 点此展开"
 
 
 func set_analyzing(label: String, ratio: float = 0.0) -> void:
-	_bar.modulate = Color(1, 1, 1, 1)
+	_bar.modulate = TecTheme.white(1.0)
 	_bar.value = clampf(ratio, 0.0, 1.0) * 100.0
 	_dot.visible = false
 	_status.text = "分析中 · " + label

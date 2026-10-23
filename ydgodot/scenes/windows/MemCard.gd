@@ -6,24 +6,22 @@ extends SysWindow
 
 const CHAR_MS := 45.0
 const MARGIN := 14.0
-const TALK_COLOR := Color("5c584a")
-const SAY_BG := Color("ccc7ad")
-const SAY_EDGE := Color("8a8672")
+const TALK_COLOR := TecTheme.INK_MUTED
+const SAY_BG := TecTheme.MEM_SAY_BG
+const SAY_EDGE := TecTheme.INK_FAINT
 const AVATAR_ART := {
 	"CHARS_TEC": "res://assets/raw/tec-avatar.png",
 	"CHARS_EXEC": "res://assets/raw/executor-avatar.png",
 }
 
-var _scroll: ScrollContainer
 var _line_box: VBoxContainer
 var _lines: Array = []
+var _rows: Array = []
 var _idx := 0
-var _typing := false
-var _cur: Label = null
+var _cur: TypewriterLabel = null
 var _cur_text := ""
-var _shown := 0.0
 var _play_mode := false
-## 标题条上那颗类型符号的类型（时刻 = ◆，人物对话 = ●）。颜色走深色面提亮版。
+## 标题条上那颗类型符号的类型（时刻 = 时，人物对话 = 人）。颜色走深色面提亮版。
 var _kind := "time"
 var _glyph: KindGlyph
 
@@ -69,46 +67,43 @@ func _setup_lines(p_title: String, p_lines: Array, w: float, h: float, play_mode
 	setup(p_title, w, h)
 	_apply_memory_skin()
 
-	_scroll = ScrollContainer.new()
-	_scroll.name = "mem_scroll"
-	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_scroll.gui_input.connect(_on_card_input)
-	content.add_child(_scroll)
-
 	_line_box = VBoxContainer.new()
 	_line_box.name = "mem_lines"
 	_line_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_line_box.add_theme_constant_override("separation", 6)
-	_scroll.add_child(_line_box)
+	content.add_child(_line_box)
 
 	gui_input.connect(_on_card_input)
+	_build_rows()
 	_play_next()
+	call_deferred("_fit_height")
 
 
-## 暗纸是另一套皮，不走烘焙九切片（那张是米白卡面）
+## 不走烘焙九切片（那张是米白卡面，且带固定的圆角与外影）；回忆卡自己画框。
 func _uses_baked_frame() -> bool:
 	return false
 
 
+## 回忆卡：白面 + **3px 黑框**（普通窗 2px、节点卡 1px）。
+## 层次靠线宽，不靠做旧。原来这里还挂着 18% 白高光与 34% 墨内影（模拟纸的隆起/压痕），
+## 在 1-bit 里它们只会把 3px 黑框内侧糊成两档灰 —— 拟物语法，P4 一并关掉。
 func _apply_memory_skin() -> void:
 	var bg := get_node_or_null("bg") as ColorRect
 	if bg != null and bg.material is ShaderMaterial:
 		var mat := bg.material as ShaderMaterial
-		mat.set_shader_parameter("col_hi", Color("e2deca"))
-		mat.set_shader_parameter("col_mid", Color("dcd8c2"))
-		mat.set_shader_parameter("col_lo", Color("d2ceb8"))
-		mat.set_shader_parameter("edge_col", Color("2b2b26"))
-		mat.set_shader_parameter("rim_col", Color(1.0, 0.988, 0.945, 0.18))
-		mat.set_shader_parameter("shade_col", Color(0.169, 0.169, 0.149, 0.34))
-		mat.set_shader_parameter("gradient_mix", 0.35)
+		mat.set_shader_parameter("col_hi", TecTheme.MEM_HI)
+		mat.set_shader_parameter("col_mid", TecTheme.MEM_MID)
+		mat.set_shader_parameter("col_lo", TecTheme.MEM_LO)
+		mat.set_shader_parameter("edge_col", TecTheme.NONE)
+		mat.set_shader_parameter("rim_col", TecTheme.NONE)
+		mat.set_shader_parameter("shade_col", TecTheme.NONE)
+		mat.set_shader_parameter("gradient_mix", 0.0)
 
 	var border := Panel.new()
 	border.name = "mem_border"
 	border.position = Vector2(PAD, PAD)
 	border.size = size - Vector2(PAD * 2.0, PAD * 2.0)
-	border.add_theme_stylebox_override("panel", TecTheme.flat(Color(0, 0, 0, 0), TecTheme.R_WIN, Color("2b2b26"), 3))
+	border.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.NONE, TecTheme.R_WIN, TecTheme.INK, 3))
 	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(border)
 	move_child(border, 1)
@@ -117,7 +112,7 @@ func _apply_memory_skin() -> void:
 	if bar != null:
 		var bar_bg := ColorRect.new()
 		bar_bg.name = "mem_bar_bg"
-		bar_bg.color = Color("2b2b26")
+		bar_bg.color = TecTheme.INK
 		bar_bg.position = Vector2.ZERO
 		bar_bg.size = bar.size
 		bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -125,18 +120,18 @@ func _apply_memory_skin() -> void:
 		bar.move_child(bar_bg, 0)
 	var title := get_node_or_null("bar/win_title") as Label
 	if title != null:
-		title.add_theme_color_override("font_color", Color("e6e3d2"))
+		title.add_theme_color_override("font_color", TecTheme.TEXT_ON_DARK)
 	var close := get_node_or_null("bar/close") as Button
 	if close != null:
-		close.set_meta("glyph_normal", Color("e6e3d2"))
-		close.set_meta("glyph_hot", Color("e6e3d2"))
+		close.set_meta("glyph_normal", TecTheme.TEXT_ON_DARK)
+		close.set_meta("glyph_hot", TecTheme.TEXT_ON_DARK)
 		_paint_mini_glyph(close, false)
-		close.add_theme_stylebox_override("normal", TecTheme.flat(Color("2b2b26"), 7, Color("8a8672")))
-		close.add_theme_stylebox_override("hover", TecTheme.flat(Color("3a3a33"), 7, Color("8a8672")))
-		close.add_theme_stylebox_override("pressed", TecTheme.flat(Color("1f1f19"), 7, Color("8a8672")))
+		close.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.INK, TecTheme.R_BTN, TecTheme.INK_FAINT))
+		close.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.FACE_DARK_HOVER, TecTheme.R_BTN, TecTheme.INK_FAINT))
+		close.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_DARK_LO, TecTheme.R_BTN, TecTheme.INK_FAINT))
 	var sep := get_node_or_null("sep") as ColorRect
 	if sep != null:
-		sep.color = Color("8a8672")
+		sep.color = TecTheme.INK_FAINT
 	_add_kind_glyph()
 
 
@@ -153,50 +148,49 @@ func _add_kind_glyph() -> void:
 	_glyph.name = "mem_glyph"
 	_glyph.kind = _kind
 	_glyph.col = TecTheme.kind_color(_kind, true)
-	_glyph.position = Vector2(9.0, (bar.size.y - 10.0) * 0.5)
-	_glyph.size = Vector2(10.0, 10.0)
-	_glyph.radius = 5.0
+	_glyph.position = Vector2(9.0, (bar.size.y - 16.0) * 0.5)
+	_glyph.size = Vector2(16.0, 16.0)
+	_glyph.radius = 8.0
 	_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.add_child(_glyph)
 
 
+func _build_rows() -> void:
+	_rows.clear()
+	for spec in _lines:
+		var d := spec as Dictionary
+		var text := String(d.get("text", ""))
+		var kind := String(d.get("t", "narr"))
+		var built := _build_say(d, text) if kind == "say" else _build_text(kind, text)
+		var row := built[0] as Control
+		var label := built[1] as TypewriterLabel
+		row.modulate.a = 0.0
+		_line_box.add_child(row)
+		_rows.append({"root": row, "label": label, "text": text})
+
+
 func _play_next() -> void:
-	if _idx >= _lines.size():
-		_typing = false
-		set_process(false)
+	if _idx >= _rows.size():
 		return
-	var spec := _lines[_idx] as Dictionary
+	var row := _rows[_idx] as Dictionary
 	_idx += 1
-	var text := String(spec.get("text", ""))
-	var kind := String(spec.get("t", "narr"))
-	if kind == "say":
-		_append_say(spec, text)
-	else:
-		_append_text(kind, text)
-	_cur_text = text
-	_shown = 0.0
-	_typing = true
-	set_process(true)
-	_scroll_to_bottom()
+	_cur = row["label"] as TypewriterLabel
+	_cur_text = String(row["text"])
+	(row["root"] as Control).modulate.a = 1.0
+	_cur.start_typing()
 
 
-func _new_text_label(color: Color) -> Label:
-	var label := TecTheme.label("", TecTheme.FS_TITLE, color)
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.visible_characters = 0
-	return label
+func _new_text_label(color: Color) -> TypewriterLabel:
+	return TecTheme.narrative_label("", color)
 
 
-func _append_text(kind: String, text: String) -> void:
-	var label := _new_text_label(TALK_COLOR if kind == "talk" else Color("2b2b26"))
+func _build_text(kind: String, text: String) -> Array:
+	var label := _new_text_label(TALK_COLOR if kind == "talk" else TecTheme.INK)
 	label.text = text
-	_line_box.add_child(label)
-	_cur = label
+	return [label, label]
 
 
-func _append_say(spec: Dictionary, text: String) -> void:
+func _build_say(spec: Dictionary, text: String) -> Array:
 	var who := String(spec.get("who", ""))
 	var name := String(spec.get("name", ""))
 	if name == "":
@@ -216,12 +210,11 @@ func _append_say(spec: Dictionary, text: String) -> void:
 	name_label.name = "mem_say_name"
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	main.add_child(name_label)
-	var label := _new_text_label(Color("2b2b26"))
+	var label := _new_text_label(TecTheme.INK)
 	label.text = text
 	main.add_child(label)
 	row.add_child(main)
-	_line_box.add_child(row)
-	_cur = label
+	return [row, label]
 
 
 func _say_avatar(who: String, name: String) -> Control:
@@ -231,7 +224,7 @@ func _say_avatar(who: String, name: String) -> Control:
 	frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	frame.clip_contents = true
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.add_theme_stylebox_override("panel", TecTheme.flat(SAY_BG, 9, SAY_EDGE))
+	frame.add_theme_stylebox_override("panel", TecTheme.flat(SAY_BG, TecTheme.R_SM, SAY_EDGE))
 	var art := String(AVATAR_ART.get(who, ""))
 	if art != "" and ResourceLoader.exists(art):
 		var tex := TextureRect.new()
@@ -250,30 +243,37 @@ func _say_avatar(who: String, name: String) -> Control:
 	return frame
 
 
-func _process(delta: float) -> void:
-	if not _typing or _cur == null:
-		return
-	_shown += delta * (1000.0 / CHAR_MS)
-	var n := int(_shown)
-	if n >= _cur_text.length():
-		_finish_line()
-	else:
-		_cur.visible_characters = n
-
-
 func _finish_line() -> void:
 	if _cur != null:
-		_cur.visible_characters = -1
-	_typing = false
-	set_process(false)
+		_cur.finish_typing()
+
+
+func _fit_height() -> void:
+	if _line_box == null:
+		return
+	if not is_inside_tree():
+		await tree_entered
+	await get_tree().process_frame
+	var lines_h := _line_box.get_combined_minimum_size().y
+	var target := SysWindow.BAR_H + 20.0 + lines_h
+	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:
+		set_inner_height(target)
+
+
+func _sync_frame(inner: Vector2) -> void:
+	super._sync_frame(inner)
+	var border := get_node_or_null("mem_border") as Control
+	if border != null:
+		border.position = Vector2(PAD, PAD)
+		border.size = inner
 
 
 ## 单击推进：本行还在打字就先补全；已打完就出下一行。
 func advance() -> bool:
-	if _typing:
+	if is_typing():
 		_finish_line()
 		return true
-	if _idx >= _lines.size():
+	if _idx >= _rows.size():
 		return false
 	_play_next()
 	return true
@@ -300,11 +300,6 @@ func _on_card_input(event: InputEvent) -> void:
 		if _dragged:
 			position = _drag_grab + (event.global_position - _drag_press)
 	# 「点击提层」走 SysWindow.raise_now（Desktop._place_z 接进来的 rank 表回调）
-
-
-func _scroll_to_bottom() -> void:
-	if _scroll != null:
-		_scroll.set_deferred("scroll_vertical", 1_000_000)
 
 
 # ── 测试钩子 ────────────────────────────────────────────────────────────
@@ -354,11 +349,7 @@ func current_text() -> String:
 
 
 func typed_text() -> String:
-	if _cur == null:
-		return ""
-	if _cur.visible_characters < 0:
-		return _cur.text
-	return _cur.text.substr(0, _cur.visible_characters)
+	return _cur.typed_text() if _cur != null else ""
 
 
 func index() -> int:
@@ -366,7 +357,7 @@ func index() -> int:
 
 
 func is_typing() -> bool:
-	return _typing
+	return _cur != null and _cur.is_typing()
 
 
 func finish_line() -> void:

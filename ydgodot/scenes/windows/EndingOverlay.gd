@@ -34,7 +34,7 @@ func setup_overlay() -> void:
 
 	var dim := ColorRect.new()
 	dim.name = "dim"
-	dim.color = Color(0.11, 0.11, 0.10, 0.88)
+	dim.color = TecTheme.DIM_HEAVY
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(dim)
@@ -106,33 +106,32 @@ func _process(delta: float) -> void:
 		var line: EndingLineDef = _lines[_idx]
 		_idx += 1
 		_shown += 1
-		var l := TecTheme.label(line.text, TecTheme.FS_TITLE, TecTheme.CARD)
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size = Vector2(560, 0)
-		_box.add_child(l)
+		_make_line(line.text, TecTheme.FS_TITLE, TecTheme.CARD, 560.0, true)
 		_wait = 0.0 if _fast else float(line.delay_ms) / 1000.0
 	else:
 		_show_message()
 
 
-func _show_message() -> void:
+func _make_line(text: String, size: int, color: Color, min_w: float, animate: bool) -> TypewriterLabel:
+	var l := TypewriterLabel.new()
+	l.configure(text, size, color)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.custom_minimum_size = Vector2(min_w, 0)
+	_box.add_child(l)
+	if animate:
+		l.start_typing()
+	else:
+		l.finish_typing()
+	return l
+
+
+func _show_message(animate: bool = true) -> void:
 	if _is_true and _truename != "" and not _truename_shown:
-		var tn := TecTheme.label("真名已识破\n——%s——" % _truename, TecTheme.FS_DISPLAY, TecTheme.CARD)
+		var tn := _make_line("真名已识破\n——%s——" % _truename, TecTheme.FS_DISPLAY, TecTheme.CARD, 560.0, animate)
 		tn.name = "truename"
-		tn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		tn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		tn.custom_minimum_size = Vector2(560, 0)
-		tn.add_theme_constant_override("line_spacing", 8)
-		_box.add_child(tn)
 		_truename_shown = true
 	if _message != "":
-		var m := TecTheme.label(_message, TecTheme.FS_BODY, TecTheme.LINE2)
-		m.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		m.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		m.custom_minimum_size = Vector2(620, 0)
-		m.add_theme_constant_override("line_spacing", 6)
-		_box.add_child(m)
+		_make_line(_message, TecTheme.FS_BODY, TecTheme.LINE2, 620.0, animate)
 		_shown_message = _message
 		_message = ""
 	_hint.visible = true
@@ -148,17 +147,22 @@ func finish_now() -> void:
 		var line: EndingLineDef = _lines[_idx]
 		_idx += 1
 		_shown += 1
-		var l := TecTheme.label(line.text, TecTheme.FS_TITLE, TecTheme.CARD)
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size = Vector2(560, 0)
-		_box.add_child(l)
-	_show_message()
+		_make_line(line.text, TecTheme.FS_TITLE, TecTheme.CARD, 560.0, false)
+	for child in _box.get_children():
+		if child is TypewriterLabel:
+			(child as TypewriterLabel).finish_typing()
+	_show_message(false)
+	_hint.visible = true
+	_playing = false
+	set_process(false)
 
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if _playing:
+			for child in _box.get_children():
+				if child is TypewriterLabel:
+					(child as TypewriterLabel).finish_typing()
 			_wait = 0.0          # 点一下 = 快进到下一幕
 		else:
 			visible = false

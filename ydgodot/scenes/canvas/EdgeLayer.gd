@@ -16,11 +16,14 @@ extends Control
 
 const SEGMENTS := 24
 
+## 1-bit：**四态全是纯黑**，强度只由「线宽 + 线型」表达 —— 这跟卡片/窗体的做法是同一条规律。
+## 原来靠 alpha（0.55）和灰值（#8C8C8C）分强弱，在纯白底上灰色线会被读成「没画好」，
+## 而不是「这条关系弱」。参考图里也没有灰线，只有 1px 与 2px 的黑线。
 const STYLE := {
-	"entity": {"color": Color("8a8672"), "width": 1.3, "dash": 0.0, "gap": 0.0, "alpha": 1.0},
-	"move": {"color": Color("2b2b26"), "width": 1.6, "dash": 0.0, "gap": 0.0, "alpha": 1.0},
-	"cond": {"color": Color("2b2b26"), "width": 1.6, "dash": 5.0, "gap": 4.0, "alpha": 1.0},
-	"tried": {"color": Color("b8b49e"), "width": 1.0, "dash": 3.0, "gap": 4.0, "alpha": 0.55},
+	"entity": {"color": TecTheme.INK, "width": 1.0, "dash": 0.0, "gap": 0.0, "alpha": 1.0},
+	"move": {"color": TecTheme.INK, "width": 2.0, "dash": 0.0, "gap": 0.0, "alpha": 1.0},
+	"cond": {"color": TecTheme.INK, "width": 2.0, "dash": 5.0, "gap": 4.0, "alpha": 1.0},
+	"tried": {"color": TecTheme.INK, "width": 1.0, "dash": 2.0, "gap": 5.0, "alpha": 1.0},
 }
 
 ## [{a: Vector2, b: Vector2, kind: String, dim: bool}]
@@ -104,7 +107,7 @@ func _draw() -> void:
 	# 幽灵线最后画，压在既有连线上面（Web 是 appendChild 到同一个 svg，天然在最上层）
 	if not _ghost.is_empty():
 		var line := PackedVector2Array([_ghost["a"], _ghost["b"]])
-		_draw_dashed(line, Color(0.169, 0.169, 0.149, 0.85), _w(2.0), _w(6.0), _w(5.0))
+		_draw_dashed(line, TecTheme.scrim(0.85), _w(2.0), _w(6.0), _w(5.0))
 
 
 ## 二次贝塞尔：控制点抬升 = min(70, |dx| × 0.16)

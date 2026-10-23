@@ -47,7 +47,12 @@ void fragment() {
 
 	// 卡面
 	float d = sd_rbox(px, half_size, radius);
-	float body = 1.0 - smoothstep(-0.75, 0.75, d);
+	// 1-bit：**硬切**。原来 `smoothstep(-0.75, 0.75, d)` 是一圈 1.5px 的半透明过渡，
+	// 在白纸上读作「毛边」，也把纯黑描边稀释成灰。像素级硬边是这套界面的底线。
+	// 阈值放到 +0.5：卡片是**连续缩放**的（0.62~1.3x），边缘几乎不可能落在整数像素上，
+	// 用 step(0, d) 会把整像素切掉、只剩亚像素覆盖 —— 肉眼看到的就是「一圈灰毛」。
+	// 放宽半像素仍是硬边（没有渐变过渡），但能稳定占满一个像素。
+	float body = 1.0 - smoothstep(-0.5, 0.5, d);
 
 	vec3 base = col_mid.rgb;
 	if (!flat_fill) {
@@ -72,8 +77,11 @@ void fragment() {
 
 	// 1px 描边 = `border:1px solid var(--edge)`。ring 梯度铺开约 1.4px（比 CSS 那条真 1px
 	// 边界软），按 edge 的 alpha 打七折会太淡、乘 3 倍又成了实墨黑边；1.4 是对拍扫出来的档位。
-	float ring = smoothstep(-1.6, -0.2, d) * body;
-	base = mix(base, edge_col.rgb, ring * clamp(edge_col.a * 1.4, 0.0, 1.0));
+	// 环带 = 区间相减：d ∈ [-1.5, 0) 为 1，其余为 0。
+	// ⚠ 别写成 `1.0 - smoothstep(...)` —— 那样卡片**内部**也会是 1，整块涂黑。
+	float ring = step(-1.5, d) - step(0.0, d);
+	// 硬边不再需要 ×1.4 的补偿（那是给软渐变补 alpha 的）
+	base = mix(base, edge_col.rgb, ring * clamp(edge_col.a, 0.0, 1.0));
 
 	// 影子合成：CSS 里先画高光再画暗影，所以暗影压在上面
 	float sa = 1.0 - (1.0 - sh_a) * (1.0 - gl_a);

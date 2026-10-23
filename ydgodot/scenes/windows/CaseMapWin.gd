@@ -57,17 +57,24 @@ func _make_row(c: Dictionary) -> Control:
 	row.name = "row_" + id
 	row.custom_minimum_size = Vector2(0, 66)
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
-	var style := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM)
+	## 键线一律纯黑（P4.2）—— 原来已知/可进入的行用的是 `EDGE`（30% 黑），
+	## 在这扇窗里读作「还没做单色改版的旧控件」。锁定行才留淡线：它是真的「不可点」。
+	var style := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.INK if known else TecTheme.EDGE_SOFT)
+	## 显式写死内容边距：悬停要把键线从 1px 加到 2px，不钉住边距的话
+	## 行内所有子控件都会被顶 1px（参考图里所有键也是一直 1px，只有悬停加粗）。
+	style.content_margin_left = 2
+	style.content_margin_right = 2
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
 	if not known:
 		style.bg_color = TecTheme.BG
-		style.border_color = TecTheme.EDGE_SOFT
-	elif current:
-		style.border_color = TecTheme.LINE
 	row.add_theme_stylebox_override("panel", style)
 	if clickable:
 		row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		row.mouse_entered.connect(func(): style.bg_color = TecTheme.BG)
-		row.mouse_exited.connect(func(): style.bg_color = TecTheme.CARD)
+		## 悬停 = 键线加粗（1px → 2px）。原来是 `CARD → BG` 换底色，
+		## 而这两个常量在单色版里都是纯白 —— 等于没有反馈。
+		row.mouse_entered.connect(func(): style.set_border_width_all(2))
+		row.mouse_exited.connect(func(): style.set_border_width_all(1))
 		row.gui_input.connect(_on_row_input.bind(id, clickable))
 
 	var hb := HBoxContainer.new()
@@ -80,7 +87,8 @@ func _make_row(c: Dictionary) -> Control:
 	glyph_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	glyph_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph_box.add_theme_stylebox_override("panel",
-		TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.EDGE))
+		TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN,
+			TecTheme.INK if known else TecTheme.EDGE_SOFT, 1))
 	hb.add_child(glyph_box)
 	var glyph := TecTheme.label("▣" if known else "▢", TecTheme.FS_BODY,
 		TecTheme.LINE if known else TecTheme.FAINT)
@@ -122,28 +130,31 @@ func _make_row(c: Dictionary) -> Control:
 	else:
 		state_text = "可进入"
 
-	var badge := PanelContainer.new()
+	## 状态牌按**按钮**的语法画（P4.2），三种档位只差键线与字色：
+	##   当前     → 白底 + 1px 键线 + **内键线**（参考图 “Find” 的双线 = 「就是这一个」）
+	##   可进入   → 白底 + 1px 键线
+	##   锁定/待接入 → 淡键线 + 淡字（它是真的不可点，靠键线浓度区分，不靠颜色）
+	## 原来是「当前 = 整块黑药丸」：那块黑是整窗最重的东西，把「可进入」压没了；
+	## 而且黑底是深色面的语法，不该长在按钮上。
+	var badge := Panel.new()
 	badge.name = "state"
-	badge.custom_minimum_size = Vector2(58, 24)
+	badge.custom_minimum_size = Vector2(64, 26)
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var state_style := TecTheme.flat(
-		TecTheme.LINE if state_kind == "on" else TecTheme.CARD,
-		TecTheme.R_PILL,
-		TecTheme.LINE if state_kind == "on" else TecTheme.EDGE_SOFT,
-		1)
-	state_style.content_margin_left = 8
-	state_style.content_margin_right = 8
-	if state_kind == "lock" or state_kind == "pend":
-		state_style.bg_color = Color(0, 0, 0, 0)
-	badge.add_theme_stylebox_override("panel", state_style)
+	var faded := state_kind == "lock" or state_kind == "pend"
+	badge.add_theme_stylebox_override("panel", TecTheme.flat(
+		TecTheme.CARD, TecTheme.R_PILL, TecTheme.INK_FAINT if faded else TecTheme.INK, 1))
 	hb.add_child(badge)
+	if state_kind == "on":
+		TecTheme.keyline_ring(badge, 3.0, TecTheme.R_PILL)
 
 	var state := TecTheme.label(state_text, TecTheme.FS_BODY,
-		TecTheme.CARD if state_kind == "on" else TecTheme.MUTED)
+		TecTheme.INK_FAINT if faded else TecTheme.TEXT)
 	state.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	state.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	state.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	## `Panel` 不是容器，子节点得自己铺满（原来的 PanelContainer 会自动排版）
+	state.set_anchors_preset(Control.PRESET_FULL_RECT)
 	badge.add_child(state)
 
 	return row

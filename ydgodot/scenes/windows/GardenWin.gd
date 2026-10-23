@@ -62,7 +62,7 @@ func _build_content() -> void:
 	bg.name = "field_bg"
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bg.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.BG, 10, TecTheme.EDGE_SOFT, 1))
+	bg.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.BG, TecTheme.R_SM, TecTheme.EDGE_SOFT, 1))
 	_field.add_child(bg)
 	content.add_child(_field)
 
@@ -143,7 +143,7 @@ func _make_plant(idx: int, plot: Dictionary) -> Control:
 	chip.size = Vector2(72, 20)
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.add_theme_stylebox_override("panel",
-		TecTheme.flat(TecTheme.LINE if bloom else TecTheme.CARD, 6,
+		TecTheme.flat(TecTheme.LINE if bloom else TecTheme.CARD, TecTheme.R_SM,
 			TecTheme.EDGE if bloom else TecTheme.EDGE_SOFT, 1))
 	p.add_child(chip)
 	var lab := TecTheme.label(GardenSystem.STAGE_NAMES[st], TecTheme.FS_BODY,
@@ -164,8 +164,8 @@ func _make_plant(idx: int, plot: Dictionary) -> Control:
 		bar.value = GardenSystem.progress_of(plot) * 100.0
 		bar.show_percentage = false
 		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		bar.add_theme_stylebox_override("background", TecTheme.flat(TecTheme.FACE_LO, 3, TecTheme.FACE_LO, 0))
-		bar.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 3, TecTheme.LINE, 0))
+		bar.add_theme_stylebox_override("background", TecTheme.flat(TecTheme.FACE_LO, 0, TecTheme.FACE_LO, 0))
+		bar.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 0, TecTheme.LINE, 0))
 		p.add_child(bar)
 	else:
 		var more := TecTheme.label("点击花朵", TecTheme.FS_BODY, TecTheme.LINE)
@@ -277,7 +277,7 @@ func _refresh_growth() -> void:
 		var chip: PanelContainer = plant.get_node_or_null("stage")
 		if chip != null:
 			chip.add_theme_stylebox_override("panel",
-				TecTheme.flat(TecTheme.LINE if st >= 4 else TecTheme.CARD, 6,
+				TecTheme.flat(TecTheme.LINE if st >= 4 else TecTheme.CARD, TecTheme.R_SM,
 					TecTheme.EDGE if st >= 4 else TecTheme.EDGE_SOFT, 1))
 			var lab: Label = chip.get_node_or_null("Label")
 			if lab != null:
@@ -376,7 +376,7 @@ func _rebuild_narr() -> void:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.add_theme_stylebox_override("panel",
-		TecTheme.flat(TecTheme.CARD, 8, TecTheme.EDGE_SOFT, 1))
+		TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE_SOFT, 1))
 	panel.gui_input.connect(func(ev): _on_narr_input(ev))
 	content.add_child(panel)
 
@@ -413,12 +413,12 @@ func _rebuild_narr() -> void:
 	head.add_child(x)
 
 	for i in shown:
-		var l := TecTheme.label(String(segs[i]), TecTheme.FS_TITLE, TecTheme.LINE)
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var l := TecTheme.narrative_label(String(segs[i]), TecTheme.LINE)
 		l.custom_minimum_size = Vector2(maxf(w - 28.0, 120.0), 0)
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_child(l)
+		if i == shown - 1:
+			l.start_typing()
 	if shown < segs.size():
 		var more := TecTheme.label("点一下 · 继续", TecTheme.FS_BODY, TecTheme.MUTED)
 		more.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -438,7 +438,7 @@ func _on_narr_input(event: InputEvent) -> void:
 func _fit_height() -> void:
 	if _field == null:
 		return
-	var content_h := content.get_combined_minimum_size().y
+	var content_h := content_min_height()
 	var inner := maxf(BASE_INNER_H, content_h + 10.0 + BAR_H + 22.0)
 	set_inner_height(inner)
 	if position.y + size.y > 740.0:

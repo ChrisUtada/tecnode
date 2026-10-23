@@ -25,7 +25,11 @@ const ANCHORS := {
 	"smell": Vector2(0.3160, 0.7727),
 	"taste": Vector2(0.2029, 0.3073),
 }
-const RED := Color("c0392b")
+## 推演阵列的几何骨架（虚线圆 / 虚线连线 / 点亮五边形的实线）。
+## 原来是朱红 `#c0392b` —— 整屏唯一的彩色，在纯白桌布上像一根天线。
+## 1-bit 里「错误 / 试错」由**线型**承担：虚线（0.42 alpha 的黑虚线 = 浅灰虚线）。
+## 变量名保留 RED 以免大改调用点，但值已是墨黑。
+const RED := TecTheme.INK
 
 var graph: GraphState
 var case_def: CaseLoader
@@ -104,10 +108,7 @@ func _build_executor() -> void:
 	frame.name = "frame"
 	frame.position = Vector2(6, 6)
 	frame.size = Vector2(72, 72)
-	var sb := TecTheme.flat(TecTheme.FACE_HI, 14, TecTheme.EDGE, 1)
-	sb.shadow_color = TecTheme.BEVEL_LO
-	sb.shadow_size = 7
-	sb.shadow_offset = Vector2(3, 4)
+	var sb := TecTheme.flat(TecTheme.FACE_HI, TecTheme.R_SM, TecTheme.EDGE, 1)
 	frame.add_theme_stylebox_override("panel", sb)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_exec.add_child(frame)
@@ -129,9 +130,6 @@ func _build_seed_pop() -> void:
 	_seed_pop.mouse_filter = Control.MOUSE_FILTER_STOP
 	_seed_pop.tooltip_text = "真名留下的种子 · 拖进花园"
 	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE, 1)
-	sb.shadow_color = TecTheme.BEVEL_LO
-	sb.shadow_size = 5
-	sb.shadow_offset = Vector2(2, 3)
 	_seed_pop.add_theme_stylebox_override("panel", sb)
 	var img := TextureRect.new()
 	img.name = "seed"
@@ -235,9 +233,6 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	chip.mouse_filter = Control.MOUSE_FILTER_STOP
 	chip.tooltip_text = "双击 = 取回画布；拖出桌布 = 取回；拖到线索册 = 收进册子"
 	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE, 1)
-	sb.shadow_color = TecTheme.BEVEL_LO
-	sb.shadow_size = 5
-	sb.shadow_offset = Vector2(2, 3)
 	chip.add_theme_stylebox_override("panel", sb)
 
 	var col := VBoxContainer.new()
@@ -502,9 +497,6 @@ func show_heartbroken() -> void:
 	pop.size = Vector2(46, 46)
 	pop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE, 1)
-	sb.shadow_color = TecTheme.BEVEL_LO
-	sb.shadow_size = 5
-	sb.shadow_offset = Vector2(2, 3)
 	pop.add_theme_stylebox_override("panel", sb)
 	var img := TextureRect.new()
 	img.texture = load("res://assets/raw/emote-heartbroken.png")

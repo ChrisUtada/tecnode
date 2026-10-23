@@ -69,9 +69,9 @@ func _build_content() -> void:
 		row.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		row.add_theme_font_size_override("font_size", TecTheme.FS_TITLE)
 		row.add_theme_color_override("font_hover_color", TecTheme.TEXT)
-		row.add_theme_stylebox_override("normal", TecTheme.flat(Color(0, 0, 0, 0), TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
-		row.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
-		row.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
+		row.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.NONE, TecTheme.R_BTN, TecTheme.NONE, 0))
+		row.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.NONE, 0))
+		row.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, TecTheme.R_BTN, TecTheme.NONE, 0))
 		row.pressed.connect(func(): play_track(id))
 		_list.add_child(row)
 		_rows[id] = row
@@ -97,8 +97,8 @@ func _build_content() -> void:
 	_prog.custom_minimum_size = Vector2(0, 10)
 	_prog.mouse_filter = Control.MOUSE_FILTER_STOP
 	_prog.tooltip_text = "播放进度 · 点击跳转"
-	_prog.add_theme_stylebox_override("background", TecTheme.flat(TecTheme.FACE_LO, 5, TecTheme.FACE_LO, 0))
-	_prog.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 5, TecTheme.LINE, 0))
+	_prog.add_theme_stylebox_override("background", TecTheme.flat(TecTheme.FACE_LO, 0, TecTheme.FACE_LO, 0))
+	_prog.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 0, TecTheme.LINE, 0))
 	_prog.gui_input.connect(_on_prog_input)
 	_player.add_child(_prog)
 
@@ -230,8 +230,8 @@ func _refresh() -> void:
 		row.add_theme_color_override("font_color", TecTheme.CARD if cur else TecTheme.TEXT)
 		row.add_theme_color_override("font_pressed_color", TecTheme.CARD if cur else TecTheme.TEXT)
 		row.add_theme_stylebox_override("normal",
-			TecTheme.flat(TecTheme.LINE if cur else Color(0, 0, 0, 0), TecTheme.R_BTN,
-				Color(0, 0, 0, 0) if cur else Color(0, 0, 0, 0), 0))
+			TecTheme.flat(TecTheme.LINE if cur else TecTheme.NONE, TecTheme.R_BTN,
+				TecTheme.NONE if cur else TecTheme.NONE, 0))
 	_player.visible = _current != ""
 	if _play_btn != null:
 		_play_btn.text = "❚❚" if is_playing() else "▶"

@@ -12,15 +12,13 @@ const AVATAR_ART := {
 var session: DialogueSession
 var case_def: CaseLoader
 
-var _scroll: ScrollContainer
 var _line_box: VBoxContainer
+var _rows: Array = []
 var _hint_rule: ColorRect
 var _hint_box: MarginContainer
 var _hint: Label
-var _cur: Label = null
+var _cur: TypewriterLabel = null
 var _cur_text := ""
-var _shown := 0.0
-var _typing := false
 var _lines_shown := 0
 
 
@@ -28,31 +26,17 @@ func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader) ->
 	case_def = p_case
 	session = DialogueSession.new(p_entry, initial_ids)
 	setup(_chat_title(p_entry, initial_ids), 390, 200)
-	body.clip_contents = true
-
-	var col := VBoxContainer.new()
-	col.name = "chat_col"
-	col.set_anchors_preset(Control.PRESET_FULL_RECT)
-	col.add_theme_constant_override("separation", 0)
-	col.mouse_filter = Control.MOUSE_FILTER_PASS
-	body.add_child(col)
-
-	_scroll = ScrollContainer.new()
-	_scroll.name = "chat_scroll"
-	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_scroll.gui_input.connect(_on_click)
-	col.add_child(_scroll)
+	content.add_theme_constant_override("separation", 0)
 
 	var pad := MarginContainer.new()
+	pad.name = "chat_pad"
 	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pad.add_theme_constant_override("margin_left", 12)
 	pad.add_theme_constant_override("margin_right", 12)
 	pad.add_theme_constant_override("margin_top", 4)
 	pad.add_theme_constant_override("margin_bottom", 4)
 	pad.mouse_filter = Control.MOUSE_FILTER_PASS
-	_scroll.add_child(pad)
+	content.add_child(pad)
 
 	_line_box = VBoxContainer.new()
 	_line_box.name = "chat_lines"
@@ -67,7 +51,7 @@ func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader) ->
 	_hint_rule.custom_minimum_size = Vector2(0, 1)
 	_hint_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hint_rule.visible = false
-	col.add_child(_hint_rule)
+	content.add_child(_hint_rule)
 
 	_hint_box = MarginContainer.new()
 	_hint_box.name = "chat_hint_box"
@@ -78,7 +62,7 @@ func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader) ->
 	_hint_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hint_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hint_box.visible = false
-	col.add_child(_hint_box)
+	content.add_child(_hint_box)
 
 	_hint = TecTheme.label("", TecTheme.FS_BODY, TecTheme.MUTED)
 	_hint.name = "chat_hint"
@@ -88,7 +72,8 @@ func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader) ->
 	_hint_box.add_child(_hint)
 
 	body.gui_input.connect(_on_click)
-	col.gui_input.connect(_on_click)
+	content.gui_input.connect(_on_click)
+	_build_rows()
 	_advance()
 	call_deferred("_fit_height")
 
@@ -111,7 +96,7 @@ func _on_click(event: InputEvent) -> void:
 
 
 func advance() -> bool:
-	if _typing:
+	if is_typing():
 		finish_line()
 		return true
 	if session == null or session.done or session.waiting_for != "":
@@ -134,28 +119,49 @@ func _advance() -> int:
 	return 0
 
 
-func _append_line(line: DialogueLineDef) -> void:
-	if _line_box.get_child_count() > 0:
-		var sep := ColorRect.new()
-		sep.color = TecTheme.LINE2
-		sep.custom_minimum_size = Vector2(0, 1)
-		sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_line_box.add_child(sep)
-	var raw := String(line.text)
-	var text := case_def.strip_tags(raw).strip_edges()
-	if String(line.kind) == "say" and line.who != null:
-		_line_box.add_child(_wrap_line(_say_row(line.who.id, line.who.name, text)))
-	else:
-		var label := _new_text_label(TecTheme.MUTED)
-		label.name = "chat_narr"
-		label.text = text
-		_line_box.add_child(_wrap_line(label))
-		_start_typing(label, text)
+func _build_rows() -> void:
+	if session == null or session.entry == null:
+		return
+	var first := true
+	for line in session.entry.script_lines:
+		var raw := String(line.text)
+		var text := case_def.strip_tags(raw).strip_edges()
+		var built: Array
+		if String(line.kind) == "say" and line.who != null:
+			built = _say_row(line.who.id, line.who.name, text)
+		else:
+			var label := _new_text_label(TecTheme.MUTED)
+			label.name = "chat_narr"
+			label.text = text
+			built = [_wrap_line(label), label]
+		var root := VBoxContainer.new()
+		root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		root.add_theme_constant_override("separation", 0)
+		root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if not first:
+			var sep := ColorRect.new()
+			sep.color = TecTheme.LINE2
+			sep.custom_minimum_size = Vector2(0, 1)
+			sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			root.add_child(sep)
+		root.add_child(built[0] as Control)
+		root.modulate.a = 0.0
+		_line_box.add_child(root)
+		_rows.append({"root": root, "label": built[1] as TypewriterLabel, "text": text})
+		first = false
+
+
+func _append_line(_line: DialogueLineDef) -> void:
+	var row := _rows[_lines_shown] as Dictionary
+	_cur = row["label"] as TypewriterLabel
+	_cur_text = String(row["text"])
+	(row["root"] as Control).modulate.a = 1.0
+	_cur.start_typing()
 	_lines_shown += 1
 	call_deferred("_fit_height")
 
 
-func _say_row(who_id: String, who_name: String, text: String) -> Control:
+func _say_row(who_id: String, who_name: String, text: String) -> Array:
 	var row := HBoxContainer.new()
 	row.name = "chat_say"
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -176,8 +182,7 @@ func _say_row(who_id: String, who_name: String, text: String) -> Control:
 	label.text = text
 	main.add_child(label)
 	row.add_child(main)
-	_start_typing(label, text)
-	return row
+	return [row, label]
 
 
 func _say_avatar(who_id: String, who_name: String) -> Control:
@@ -187,7 +192,7 @@ func _say_avatar(who_id: String, who_name: String) -> Control:
 	frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	frame.clip_contents = true
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.BG, 6, TecTheme.EDGE))
+	frame.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.BG, TecTheme.R_SM, TecTheme.EDGE))
 	var art := String(AVATAR_ART.get(who_id, ""))
 	if art != "" and ResourceLoader.exists(art):
 		var tex := TextureRect.new()
@@ -206,13 +211,8 @@ func _say_avatar(who_id: String, who_name: String) -> Control:
 	return frame
 
 
-func _new_text_label(color: Color) -> Label:
-	var label := TecTheme.label("", TecTheme.FS_TITLE, color)
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.visible_characters = 0
-	return label
+func _new_text_label(color: Color) -> TypewriterLabel:
+	return TecTheme.narrative_label("", color)
 
 
 func _wrap_line(row: Control) -> Control:
@@ -225,45 +225,9 @@ func _wrap_line(row: Control) -> Control:
 	return pad
 
 
-func _start_typing(label: Label, text: String) -> void:
-	_cur = label
-	_cur_text = text
-	_shown = 0.0
-	_typing = true
-	label.visible_characters = 0
-	set_process(true)
-	_scroll_bottom()
-
-
-func _process(delta: float) -> void:
-	if not _typing or _cur == null:
-		return
-	_shown += delta * (1000.0 / CHAR_MS)
-	var n := int(_shown)
-	if n >= _cur_text.length():
-		finish_line()
-	else:
-		_cur.visible_characters = n
-
-
 func finish_line() -> void:
 	if _cur != null:
-		_cur.visible_characters = -1
-	_typing = false
-	set_process(false)
-	_scroll_bottom()
-
-
-func _scroll_bottom() -> void:
-	if _scroll == null:
-		return
-	_scroll.scroll_vertical = 1000000
-	call_deferred("_scroll_bottom_now")
-
-
-func _scroll_bottom_now() -> void:
-	if _scroll != null and is_instance_valid(_scroll):
-		_scroll.scroll_vertical = int(_scroll.get_v_scroll_bar().max_value)
+		_cur.finish_typing()
 
 
 func set_hint(text: String) -> void:
@@ -278,16 +242,15 @@ func set_hint(text: String) -> void:
 
 ## Web 的 `.chat-win` 高度随内容长；Godot 里同样只改内高，宽度和顶边保持贴右上。
 func _fit_height() -> void:
-	if _line_box == null or body == null:
+	if content == null or body == null:
 		return
-	var lines_h := _line_box.get_combined_minimum_size().y + 8.0
-	var hint_h := 30.0 if _hint_box != null and _hint_box.visible else 0.0
-	var need := 56.0 + lines_h + hint_h + 8.0
-	var target := clampf(need, 150.0, 368.0)
+	if not is_inside_tree():
+		await tree_entered
+	await get_tree().process_frame
+	var content_h := content.get_combined_minimum_size().y
+	var target := SysWindow.BAR_H + 20.0 + content_h
 	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:
 		set_inner_height(target)
-		call_deferred("_fit_height")
-	_scroll_bottom()
 
 
 func hint_text() -> String:
@@ -319,15 +282,11 @@ func line_count() -> int:
 
 
 func is_typing() -> bool:
-	return _typing
+	return _cur != null and _cur.is_typing()
 
 
 func typed_text() -> String:
-	if _cur == null:
-		return ""
-	if _cur.visible_characters < 0:
-		return _cur.text
-	return _cur.text.substr(0, _cur.visible_characters)
+	return _cur.typed_text() if _cur != null else ""
 
 
 func current_text() -> String:
@@ -341,6 +300,6 @@ func waiting_for() -> String:
 func state() -> Dictionary:
 	var out := session.state() if session != null else {}
 	out["open"] = true
-	out["typing"] = _typing
+	out["typing"] = is_typing()
 	out["lines"] = _lines_shown
 	return out

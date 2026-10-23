@@ -42,10 +42,13 @@ func setup(p_title: String, w: float, h: float, radius: int = TecTheme.R_WIN) ->
 	_build(radius)
 
 
-## 是否用烘焙九切片当底板。暗纸血统的窗口（放映卡 / 回忆小剧场）自己改 shader 参数，
-## 覆盖成 false 即可继续走程序生成，不必为每种纸各烘一张。
+## 是否用烘焙九切片当底板。
+## **P2 起默认 false**：`win_frame.png` 是「米色底 + 13px 圆角 + 四层柔光投影」，
+## 换成中性灰之后它是全屏唯一的暖色残留（0.9% 面积，但正好是窗框那一圈，极显眼）。
+## 而且单色骨架的层次该由 **1px 黑框**承担 —— 框越软越像「贴了张纸」，
+## 1-bit 要的是「划出来的边」。烘焙图留着（`assets/baked/`），需要时改回 true。
 func _uses_baked_frame() -> bool:
-	return true
+	return false
 
 
 ## 烘焙底板：九切片往外撑出 BLEED，框线正好落在原来 shader 画的 PAD 位置，
@@ -65,24 +68,30 @@ func _build_baked_frame() -> void:
 	add_child(frame)
 
 
-func _build_shader_bg(radius: int) -> void:
-	_mat = ShaderMaterial.new()
-	_mat.shader = load("res://ui/shaders/surface.gdshader")
-	_mat.set_shader_parameter("rect_size", size)
-	_mat.set_shader_parameter("pad", PAD)
-	_mat.set_shader_parameter("radius", float(radius))
-	_mat.set_shader_parameter("shade_soft", 12.0)
-	_mat.set_shader_parameter("shade_offset", Vector2(5.0, 7.0))
-	_mat.set_shader_parameter("flat_fill", true)
-	_mat.set_shader_parameter("col_mid", TecTheme.CARD)
-	_mat.set_shader_parameter("edge_col", Color(0.290, 0.271, 0.204, 0.10))
+## 窗框底色：与外壳同一块灰。**框不发白** —— 白框包灰画布会读成「纸边的窗」，
+## 而这里要的是「灰桌面里嵌了一块中灰垫板」。子类（暗纸血统）可覆盖。
+func _frame_fill() -> Color:
+	return TecTheme.BG
 
-	var bg := ColorRect.new()
+
+## 窗体底板（P2）：**程序化硬框**，不用 shader、不用烘焙图。
+## 位置仍从 `PAD` 起算、尺寸扣掉两倍 `PAD`，所以调用方的坐标一个都不用改
+## —— 窗框依旧落在原来的 PAD 处，只是外面那圈「投影 / 圆角」没了。
+func _build_shader_bg(radius: int) -> void:
+	var bg := Panel.new()
 	bg.name = "bg"
-	bg.material = _mat
-	bg.color = Color.WHITE
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.position = Vector2(PAD, PAD)
+	bg.size = Vector2(size.x - PAD * 2.0, size.y - PAD * 2.0)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = _frame_fill()
+	sb.border_color = TecTheme.LINE
+	## **2px**，而卡片是 1px。纯白纸上没有灰阶可用，窗口与卡片叠在一起时
+	## 唯一的「谁压着谁」线索就是边框粗细 —— 窗口是容器，必须比内容重一档。
+	## （参考图的窗口内部还有一层内框承担同样的职责。）
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(0)
+	bg.add_theme_stylebox_override("panel", sb)
 	add_child(bg)
 
 
@@ -104,15 +113,6 @@ func _build(radius: int) -> void:
 	add_child(bar)
 	_bar_nodes.append(bar)
 
-	var shade := TextureRect.new()
-	shade.name = "bar_shade"
-	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	shade.stretch_mode = TextureRect.STRETCH_SCALE
-	shade.texture = _bar_gradient()
-	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.add_child(shade)
-
 	var title_row := HBoxContainer.new()
 	title_row.name = "title_row"
 	title_row.position = Vector2(10.0, 0.0)
@@ -128,7 +128,8 @@ func _build(radius: int) -> void:
 	_title_label.name = "win_title"
 	var spaced := FontVariation.new()
 	spaced.base_font = TecTheme.font()
-	spaced.set_spacing(TextServer.SPACING_GLYPH, 2)
+	## 字距 2 → 1：换字体后 12px 黑体的西文本身比点阵宋体宽，再 +2 就散了。
+	spaced.set_spacing(TextServer.SPACING_GLYPH, 1)
 	_title_label.add_theme_font_override("font", spaced)
 	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title_label.clip_text = true
@@ -139,17 +140,10 @@ func _build(radius: int) -> void:
 	title_row.add_child(_title_label)
 	title_row.add_child(_title_rule())
 
-	var top_hl := ColorRect.new()
-	top_hl.name = "top_hl"
-	top_hl.color = Color(1.0, 0.992, 0.965, 0.9)
-	top_hl.position = Vector2(0, 0)
-	top_hl.size = Vector2(inner_w, 1.0)
-	top_hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.add_child(top_hl)
-
 	var sep := ColorRect.new()
 	sep.name = "sep"
-	sep.color = Color(0.290, 0.271, 0.204, 0.15)
+	## 1-bit 的分隔线就是黑线，不用半透明 —— 白底上 35% 的黑读作「灰」
+	sep.color = TecTheme.INK
 	sep.position = Vector2(PAD, PAD + BAR_H)
 	sep.size = Vector2(inner_w, 1.0)
 	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -179,37 +173,44 @@ func _build(radius: int) -> void:
 	body.add_child(content)
 
 
-func _bar_gradient() -> GradientTexture2D:
-	var grad := Gradient.new()
-	grad.offsets = PackedFloat32Array([0.0, 1.0])
-	grad.colors = PackedColorArray([Color(1.0, 0.988, 0.945, 0.6), Color(1.0, 0.988, 0.945, 0.0)])
-	var tex := GradientTexture2D.new()
-	tex.gradient = grad
-	tex.width = 4
-	tex.height = 32
-	tex.fill_from = Vector2(0, 0)
-	tex.fill_to = Vector2(0, 1)
-	return tex
+## 内容流的最小高度。`get_combined_minimum_size()` 在刚增删子节点、还没排下一帧时
+## 可能仍是旧值；这里按可见子节点逐项求和兜底，避免窗框底边落在内容上。
+func content_min_height() -> float:
+	if content == null:
+		return 0.0
+	var n := content.get_child_count()
+	var sum := 0.0
+	for child in content.get_children():
+		if child.visible:
+			sum += child.get_combined_minimum_size().y
+	sum += maxf(n - 1, 0) * content.get_theme_constant("separation")
+	return maxf(content.get_combined_minimum_size().y, sum)
 
 
 func _title_rule() -> Control:
+	## 标题两侧的装饰条：**三道 1px 纯黑横纹**（参考图即为此）。
+	## 原来是一条 30% 半透明灰线 —— 在 1-bit 里「淡」不能靠 alpha，只能靠线宽与线数。
+	## 三道刚好填满 28px 标题栏的视觉中线，且与「1px 分隔线」拉开层次。
 	var wrap := Control.new()
 	wrap.custom_minimum_size = Vector2(12.0, BAR_H - 1.0)
 	wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var rule := ColorRect.new()
-	rule.color = TecTheme.EDGE
-	rule.anchor_left = 0.0
-	rule.anchor_right = 1.0
-	rule.anchor_top = 0.0
-	rule.anchor_bottom = 0.0
-	rule.offset_left = 0.0
-	rule.offset_right = 0.0
-	rule.offset_top = 11.0
-	rule.offset_bottom = 12.0
-	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wrap.add_child(rule)
+	var mid := BAR_H * 0.5
+	for i in 3:
+		var rule := ColorRect.new()
+		rule.color = TecTheme.INK
+		rule.anchor_left = 0.0
+		rule.anchor_right = 1.0
+		rule.anchor_top = 0.0
+		rule.anchor_bottom = 0.0
+		rule.offset_left = 0.0
+		rule.offset_right = 0.0
+		## 间距 4px：三条线占 9px，在 28px 里居中
+		rule.offset_top = mid - 4.5 + float(i) * 4.0
+		rule.offset_bottom = rule.offset_top + 1.0
+		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		wrap.add_child(rule)
 	return wrap
 
 
@@ -218,17 +219,16 @@ func _mini_button(text: String) -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	b.size = Vector2(CTRL, CTRL)
 	b.custom_minimum_size = b.size
-	var normal := TecTheme.flat(TecTheme.FACE_HI, 7)
-	normal.shadow_color = TecTheme.BEVEL_LO
-	normal.shadow_size = 1
-	normal.shadow_offset = Vector2(0, 1)
+	var normal := TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.INK, 1)
 	normal.content_margin_left = 0
 	normal.content_margin_right = 0
 	normal.content_margin_top = 0
 	normal.content_margin_bottom = 0
 	b.add_theme_stylebox_override("normal", normal)
-	b.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.LINE, 7))
-	b.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, 7))
+	## 与全站按钮同一套语法（P4.2）：键线 1px → 悬停 2px → 按下反白。
+	## 原来常态用 `EDGE`（30% 黑），这两个小圆在标题栏上淡得像没画框。
+	b.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.INK, 2))
+	b.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.INK, TecTheme.R_BTN, TecTheme.INK, 1))
 	var glyph := TecTheme.label(text, TecTheme.FS_BODY, TecTheme.TEXT)
 	glyph.name = "glyph"
 	glyph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -238,10 +238,9 @@ func _mini_button(text: String) -> Button:
 	b.add_child(glyph)
 	b.set_meta("glyph_normal", TecTheme.TEXT)
 	b.set_meta("glyph_hot", TecTheme.CARD)
-	b.mouse_entered.connect(func(): _paint_mini_glyph(b, true))
-	b.mouse_exited.connect(func(): _paint_mini_glyph(b, false))
+	## 只有**按下**才反白；悬停只加粗键线，字形不动。
 	b.button_down.connect(func(): _paint_mini_glyph(b, true))
-	b.button_up.connect(func(): _paint_mini_glyph(b, b.is_hovered()))
+	b.button_up.connect(func(): _paint_mini_glyph(b, false))
 	return b
 
 
@@ -349,6 +348,9 @@ func _sync_frame(inner: Vector2) -> void:
 	if frame != null:
 		frame.position = Vector2(PAD - BLEED, PAD - BLEED)
 		frame.size = inner + Vector2(BLEED, BLEED) * 2.0
+	var bg := get_node_or_null("bg") as Control
+	if bg != null:
+		bg.size = inner
 
 
 func enable_case_controls() -> void:

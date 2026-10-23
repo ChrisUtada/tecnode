@@ -1,31 +1,31 @@
 class_name NarrCard
 extends SysWindow
-## 场景叙事卡：展开场景时浮在画布上，正文可滚。
-## Web 版是锚在节点上方的卡片；P0 先用窗口承载，P1 补锚定与打字机。
+## 场景叙事卡：展开场景时浮在画布上，正文一次性预留高度并逐字打出。
 
-var _text: RichTextLabel
+var _text: TypewriterLabel
+var _width := 470.0
 
 
 func setup_narr(scene_title: String, text: String, w: float = 470.0, h: float = 330.0) -> void:
+	_width = w
 	setup("叙事 · " + scene_title, w, h, TecTheme.R_SM)
+	_text = TecTheme.narrative_label(text, TecTheme.TEXT)
+	_text.name = "narr_text"
+	_text.custom_minimum_size = Vector2(w - 72.0, 0)
+	content.add_child(_text)
+	_text.start_typing()
+	call_deferred("_fit_height")
 
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	content.add_child(scroll)
 
-	_text = RichTextLabel.new()
-	_text.bbcode_enabled = false
-	_text.fit_content = true
-	_text.scroll_active = false
-	_text.add_theme_font_override("normal_font", TecTheme.font())
-	_text.add_theme_font_size_override("normal_font_size", TecTheme.FS_TITLE)
-	_text.add_theme_color_override("default_color", TecTheme.TEXT)
-	_text.add_theme_constant_override("line_separation", 6)
-	_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_text.custom_minimum_size = Vector2(w - 60.0, 0)
-	_text.text = text
-	scroll.add_child(_text)
+func _fit_height() -> void:
+	if _text == null:
+		return
+	if not is_inside_tree():
+		await tree_entered
+	await get_tree().process_frame
+	var target := SysWindow.BAR_H + 20.0 + _text.get_combined_minimum_size().y
+	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:
+		set_inner_height(target)
 
 
 func text_of() -> String:

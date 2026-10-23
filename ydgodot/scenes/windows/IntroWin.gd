@@ -39,7 +39,7 @@ func _build() -> void:
 
 	var dim := ColorRect.new()
 	dim.name = "dim"
-	dim.color = Color(0.169, 0.169, 0.149, 0.45)
+	dim.color = TecTheme.scrim(0.45)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(dim)
@@ -147,7 +147,7 @@ func _render_name() -> void:
 
 
 func _input_style(focused: bool) -> StyleBoxFlat:
-	var sb := TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.LINE if focused else TecTheme.EDGE)
+	var sb := TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.LINE if focused else TecTheme.EDGE_SOFT)
 	sb.content_margin_left = 10
 	sb.content_margin_right = 10
 	sb.content_margin_top = 7
@@ -273,7 +273,7 @@ func _locked_button() -> Control:
 	var p := PanelContainer.new()
 	p.custom_minimum_size = Vector2(0, 92)
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	p.add_theme_stylebox_override("panel", TecTheme.flat(Color(0, 0, 0, 0), TecTheme.R_SM, TecTheme.EDGE))
+	p.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.NONE, TecTheme.R_SM, TecTheme.EDGE))
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -369,7 +369,7 @@ static func build_cert(c: Dictionary) -> Control:
 	var panel := PanelContainer.new()
 	panel.name = "cert"
 	panel.custom_minimum_size = Vector2(320, 0)
-	panel.add_theme_stylebox_override("panel", TecTheme.flat(Color("efece0"), 16, TecTheme.EDGE))
+	panel.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.FACE_RISE, TecTheme.R_SM, TecTheme.EDGE))
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 0)
 	panel.add_child(col)
@@ -378,7 +378,7 @@ static func build_cert(c: Dictionary) -> Control:
 	head.color = TecTheme.LINE
 	head.custom_minimum_size = Vector2(0, 36)
 	col.add_child(head)
-	var head_label := TecTheme.label("T.E.C-OS 调查员证", TecTheme.FS_TITLE, Color("e6e3d2"))
+	var head_label := TecTheme.label("T.E.C-OS 调查员证", TecTheme.FS_TITLE, TecTheme.TEXT_ON_DARK)
 	head_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	head_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -390,7 +390,7 @@ static func build_cert(c: Dictionary) -> Control:
 	sec1.add_child(photo_center)
 	var photo := PanelContainer.new()
 	photo.custom_minimum_size = Vector2(156, 156)
-	photo.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.CARD, 10, TecTheme.EDGE))
+	photo.add_theme_stylebox_override("panel", TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE))
 	photo_center.add_child(photo)
 	var pm := MarginContainer.new()
 	pm.add_theme_constant_override("margin_left", 6)
@@ -481,10 +481,10 @@ static func _stamp() -> Control:
 	holder.custom_minimum_size = Vector2(58, 58)
 	var circle := Panel.new()
 	circle.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var sb := TecTheme.flat(Color(0, 0, 0, 0), 29, Color("c0392b"), 2)
+	var sb := TecTheme.flat(TecTheme.NONE, TecTheme.R_PILL, TecTheme.INK, 2)
 	circle.add_theme_stylebox_override("panel", sb)
 	holder.add_child(circle)
-	var label := TecTheme.label("T.E.C\n核准", TecTheme.FS_BODY, Color("c0392b"))
+	var label := TecTheme.label("T.E.C\n核准", TecTheme.FS_BODY, TecTheme.INK)
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

@@ -419,7 +419,7 @@ func _make_drag_ghost(text: String) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.name = "drag_ghost"
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := TecTheme.flat(TecTheme.LINE, 6, TecTheme.LINE, 1)
+	var sb := TecTheme.flat(TecTheme.LINE, TecTheme.R_SM, TecTheme.LINE, 1)
 	sb.content_margin_left = 8
 	sb.content_margin_right = 8
 	sb.content_margin_top = 4
@@ -541,20 +541,14 @@ func _zoom_override() -> float:
 func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	var grad := Gradient.new()
-	grad.offsets = PackedFloat32Array([0.0, 0.46, 1.0])
-	grad.colors = PackedColorArray([Color("efece0"), Color("e9e5d6"), Color("e2ddca")])
-	var grad_tex := GradientTexture2D.new()
-	grad_tex.gradient = grad
-	grad_tex.fill_from = Vector2(0, 0)
-	grad_tex.fill_to = Vector2(0, 1)
-	grad_tex.width = 1
-	grad_tex.height = 256
-	var bg := TextureRect.new()
+	## 外壳底板：**平涂**。原来是竖向三段渐变（BG_HI → BG → BG_LO），
+	## 那是「纸面浮雕」的遗产 —— 换到灰阶后，上亮下暗只会被读成脏，不是立体。
+	## Mac 的桌面本来就是一块平色，层次全靠黑框和窗口的白面撑。
+	var bg := ColorRect.new()
 	bg.name = "desk_bg"
-	bg.texture = grad_tex
-	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg.stretch_mode = TextureRect.STRETCH_SCALE
+	## 外壳底色与画布**同一个灰**（P4.1）：图标区原来是纯白，白底板压在灰画布边上会显形；
+	## 两处同色之后，图标「没有底板」才真的没有。
+	bg.color = TecTheme.DESK_GRAY
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
@@ -653,8 +647,8 @@ func _build_header() -> void:
 	_inv_chip.add_theme_color_override("font_color", TecTheme.CARD)
 	_inv_chip.add_theme_color_override("font_hover_color", TecTheme.TEXT)
 	_inv_chip.add_theme_color_override("font_pressed_color", TecTheme.TEXT)
-	var chip_normal := TecTheme.flat(Color(0, 0, 0, 0), 0, TecTheme.CARD)
-	var chip_hover := TecTheme.flat(TecTheme.CARD, 0, TecTheme.CARD)
+	var chip_normal := TecTheme.flat(TecTheme.NONE, TecTheme.R_SM, TecTheme.CARD)
+	var chip_hover := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.CARD)
 	for csb in [chip_normal, chip_hover]:
 		csb.content_margin_left = 8
 		csb.content_margin_right = 8
@@ -717,7 +711,7 @@ func _make_toggle(text: String) -> Button:
 	# 开关的「按下」就是常态：底保持透明，字必须一直是奶油色
 	b.add_theme_color_override("font_pressed_color", TecTheme.CARD)
 	b.add_theme_color_override("font_hover_pressed_color", TecTheme.CARD)
-	var sb := TecTheme.flat(Color(0, 0, 0, 0), TecTheme.R_BTN, TecTheme.CARD)
+	var sb := TecTheme.flat(TecTheme.NONE, TecTheme.R_BTN, TecTheme.CARD)
 	# 左 10 / 右 9 / 上下 6.5：左内边距对上 Web `.tog` 的 `padding-left:10px`
 	# （勾选框左边线正好落在 680）；上下 6.5 让最小高度 = 12 + 13 = 25，不会顶开 25 的目标高度。
 	sb.content_margin_left = 10
@@ -758,7 +752,7 @@ func _sync_header_sizes() -> void:
 ## 现画而不是切图：勾是 2px 阶梯，缩放后比切图更稳。
 func _check_tex(on: bool) -> ImageTexture:
 	var img := Image.create(13, 13, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
+	img.fill(TecTheme.NONE)
 	var radius := 2
 	var inside := PackedByteArray()
 	inside.resize(13 * 13)
@@ -773,7 +767,7 @@ func _check_tex(on: bool) -> ImageTexture:
 		for y in range(13):
 			for x in range(13):
 				if inside[y * 13 + x] == 1:
-					img.set_pixel(x, y, Color("e6e3d2"))
+					img.set_pixel(x, y, TecTheme.TEXT_ON_DARK)
 		var steps := [[3, 6], [4, 7], [5, 8], [6, 9], [7, 8], [8, 7], [9, 6], [10, 5]]
 		for s in steps:
 			img.set_pixel(int(s[0]), int(s[1]), TecTheme.LINE)
@@ -901,15 +895,14 @@ func _build_case_window() -> void:
 	_stage.gui_input.connect(_on_stage_input)
 	_case_win.body.add_child(_stage)
 
-	## 纸纹用 shader 按物理像素生成：窗口尺寸变化时只增加/减少采样面积，
-	## 不会把一张固定尺寸的整图拉伸。`stage_paper.png` 保留作视觉基准，不再挂载。
+	## 桌布：**平涂中性灰**（Mac OS 8 式），不铺网点。
+	## 25% 网点在 1x 屏上会被读成一层灰砂；五档密度试下来，拉大点距只是把「砂纸」
+	## 换成「网点纸」，6px 那档更脏 —— 有效的是降对比或直接平涂，见 TecTheme.DESK_GRAY。
+	## `mono_pattern.gdshader` 保留，改挂到标题栏横纹 / 进度条这类窄条上（那里才该有纹理）。
+	## `stage_paper.png` 保留作视觉基准，不再挂载。
 	var stage_bg := ColorRect.new()
 	stage_bg.name = "stage_bg"
-	stage_bg.color = Color.WHITE
-	var paper_mat := ShaderMaterial.new()
-	paper_mat.shader = load("res://ui/shaders/paper.gdshader")
-	paper_mat.set_shader_parameter("paper_col", TecTheme.PAPER)
-	stage_bg.material = paper_mat
+	stage_bg.color = TecTheme.DESK_GRAY
 	stage_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	stage_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stage.add_child(stage_bg)
@@ -1481,13 +1474,12 @@ func _build_case_park() -> void:
 	_dock_card.size = Vector2(170, 56)
 	_dock_card.position = Vector2(1094, 678)
 	_dock_card.focus_mode = Control.FOCUS_NONE
-	var normal := TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN)
-	normal.shadow_color = Color(0.306, 0.282, 0.212, 0.24)
-	normal.shadow_size = 8
-	normal.shadow_offset = Vector2(3, 5)
+	var normal := TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 1)
 	_dock_card.add_theme_stylebox_override("normal", normal)
-	_dock_card.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_WIN))
-	_dock_card.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, TecTheme.R_WIN))
+	## 悬停 = 键线 1px → 2px（与全站按钮同一套语法）。原来是 `CARD → BG`，
+	## 两个常量在单色版里都是纯白，等于没有反馈。
+	_dock_card.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 2))
+	_dock_card.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 2))
 	_dock_card.pressed.connect(_reopen_case)
 	_dock_card.visible = false
 	_desk.add_child(_dock_card)
@@ -1508,7 +1500,7 @@ func _build_case_park() -> void:
 	glyph_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	glyph_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph_box.add_theme_stylebox_override("panel",
-		TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.EDGE))
+		TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.INK, 1))
 	row.add_child(glyph_box)
 	var glyph := TecTheme.label("▣", TecTheme.FS_TITLE, TecTheme.MUTED)
 	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1558,9 +1550,6 @@ func _build_toast() -> void:
 	sb.content_margin_right = 16
 	sb.content_margin_top = 9
 	sb.content_margin_bottom = 9
-	sb.shadow_color = Color(0.306, 0.282, 0.212, 0.30)
-	sb.shadow_size = 10
-	sb.shadow_offset = Vector2(4, 6)
 	_toast.add_theme_stylebox_override("panel", sb)
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toast.visible = false
@@ -2003,9 +1992,6 @@ func _toast_style(warn: bool) -> StyleBoxFlat:
 	if warn:
 		sb.border_width_left = 4
 		sb.border_color = TecTheme.LINE2
-	sb.shadow_color = Color(0.306, 0.282, 0.212, 0.30)
-	sb.shadow_size = 10
-	sb.shadow_offset = Vector2(4, 6)
 	return sb
 
 
@@ -5207,6 +5193,16 @@ func _shot_p2_flow() -> void:
 	_catalog.clear_progress(_progress_path)
 	_catalog = CaseCatalog.new(_progress_path)
 	_update_case_park_ui()
+
+	# ── P4.2：桌面图标的按下态（只反白标签条，图标本体不垫底板）──
+	# 必须**在流程开头**拍：跑到结尾时图标栏已经切紧凑模式、标签被收掉了。
+	var pressed_icon := _icon_by_app("bag")
+	if pressed_icon != null:
+		pressed_icon.set_selected(true)
+		_hide_toast()
+		await _wait(0.3)
+		await _shot("res://docs/p2_23_icon_press.png")
+		pressed_icon.set_selected(false)
 
 	dbg_open_case_map()
 	await _wait(0.35)

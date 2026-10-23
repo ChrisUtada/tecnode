@@ -187,19 +187,34 @@ func _initialize() -> void:
 	var chip := scene.get_node_or_null("header/inv_chip") as Button
 	check("证章摆在 318 / 宽 190", chip != null and absf(chip.position.x - 318.0) < 0.5
 		and absf(chip.size.x - 190.0) < 0.5)
-	# 窗框九切片：烘焙的底板在，投影才有地方画（PAD 内不裁）
-	var frame := scene.get_node_or_null("desk/case_win/frame") as NinePatchRect
-	check("案件窗用烘焙九切片当底板", frame != null
-		and frame.texture != null and frame.patch_margin_left == 46)
-	check("九切片往外撑出投影余量", frame != null and frame.position.x < 0.0 and frame.position.y < 0.0)
+	# 窗框（P2）：程序化硬框取代烘焙九切片 —— 1px 黑边 + 0 圆角，位置仍在 PAD 处
+	var case_win := scene.get_node_or_null("desk/case_win")
+	check("案件窗不再用烘焙九切片", case_win != null and not case_win._uses_baked_frame()
+		and case_win.get_node_or_null("frame") == null)
+	var frame_bg := scene.get_node_or_null("desk/case_win/bg") as Panel
+	check("案件窗底板是程序化 Panel", frame_bg != null)
+	if frame_bg != null:
+		var fsb := frame_bg.get_theme_stylebox("panel") as StyleBoxFlat
+		# 1-bit：白底上没有灰阶可分层，窗口与卡片叠在一起时唯一的线索就是**边框粗细**，
+		# 所以窗框取 2px（卡片是 1px）。圆角归零 —— 圆角是柔光语法的残留。
+		check("窗框是 2px 黑边 + 零圆角（比卡片 1px 重一档）",
+			fsb != null and fsb.border_width_left == 2
+				and fsb.border_color.is_equal_approx(TecTheme.LINE) and fsb.corner_radius_top_left == 0,
+			str(fsb))
+		check("窗框仍是 PAD 内缩（调用方坐标一个都没改）",
+			frame_bg.position.is_equal_approx(Vector2(SysWindow.PAD, SysWindow.PAD))
+				and frame_bg.size.is_equal_approx(case_win.size - Vector2(SysWindow.PAD, SysWindow.PAD) * 2.0),
+			str(frame_bg.position) + " " + str(frame_bg.size))
 	# 枢纽场景：双线框（对应 Web 的 3px double）
 	var hub_card: NodeCard = _cards().get("loc:SCENES_garden")
 	var border := hub_card.get_node_or_null("border") as Control
 	check("枢纽场景走双线框", border != null and border.visible and bool(border.get("double_line")))
+	# P4.1：角标回到「22×20 小药丸」—— 参考图里状态牌就是圆头的，
+	# 直角牌在满屏圆角按钮之间读作「一块贴纸」。
 	var unread_sb := hub_card._badge.get_theme_stylebox("normal") as StyleBoxFlat
-	check("卡片「新」角标 22×20 药丸", hub_card._badge.size == Vector2(22, 20)
+	check("卡片「新」角标 22×20 小药丸", hub_card._badge.size == Vector2(22, 20)
 		and unread_sb != null and unread_sb.corner_radius_top_left >= 100,
-		str(hub_card._badge.size))
+		str(hub_card._badge.size) + " r=" + (str(unread_sb.corner_radius_top_left) if unread_sb else "null"))
 
 	# ── P0 交互（2026-10-21）：单击/双击分流 · 右键钉住 · 位置写回 · 落点表 · 连线 · 缩放 · 详情窗 ──
 	var all2: Dictionary = _cards()
@@ -405,10 +420,16 @@ func _initialize() -> void:
 		and lod_card._glyph.col == TecTheme.kind_color(lod_card.kind),
 		"null" if lod_card == null else "%s %s" % [lod_card._glyph.visible,
 			lod_card._glyph.col.to_html(false)])
+	check("类型符号用圆形描边汉字", KindGlyph.GLYPH_TEXT.get("loc", "") == "地"
+		and KindGlyph.GLYPH_TEXT.get("item", "") == "物"
+		and KindGlyph.GLYPH_TEXT.get("char", "") == "人"
+		and KindGlyph.GLYPH_TEXT.get("clue", "") == "线"
+		and KindGlyph.GLYPH_TEXT.get("time", "") == "时",
+		str(KindGlyph.GLYPH_TEXT))
 	scene._view_k = 0.9
 	scene._apply_view()
 	check("0.9x：标题 + 左侧小符号并存", lod_card != null and lod_card._title.visible
-		and lod_card._glyph.visible and lod_card._glyph.size.x <= 11.0,
+		and lod_card._glyph.visible and lod_card._glyph.size.x <= NodeCard.GLYPH_BOX,
 		"null" if lod_card == null else "%s/%.0f" % [lod_card._title.visible,
 			lod_card._glyph.size.x])
 	## 0.88x 实测标题已缺笔（「注射器」被压成「注器」）⇒ 再往下只留放大的类型符号
@@ -425,8 +446,49 @@ func _initialize() -> void:
 	scene._view_k = 1.0
 	scene._apply_view()
 	check("1x：标题回来、符号缩回左侧", lod_card != null and lod_card._title.visible
-		and lod_card._glyph.size.x <= 11.0,
+		and lod_card._glyph.size.x <= NodeCard.GLYPH_BOX,
 		"null" if lod_card == null else "%.0f" % lod_card._glyph.size.x)
+
+	## 7c1) 符号必须**贴着首字**（不是钉在卡沿）：用一张短标题的合成卡做定值检验。
+	## 旧版把符号固定在 `PAD+5`、标题另外居中，两字标题时符号离文字一大截、又压着卡边。
+	var demo: NodeCard = NodeCard.new()
+	demo.setup("loc:demo", "loc", {"label": "门锁"}, 152.0, 54.0)
+	root.add_child(demo)
+	await process_frame
+	var g: Control = demo._glyph
+	var tl: Label = demo._title
+	check("符号右边 + 间隙 = 标题左边（符号紧贴首字）",
+		absf(g.position.x + g.size.x + NodeCard.GLYPH_GAP - tl.position.x) < 0.6,
+		"%.2f / %.2f" % [g.position.x + g.size.x, tl.position.x])
+	check("符号不再钉在卡沿（左沿内缩 ≥ 6px，旧值 5px）",
+		g.position.x - NodeCard.PAD >= 6.0,
+		"%.2f" % (g.position.x - NodeCard.PAD))
+	var dfont := tl.get_theme_font("font")
+	var dfsz := tl.get_theme_font_size("font_size")
+	var dtw := dfont.get_string_size(tl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, dfsz).x
+	dtw = minf(dtw, demo._w - 12.0 - NodeCard.GLYPH_BOX - NodeCard.GLYPH_GAP)
+	var dgroup := g.position.x - NodeCard.PAD + (NodeCard.GLYPH_BOX + NodeCard.GLYPH_GAP + dtw) * 0.5
+	check("符号 + 标题作为一组在卡片里水平居中（±1px）",
+		absf(dgroup - demo._w * 0.5) < 1.0,
+		"组心 %.2f / 卡心 %.2f" % [dgroup, demo._w * 0.5])
+	## 7c1b) 竖向：符号与文字挂在**同一个基准**（卡中线）上。
+	## 标题用 TOP 对齐、矩形顶边落在「卡中线 − TITLE_INK_CY」，墨迹中心因此在卡中线上；
+	## 符号中心也直接取卡中线。不再依赖 Godot 的「行盒居中」——那条规则在不同倍率/DPI 下
+	## 会让墨迹漂 1.6px，方块只能对着某一档调，换台机器就歪（用户两次反馈「偏上/偏下」）。
+	var dmid := NodeCard.PAD + demo._h * 0.5
+	check("符号中心 = 卡中线（与文字同一基准）",
+		absf(g.position.y + g.size.y * 0.5 - dmid) < 0.01,
+		"符号心 %.2f / 卡中线 %.2f" % [g.position.y + g.size.y * 0.5, dmid])
+	check("标题矩形顶边 = 卡中线 − TITLE_INK_CY（TOP 对齐，墨迹中心落在卡中线）",
+		tl.vertical_alignment == VERTICAL_ALIGNMENT_TOP
+			and absf(tl.position.y - (dmid - NodeCard.TITLE_INK_CY)) < 0.01,
+		"顶边 %.2f / 期望 %.2f / valign %d" % [
+			tl.position.y, dmid - NodeCard.TITLE_INK_CY, tl.vertical_alignment])
+	check("符号边长 = GLYPH_BOX（16 = 圆形字牌外径）",
+		absf(g.size.x - NodeCard.GLYPH_BOX) < 0.01 and absf(g.size.y - NodeCard.GLYPH_BOX) < 0.01,
+		"%.1f×%.1f" % [g.size.x, g.size.y])
+	demo.queue_free()
+	await process_frame
 
 	# 7c2) 状态三态：副标删掉后，折叠与未探索必须能只靠「纸 + 框」区分
 	#   未探索 = 纸色平面 + 虚线框；折叠 = 白纸 + 虚线框；已探索 = 白纸 + 实线框
@@ -1030,6 +1092,150 @@ func _initialize() -> void:
 		check("桌布内松手：镜像撤掉", mw25._drag_mirror == null)
 		check("桌布内松手：原件复原", is_equal_approx(ch25.modulate.a, 1.0), str(ch25.modulate.a))
 		check("桌布内松手：仍留在桌布", mw25._chips.has("CLUES_nm"))
+
+	# ── 单色改版 P0：调色板契约 ─────────────────────────────────────────────
+	# 这一组不测「某个色等于某个值」（P1~P6 会换色，那种断言一改就红），
+	# 只测**结构**：别名是不是真同源、派生函数是不是只动它该动的那一位。
+	# 防的是「有人在 TecTheme 里另起炉灶复制一份色值」——那会让改色改不干净。
+	print("--- 单色改版 P0：调色板契约 ---")
+	check("LINE 与 TEXT 都指向 INK（同一支墨，不是三份副本）",
+		TecTheme.LINE.is_equal_approx(TecTheme.INK) and TecTheme.TEXT.is_equal_approx(TecTheme.INK))
+	check("MUTED 指向 INK_MUTED", TecTheme.MUTED.is_equal_approx(TecTheme.INK_MUTED))
+	check("FAINT 指向 INK_FAINT", TecTheme.FAINT.is_equal_approx(TecTheme.INK_FAINT))
+	check("LINE2 指向 DIVIDER", TecTheme.LINE2.is_equal_approx(TecTheme.DIVIDER))
+	check("KIND_LOC / KIND_ITEM / KIND_CHAR 指向 SPOT_*",
+		TecTheme.KIND_LOC.is_equal_approx(TecTheme.SPOT_LOC)
+			and TecTheme.KIND_ITEM.is_equal_approx(TecTheme.SPOT_ITEM)
+			and TecTheme.KIND_CHAR.is_equal_approx(TecTheme.SPOT_CHAR))
+	check("深色面提亮版同名同源",
+		TecTheme.KIND_LOC_DARK.is_equal_approx(TecTheme.SPOT_LOC_ON_DARK)
+			and TecTheme.KIND_ITEM_DARK.is_equal_approx(TecTheme.SPOT_ITEM_ON_DARK)
+			and TecTheme.KIND_CHAR_DARK.is_equal_approx(TecTheme.SPOT_CHAR_ON_DARK))
+	var spots := [TecTheme.SPOT_LOC, TecTheme.SPOT_ITEM, TecTheme.SPOT_CHAR]
+	check("三个类型专色常量仍互不相同（留档，P4 起不再有调用方返回它们）",
+		not spots[0].is_equal_approx(spots[1]) and not spots[1].is_equal_approx(spots[2])
+			and not spots[0].is_equal_approx(spots[2]))
+	# P4：类型不再靠色相区分 —— 五种形状（实心方/空心方/实心圆/三角/菱形）已经说完了，
+	# 再叠一层彩色就是整屏唯一的「有彩色」，会把「全部单色」这句话当场破掉。
+	check("类型符号已单色化（亮面一律 INK、暗面一律 TEXT_ON_DARK）",
+		TecTheme.kind_color("loc").is_equal_approx(TecTheme.INK)
+			and TecTheme.kind_color("item").is_equal_approx(TecTheme.INK)
+			and TecTheme.kind_color("char").is_equal_approx(TecTheme.INK)
+			and TecTheme.kind_color("loc", true).is_equal_approx(TecTheme.TEXT_ON_DARK)
+			and TecTheme.kind_color("char", true).is_equal_approx(TecTheme.TEXT_ON_DARK))
+	var e := TecTheme.edge(0.42)
+	check("edge(a) 只动 alpha，rgb 与 EDGE 完全一致",
+		is_equal_approx(e.a, 0.42) and e.r == TecTheme.EDGE.r
+			and e.g == TecTheme.EDGE.g and e.b == TecTheme.EDGE.b, str(e))
+	var sh := TecTheme.shadow(0.28)
+	check("shadow(a) 用 SHADOW_BASE 做基色",
+		is_equal_approx(sh.a, 0.28) and sh.r == TecTheme.SHADOW_BASE.r
+			and sh.g == TecTheme.SHADOW_BASE.g and sh.b == TecTheme.SHADOW_BASE.b, str(sh))
+	check("rim(0.95) 就是 BEVEL_HI（高光只有一支奶油白）",
+		TecTheme.rim(0.95).is_equal_approx(TecTheme.BEVEL_HI))
+	check("rim(a) 只动 alpha", is_equal_approx(TecTheme.rim(0.18).a, 0.18)
+		and TecTheme.rim(0.18).r == TecTheme.RIM_BASE.r)
+	var sc := TecTheme.scrim(0.85)
+	check("scrim(a) 是墨的 alpha 变体（rgb 同 INK 的暖墨系）",
+		is_equal_approx(sc.a, 0.85) and absf(sc.r - 0.169) < 0.001 and absf(sc.b - 0.149) < 0.001, str(sc))
+	check("white(a) / black(a) 只动 alpha",
+		TecTheme.white(0.28).r == 1.0 and is_equal_approx(TecTheme.white(0.28).a, 0.28)
+			and TecTheme.black(0.35).r == 0.0 and is_equal_approx(TecTheme.black(0.35).a, 0.35))
+	check("NONE 是全透明", is_equal_approx(TecTheme.NONE.a, 0.0))
+	check("kind_color 回落：亮面走 INK、暗面走 TEXT_ON_DARK",
+		TecTheme.kind_color("clue").is_equal_approx(TecTheme.INK)
+			and TecTheme.kind_color("time").is_equal_approx(TecTheme.INK)
+			and TecTheme.kind_color("clue", true).is_equal_approx(TecTheme.TEXT_ON_DARK))
+
+	# ── 单色改版 P1：桌布平涂 ────────────────────────────────────────────────
+	# 只验接线与色值，不验像素（像素由 `--shot` 1x 截图人工验收）。
+	print("--- 单色改版 P1：桌布平涂 ---")
+	var stage_bg := scene.get_node_or_null("desk/case_win/body/stage/stage_bg") as ColorRect
+	check("桌布节点存在且是 ColorRect", stage_bg != null)
+	if stage_bg != null:
+		check("桌布是平涂（不再挂任何 material）", stage_bg.material == null,
+			"" if stage_bg.material == null else str(stage_bg.material))
+		check("桌布底色 = DESK_GRAY（中性灰，不是纸白）",
+			stage_bg.color.is_equal_approx(TecTheme.DESK_GRAY), str(stage_bg.color))
+	var clear_col = ProjectSettings.get_setting("rendering/environment/defaults/default_clear_color")
+	check("默认清屏色同步桌面色",
+		clear_col is Color and (clear_col as Color).is_equal_approx(TecTheme.DESK_GRAY), str(clear_col))
+
+	# ── 单色改版 P4.2：按钮语法统一 ──────────────────────────────────────────
+	# 参考图（System 6 Control Panel）只有两枚键：Set = 白底 + 1px 黑键线；
+	# Find = 同一条键线里再套一条内键线。**都不是黑底**，也都不是浅灰线。
+	print("--- 单色改版 P4.2：按钮键线 / 图标按下态 ---")
+	var p42_btn := TecTheme.button("确定")
+	var p42_n := p42_btn.get_theme_stylebox("normal") as StyleBoxFlat
+	var p42_h := p42_btn.get_theme_stylebox("hover") as StyleBoxFlat
+	var p42_p := p42_btn.get_theme_stylebox("pressed") as StyleBoxFlat
+	# 键线必须是**纯黑 1px**。上一版走 `flat()` 的默认参数 `EDGE`（30% 黑），
+	# 那条线在白底上读作浅灰 —— 案件地图里 34px 的小方框整片「看着没改」就是它。
+	check("按钮常态 = 白底 + 1px 纯黑键线 + R_BTN 圆角",
+		p42_n.bg_color.is_equal_approx(TecTheme.CARD)
+			and p42_n.border_width_left == 1
+			and p42_n.border_color.is_equal_approx(TecTheme.INK)
+			and p42_n.corner_radius_top_left == TecTheme.R_BTN,
+		str(p42_n))
+	check("悬停只把键线加到 2px（填充仍是白）",
+		p42_h.border_width_left == 2 and p42_h.border_color.is_equal_approx(TecTheme.INK)
+			and p42_h.bg_color.is_equal_approx(TecTheme.CARD), str(p42_h))
+	check("按下反白（黑底 + 白字），不引入灰阶填充",
+		p42_p.bg_color.is_equal_approx(TecTheme.INK)
+			and p42_p.border_color.is_equal_approx(TecTheme.INK)
+			and (p42_btn.get_theme_color("font_pressed_color") as Color).is_equal_approx(TecTheme.CARD),
+		str(p42_p))
+	var p42_pb := TecTheme.primary_button("开始")
+	var p42_ring := p42_pb.get_node_or_null("keyline") as Panel
+	var p42_rsb := p42_ring.get_theme_stylebox("panel") as StyleBoxFlat if p42_ring != null else null
+	check("默认键多一道内键线（双键线 = 参考图的 Find）",
+		p42_rsb != null and p42_rsb.border_width_left == 1
+			and p42_rsb.border_color.is_equal_approx(TecTheme.INK)
+			and is_equal_approx(p42_rsb.bg_color.a, 0.0), str(p42_rsb))
+	check("默认键不再填黑（黑底是深色面的语法，不属于按钮）",
+		(p42_pb.get_theme_stylebox("normal") as StyleBoxFlat).bg_color.is_equal_approx(TecTheme.CARD))
+	p42_pb.queue_free()
+	p42_btn.queue_free()
+
+	# 桌面图标（P4.2）：按下**只反白标签条**，图标本体不垫底板。
+	# 原来图标后面那块 44×44 黑圆角 + 黑标签条 = 屏上两个黑块夹一道白缝，
+	# 也就是「多一个框出来的全黑」。
+	var p42_bag := scene.get_node_or_null("desk/icons/icon_bag") as DeskIcon
+	check("桌面图标常态不垫底板（图标直接躺在桌面上）",
+		p42_bag != null and p42_bag._glyph.material == null
+			and is_equal_approx(p42_bag._glyph.color.a, 0.0),
+		"null" if p42_bag == null else str(p42_bag._glyph.color))
+	if p42_bag != null:
+		p42_bag.set_selected(true)
+		var p42_lab := p42_bag._label.get_theme_stylebox("normal") as StyleBoxFlat
+		check("按下只反白标签条（实心黑 + 白字 + 直角）",
+			p42_lab != null and p42_lab.bg_color.is_equal_approx(TecTheme.INK)
+				and (p42_bag._label.get_theme_color("font_color") as Color).is_equal_approx(TecTheme.CARD)
+				and p42_lab.corner_radius_top_left == 0, str(p42_lab))
+		check("黑条按字宽收紧（不是铺满 64px 的整条横幅）",
+			p42_bag._label.size.x < DeskIcon.ROOT_SIZE and p42_bag._label.size.x >= 24.0,
+			str(p42_bag._label.size))
+		check("图标本体始终是黑线稿（它没有底板可衬白线）",
+			p42_bag._icon.modulate.is_equal_approx(TecTheme.LINE))
+		p42_bag.set_selected(false)
+
+	# 案件地图（用户点名「尤其明显没改」的一扇窗）：行 / 小方块 / 状态牌同一条键线
+	var p42_map: CaseMapWin = scene.dbg_open_case_map()
+	var p42_r1: Control = p42_map.find_child("row_A001", true, false) if p42_map != null else null
+	var p42_c1: Panel = p42_r1.find_child("state", true, false) as Panel if p42_r1 != null else null
+	var p42_rs := p42_r1.get_theme_stylebox("panel") as StyleBoxFlat if p42_r1 != null else null
+	check("案件地图已知行 = 1px 纯黑键线",
+		p42_rs != null and p42_rs.border_color.is_equal_approx(TecTheme.INK), str(p42_rs))
+	check("案件地图「当前」牌 = 白底 + 双键线",
+		p42_c1 != null and p42_c1.get_node_or_null("keyline") != null
+			and (p42_c1.get_theme_stylebox("panel") as StyleBoxFlat).border_color.is_equal_approx(TecTheme.INK),
+		"null" if p42_c1 == null else str(p42_c1.get_theme_stylebox("panel")))
+	var p42_r2: Control = p42_map.find_child("row_A002", true, false) if p42_map != null else null
+	var p42_c2: Panel = p42_r2.find_child("state", true, false) as Panel if p42_r2 != null else null
+	check("案件地图锁定牌 = 淡键线 + 淡字，且没有内键线",
+		p42_c2 != null and p42_c2.get_node_or_null("keyline") == null
+			and (p42_c2.get_theme_stylebox("panel") as StyleBoxFlat).border_color.is_equal_approx(TecTheme.INK_FAINT),
+		"null" if p42_c2 == null else str(p42_c2.get_theme_stylebox("panel")))
 
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)

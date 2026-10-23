@@ -95,41 +95,41 @@ func _rebuild(n: Dictionary) -> void:
 	for c in _rows.get_children():
 		c.queue_free()
 	var kind := String(n.get("kind", ""))
-	_head = _line(String(n.get("label", _key)), 13, TecTheme.TEXT)
+	_head = _line(String(n.get("label", _key)), TecTheme.FS_BODY, TecTheme.TEXT)
 	_head.name = "dt_title"
 	_rows.add_child(_head)
 	_meta = _line(_kind_name(kind), TecTheme.FS_BODY, TecTheme.MUTED)
 	_meta.name = "dt_meta"
 	_rows.add_child(_meta)
-	_rows.add_child(_para(_intro_text(n, kind)))
+	var para := _para(_intro_text(n, kind))
+	_rows.add_child(para)
+	para.start_typing()
 	var st := _status_text(n, kind)
 	if st != "":
-		_rows.add_child(_line("状态：" + st, 12, TecTheme.MUTED))
+		_rows.add_child(_line("状态：" + st, TecTheme.FS_BODY, TecTheme.MUTED))
 	if kind != "loc" and String(n.get("home_scene", "")) != "":
-		_rows.add_child(_line("来源：" + _container_title(String(n["home_scene"])), 12, TecTheme.MUTED))
+		_rows.add_child(_line("来源：" + _container_title(String(n["home_scene"])), TecTheme.FS_BODY, TecTheme.MUTED))
 	if _graph.is_container_node(_key) and _graph.explored.has(String(n.get("id", ""))):
-		var b := _button("[ " + ("重看场景叙事" if GraphState.is_scene_kind(kind) else "重看叙事") + " ]")
+		var b := _button("重看场景叙事" if GraphState.is_scene_kind(kind) else "重看叙事")
 		b.pressed.connect(func(): renarr_scene.emit(String(n["id"])))
 		_rows.add_child(b)
 	if kind == "char":
 		if int(_graph.talk_prog.get(_key, 0)) > 0:
-			var t := _button("[ 重看对话 ]")
+			var t := _button("重看对话")
 			t.pressed.connect(func(): renarr_talk.emit(_key))
 			_rows.add_child(t)
 		if _has_monologue(String(n["id"])):
-			var m := _button("[ 播放独白 ]")
+			var m := _button("播放独白")
 			m.pressed.connect(func(): play_monologue.emit(String(n["id"])))
 			_rows.add_child(m)
 	if String(n.get("id", "")) == "ITEMS_changji" and _installed(n).has("ITEMS_cz"):
-		var mu := _button("[ 播放音乐 ]")
+		var mu := _button("播放音乐")
 		mu.pressed.connect(func(): play_music.emit())
 		_rows.add_child(mu)
-	# 高度跟着内容走（下限 150，上限 420）
+	# 高度跟着内容走，不再截到 420
 	await get_tree().process_frame
-	var h := 40.0
-	for c in _rows.get_children():
-		h += c.size.y + 6.0
-	set_inner_height(clampf(h + 24.0, 150.0, 420.0))
+	var h := _rows.get_combined_minimum_size().y
+	set_inner_height(h + SysWindow.BAR_H + 20.0)
 
 
 func _intro_text(n: Dictionary, kind: String) -> String:
@@ -265,22 +265,15 @@ func _line(text: String, size_px: int, color: Color) -> Label:
 	return l
 
 
-func _para(text: String) -> Label:
-	var l := _line(text, 13, TecTheme.TEXT)
+func _para(text: String) -> TypewriterLabel:
+	var l := TecTheme.narrative_label(text, TecTheme.TEXT)
 	l.name = "dt_desc"
+	l.custom_minimum_size = Vector2(W - 24.0 - 24.0, 0)
 	return l
 
 
+## 详情窗的四个「重看」键走**全站同一套按钮语法**（P4.2）：白底 + 1px 纯黑键线。
+## 原来是无框纯文字 + 悬停反白 —— 在满屏有框的界面里，它读作「一段可点的说明」；
+## 文案里的 `[ ]` 方括号也是「没有框，只好用字符假装一个框」的补偿，有真键线后就一起去掉。
 func _button(text: String) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_override("font", TecTheme.font())
-	b.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
-	b.add_theme_color_override("font_color", TecTheme.TEXT)
-	b.add_theme_color_override("font_hover_color", TecTheme.CARD)
-	for state in ["normal", "hover", "pressed", "focus"]:
-		b.add_theme_stylebox_override(state, TecTheme.flat(
-			TecTheme.LINE if state == "hover" else Color(0, 0, 0, 0), 6,
-			Color(0, 0, 0, 0), 0))
-	return b
+	return TecTheme.button(text)

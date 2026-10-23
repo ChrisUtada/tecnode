@@ -61,8 +61,8 @@ func setup_dock() -> void:
 	_prog.show_percentage = false
 	_prog.custom_minimum_size = Vector2(0, 4)
 	_prog.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_prog.add_theme_stylebox_override("background", TecTheme.flat(TecTheme.FACE_LO, 2, TecTheme.FACE_LO, 0))
-	_prog.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 2, TecTheme.LINE, 0))
+	_prog.add_theme_stylebox_override("background", TecTheme.flat(TecTheme.FACE_LO, 0, TecTheme.FACE_LO, 0))
+	_prog.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 0, TecTheme.LINE, 0))
 	v.add_child(_prog)
 
 	_time = TecTheme.label("--:-- / --:--", TecTheme.FS_BODY, TecTheme.MUTED)

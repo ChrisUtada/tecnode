@@ -5,11 +5,12 @@ extends SysWindow
 ## 案卷式清单：一条一条往下堆，新的在底部、自动滚到底。
 ## 条目样式照抄 `06-shell.css:94-102`：
 ##   · 普通  —— 正文色 + 底部 1px 细线
-##   · sys   —— 加粗，前缀「▍ 」
+##   · sys   —— 正文色 + 前缀「▍ 」
 ##   · warn  —— 灰（MUTED），前缀「※ 」
 ##   · err   —— 反白（深底浅字）
 ##   · cap   —— 下划线（捕获到线索）
 ##   · act   —— 浅底（做成了某件事）
+## 新落到最底部的一条按打字机逐字显现。
 ## 内容本身不在这里判断 —— 写不写、写什么由调用方按 Web 的日志口径决定（见 GraphState.add_log）。
 
 const PREFIX := {"sys": "▍ ", "warn": "※ "}
@@ -19,6 +20,9 @@ var _scroll: ScrollContainer
 var _list: VBoxContainer
 var _rows: Array[Control] = []
 var _log_sig := ""
+var _typing_lab: RichTextLabel
+var _typing_total := 0
+var _typing_shown := 0.0
 
 
 ## h 是 **body 高**。Web `.log-win .log-body{max-height:340px}`，body 还要扣掉标题栏 23
@@ -52,6 +56,7 @@ func refresh_log() -> void:
 	if sig == _log_sig:
 		return
 	_log_sig = sig
+	_stop_typing()
 	for c in _list.get_children():
 		_list.remove_child(c)
 		c.queue_free()
@@ -60,10 +65,48 @@ func refresh_log() -> void:
 		var empty := TecTheme.label("（还没有记录）", TecTheme.FS_BODY, TecTheme.MUTED)
 		_list.add_child(empty)
 		return
-	for e in entries:
-		var kind := String((e as Dictionary).get("kind", ""))
-		var text := String((e as Dictionary).get("text", ""))
-		_list.add_child(_make_row(text, kind))
+	for i in entries.size():
+		var e: Dictionary = entries[i]
+		var kind := String(e.get("kind", ""))
+		var text := String(e.get("text", ""))
+		var row := _make_row(text, kind)
+		_list.add_child(row)
+		if i == entries.size() - 1:
+			_start_typing(row.get_node_or_null("log_text") as RichTextLabel)
+	_scroll_to_end()
+
+
+func _start_typing(lab: RichTextLabel) -> void:
+	if lab == null:
+		return
+	_typing_total = lab.get_total_character_count()
+	if _typing_total <= 0:
+		return
+	_typing_lab = lab
+	_typing_shown = 0.0
+	lab.visible_characters = 0
+	set_process(true)
+
+
+func _stop_typing() -> void:
+	if _typing_lab != null and is_instance_valid(_typing_lab):
+		_typing_lab.visible_characters = -1
+	_typing_lab = null
+	_typing_total = 0
+	_typing_shown = 0.0
+	set_process(false)
+
+
+func _process(delta: float) -> void:
+	if _typing_lab == null or not is_instance_valid(_typing_lab):
+		_stop_typing()
+		return
+	_typing_shown += delta * (1000.0 / TypewriterLabel.CHAR_MS)
+	var n := int(_typing_shown)
+	if n >= _typing_total:
+		_stop_typing()
+		return
+	_typing_lab.visible_characters = n
 	_scroll_to_end()
 
 
@@ -71,7 +114,7 @@ func _make_row(text: String, kind: String) -> Control:
 	var row := PanelContainer.new()
 	row.name = "log_row"
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0, 0, 0, 0)
+	sb.bg_color = TecTheme.NONE
 	sb.set_border_width_all(0)
 	sb.border_width_bottom = 1
 	sb.border_color = TecTheme.LINE2
@@ -95,9 +138,7 @@ func _make_row(text: String, kind: String) -> Control:
 	lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lab.custom_minimum_size = Vector2(body.size.x - 12.0, 0)
 	lab.add_theme_font_override("normal_font", TecTheme.font())
-	lab.add_theme_font_override("bold_font", TecTheme.font())
 	lab.add_theme_font_size_override("normal_font_size", TecTheme.FS_BODY)
-	lab.add_theme_font_size_override("bold_font_size", TecTheme.FS_BODY)
 	lab.add_theme_constant_override("line_separation", 5)
 	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -108,9 +149,7 @@ func _make_row(text: String, kind: String) -> Control:
 		col = TecTheme.CARD
 	lab.add_theme_color_override("default_color", col)
 	var body_text := String(PREFIX.get(kind, "")) + text
-	if kind == "sys":
-		body_text = "[b]%s[/b]" % body_text
-	elif kind == "cap":
+	if kind == "cap":
 		body_text = "[u]%s[/u]" % body_text
 	lab.text = body_text
 	row.add_child(lab)

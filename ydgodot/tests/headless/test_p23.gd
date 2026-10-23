@@ -279,6 +279,15 @@ func _test_ui() -> void:
 	check("放映卡锚在地点旁且不压住节点", card != null and not garden_rect.intersects(mem_rect),
 		str(garden_rect) + " / " + str(mem_rect))
 	check("首行在打字", card != null and card.is_typing())
+	check("放映卡无滚动条", card != null and card.find_children("*", "ScrollContainer", true, false).is_empty())
+	check("放映卡预排全文行", card != null and card._rows.size() == card.line_count(),
+		str(card._rows.size()) if card != null else "null")
+	var mem_border: Control = null
+	if card != null:
+		mem_border = card.get_node_or_null("mem_border") as Control
+	check("放映卡黑框随内容增高", mem_border != null
+		and absf(mem_border.size.y - (card.size.y - SysWindow.PAD * 2.0)) < 0.5,
+		"null" if mem_border == null else "%.0f / %.0f" % [mem_border.size.y, card.size.y])
 	check("单击先补全本行", scene.dbg_mem_advance() and not card.is_typing())
 	check("补全后文字完整", card != null and card.typed_text() == card.current_text())
 	var idx_before := card.index()

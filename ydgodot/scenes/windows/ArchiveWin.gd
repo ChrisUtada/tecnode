@@ -53,9 +53,9 @@ func _make_row(tid: String, current: bool) -> Control:
 	row.name = "row_" + tid
 	row.custom_minimum_size = Vector2(0, 46)
 	row.focus_mode = Control.FOCUS_NONE
-	row.add_theme_stylebox_override("normal", TecTheme.flat(Color(0, 0, 0, 0), TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
-	row.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
-	row.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, TecTheme.R_BTN, Color(0, 0, 0, 0), 0))
+	row.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.NONE, TecTheme.R_BTN, TecTheme.NONE, 0))
+	row.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_BTN, TecTheme.NONE, 0))
+	row.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, TecTheme.R_BTN, TecTheme.NONE, 0))
 	row.pressed.connect(_on_row_pressed.bind(tid))
 
 	var pad := MarginContainer.new()

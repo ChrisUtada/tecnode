@@ -21,11 +21,6 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/size/window_width_override=1280
 window/size/window_height_override=720
-window/size/resizable=true
-; 不缩放。点阵字体（VonwaonBitmap 12px）只在 12 的整数倍像素落得下原字格，
-; canvas_items 会把整张 1280×720 画布重采样到窗口大小 —— 1920×1080 上就是 1.44x，
-; 字全部发胖发糊。改成 disabled 后逻辑尺寸 = 窗口像素，界面靠 Desktop._layout_root() 自适应。
-window/stretch/mode="disabled"
 
 [editor_plugins]
 
@@ -42,4 +37,4 @@ theme/default_font_subpixel_positioning=0
 textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-environment/defaults/default_clear_color=Color(0.914, 0.898, 0.839, 1)
+environment/defaults/default_clear_color=Color(0.937255, 0.937255, 0.937255, 1)

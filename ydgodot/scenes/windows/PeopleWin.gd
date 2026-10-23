@@ -143,8 +143,8 @@ func _make_row(id: String) -> Control:
 
 
 func _row_style(hover: bool) -> StyleBoxFlat:
-	var sb := TecTheme.flat(TecTheme.BG if hover else Color(0, 0, 0, 0), TecTheme.R_BTN,
-		Color(0, 0, 0, 0) if not hover else Color(0, 0, 0, 0))
+	var sb := TecTheme.flat(TecTheme.BG if hover else TecTheme.NONE, TecTheme.R_BTN,
+		TecTheme.NONE if not hover else TecTheme.NONE)
 	sb.content_margin_left = 8
 	sb.content_margin_right = 8
 	sb.content_margin_top = 6

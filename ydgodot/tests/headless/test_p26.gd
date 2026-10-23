@@ -155,7 +155,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	var badge_sb: StyleBoxFlat = null
 	if badge != null:
 		badge_sb = badge.get_theme_stylebox("panel") as StyleBoxFlat
-	check("图标角标是药丸（999px 半径）",
+	check("图标角标是药丸（P4.1 恢复圆头）",
 		badge_sb != null and badge_sb.corner_radius_top_left >= 100,
 		str(badge_sb.corner_radius_top_left) if badge_sb != null else "null")
 
@@ -276,7 +276,7 @@ func _test_desktop(c: CaseLoader) -> void:
 			sys_row = t
 		elif String(scene.dbg_log_kinds()[i]) == "warn":
 			warn_row = t
-	check("sys 行加粗 + ▍ 前缀", sys_row.begins_with("[b]▍ "), sys_row)
+	check("sys 行正常字重 + ▍ 前缀", sys_row.begins_with("▍ ") and not sys_row.contains("[b]"), sys_row)
 	check("warn 行 ※ 前缀", warn_row.begins_with("※ "), warn_row)
 
 	# 5) 日志口径：只记结果，不记操作流水
