@@ -14,24 +14,26 @@ func setup_map(p_catalog: CaseCatalog, p_current: String, p_open: bool) -> void:
 	catalog = p_catalog
 	current_id = p_current
 	case_open = p_open
-	setup("案件地图", 430, 390)
+	setup("案件地图", 430, 260)
 	_build_map()
 
 
 func _build_map() -> void:
 	var tip := TecTheme.label(
-		"每个地址对应一宗案件。\n"
-		+ "在本案捕获「真名」后，下一案的地址才会点亮。\n"
-		+ "案件窗「–」收进右下角案件卡片；「×」收进本图标。\n"
-		+ "两种情况都会自动保存，点本案那行即可展开。", TecTheme.FS_BODY, TecTheme.MUTED)
+		"每个地址对应一宗案件；捕获「真名」后下一案才会点亮。\n"
+		+ "「–」收进右下角卡片，「×」收进本图标，点本案那行展开。",
+		TecTheme.FS_BODY, TecTheme.MUTED)
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tip.add_theme_constant_override("line_spacing", 3)
-	tip.custom_minimum_size = Vector2(content.size.x, 0)
+	tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_child(tip)
+
+	## D1：列表是独立小节，用黑条白字标题与说明 / 行分开。
+	content.add_child(TecTheme.section_bar("案件索引"))
 
 	_rows = VBoxContainer.new()
 	_rows.name = "rows"
-	_rows.add_theme_constant_override("separation", 8)
+	_rows.add_theme_constant_override("separation", 0)
 	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_child(_rows)
 	refresh_map()
@@ -43,38 +45,39 @@ func refresh_map() -> void:
 	for child in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
-	for c in CaseCatalog.all():
-		_rows.add_child(_make_row(c))
+	var all := CaseCatalog.all()
+	for i in all.size():
+		_rows.add_child(_make_row(all[i], i == all.size() - 1))
 
 
-func _make_row(c: Dictionary) -> Control:
+func _make_row(c: Dictionary, last: bool = false) -> Control:
 	var id := String(c["id"])
 	var known := catalog != null and catalog.is_unlocked(id)
 	var current := id == current_id
 	var clickable := known and not (current and case_open)
 
+	## D2：与档案 / 名册 / 证物袋同一套列表语法 —— 不再给每行套一个圆角盒子。
+	## 行间只留 1px 发丝线（左右缩进 8px），行高 56 给「编号 + 标题 + 说明」两行用。
 	var row := PanelContainer.new()
 	row.name = "row_" + id
-	row.custom_minimum_size = Vector2(0, 66)
+	row.custom_minimum_size = Vector2(0, 56)
+	row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
-	## 键线一律纯黑（P4.2）—— 原来已知/可进入的行用的是 `EDGE`（30% 黑），
-	## 在这扇窗里读作「还没做单色改版的旧控件」。锁定行才留淡线：它是真的「不可点」。
-	var style := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.INK if known else TecTheme.EDGE_SOFT)
-	## 显式写死内容边距：悬停要把键线从 1px 加到 2px，不钉住边距的话
-	## 行内所有子控件都会被顶 1px（参考图里所有键也是一直 1px，只有悬停加粗）。
-	style.content_margin_left = 2
-	style.content_margin_right = 2
-	style.content_margin_top = 2
-	style.content_margin_bottom = 2
-	if not known:
-		style.bg_color = TecTheme.BG
+	var style := TecTheme.flat(TecTheme.NONE, 0, TecTheme.NONE, 0)
+	style.border_color = TecTheme.edge(0.18)
+	if not last:
+		style.border_width_bottom = 1
+		style.expand_margin_left = -8.0
+		style.expand_margin_right = -8.0
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 4
+	style.content_margin_bottom = 4
 	row.add_theme_stylebox_override("panel", style)
 	if clickable:
 		row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		## 悬停 = 键线加粗（1px → 2px）。原来是 `CARD → BG` 换底色，
-		## 而这两个常量在单色版里都是纯白 —— 等于没有反馈。
-		row.mouse_entered.connect(func(): style.set_border_width_all(2))
-		row.mouse_exited.connect(func(): style.set_border_width_all(1))
+		row.mouse_entered.connect(func(): style.bg_color = TecTheme.BG)
+		row.mouse_exited.connect(func(): style.bg_color = TecTheme.NONE)
 		row.gui_input.connect(_on_row_input.bind(id, clickable))
 
 	var hb := HBoxContainer.new()
@@ -82,37 +85,48 @@ func _make_row(c: Dictionary) -> Control:
 	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(hb)
 
-	var glyph_box := PanelContainer.new()
-	glyph_box.custom_minimum_size = Vector2(34, 34)
-	glyph_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	glyph_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	glyph_box.add_theme_stylebox_override("panel",
-		TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN,
-			TecTheme.INK if known else TecTheme.EDGE_SOFT, 1))
-	hb.add_child(glyph_box)
-	var glyph := TecTheme.label("▣" if known else "▢", TecTheme.FS_BODY,
-		TecTheme.LINE if known else TecTheme.FAINT)
-	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	glyph_box.add_child(glyph)
+	## 行首编号牌：a-001 / a-002。比旧版「▣ / ▢」有信息量，也只占一个短格。
+	var code_box := PanelContainer.new()
+	code_box.name = "code"
+	code_box.custom_minimum_size = Vector2(52, 24)
+	code_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	code_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	code_box.add_theme_stylebox_override("panel", TecTheme.flat(
+		TecTheme.CARD, TecTheme.R_SM, TecTheme.INK if known else TecTheme.EDGE_SOFT, 1))
+	hb.add_child(code_box)
+	var code_text := String(c["code"]).replace("CASE ", "")
+	var code := TecTheme.label(code_text, TecTheme.FS_BODY,
+		TecTheme.TEXT if known else TecTheme.INK_FAINT)
+	code.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	code.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	code.clip_text = true
+	code.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	code_box.add_child(code)
 
 	var meta := VBoxContainer.new()
 	meta.add_theme_constant_override("separation", 2)
 	meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meta.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hb.add_child(meta)
 
-	var title := TecTheme.label(
-		String(c["code"]) + " · " + (String(c["title"]) if known else "？？？？？？"),
-		TecTheme.FS_TITLE, TecTheme.TEXT if known else TecTheme.MUTED)
+	var title_text := String(c["title"]) if known else "？？？？？？"
+	var title := TecTheme.label(title_text, TecTheme.FS_TITLE,
+		TecTheme.TEXT if known else TecTheme.MUTED)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.clip_text = true
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title.tooltip_text = title_text
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(title)
 
-	var note := TecTheme.label(catalog.note_for(id) if known else String(c["note"]), TecTheme.FS_BODY, TecTheme.MUTED)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	note.custom_minimum_size = Vector2(240, 0)
+	var note_text := catalog.note_for(id) if known else String(c["note"])
+	var note := TecTheme.label(note_text, TecTheme.FS_BODY,
+		TecTheme.MUTED if known else TecTheme.INK_FAINT)
+	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	note.clip_text = true
+	note.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	note.tooltip_text = note_text
 	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(note)
 
@@ -130,15 +144,11 @@ func _make_row(c: Dictionary) -> Control:
 	else:
 		state_text = "可进入"
 
-	## 状态牌按**按钮**的语法画（P4.2），三种档位只差键线与字色：
-	##   当前     → 白底 + 1px 键线 + **内键线**（参考图 “Find” 的双线 = 「就是这一个」）
-	##   可进入   → 白底 + 1px 键线
-	##   锁定/待接入 → 淡键线 + 淡字（它是真的不可点，靠键线浓度区分，不靠颜色）
-	## 原来是「当前 = 整块黑药丸」：那块黑是整窗最重的东西，把「可进入」压没了；
-	## 而且黑底是深色面的语法，不该长在按钮上。
+	## 状态牌按**按钮**的语法画（P4.2）：当前 = 双键线，可进入 = 1px，
+	## 锁定 / 待接入 = 淡键线 + 淡字。高度与编号牌同为 24，行内基线对齐。
 	var badge := Panel.new()
 	badge.name = "state"
-	badge.custom_minimum_size = Vector2(64, 26)
+	badge.custom_minimum_size = Vector2(56, 24)
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var faded := state_kind == "lock" or state_kind == "pend"
@@ -153,7 +163,6 @@ func _make_row(c: Dictionary) -> Control:
 	state.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	state.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	state.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	## `Panel` 不是容器，子节点得自己铺满（原来的 PanelContainer 会自动排版）
 	state.set_anchors_preset(Control.PRESET_FULL_RECT)
 	badge.add_child(state)
 

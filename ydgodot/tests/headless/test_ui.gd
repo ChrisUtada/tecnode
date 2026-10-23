@@ -127,6 +127,21 @@ func _initialize() -> void:
 				pop._offset_shadow.position.is_equal_approx(Vector2(SysWindow.PAD, SysWindow.PAD)
 					+ SysWindow.OFFSET_SHADOW), str(pop._offset_shadow.position))
 			check("A4 密码影在窗体内容之下", pop._offset_shadow.get_index() < pop.get_child_count() - 1)
+		# 顶栏统一：标题按文字宽度居中，窄窗不压关闭键，横纹不越出栏。
+		var pw_bar := pop.get_node("bar") as Control
+		var pw_title := pop._title_label as Control
+		var pw_close := pop.get_node("bar/close") as Control
+		var pw_stripes := pop._title_stripes as Control
+		check("顶栏标题居中（窄弹窗）",
+			absf(pw_title.position.x + pw_title.size.x * 0.5 - pw_bar.size.x * 0.5) < 0.5,
+			"%s / bar %s" % [pw_title.position, pw_bar.size])
+		check("窄弹窗标题不压关闭键",
+			pw_title.position.x + pw_title.size.x <= pw_close.position.x,
+			"%s / close %s" % [pw_title.position + pw_title.size, pw_close.position])
+		check("窄弹窗横纹不越出顶栏",
+			pw_stripes.size.x <= pw_bar.size.x and pw_stripes.size.y <= pw_bar.size.y
+				and float(pw_stripes.get("line_right")) <= pw_bar.size.x,
+			"%s / bar %s" % [pw_stripes.size, pw_bar.size])
 	scene.dbg_password("item:ITEMS_jzmh", "1111")
 	await process_frame
 	check("密码错：弹窗还在", scene.get_node_or_null("desk/pw_pop") != null)
@@ -255,6 +270,17 @@ func _initialize() -> void:
 	var case_win := scene.get_node_or_null("desk/case_win")
 	check("案件窗不再用烘焙九切片", case_win != null and not case_win._uses_baked_frame()
 		and case_win.get_node_or_null("frame") == null)
+	var cw_bar := case_win.get_node("bar") as Control
+	var cw_title := case_win._title_label as Control
+	var cw_stripes := case_win._title_stripes as Control
+	check("顶栏标题居中（主窗）",
+		absf(cw_title.position.x + cw_title.size.x * 0.5 - cw_bar.size.x * 0.5) < 0.5,
+		"%s / bar %s" % [cw_title.position, cw_bar.size])
+	check("主窗横纹在顶栏内",
+		cw_stripes.size.x <= cw_bar.size.x and cw_stripes.size.y <= cw_bar.size.y
+			and float(cw_stripes.get("line_left")) >= 0.0
+			and float(cw_stripes.get("line_right")) <= cw_bar.size.x,
+		"%s / bar %s" % [cw_stripes.size, cw_bar.size])
 	var frame_bg := scene.get_node_or_null("desk/case_win/bg") as Panel
 	check("案件窗底板是程序化 Panel", frame_bg != null)
 	if frame_bg != null:
@@ -1350,12 +1376,7 @@ func _initialize() -> void:
 	check("默认清屏色同步桌面色",
 		clear_col is Color and (clear_col as Color).is_equal_approx(TecTheme.DESK_GRAY), str(clear_col))
 	var wm := scene.get_node_or_null("desk/case_win/body/stage/desk_watermark") as Control
-	var cards_layer := scene.get_node_or_null("desk/case_win/body/stage/cards") as Control
-	check("E1 画布水印存在且不吃鼠标",
-		wm != null and wm.mouse_filter == Control.MOUSE_FILTER_IGNORE)
-	check("E1 水印在卡片层之下",
-		wm != null and cards_layer != null and wm.get_index() < cards_layer.get_index(),
-		"null" if wm == null or cards_layer == null else "%d / %d" % [wm.get_index(), cards_layer.get_index()])
+	check("E1 画布不挂水印（按用户反馈取消）", wm == null)
 
 	# ── 单色改版 P4.2：按钮语法统一 ──────────────────────────────────────────
 	# 参考图（System 6 Control Panel）只有两枚键：Set = 白底 + 1px 黑键线；
@@ -1415,13 +1436,26 @@ func _initialize() -> void:
 			p42_bag._icon.modulate.is_equal_approx(TecTheme.LINE))
 		p42_bag.set_selected(false)
 
-	# 案件地图（用户点名「尤其明显没改」的一扇窗）：行 / 小方块 / 状态牌同一条键线
+	# 案件地图：列表行与其它列表同一套语法 —— 行首编号牌 + 发丝线，不再套圆角盒子。
 	var p42_map: CaseMapWin = scene.dbg_open_case_map()
 	var p42_r1: Control = p42_map.find_child("row_A001", true, false) if p42_map != null else null
 	var p42_c1: Panel = p42_r1.find_child("state", true, false) as Panel if p42_r1 != null else null
 	var p42_rs := p42_r1.get_theme_stylebox("panel") as StyleBoxFlat if p42_r1 != null else null
-	check("案件地图已知行 = 1px 纯黑键线",
-		p42_rs != null and p42_rs.border_color.is_equal_approx(TecTheme.INK), str(p42_rs))
+	check("案件地图行 = 底部 1px 发丝线（不再是圆角盒）",
+		p42_rs != null and p42_rs.border_width_bottom == 1
+			and p42_rs.border_width_top == 0
+			and p42_rs.border_width_left == 0
+			and p42_rs.border_width_right == 0
+			and p42_rs.border_color.is_equal_approx(TecTheme.edge(0.18))
+			and p42_rs.expand_margin_left == -8.0
+			and p42_rs.expand_margin_right == -8.0,
+		str(p42_rs))
+	var p42_code: PanelContainer = p42_r1.find_child("code", true, false) as PanelContainer if p42_r1 != null else null
+	var p42_code_txt := p42_code.get_child(0) as Label if p42_code != null and p42_code.get_child_count() > 0 else null
+	check("案件地图行首 = A-001 编号牌",
+		p42_code != null and p42_code.custom_minimum_size == Vector2(52, 24)
+			and p42_code_txt != null and p42_code_txt.text == "A-001",
+		"null" if p42_code_txt == null else p42_code_txt.text)
 	check("案件地图「当前」牌 = 白底 + 双键线",
 		p42_c1 != null and p42_c1.get_node_or_null("keyline") != null
 			and (p42_c1.get_theme_stylebox("panel") as StyleBoxFlat).border_color.is_equal_approx(TecTheme.INK),
@@ -1442,17 +1476,14 @@ func _initialize() -> void:
 		toast_sb != null and toast_sb.bg_color.is_equal_approx(TecTheme.LINE)
 			and toast_sb.corner_radius_top_left >= 100,
 		str(toast_sb))
-	check("A4 Toast 3px 偏移影",
-		scene._toast_shadow != null and scene._toast_shadow.visible
-			and scene._toast_shadow.position.is_equal_approx(scene._toast.position + SysWindow.OFFSET_SHADOW)
-			and scene._toast_shadow.size.is_equal_approx(scene._toast.size),
-		"null" if scene._toast_shadow == null else str(scene._toast_shadow.position))
+	check("E4 Toast 底部水平居中",
+		absf(scene._toast.position.x + scene._toast.size.x * 0.5 - scene._vw() * 0.5) < 1.0,
+		str(scene._toast.position) + " / " + str(scene._toast.size))
 	scene._show_toast("队列二")
 	check("E4 第二条排队不抢屏", scene._toast_label.text == "队列一"
 		and scene._toast_queue.size() == 1, str(scene._toast_queue))
 	scene._hide_toast()
 	check("E4 清场同时清队列", not scene._toast.visible and scene._toast_queue.is_empty())
-	check("A4 Toast 影随清场隐藏", scene._toast_shadow == null or not scene._toast_shadow.visible)
 	scene._show_toast("队列三")
 	check("E4 清场后新消息立即显示", scene._toast_label.text == "队列三" and scene._toast.visible)
 	scene._hide_toast()

@@ -376,6 +376,7 @@ static func label(text: String, size: int = FS_BODY, color: Color = TEXT) -> Lab
 static func section_bar(text: String) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.name = "section_bar"
+	p.custom_minimum_size = Vector2(0, 24)
 	var sb := flat(INK, 0, INK, 0)
 	sb.content_margin_left = 8
 	sb.content_margin_right = 8
@@ -384,6 +385,8 @@ static func section_bar(text: String) -> PanelContainer:
 	p.add_theme_stylebox_override("panel", sb)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var l := label(text, FS_BODY, TEXT_ON_DARK)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(l)
 	return p

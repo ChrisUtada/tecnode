@@ -40,6 +40,7 @@ var _over_ring: Control = null
 ## A2：激活窗有条纹标题栏 + 2px 框；非激活窗只留空标题栏 + 1px 框。
 var _active := true
 var _rules: Array[Control] = []
+var _title_stripes: Control = null
 
 
 func setup(p_title: String, w: float, h: float, radius: int = TecTheme.R_WIN) -> void:
@@ -130,18 +131,16 @@ func _build(radius: int) -> void:
 	add_child(bar)
 	_bar_nodes.append(bar)
 
-	var title_row := HBoxContainer.new()
-	title_row.name = "title_row"
-	title_row.position = Vector2(10.0, 0.0)
-	title_row.size = Vector2(inner_w - 20.0, BAR_H - 1.0)
-	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	title_row.add_theme_constant_override("separation", 8)
-	title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.add_child(title_row)
+	## 顶栏统一语法：三道横纹铺满整条栏，标题文字居中并留出左右缺口；
+	## 标题宽度按文字实测，窄窗只收窄标题，不会压到右侧按钮或把横纹挤出栏外。
+	_title_stripes = TitleStripes.new()
+	_title_stripes.name = "title_stripes"
+	_title_stripes.position = Vector2.ZERO
+	_title_stripes.size = Vector2(inner_w, BAR_H - 1.0)
+	_title_stripes.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(_title_stripes)
+	_rules.append(_title_stripes)
 
-	var left_rule := _title_rule()
-	_rules.append(left_rule)
-	title_row.add_child(left_rule)
 	_title_label = TecTheme.label(title, TecTheme.FS_BODY, TecTheme.TEXT)
 	_title_label.name = "win_title"
 	var spaced := FontVariation.new()
@@ -150,15 +149,11 @@ func _build(radius: int) -> void:
 	spaced.set_spacing(TextServer.SPACING_GLYPH, 1)
 	_title_label.add_theme_font_override("font", spaced)
 	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_title_label.clip_text = true
 	_title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_title_label.custom_minimum_size = Vector2(240, 0)
-	_title_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title_row.add_child(_title_label)
-	var right_rule := _title_rule()
-	_rules.append(right_rule)
-	title_row.add_child(right_rule)
+	bar.add_child(_title_label)
 
 	var sep := ColorRect.new()
 	sep.name = "sep"
@@ -177,6 +172,7 @@ func _build(radius: int) -> void:
 	bar.add_child(close)
 
 	bar.gui_input.connect(_on_bar_input)
+	_sync_title_area()
 
 	body = Control.new()
 	body.name = "body"
@@ -207,31 +203,55 @@ func content_min_height() -> float:
 	return maxf(content.get_combined_minimum_size().y, sum)
 
 
-func _title_rule() -> Control:
-	## 标题两侧的装饰条：**三道 1px 纯黑横纹**（参考图即为此）。
-	## 原来是一条 30% 半透明灰线 —— 在 1-bit 里「淡」不能靠 alpha，只能靠线宽与线数。
-	## 三道刚好填满 28px 标题栏的视觉中线，且与「1px 分隔线」拉开层次。
-	var wrap := Control.new()
-	wrap.custom_minimum_size = Vector2(12.0, BAR_H - 1.0)
-	wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var mid := BAR_H * 0.5
-	for i in 3:
-		var rule := ColorRect.new()
-		rule.color = TecTheme.INK
-		rule.anchor_left = 0.0
-		rule.anchor_right = 1.0
-		rule.anchor_top = 0.0
-		rule.anchor_bottom = 0.0
-		rule.offset_left = 0.0
-		rule.offset_right = 0.0
-		## 间距 4px：三条线占 9px，在 28px 里居中
-		rule.offset_top = mid - 4.5 + float(i) * 4.0
-		rule.offset_bottom = rule.offset_top + 1.0
-		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		wrap.add_child(rule)
-	return wrap
+## 顶栏标题区：按文字实测宽度居中；左右各留出控件宽度，标题永远不会压到
+## 关闭 / 最小化按钮。三道横纹由 `TitleStripes` 整条绘制，并在标题处断开。
+func _sync_title_area() -> void:
+	if _title_label == null or not is_instance_valid(_title_label):
+		return
+	if _title_stripes == null or not is_instance_valid(_title_stripes):
+		return
+	var bar := _title_label.get_parent() as Control
+	if bar == null:
+		return
+	var controls := 47.0 if bar.get_node_or_null("min") != null else 24.0
+	var margin := controls + 8.0
+	var max_w := maxf(_inner_w - margin * 2.0, 24.0)
+	var font := _title_label.get_theme_font("font")
+	var fs := _title_label.get_theme_font_size("font_size")
+	var text_w := 0.0
+	if font != null and _title_label.text != "":
+		text_w = font.get_string_size(_title_label.text, HORIZONTAL_ALIGNMENT_LEFT,
+			-1, fs).x
+	var w := clampf(text_w + 12.0, 24.0, max_w)
+	var x := (_inner_w - w) * 0.5
+	_title_label.position = Vector2(x, 0.0)
+	_title_label.size = Vector2(w, BAR_H - 1.0)
+	_title_stripes.position = Vector2.ZERO
+	_title_stripes.size = Vector2(_inner_w, BAR_H - 1.0)
+	var stripes := _title_stripes as TitleStripes
+	stripes.line_left = 10.0
+	stripes.line_right = maxf(_inner_w - controls - 8.0, 10.0)
+	stripes.gap_left = x - 7.0
+	stripes.gap_right = x + w + 7.0
+	stripes.queue_redraw()
+
+
+## 标题栏横纹：三道 1px 线，按标题区留出中间缺口；整条 Control 参与
+## 激活 / 非激活切换（非激活时隐藏，与 System 6 一致）。
+class TitleStripes extends Control:
+	var line_left := 10.0
+	var line_right := 10.0
+	var gap_left := 0.0
+	var gap_right := 0.0
+
+	func _draw() -> void:
+		var mid := size.y * 0.5
+		for i in 3:
+			var y := mid - 4.5 + float(i) * 4.0
+			if gap_left > line_left:
+				draw_line(Vector2(line_left, y), Vector2(gap_left, y), TecTheme.INK, 1.0)
+			if line_right > gap_right:
+				draw_line(Vector2(gap_right, y), Vector2(line_right, y), TecTheme.INK, 1.0)
 
 
 func _mini_button(text: String) -> Button:
@@ -311,6 +331,7 @@ func set_title(t: String) -> void:
 	title = t
 	if _title_label != null:
 		_title_label.text = t
+		_sync_title_area()
 
 
 ## A2：与 System 6 一致 —— 激活窗的标题栏有三道横纹、2px 框；
@@ -370,9 +391,7 @@ func resize_to(w: float, h: float) -> void:
 	var bar := get_node_or_null("bar") as Control
 	if bar != null:
 		bar.size.x = iw
-		var row := bar.get_node_or_null("title_row") as Control
-		if row != null:
-			row.size.x = iw - 20.0
+		_sync_title_area()
 		var hl := bar.get_node_or_null("top_hl") as Control
 		if hl != null:
 			hl.size.x = iw
@@ -423,6 +442,7 @@ func enable_controls(min_tip: String, close_tip: String = "", show_min := true) 
 		min_btn.pressed.connect(func(): minimized.emit())
 		bar.add_child(min_btn)
 	_close_btn.tooltip_text = close_tip
+	_sync_title_area()
 
 
 func _on_close_pressed() -> void:

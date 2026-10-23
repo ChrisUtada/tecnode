@@ -23,7 +23,6 @@ const MEM_CARD_MIN_X := 132.0
 const WORLD_W := 2000.0
 const WORLD_H := 1300.0
 const AUTOSAVE_DELAY_MSEC := 180
-const TecWatermarkScript := preload("res://ui/TecWatermark.gd")
 
 ## 页眉几何 —— 逐项来自 Web 的计算布局（tools/pixeldiff/probe_web_rects.cjs 量的
 ## getBoundingClientRect），不是凭感觉的间距。改文案长度要同步改宽度，否则右侧按钮组会错位。
@@ -87,7 +86,6 @@ var _debug_scrim: Control
 var _hdr_sized: Array = []      # [Control, Vector2]：页眉控件的目标尺寸，见 _sync_header_sizes()
 var _hdr_right: Array = []      # [Control, float]：贴右控件的「距右边缘」距离，见 _layout_header_right()
 var _toast: PanelContainer
-var _toast_shadow: ColorRect
 var _toast_label: Label
 var _toast_timer: SceneTreeTimer
 var _toast_queue: Array[Dictionary] = []
@@ -1035,13 +1033,6 @@ func _build_case_window() -> void:
 	stage_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stage.add_child(stage_bg)
 
-	## E1：空旷画布的视线锚点。水印必须画在 stage 内（desk 中央被主窗盖住），
-	## 又在卡片层之前，窗口多时自然被卡片遮掉。
-	var watermark := TecWatermarkScript.new()
-	watermark.name = "desk_watermark"
-	watermark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_stage.add_child(watermark)
-
 	_card_layer = Control.new()
 	_card_layer.name = "cards"
 	_card_layer.size = Vector2(WORLD_W, WORLD_H)
@@ -1746,15 +1737,6 @@ func _build_tec_chip() -> void:
 
 
 func _build_toast() -> void:
-	## A4：浮层 1-bit 硬影。toast 是黑底，影子在灰桌面上才看得出偏移。
-	_toast_shadow = ColorRect.new()
-	_toast_shadow.name = "toast_shadow"
-	_toast_shadow.color = TecTheme.shadow(1.0)
-	_toast_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_toast_shadow.visible = false
-	_desk.add_child(_toast_shadow)
-	_place_z(_toast_shadow, ZR_TOAST)
-
 	_toast = PanelContainer.new()
 	_toast.name = "toast"
 	var sb := StyleBoxFlat.new()
@@ -2185,11 +2167,6 @@ func _show_toast_now(text: String, warn: bool) -> void:
 	_toast.visible = true
 	_toast.reset_size()
 	_place_toast_anchor()
-	if _toast_shadow != null:
-		_toast_shadow.modulate.a = 1.0
-		_toast_shadow.visible = true
-		_toast_shadow.size = _toast.size
-		_toast_shadow.position = _toast.position + SysWindow.OFFSET_SHADOW
 	_stop_toast_timer()
 	_toast_timer = get_tree().create_timer(2.4)
 	_toast_timer.timeout.connect(_fade_toast)
@@ -2204,17 +2181,12 @@ func _fade_toast() -> void:
 	_toast_tween = create_tween()
 	_toast_tween.set_trans(Tween.TRANS_LINEAR)
 	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.18)
-	if _toast_shadow != null:
-		_toast_tween.parallel().tween_property(_toast_shadow, "modulate:a", 0.0, 0.18)
 	_toast_tween.finished.connect(_after_toast_fade)
 
 
 func _after_toast_fade() -> void:
 	_toast.visible = false
 	_toast.modulate.a = 1.0
-	if _toast_shadow != null:
-		_toast_shadow.visible = false
-		_toast_shadow.modulate.a = 1.0
 	_toast_active = false
 	if _toast_queue.is_empty():
 		return
@@ -2237,16 +2209,10 @@ func _stop_toast_timer() -> void:
 func _place_toast_anchor() -> void:
 	if _toast == null or not is_instance_valid(_toast) or not _toast.visible:
 		return
-	var right := _vw() - 16.0
+	## E4：底部居中，距底 16px。不再贴右下角，也不做 dock 避让 —— 居中后与
+	## 右下角的 TEC 胶囊 / 音乐卡片天然分开。
 	var bottom := _vh() - HEADER_H - 16.0
-	if _tec_chip != null and is_instance_valid(_tec_chip) and _tec_chip.visible:
-		bottom = minf(bottom, _tec_chip.position.y - 8.0)
-	if _music_dock != null and is_instance_valid(_music_dock) and _music_dock.visible:
-		bottom = minf(bottom, _music_dock.position.y - 8.0)
-	_toast.position = Vector2(right - _toast.size.x, bottom - _toast.size.y)
-	if _toast_shadow != null and _toast_shadow.visible:
-		_toast_shadow.size = _toast.size
-		_toast_shadow.position = _toast.position + SysWindow.OFFSET_SHADOW
+	_toast.position = Vector2((_vw() - _toast.size.x) * 0.5, bottom - _toast.size.y)
 
 
 func _toast_style(warn: bool) -> StyleBoxFlat:
@@ -2272,9 +2238,6 @@ func _hide_toast() -> void:
 	_toast_active = false
 	_toast.modulate.a = 1.0
 	_toast.visible = false
-	if _toast_shadow != null:
-		_toast_shadow.modulate.a = 1.0
-		_toast_shadow.visible = false
 
 
 # ── 撤销 / 存档 ─────────────────────────────────────────────────────────
