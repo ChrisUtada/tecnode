@@ -130,6 +130,9 @@ func _rebuild(n: Dictionary) -> void:
 	await get_tree().process_frame
 	var h := _rows.get_combined_minimum_size().y
 	set_inner_height(h + SysWindow.BAR_H + 20.0)
+	## 长简介同样不能把窗底顶出画面：贴到底就整体上移
+	if position.y + size.y > 740.0:
+		position.y = maxf(8.0, 740.0 - size.y)
 
 
 func _intro_text(n: Dictionary, kind: String) -> String:

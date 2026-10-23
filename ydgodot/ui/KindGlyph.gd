@@ -19,17 +19,28 @@ var radius := 8.0
 func _draw() -> void:
 	var c := size * 0.5
 	var r := radius
-	var sw := maxf(1.0, 1.7 / maxf(zoom, 0.1))
+	var sw := maxf(1.0, 1.1 / maxf(zoom, 0.1))
 	draw_arc(c, maxf(r - sw * 0.5, 0.5), 0.0, TAU, 40, col, sw, true)
 	var glyph := String(GLYPH_TEXT.get(kind, "?"))
 	var font := TecTheme.font()
-	var px := TecTheme.FS_BODY if minf(size.x, size.y) < 30.0 else TecTheme.FS_DISPLAY
+	## 字要明显小于圈：占圈内径的 ~2/3，四边留出呼吸缝，笔画才不会顶到弧线上。
+	## （旧版文字档直接画 12px、缩略档画 24px，圈内径只有 13/30，一放大就糊成一团�?
+	var px := glyph_font_px(r, zoom)
 	var w := font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_CENTER, -1, px).x
 	var asc := font.get_ascent(px)
 	var desc := font.get_descent(px)
 	var baseline := c.y + (asc - desc) * 0.5
 	draw_string(font, Vector2(c.x - w * 0.5, baseline), glyph,
 		HORIZONTAL_ALIGNMENT_CENTER, -1, px, col)
+
+
+## 圈内字号：取**描边内缘**围成的内径（外径 − 2×描边）的 ~3/5，再夹到 9..22。
+## 汉字实心笔画比西文墨盒高（12px 时约 16px），按 2/3 取会顶到弧线上；
+## 抽成静态函数是为了测试能直接断言「笔画 < 内径」，不依赖渲染截图。
+static func glyph_font_px(radius: float, zoom: float) -> int:
+	var sw := maxf(1.0, 1.1 / maxf(zoom, 0.1))
+	var inner_d := maxf((radius - sw) * 2.0, 1.0)
+	return clampi(int(round(inner_d * 0.62)), 9, 22)
 
 
 func set_kind(k: String) -> void:

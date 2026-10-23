@@ -490,6 +490,69 @@ func _initialize() -> void:
 	demo.queue_free()
 	await process_frame
 
+	## 7c1c) 字牌笔画必须留缝：字号按圈内径的 ~2/3 取，笔画高度 < 内径。
+	## （旧版文字档画 12px：CJK 墨高 16 > 内径 13.8，直接顶到弧线上。）
+	var gpx := KindGlyph.glyph_font_px(8.0, 1.0)
+	var gfont := TecTheme.font()
+	var gink := gfont.get_ascent(gpx) + gfont.get_descent(gpx)
+	check("字牌字号收在 9~10px（旧版文字档 12px 顶圈）",
+		gpx >= 9 and gpx <= 10, "px %d" % gpx)
+	check("字牌笔画高度 < 圈内径（四边留缝）",
+		gink < 16.0 - 2.0 * 1.1, "墨高 %.1f / 内径 %.1f" % [gink, 16.0 - 2.2])
+
+	## 7c1d) 打字机必须**全程按全文**占位：`visible_characters` 会让 Label 只在
+	## 剩余字里算最小高度，窗体会塌成一行、正文溢出框外（用户反馈）。
+	## 判据：打字期间的最小高度 == 同宽纯 Label（visible_characters=-1）的最小高度。
+	var long_text := "植物学家的花园里种着许多花草，花盆沿上还摆着一把小铲子。".repeat(12)
+	var tbox := Control.new()
+	tbox.size = Vector2(360.0, 480.0)
+	root.add_child(tbox)
+	var tw := TecTheme.narrative_label(long_text, TecTheme.TEXT)
+	tw.custom_minimum_size = Vector2(300.0, 0.0)
+	tbox.add_child(tw)
+	tw.start_typing()
+	await process_frame
+	await process_frame
+	var ref := Label.new()
+	ref.text = long_text
+	ref.add_theme_font_override("font", TecTheme.font())
+	ref.add_theme_font_size_override("font_size", 12)
+	ref.add_theme_constant_override("line_spacing", TecTheme.NARR_LINE_SPACING)
+	ref.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ref.size = Vector2(tw.size.x, 480.0)
+	tbox.add_child(ref)
+	await process_frame
+	check("打字进行中（只揭示了几个字）",
+		tw.is_typing() and tw.visible_characters >= 0 and tw.visible_characters < 6,
+		"typing=%s vc=%d" % [tw.is_typing(), tw.visible_characters])
+	check("打字期间最小高度 = 全文高度（不会塌回一行）",
+		absf(tw.get_combined_minimum_size().y - ref.get_combined_minimum_size().y) < 0.5,
+		"打字 %.1f / 全文 %.1f（宽 %.0f）" % [tw.get_combined_minimum_size().y,
+			ref.get_combined_minimum_size().y, tw.size.x])
+	tbox.queue_free()
+
+	## 7c1e) 叙事卡：底板盖满整窗 + 按全文增高。长文打字期间若只长一点，
+	## 正文会画在底板之外 —— 读起来就是「窗口是透明的」。
+	var nc := NarrCard.new()
+	nc.setup_narr("测试", long_text)
+	root.add_child(nc)
+	await process_frame
+	await process_frame
+	await process_frame
+	var nbg := nc.get_node_or_null("bg") as Control
+	var ntxt := nc.get_node_or_null("body/content/narr_text") as TypewriterLabel
+	check("叙事卡底板与整窗同比（长高后不露桌面）",
+		nbg != null and absf(nbg.size.y - (nc.size.y - SysWindow.PAD * 2.0)) < 0.01
+			and absf(nbg.size.x - (nc.size.x - SysWindow.PAD * 2.0)) < 0.01,
+		"null" if nbg == null else "底板 %s / 窗 %s" % [nbg.size, nc.size])
+	check("叙事卡按全文增高（打字期间不缩回一行）",
+		ntxt != null and absf(nc.size.y - SysWindow.PAD * 2.0
+			- (SysWindow.BAR_H + 20.0 + ntxt.get_combined_minimum_size().y)) < 1.0,
+		"null" if ntxt == null else "窗内高 %.1f / 文字 %.1f" % [
+			nc.size.y - SysWindow.PAD * 2.0, ntxt.get_combined_minimum_size().y])
+	nc.queue_free()
+	await process_frame
+
 	# 7c2) 状态三态：副标删掉后，折叠与未探索必须能只靠「纸 + 框」区分
 	#   未探索 = 纸色平面 + 虚线框；折叠 = 白纸 + 虚线框；已探索 = 白纸 + 实线框
 	if lod_card != null:

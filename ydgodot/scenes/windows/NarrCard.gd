@@ -26,6 +26,9 @@ func _fit_height() -> void:
 	var target := SysWindow.BAR_H + 20.0 + _text.get_combined_minimum_size().y
 	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:
 		set_inner_height(target)
+	## 长旁白把窗口撑到屏幕外时把顶边提上来，保证最后一行仍在画面里
+	if position.y + size.y > 740.0:
+		position.y = maxf(8.0, 740.0 - size.y)
 
 
 func text_of() -> String:

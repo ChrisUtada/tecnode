@@ -39,12 +39,12 @@ const GLYPH_BOX := 16.0
 const GLYPH_GAP := 6.0
 ## 标题 Label 的固定高度（单行，副标已删）
 const TITLE_H := 16.0
-## **墨迹中心距标题矩形顶边的高度**（16px 高的标题框里，12px CJK 墨迹约 11.7px、中心在
-## 顶边下 5.0~5.5px）。标题用 `VERTICAL_ALIGNMENT_TOP` 而不是 CENTER —— CENTER 让 Godot
-## 去居中「行盒」（行高 12 + line_spacing 3），实测同一条规则在不同倍率/DPI 下墨迹会漂 1.6px，
+## **墨迹中心距标题矩形顶边的高度**。标题用 `VERTICAL_ALIGNMENT_TOP` 而不是 CENTER ——
+## CENTER 让 Godot 去居中「行盒」，实测同一条规则在不同倍率/DPI 下墨迹会漂 1.6px，
 ## 方块只能对着某一档去调，换台机器或换个缩放就又歪了（用户两次反馈「偏上 / 偏下」都源于此）。
-## 顶部对齐后墨迹从固定高度垂下，倍率 0.94~1.7 实测只漂 0.7px，方块便能稳稳对着卡中线。
-const TITLE_INK_CY := 5.0
+## 顶部对齐后墨迹从固定高度垂下。`font-fusion` 12px 的行盒是 asc 13 / desc 3，
+## 墨迹中心在 `(asc + desc) / 2 = 8px` 处 —— 符号圆心必须也落在卡中线上，两者才对齐。
+const TITLE_INK_CY := 8.0
 ## 双击判定窗口（对齐浏览器 dblclick 的默认 ~500ms：之前收紧到 280ms，
 ## 玩家用正常节奏点两下就经常被判成两次单击，「双击无法展开」就是这么来的）
 const DBL_MS := 500
