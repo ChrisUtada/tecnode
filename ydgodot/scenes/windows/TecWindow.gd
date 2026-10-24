@@ -322,6 +322,11 @@ func reset_tec() -> void:
 	_target = ""
 	_target_label = ""
 	_bar.value = 0
+	if _status != null:
+		_status.text = _idle_text()
+		_status.add_theme_color_override("font_color", TecTheme.MUTED)
+	if _hint != null:
+		_hint.text = "拖节点到我身上分析 · 点框内任意位置闲聊"
 	call_deferred("_fit_height")
 
 

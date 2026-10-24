@@ -8,6 +8,8 @@
 [ext_resource type="Resource" path="res://cases/tutorial/clues/CLUES_INVESTIGATOR_CERT.tres" id="6_c2"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="7_item"]
 [ext_resource type="Resource" path="res://cases/tutorial/items/ITEMS_investigator_cert.tres" id="8_cert"]
+[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="9_end"]
+[ext_resource type="Resource" path="res://cases/tutorial/endings/TUT_CERT.tres" id="10_tut"]
 
 [resource]
 script = ExtResource("1_case")
@@ -17,3 +19,4 @@ now_label = "现在"
 chars = Array[ExtResource("2_char")]([ExtResource("3_inv")])
 items = Array[ExtResource("7_item")]([ExtResource("8_cert")])
 clues = Array[ExtResource("4_clue")]([ExtResource("5_c1"), ExtResource("6_c2")])
+endings = Array[ExtResource("9_end")]([ExtResource("10_tut")])

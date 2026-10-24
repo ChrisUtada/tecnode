@@ -457,6 +457,10 @@ func set_drag_enabled(on: bool) -> void:
 	_drag_enabled = on
 
 
+func dbg_drag_enabled() -> bool:
+	return _drag_enabled
+
+
 func _on_bar_input(event: InputEvent) -> void:
 	if not _drag_enabled:
 		return

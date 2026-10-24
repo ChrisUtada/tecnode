@@ -33,6 +33,8 @@ const TUT_ACTOR_ID := "CHARS_INVESTIGATOR"
 const TUT_CLUE_ID := "CLUES_INVESTIGATOR"
 const TUT_CERT_ITEM_ID := "ITEMS_investigator_cert"
 const TUT_CERT_CLUE_ID := "CLUES_INVESTIGATOR_CERT"
+const TUT_ENDING_ID := "TUT_CERT"
+const CertWinScript := preload("res://scenes/windows/CertWin.gd")
 const TUT_ACTOR_KEY := "char:" + TUT_ACTOR_ID
 const TUT_CLUE_KEY := "clue:" + TUT_CLUE_ID
 const TUT_CERT_ITEM_KEY := "item:" + TUT_CERT_ITEM_ID
@@ -45,6 +47,10 @@ enum TutorialStep {
 	DRAG_ACTOR,        # ① 把「调查员」拖给 TEC
 	DOUBLE_CLICK_CLUE, # ② 双击「调查员」线索
 	DRAG_CERT,         # ③ 把「调查员证」拖给 TEC
+	STORE_SUPPLIES,    # ④ 物品进证物袋、线索进线索册
+	INFER,             # ⑤ 两条线索上桌布 + 长按执行者
+	CERT_FORM,         # ⑥ 填写调查员证
+	CHOOSE_CASE,       # ⑦ 在案件地图里选 A-001
 	DONE,
 }
 
@@ -179,6 +185,11 @@ var _start_screen: Control = null
 var _tutorial_active := false
 var _tutorial_step := TutorialStep.DRAG_ACTOR
 var _tutorial_actor_key := ""
+var _tutorial_apps_unlocked := false
+var _tutorial_map_unlocked := false
+var _tutorial_item_stored := false
+var _tutorial_clue_stored := false
+var _tutorial_cert_win: SysWindow = null
 var _inv_chip: Button = null
 var _cert_win: SysWindow = null
 var _catalog: CaseCatalog = null
@@ -1109,6 +1120,7 @@ const ZR_WIN := 25        # .bag/.clue/.cert/.map/.music/.goto/.infer/.garden/.p
 const ZR_CHAT := 26       # .chat-win / .avatar-win
 const ZR_TEC := 28        # .tec-win / .dlg-win
 const ZR_TOAST := 30      # #toast / #verdict
+const ZR_CERT := 32       # 教学期领证窗体：压住 TEC / 地图，必须填完
 const ZR_MIRROR := 40     # #drag-layer：桌面最高层（批 3 的拖动镜像也用这档）
 
 
@@ -1276,6 +1288,61 @@ func _set_badge(badge: PanelContainer, text: String) -> void:
 
 ## 按当前可见图标数重排（Web `resetIconPositions()`）—— 图标增减时才调，
 ## 平时不碰，免得把玩家拖过的位置收走。
+## 教学期图标栏是分阶段解锁的：第 3 幕只出线索册 / 证物袋 / 推演器，
+## 第 6 幕再出案件地图。其余 app 一律不露头，避免玩家提前点进未接好的系统。
+func _refresh_tutorial_icons() -> void:
+	var allowed := {}
+	if _tutorial_apps_unlocked:
+		allowed = {"clue": true, "bag": true, "infer": true}
+		if _tutorial_map_unlocked:
+			allowed["map"] = true
+	for app in ["infer", "goto", "clue", "people", "bag", "tec", "log", "map", "music", "garden"]:
+		var b := _icon_by_app(app)
+		if b != null:
+			b.visible = allowed.has(app)
+	var layer := _icon_layer()
+	if layer != null and layer != _desk:
+		layer.visible = not allowed.is_empty()
+	if not allowed.is_empty():
+		_reset_icon_positions()
+	_refresh_count_badges()
+
+
+func _tutorial_unlock_apps() -> void:
+	_tutorial_apps_unlocked = true
+	var layer := _icon_layer()
+	if layer != null:
+		layer.visible = true
+	_refresh_tutorial_icons()
+	_animate_tutorial_icons(["infer", "clue", "bag"])
+
+
+func _tutorial_unlock_map() -> void:
+	_tutorial_map_unlocked = true
+	var layer := _icon_layer()
+	if layer != null:
+		layer.visible = true
+	_refresh_tutorial_icons()
+	_animate_tutorial_icons(["map"])
+
+
+## 图标从左侧滑入：只动教学刚解锁的几枚，不碰运行中的拖拽 / 落点计算。
+func _animate_tutorial_icons(apps: Array) -> void:
+	for app in apps:
+		var b := _icon_by_app(String(app))
+		if b == null:
+			continue
+		var target := b.position
+		b.position = target - Vector2(18.0, 0.0)
+		b.modulate.a = 0.0
+		var tw := b.create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(b, "position", target, 0.24)\
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_property(b, "modulate:a", 1.0, 0.22)\
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
 func _reset_icon_positions() -> void:
 	var layer := _icon_layer()
 	var list: Array = []
@@ -1410,6 +1477,14 @@ func _music_unlocked() -> bool:
 func _refresh_app_icons() -> void:
 	if graph == null:
 		return
+	if _tutorial_active:
+		_refresh_tutorial_icons()
+		return
+	## 从教学桌面退回完整桌面时，教学期被隐藏的常驻 app 要重新出现。
+	for app in ["infer", "goto", "clue", "people", "bag", "tec", "log", "map"]:
+		var b := _icon_by_app(app)
+		if b != null:
+			b.visible = true
 	var music := _music_unlocked()
 	var had_music := _music_btn != null and _music_btn.visible
 	if _music_btn != null:
@@ -1579,6 +1654,37 @@ func _place_floating_windows() -> void:
 		_garden_win.position = Vector2(
 			maxf(14.0, minf(380.0, vw - 14.0 - _garden_win.size.x)),
 			maxf(14.0, minf(58.0, desk_h - 14.0 - _garden_win.size.y)))
+
+	## 教学第 4 幕：矩阵在左、线索册在右，TEC 先收起来，桌布不被压在窗体下面。
+	if _tutorial_active and _matrix_win != null and is_instance_valid(_matrix_win) \
+			and _matrix_win.visible:
+		## 留出最左侧 86px 的图标栏；桌布 + 线索册作为一组居中，窄窗也不互相压。
+		var gap := 8.0
+		var led_w := 0.0
+		if _ledger_win != null and is_instance_valid(_ledger_win) and _ledger_win.visible:
+			led_w = _ledger_win.size.x + gap
+		var total_w := _matrix_win.size.x + led_w
+		var mx_x := maxf(84.0, (vw - total_w) * 0.5)
+		var mx_y := maxf(4.0, minf(40.0, desk_h - 4.0 - _matrix_win.size.y))
+		_matrix_win.position = Vector2(mx_x, mx_y)
+		if led_w > 0.0:
+			_ledger_win.position = Vector2(
+				mx_x + _matrix_win.size.x + gap,
+				maxf(14.0, minf(60.0, desk_h - 14.0 - _ledger_win.size.y)))
+
+	## 教学第 6 幕：案件地图在左、TEC 在右，两个窗体并排读。
+	if _tutorial_active and _map_win != null and is_instance_valid(_map_win) \
+			and _map_win.visible:
+		var gap := 16.0
+		var tec_w := _tec.size.x if _tec != null and _tec.visible else 0.0
+		var total_w := _map_win.size.x + tec_w + (gap if tec_w > 0.0 else 0.0)
+		## 同样留出图标栏：地图不能压住左侧「案件地图」这枚图标。
+		var left := maxf(96.0, (vw - total_w) * 0.5)
+		_map_win.position = Vector2(left,
+			maxf(14.0, minf(72.0, desk_h - 14.0 - _map_win.size.y)))
+		if _tec != null and _tec.visible:
+			_tec.position = Vector2(left + _map_win.size.x + gap,
+				maxf(14.0, (desk_h - _tec.size.y) * 0.5 - 24.0))
 
 
 func _minimize_music() -> void:
@@ -1846,22 +1952,33 @@ func _toggle_case_map() -> void:
 	if _map_win != null and is_instance_valid(_map_win):
 		_map_win.queue_free()
 		_map_win = null
+		_place_floating_windows()
 		return
 	var w := CaseMapWin.new()
 	w.name = "case_map"
-	w.setup_map(_catalog, _active_case, _case_open)
+	## 教学第 6 幕：还没有「当前案件」，A-001 必须保持可点击。
+	var cur := "" if _tutorial_active else _active_case
+	var opened := false if _tutorial_active else _case_open
+	w.setup_map(_catalog, cur, opened,
+		CaseCatalog.DEFAULT_ID if _tutorial_active else "")
 	w.position = Vector2(420, 72)
 	w.enter_requested.connect(_on_case_map_enter)
-	w.closed.connect(func(): _map_win = null)
+	w.closed.connect(func():
+		_map_win = null
+		_place_floating_windows())
 	_desk.add_child(w)
 	_place_z(w, ZR_WIN)
 	_map_win = w
+	_place_floating_windows()
 
 
 func _on_case_map_enter(id: String) -> void:
 	if _map_win != null and is_instance_valid(_map_win):
 		_map_win.queue_free()
 		_map_win = null
+	if _tutorial_active:
+		_finish_tutorial_to_case(id)
+		return
 	_enter_case(id)
 
 
@@ -2143,12 +2260,13 @@ func _close_start_screen() -> void:
 
 
 func _boot_session() -> void:
-	if _resume_allowed() and _resume_from_save():
+	var resumed := _resume_allowed() and _resume_from_save()
+	if resumed:
 		_show_toast("已继续上次进度")
 	else:
 		_start_slice()
-	if _intro_allowed() and _investigator.is_empty():
-		_open_intro()
+	if not resumed and _intro_allowed() and _investigator.is_empty():
+		_begin_tutorial()
 
 
 func _on_start_new(overwrite: bool) -> void:
@@ -2163,6 +2281,14 @@ func _on_start_new(overwrite: bool) -> void:
 func _begin_tutorial() -> void:
 	_tutorial_active = true
 	_tutorial_step = TutorialStep.DRAG_ACTOR
+	_tutorial_apps_unlocked = false
+	_tutorial_map_unlocked = false
+	_tutorial_item_stored = false
+	_tutorial_clue_stored = false
+	_tutorial_cert_win = null
+	## 新调查从领证开始：不要把上一次的调查员证带进来。
+	Investigator.clear(_inv_path)
+	_investigator = {}
 	var tutorial := CaseLoader.new(TUTORIAL_CASE_PATH)
 	if tutorial.load_case():
 		case_def = tutorial
@@ -2305,6 +2431,14 @@ func _tutorial_set_hint() -> void:
 			_tec.set_guidance("待命 · 等你双击线索", "双击「调查员」线索")
 		TutorialStep.DRAG_CERT:
 			_tec.set_guidance("待命 · 等你交证件", "把「调查员证」拖到我身上")
+		TutorialStep.STORE_SUPPLIES:
+			_tec.set_guidance("待命 · 整理桌面", "物品 → 证物袋 · 线索 → 线索册")
+		TutorialStep.INFER:
+			_tec.set_guidance("待命 · 等推演", "线索拖上桌布 · 长按执行者")
+		TutorialStep.CERT_FORM:
+			_tec.set_guidance("待命 · 等你领证", "填写调查员证")
+		TutorialStep.CHOOSE_CASE:
+			_tec.set_guidance("待命 · 等你选案", "在案件地图里选 A-001")
 		_:
 			_tec.set_guidance("待命 · 登记完成", "证件信息已核对")
 
@@ -2318,6 +2452,14 @@ func _tutorial_talk_line() -> String:
 			return "双击「调查员」线索，看看里面有什么。"
 		TutorialStep.DRAG_CERT:
 			return "把「调查员证」拖给我，我核对一下。"
+		TutorialStep.STORE_SUPPLIES:
+			return "物品放进证物袋，线索放进线索册。先把桌面收好。"
+		TutorialStep.INFER:
+			return "把两条线索拖上推演器桌布，然后长按执行者。"
+		TutorialStep.CERT_FORM:
+			return "先把调查员证填完。"
+		TutorialStep.CHOOSE_CASE:
+			return "在案件地图里选 A-001。"
 		_:
 			return "登记已经完成了。证件信息都齐了。"
 
@@ -2334,6 +2476,14 @@ func _tutorial_tec_guard(key: String) -> bool:
 			if key == TUT_CERT_ITEM_KEY:
 				return true
 			_tutorial_say("把「调查员证」拖给我。")
+		TutorialStep.STORE_SUPPLIES:
+			_tutorial_say("先把桌面收好：物品进证物袋，线索进线索册。")
+		TutorialStep.INFER:
+			_tutorial_say("线索不要交给我——拖进推演器桌布，再长按执行者。")
+		TutorialStep.CERT_FORM:
+			_tutorial_say("先把调查员证填完。")
+		TutorialStep.CHOOSE_CASE:
+			_tutorial_say("在案件地图里选 A-001。")
 		_:
 			_tutorial_say("证件已经核对完了。")
 	return false
@@ -2371,11 +2521,226 @@ func _tutorial_on_tec_done(key: String) -> bool:
 		return true
 	if _tutorial_step == TutorialStep.DRAG_CERT and key == TUT_CERT_ITEM_KEY:
 		_tutorial_spawn_clue(TUT_CERT_CLUE_ID, key, 3)
-		_tutorial_step = TutorialStep.DONE
+		_tutorial_step = TutorialStep.STORE_SUPPLIES
+		_tutorial_unlock_apps()
 		_tutorial_set_hint()
-		_tutorial_say("核对完成。证件信息已经齐了。")
+		_tutorial_say("核对完成。桌面要整理一下：物品卡放进证物袋，线索放进线索册。")
 		return true
 	return false
+
+
+func _tutorial_on_store_success(where: String, _key: String) -> void:
+	if where == GraphState.BAG:
+		_tutorial_item_stored = true
+	else:
+		_tutorial_clue_stored = true
+	if _tutorial_item_stored and _tutorial_clue_stored:
+		_tutorial_begin_infer()
+		return
+	if not _tutorial_item_stored:
+		_tutorial_say("收好了。再把「调查员证」放进证物袋。")
+	else:
+		_tutorial_say("收好了。再把一条线索放进线索册。")
+
+
+func _tutorial_begin_infer() -> void:
+	_tutorial_step = TutorialStep.INFER
+	_tutorial_set_hint()
+	## 第 3 幕只要求「线索收进册子一次」，所以另一条可能还在画布上。
+	## 推演桌布会盖住左侧画布，这里把剩下的教学线索一并收进线索册，
+	## 保证两条都能从同一个窗口拖上桌布，不会出现「看不见也拖不到」的死路。
+	var moved := 0
+	for cid in [TUT_CLUE_ID, TUT_CERT_CLUE_ID]:
+		var ck := graph.key_of("clue", String(cid))
+		if graph.stored.has(ck):
+			continue
+		if graph.ledger_store(ck):
+			moved += 1
+	if moved > 0:
+		_tutorial_clue_stored = true
+		_apply_hidden()
+		_tutorial_say("另一条线索也先放进线索册了，方便一起拖上桌布。")
+	_tutorial_say("桌面收好了。把「调查员」和「调查员证」两条线索拖进推演器桌布。")
+	if _bag_win != null and is_instance_valid(_bag_win):
+		_toggle_storage(GraphState.BAG)
+	if _matrix_win == null or not is_instance_valid(_matrix_win):
+		_toggle_matrix()
+	if _tutorial_clue_stored and (_ledger_win == null or not is_instance_valid(_ledger_win)):
+		_toggle_storage(GraphState.LEDGER)
+	if _tec != null:
+		_tec.visible = false
+	_place_floating_windows()
+	_tutorial_on_matrix_changed()
+
+
+func _tutorial_on_matrix_changed() -> void:
+	if not _tutorial_active or _tutorial_step != TutorialStep.INFER:
+		return
+	if _matrix_win == null or not is_instance_valid(_matrix_win):
+		return
+	var got := 0
+	for id in [TUT_CLUE_ID, TUT_CERT_CLUE_ID]:
+		if graph.matrix_has(String(id)):
+			got += 1
+	if got >= 2:
+		_matrix_win.set_hint("TEC：两条线索齐了。长按执行者，开始推演。")
+	else:
+		_matrix_win.set_hint("TEC：还需要一条线索——「调查员」和「调查员证」都要上桌布。")
+
+
+func _tutorial_on_inference_success(hit: EndingDef) -> void:
+	graph.mark_ending(hit.id)
+	_tutorial_step = TutorialStep.CERT_FORM
+	_tutorial_set_hint()
+	_tutorial_say("推演成立。调查员证已经生成——把姓名、编号、日期和照片补齐。")
+	## 桌布和收纳窗到此完成使命：收掉，把注意力交给证件。
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_restore_matrix_occlusion()
+		_matrix_win.queue_free()
+		_matrix_win = null
+	if _ledger_win != null and is_instance_valid(_ledger_win):
+		_ledger_win.queue_free()
+		_ledger_win = null
+	if _bag_win != null and is_instance_valid(_bag_win):
+		_bag_win.queue_free()
+		_bag_win = null
+	if _tec != null:
+		_tec.visible = false
+	_place_floating_windows()
+	_open_cert_form()
+
+
+func _open_cert_form() -> void:
+	if _tutorial_cert_win != null and is_instance_valid(_tutorial_cert_win):
+		return
+	var w := CertWinScript.new()
+	w.name = "tutorial_cert"
+	w.store_path = _inv_path
+	w.setup_cert(String(_investigator.get("name", "")))
+	w.completed.connect(_on_tutorial_cert_completed)
+	_desk.add_child(w)
+	_place_z(w, ZR_CERT)
+	w.place_center(_vw(), _desk.size.y)
+	_tutorial_cert_win = w
+
+
+func _on_tutorial_cert_completed(card: Dictionary) -> void:
+	_investigator = card.duplicate(true)
+	_refresh_chip()
+	if _tutorial_cert_win != null and is_instance_valid(_tutorial_cert_win):
+		_tutorial_cert_win.queue_free()
+	_tutorial_cert_win = null
+	_tutorial_step = TutorialStep.CHOOSE_CASE
+	_tutorial_unlock_map()
+	_tutorial_set_hint()
+	## 第 5 幕完成即写一份「进入案件」的档：玩家此时退出，下一次「继续」
+	## 也能跳过整段开场。第 6 幕真正选案后会被实际案件进度覆盖。
+	_write_tutorial_entry_save()
+	if _tec != null:
+		_tec.visible = true
+		_tec.set_drag_enabled(false)
+		_tec.append_line("证件已签发。现在选择一个案件。")
+		_recenter_tutorial_tec()
+	_toggle_case_map()
+
+
+func _write_tutorial_entry_save() -> void:
+	if _shot_mode() or DisplayServer.get_name() == "headless" or _has_arg("--fresh"):
+		return
+	var path := CaseCatalog.path_of(CaseCatalog.DEFAULT_ID)
+	if path == "" or not ResourceLoader.exists(path):
+		return
+	var loader := CaseLoader.new(path)
+	if not loader.load_case():
+		return
+	var g := GraphState.new(loader)
+	var loc := g.add_node("loc", SLICE_SCENE)
+	loc["x"] = 1000.0
+	loc["y"] = 620.0
+	g.last_scene = SLICE_SCENE
+	g.mark_fresh(String(loc["key"]))
+	var s := SaveSystem.new(g, loader.case_def.id)
+	if not s.save_to_disk():
+		push_warning("开场完成后写档失败：" + s.last_error)
+
+
+func _finish_tutorial_to_case(id: String) -> bool:
+	if id != CaseCatalog.DEFAULT_ID:
+		_show_toast("教学期只开放 A-001", true)
+		return false
+	if not CaseCatalog.exists(id):
+		_show_toast("没有这个案件地址", true)
+		return false
+	if not _catalog.is_unlocked(id):
+		_show_toast("该案件地址尚未解锁", true)
+		return false
+	if not CaseCatalog.data_ready(id):
+		_show_toast("案件 " + CaseCatalog.code_of(id) + " 的数据尚未装机", true)
+		return false
+	var loader := CaseLoader.new(CaseCatalog.path_of(id))
+	if not loader.load_case():
+		_show_toast("案件装载失败：" + loader.load_error, true)
+		return false
+	_tutorial_active = false
+	_tutorial_step = TutorialStep.DONE
+	_tutorial_apps_unlocked = false
+	_tutorial_map_unlocked = false
+	_tutorial_cert_win = null
+	_active_case = id
+	case_def = loader
+	_catalog.last = id
+	var saves := not _shot_mode() and DisplayServer.get_name() != "headless"
+	_save_enabled = saves
+	if saves and not _progress_read_only:
+		_catalog.save_progress()
+	_case_open = true
+	_case_held = false
+	_case_docked = false
+	_case_win.visible = true
+	## 教学桌面把镜头固定在 1x；进入正式案件要交还给「适应窗口」。
+	_view_k = 1.0
+	_view_pos = Vector2.ZERO
+	_view_user = false
+	_apply_view()
+	_start_slice()
+	_restore_full_chrome()
+	_update_case_chrome()
+	_update_case_park_ui()
+	_refresh_chip()
+	_refresh_app_icons()
+	_reset_icon_positions()
+	_place_floating_windows()
+	_autosave()
+	_show_toast("已进入案件 " + CaseCatalog.code_of(id))
+	_log("已进入案件 %s // %s" % [CaseCatalog.code_of(id), CaseCatalog.title_of(id)], "sys")
+	return true
+
+
+func _restore_full_chrome() -> void:
+	var layer := _icon_layer()
+	if layer != null:
+		layer.visible = true
+	for n in ["btn_撤销", "btn_调试"]:
+		var b := _head.get_node_or_null(n) as Control
+		if b != null:
+			b.visible = true
+	if _brand_sub != null:
+		_brand_sub.visible = true
+	if _crumb != null:
+		_crumb.visible = true
+	if _inv_chip != null:
+		_inv_chip.visible = not _investigator.is_empty()
+	for n in ["bar/close", "bar/min"]:
+		var c := _case_win.get_node_or_null(n) as Control
+		if c != null:
+			c.visible = true
+	if _tec != null:
+		_tec.set_drag_enabled(true)
+		for n in ["bar/close", "bar/min"]:
+			var c := _tec.get_node_or_null(n) as Control
+			if c != null:
+				c.visible = true
+	_layout_header_left(_vw())
 
 
 func _on_start_continue() -> void:
@@ -2383,10 +2748,9 @@ func _on_start_continue() -> void:
 	if _resume_allowed() and _resume_from_save():
 		_show_toast("已继续上次进度")
 		return
-	## 存档损坏 / 被外部删掉：退回新调查，不把玩家卡在空桌面。
-	_start_slice()
-	if _intro_allowed() and _investigator.is_empty():
-		_open_intro()
+	## 存档损坏 / 被外部删掉：退回新调查的完整开场，不把玩家卡在空桌面，
+	## 也不再落回旧的测验式 IntroWin。
+	_begin_tutorial()
 	_show_toast("存档不可用，已开始新调查", true)
 
 func _clear_case_save() -> void:
@@ -2477,7 +2841,7 @@ func _open_cert_review() -> void:
 		_cert_win = null
 	var w := SysWindow.new()
 	w.name = "cert_win"
-	w.setup("调查员证", 340, 540)
+	w.setup("调查员证", 340, 420)
 	w.position = Vector2(470, 40)
 	_desk.add_child(w)
 	_place_z(w, ZR_WIN)
@@ -3250,14 +3614,31 @@ func _store_into(where: String, key: String) -> void:
 	var n := graph.node(key)
 	if n.is_empty():
 		return
+	var tut_store := _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES
+	if tut_store:
+		if where == GraphState.BAG and String(n["kind"]) != "item":
+			_tutorial_say("证物袋收物品；线索要放进线索册。")
+			return
+		if where == GraphState.LEDGER and String(n["kind"]) != "clue":
+			_tutorial_say("线索册只收线索。物品放进证物袋。")
+			return
 	if graph.stored.has(key):
-		_show_toast("它已经在收纳里了", true)
+		if tut_store:
+			_tutorial_say("这个已经收好了。")
+		else:
+			_show_toast("它已经在收纳里了", true)
 		return
 	if graph.is_container_node(key):
-		_show_toast("场景与容器收不进收纳袋", true)
+		if tut_store:
+			_tutorial_say("容器不能直接收起来。")
+		else:
+			_show_toast("场景与容器收不进收纳袋", true)
 		return
 	if where == GraphState.LEDGER and String(n["kind"]) != "clue":
-		_show_toast("只有线索能进线索册", true)
+		if tut_store:
+			_tutorial_say("线索册只收线索。物品放进证物袋。")
+		else:
+			_show_toast("只有线索能进线索册", true)
 		return
 	var before := _save.snapshot()
 	var ok := graph.bag_store(key) if where == GraphState.BAG else graph.ledger_store(key)
@@ -3265,8 +3646,11 @@ func _store_into(where: String, key: String) -> void:
 		return
 	_apply_hidden()
 	_refresh_storage_wins()
-	_show_toast("「%s」收进%s" % [String(n.get("label", "")),
-		"证物袋" if where == GraphState.BAG else "线索册"])
+	if tut_store:
+		_tutorial_on_store_success(where, key)
+	else:
+		_show_toast("「%s」收进%s" % [String(n.get("label", "")),
+			"证物袋" if where == GraphState.BAG else "线索册"])
 	_commit(before)
 
 
@@ -3482,7 +3866,8 @@ func _toggle_storage(kind: String) -> void:
 			return
 		_bag_win = StorageWin.new()
 		_bag_win.name = "bag_win"
-		_bag_win.setup_store("证物袋", GraphState.BAG, graph, case_def)
+		var bag_w := 220.0 if _tutorial_active else 240.0
+		_bag_win.setup_store("证物袋", GraphState.BAG, graph, case_def, bag_w)
 		_bag_win.position = Vector2(150, 300)
 		_bag_win.will_take.connect(_on_storage_will_take)
 		_bag_win.took.connect(_on_storage_took)
@@ -3497,7 +3882,8 @@ func _toggle_storage(kind: String) -> void:
 		return
 	_ledger_win = StorageWin.new()
 	_ledger_win.name = "clue_win"
-	_ledger_win.setup_store("线索册", GraphState.LEDGER, graph, case_def)
+	var ledger_w := 220.0 if _tutorial_active else 240.0
+	_ledger_win.setup_store("线索册", GraphState.LEDGER, graph, case_def, ledger_w)
 	_ledger_win.position = Vector2(410, 300)
 	_ledger_win.will_take.connect(_on_storage_will_take)
 	_ledger_win.took.connect(_on_storage_took)
@@ -3780,8 +4166,14 @@ func _assign_to_matrix(key: String) -> bool:
 	var n := graph.node(key)
 	if n.is_empty():
 		return false
+	if _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES:
+		_tutorial_say("先把桌面收好：物品进证物袋，线索进线索册。")
+		return false
 	if String(n["kind"]) != "clue":
-		_show_toast("只有线索能归位到推演桌布", true)
+		if _tutorial_active and _tutorial_step == TutorialStep.INFER:
+			_tutorial_say("推演桌布只收线索。")
+		else:
+			_show_toast("只有线索能归位到推演桌布", true)
 		return false
 	var cl := case_def.clue_of(String(n["id"]))
 	if cl == null:
@@ -3793,6 +4185,7 @@ func _assign_to_matrix(key: String) -> bool:
 	_apply_hidden()
 	_refresh_or_spawn_card(key)
 	_refresh_matrix_views()
+	_tutorial_on_matrix_changed()
 	_commit(before)
 	return true
 
@@ -3814,6 +4207,7 @@ func _on_matrix_took(key: String, at_global: Vector2 = Vector2(-1.0, -1.0)) -> v
 			card.set_home(world)
 	_repaint_edges()
 	_refresh_matrix_views()
+	_tutorial_on_matrix_changed()
 	_commit(before)
 
 
@@ -3853,11 +4247,21 @@ func _refresh_matrix_views() -> void:
 		_bag_win.refresh_store()
 	if _ledger_win != null and is_instance_valid(_ledger_win):
 		_ledger_win.refresh_store()
+	if _ledger_win != null and is_instance_valid(_ledger_win):
+		_ledger_win.refresh_store()
 
 
 ## 长按蓄力完成 → 配方判定（Web 的 executeInference）：恰好命中才算，多余线索也失败
 func _run_inference() -> void:
 	var hit := graph.match_ending()
+	if _tutorial_active and _tutorial_step == TutorialStep.INFER:
+		if hit == null or hit.id != TUT_ENDING_ID:
+			if _matrix_win != null and is_instance_valid(_matrix_win):
+				_matrix_win.show_heartbroken()
+				_matrix_win.set_hint("TEC：配方不对——需要「调查员」+「调查员证」两条线索。")
+			return
+		_tutorial_on_inference_success(hit)
+		return
 	if hit == null:
 		if _matrix_win != null and is_instance_valid(_matrix_win):
 			_matrix_win.show_heartbroken()

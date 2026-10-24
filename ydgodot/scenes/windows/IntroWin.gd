@@ -430,18 +430,7 @@ static func build_cert(c: Dictionary) -> Control:
 	level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sec1.add_child(level)
 
-	var sec2 := _cert_section(col, true)
-	var sense := String(c.get("sense", "vision"))
-	var sense_label := TecTheme.label("%s主导型" % String(Investigator.SENSE_NAMES.get(sense, sense)),
-		21, TecTheme.TEXT)
-	sense_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sec2.add_child(sense_label)
-	var flavor := TecTheme.label(String(Investigator.SENSE_FLAVOR.get(sense, "")), TecTheme.FS_TITLE, TecTheme.MUTED)
-	flavor.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	flavor.custom_minimum_size = Vector2(292, 0)
-	sec2.add_child(flavor)
-
+	## 证件只保留姓名 / 编号 / 日期 / 照片四项（2026-10-24 定稿：sense 不上证件）。
 	var sec3 := _cert_section(col, true)
 	var row := HBoxContainer.new()
 	sec3.add_child(row)

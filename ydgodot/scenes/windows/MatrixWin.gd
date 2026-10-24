@@ -95,6 +95,16 @@ func setup_matrix(p_graph: GraphState, p_case: CaseLoader) -> void:
 	refresh_matrix()
 
 
+## 教学期由 Desktop 接管底部提示：把 TEC 的下一步写进桌布，不另弹 toast。
+func set_hint(text: String) -> void:
+	if _hint != null:
+		_hint.text = text
+
+
+func dbg_hint() -> String:
+	return _hint.text if _hint != null else ""
+
+
 func _build_executor() -> void:
 	_exec = Control.new()
 	_exec.name = "mx_exec"

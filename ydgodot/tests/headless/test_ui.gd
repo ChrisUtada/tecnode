@@ -1551,6 +1551,8 @@ func _initialize() -> void:
 	await process_frame
 
 	# 第 0 幕与 Desktop 接线：开始后撤掉开始界面并进入第 1 幕（空白桌面 + TEC + 调查员）。
+	scene._inv_path = "user://test_ui_tutorial_inv.json"
+	Investigator.clear(scene._inv_path)
 	scene._open_start_screen()
 	await process_frame
 	check("G0 Desktop 能挂开始界面", scene._start_screen != null)
@@ -1611,8 +1613,130 @@ func _initialize() -> void:
 		await process_frame
 	check("G2 产出调查员证线索",
 		scene.graph.captured.has("CLUES_INVESTIGATOR_CERT") and scene._cards.has(tut_cert_clue_key))
-	check("G2 第②幕完成", scene._tutorial_step == 3)
+	check("G2 进入第③幕收纳", scene._tutorial_step == 3)
 	check("G2 TEC 收尾台词", _last_line(scene._tec).contains("核对完成"))
+
+	# ── 第 3 幕：三枚 app 解锁 + 物品进袋 / 线索进册 ──
+	check("G3 图标栏解锁",
+		scene._icon_layer().visible and scene._icon_by_app("bag").visible
+			and scene._icon_by_app("clue").visible and scene._icon_by_app("infer").visible)
+	check("G3 只解锁三枚（地图 / TEC / 档案未出）",
+		not scene._icon_by_app("map").visible and not scene._icon_by_app("tec").visible
+			and not scene._icon_by_app("goto").visible)
+	# 错收：物品不能进线索册，线索不能进证物袋，未收纳完不能上推演桌布。
+	scene._apply_drop("clue-icon", tut_cert_key)
+	check("G3 物品不能进线索册", not scene.graph.stored.has(tut_cert_key))
+	check("G3 错收由 TEC 纠正", _last_line(scene._tec).contains("线索册"))
+	scene._apply_drop("bag-dock", tut_clue_key)
+	check("G3 线索不能进证物袋", not scene.graph.stored.has(tut_clue_key))
+	check("G3 错收提示去证物袋", _last_line(scene._tec).contains("证物袋"))
+	scene._assign_to_matrix(tut_clue_key)
+	check("G3 收纳未完成不能上桌布",
+		scene._matrix_win == null and not scene.graph.stored.has(tut_clue_key))
+	scene._apply_drop("bag-dock", tut_cert_key)
+	for i in 2:
+		await process_frame
+	check("G3 物品进证物袋", String(scene.graph.stored.get(tut_cert_key, "")) == GraphState.BAG)
+	check("G3 收纳后仍未完成第③幕", scene._tutorial_step == 3)
+	check("G3 TEC 提示还差线索", _last_line(scene._tec).contains("线索"))
+	scene._apply_drop("clue-icon", tut_clue_key)
+	for i in 4:
+		await process_frame
+	check("G3 线索进线索册", String(scene.graph.stored.get(tut_clue_key, "")) == GraphState.LEDGER)
+	check("G3 第③幕完成进入推演", scene._tutorial_step == 4)
+	check("G3 另一条线索一并进册",
+		String(scene.graph.stored.get(tut_cert_clue_key, "")) == GraphState.LEDGER)
+	check("G3 推演桌布与线索册打开",
+		scene._matrix_win != null and scene._ledger_win != null)
+	check("G3 桌布提示还差一条",
+		scene._matrix_win.dbg_hint().contains("还需要"))
+
+	# ── 第 4 幕：两条线索上桌布 + 长按执行者 ──
+	scene._matrix_win.finish_charge()
+	for i in 3:
+		await process_frame
+	check("G4 配方不齐不进入领证",
+		scene._tutorial_step == 4 and scene._tutorial_cert_win == null)
+	check("G4 桌布口头纠正",
+		scene._matrix_win.dbg_hint().contains("配方不对"))
+	scene._assign_to_matrix(tut_clue_key)
+	scene._assign_to_matrix(tut_cert_clue_key)
+	check("G4 两条线索上桌布", scene.graph.matrix_count() == 2)
+	check("G4 桌布提示长按", scene._matrix_win.dbg_hint().contains("长按"))
+	scene._matrix_win.finish_charge()
+	for i in 7:
+		await process_frame
+	check("G4 推演成功进入领证",
+		scene._tutorial_step == 5 and scene._tutorial_cert_win != null)
+	check("G4 桌布窗已收起", scene._matrix_win == null)
+
+	# ── 第 5 幕：姓名 / 编号 / 日期 / 照片 ──
+	var cert = scene._tutorial_cert_win
+	check("G5 领证窗打开", cert != null)
+	check("G5 四项字段齐全",
+		cert != null and cert.find_child("cert_name", true, false) != null
+			and cert.find_child("cert_id_value", true, false) != null
+			and cert.find_child("cert_date_value", true, false) != null
+			and cert.find_child("cert_photos", true, false) != null)
+	var cert_date := cert.find_child("cert_date_value", true, false) as Label
+	check("G5 编号日期自动生成",
+		cert.dbg_cert_id().begins_with("TEC-") and cert_date != null and cert_date.text != "")
+	if cert != null:
+		cert.dbg_set_name("")
+		cert.dbg_confirm()
+	check("G5 空姓名不能签发", cert != null and scene._tutorial_cert_win != null)
+	var cert_err := cert.find_child("cert_error", true, false) as Label
+	check("G5 空姓名给出提示", cert_err != null and cert_err.text != "")
+	if cert != null:
+		cert.dbg_set_name("测试调查员")
+		cert.dbg_pick("CHARS_TEC")
+	check("G5 照片可选", cert != null and cert.dbg_avatar() == "CHARS_TEC")
+	if cert != null:
+		cert.dbg_confirm()
+	for i in 7:
+		await process_frame
+	var saved := Investigator.load_from(scene._inv_path)
+	check("G5 证件写入并落盘",
+		scene._investigator.get("name", "") == "测试调查员"
+			and saved.get("name", "") == "测试调查员"
+			and saved.get("avatarId", "") == "CHARS_TEC")
+	check("G5 领证窗关闭", scene._tutorial_cert_win == null)
+	check("G5 案件地图弹出", scene._map_win != null)
+	check("G5 地图图标解锁", scene._icon_by_app("map").visible)
+	check("G5 TEC 提示选案",
+		scene._tec.visible and _last_line(scene._tec).contains("选择"))
+
+	# ── 第 6 幕：选 A-001，进入完整桌面 ──
+	var case_map = scene._map_win
+	check("G6 A-001 显示可进入",
+		case_map != null and case_map.dbg_row_state("A001") in ["可进入", "进入"])
+	check("G6 A-002 仍锁定",
+		case_map != null and case_map.dbg_row_state("A002") == "锁定")
+	check("G6 锁定案件点不进去", case_map != null and not case_map.dbg_click("A002"))
+	check("G6 点击 A-001", case_map != null and case_map.dbg_click("A001"))
+	for i in 10:
+		await process_frame
+	check("G6 进入正式案件",
+		not scene._tutorial_active and scene._active_case == "A001"
+			and scene.case_def.case_def.id == "a001")
+	check("G6 起始场景已上桌", scene.graph.nodes.has("loc:SCENES_garden"))
+	check("G6 完整图标栏恢复",
+		scene._icon_layer().visible and scene._icon_by_app("goto").visible
+			and scene._icon_by_app("people").visible and scene._icon_by_app("tec").visible
+			and scene._icon_by_app("log").visible)
+	check("G6 顶栏恢复",
+		(scene.get_node("header/brand_sub") as Control).visible
+			and (scene.get_node("header/btn_撤销") as Control).visible
+			and scene._inv_chip.visible)
+	check("G6 案件窗控件恢复",
+		(scene._case_win.get_node("bar/close") as Control).visible
+			and (scene._case_win.get_node("bar/min") as Control).visible)
+	check("G6 TEC 收起并恢复拖动",
+		not scene._tec.visible and scene._tec.dbg_drag_enabled())
+	check("G6 TEC 控件恢复",
+		(scene._tec.get_node("bar/close") as Control).visible
+			and (scene._tec.get_node("bar/min") as Control).visible)
+	Investigator.clear(scene._inv_path)
 
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)

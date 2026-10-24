@@ -8,12 +8,15 @@ var current_id: String = ""
 var case_open := true
 
 var _rows: VBoxContainer
+## 教学第 6 幕：地图只开放 A-001，即使玩家进度里已有别的案子。
+var only_id := ""
 
 
-func setup_map(p_catalog: CaseCatalog, p_current: String, p_open: bool) -> void:
+func setup_map(p_catalog: CaseCatalog, p_current: String, p_open: bool, p_only_id: String = "") -> void:
 	catalog = p_catalog
 	current_id = p_current
 	case_open = p_open
+	only_id = p_only_id
 	setup("案件地图", 430, 260)
 	_build_map()
 
@@ -52,7 +55,7 @@ func refresh_map() -> void:
 
 func _make_row(c: Dictionary, last: bool = false) -> Control:
 	var id := String(c["id"])
-	var known := catalog != null and catalog.is_unlocked(id)
+	var known := catalog != null and catalog.is_unlocked(id) and (only_id == "" or id == only_id)
 	var current := id == current_id
 	var clickable := known and not (current and case_open)
 
@@ -186,7 +189,7 @@ func dbg_click(id: String) -> bool:
 	for c in CaseCatalog.all():
 		if String(c["id"]) != id:
 			continue
-		if catalog == null or not catalog.is_unlocked(id):
+		if catalog == null or not catalog.is_unlocked(id) or (only_id != "" and id != only_id):
 			return false
 		if id == current_id and case_open:
 			return false
