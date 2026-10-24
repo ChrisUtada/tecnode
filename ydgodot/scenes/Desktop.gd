@@ -36,6 +36,7 @@ const TUT_CERT_CLUE_ID := "CLUES_INVESTIGATOR_CERT"
 const TUT_ENDING_ID := "TUT_CERT"
 const CertWinScript := preload("res://scenes/windows/CertWin.gd")
 const PhotoWinScript := preload("res://scenes/windows/PhotoWin.gd")
+const DropOutlineScript := preload("res://ui/DropOutline.gd")
 const TUT_ACTOR_KEY := "char:" + TUT_ACTOR_ID
 const TUT_CLUE_KEY := "clue:" + TUT_CLUE_ID
 const TUT_CERT_ITEM_KEY := "item:" + TUT_CERT_ITEM_ID
@@ -133,9 +134,7 @@ var _narr: NarrCard
 var _ending: EndingOverlay
 var _cards: Dictionary = {}          # key -> NodeCard
 var _selected: String = ""
-## 拖动中的悬停落点（落点 id / 被高亮的控件 / 被高亮的目标卡）
-var _drop_over_id := ""
-var _drop_over_node: Node = null
+## 拖动中指针下的目标卡（卡片叠卡片时作为组合目标）
 var _drag_over_card := ""
 ## 拖动镜像（Web #drag-layer）：拖起时在桌布根上占一份"假身"，松手销毁。
 var _card_mirror: NodeCard = null
@@ -195,6 +194,7 @@ var _tutorial_tec_placed := false
 var _tutorial_tec_icon_visible := false
 var _tutorial_map_arranged := false
 var _photo_win: SysWindow = null
+var _drop_outline: DropOutline = null
 var _inv_chip: Button = null
 var _cert_win: SysWindow = null
 var _catalog: CaseCatalog = null
@@ -660,6 +660,13 @@ func _build_ui() -> void:
 	_build_toast()
 	_build_debug_panel()
 
+	_drop_outline = DropOutlineScript.new()
+	_drop_outline.name = "drop_outline"
+	_drop_outline.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_drop_outline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_desk.add_child(_drop_outline)
+	_place_z(_drop_outline, ZR_DROP)
+
 	## 界面建完才开自适应：_build_ui 期间主窗/浮层还没影，重排会空转。
 	_ui_built = true
 	_layout_root()
@@ -1124,6 +1131,7 @@ const ZR_ICONS := 24      # #icons：窗开着会被任何系统窗盖住（11-d
 const ZR_WIN := 25        # .bag/.clue/.cert/.map/.music/.goto/.infer/.garden/.people-win
 const ZR_CHAT := 26       # .chat-win / .avatar-win
 const ZR_TEC := 28        # .tec-win / .dlg-win
+const ZR_DROP := 29       # 拖拽落点虚线框：压住 TEC / 窗口 / 图标
 const ZR_TOAST := 30      # #toast / #verdict
 const ZR_CERT := 32       # 教学期领证窗体：压住 TEC / 地图，必须填完
 const ZR_MIRROR := 40     # #drag-layer：桌面最高层（批 3 的拖动镜像也用这档）
@@ -2401,7 +2409,7 @@ func _tutorial_set_hint() -> void:
 		TutorialStep.DRAG_ACTOR:
 			_tec.set_guidance("待命 · 等你的档案", "把「调查员」拖到我身上")
 		TutorialStep.DOUBLE_CLICK_CLUE:
-			_tec.set_guidance("待命 · 等你双击节点", "双击「调查员」节点调出证件")
+			_tec.set_guidance("待命 · 等你双击人物", "双击人物「调查员」调出证件")
 		TutorialStep.DRAG_CERT:
 			_tec.set_guidance("待命 · 等你交证件", "把「调查员证」拖到我身上")
 		TutorialStep.STORE_SUPPLIES:
@@ -2422,7 +2430,7 @@ func _tutorial_talk_line() -> String:
 		TutorialStep.DRAG_ACTOR:
 			return "把你的档案拖到我身上，我给你看看。"
 		TutorialStep.DOUBLE_CLICK_CLUE:
-			return "双击「调查员」节点，把证件调出来。"
+			return "双击人物「调查员」节点，把证件调出来。"
 		TutorialStep.DRAG_CERT:
 			return "把「调查员证」拖给我，我核对一下。"
 		TutorialStep.STORE_SUPPLIES:
@@ -2444,7 +2452,7 @@ func _tutorial_tec_guard(key: String) -> bool:
 				return true
 			_tutorial_say("先把「调查员」拖给我。")
 		TutorialStep.DOUBLE_CLICK_CLUE:
-			_tutorial_say("先双击「调查员」节点，把证件调出来。")
+			_tutorial_say("先双击人物「调查员」节点，把证件调出来。")
 		TutorialStep.DRAG_CERT:
 			if key == TUT_CERT_ITEM_KEY:
 				return true
@@ -2466,7 +2474,7 @@ func _tutorial_tec_guard(key: String) -> bool:
 ## 避免桌面上两张同名卡让玩家猜哪一张才是正确的入口。
 func _tutorial_on_activate(key: String) -> bool:
 	if _tutorial_step == TutorialStep.DOUBLE_CLICK_CLUE:
-		if key == TUT_CLUE_KEY or key == TUT_ACTOR_KEY:
+		if key == TUT_ACTOR_KEY:
 			var cert_key := _tutorial_spawn_node("item", TUT_CERT_ITEM_ID, 2)
 			## 证件是「人」的证件：连线从调查员人物节点出发，不从线索出发。
 			graph.link(TUT_ACTOR_KEY, cert_key, "entity")
@@ -2474,6 +2482,9 @@ func _tutorial_on_activate(key: String) -> bool:
 			_tutorial_step = TutorialStep.DRAG_CERT
 			_tutorial_set_hint()
 			_tutorial_say("这是你的调查员证。把它拖给我，我核对一下。")
+			return true
+		if key == TUT_CLUE_KEY:
+			_tutorial_say("证件要从人物「调查员」调出——双击人物，不要双击线索。")
 			return true
 	elif _tutorial_step == TutorialStep.DRAG_CERT and (key == TUT_CLUE_KEY or key == TUT_ACTOR_KEY):
 		_tutorial_say("证件已经调出来了。把「调查员证」拖给我。")
@@ -2490,7 +2501,7 @@ func _tutorial_on_tec_done(key: String) -> bool:
 		_tutorial_spawn_clue(TUT_CLUE_ID, key, 1)
 		_tutorial_step = TutorialStep.DOUBLE_CLICK_CLUE
 		_tutorial_set_hint()
-		_tutorial_say("分析完成。这是「调查员」线索——双击「调查员」节点，把证件调出来。")
+		_tutorial_say("分析完成。这是「调查员」线索——双击人物「调查员」，把证件调出来。")
 		return true
 	if _tutorial_step == TutorialStep.DRAG_CERT and key == TUT_CERT_ITEM_KEY:
 		_tutorial_spawn_clue(TUT_CERT_CLUE_ID, key, 3)
@@ -3446,23 +3457,23 @@ func _on_card_pin_toggled(key: String) -> void:
 func _drop_targets() -> Array:
 	var out: Array = []
 	if _chat_win != null and is_instance_valid(_chat_win) and _chat_win.is_visible_in_tree():
-		out.append({"id": "chat-win", "rect": _chat_win.get_global_rect()})
+		out.append({"id": "chat-win", "rect": _chat_win.get_global_rect(), "inset": 16.0})
 	if _bag_win != null and is_instance_valid(_bag_win) and _bag_win.is_visible_in_tree():
-		out.append({"id": "bag-win", "rect": _bag_win.get_global_rect()})
+		out.append({"id": "bag-win", "rect": _bag_win.get_global_rect(), "inset": 16.0})
 	if _ledger_win != null and is_instance_valid(_ledger_win) and _ledger_win.is_visible_in_tree():
-		out.append({"id": "clue-win", "rect": _ledger_win.get_global_rect()})
+		out.append({"id": "clue-win", "rect": _ledger_win.get_global_rect(), "inset": 16.0})
 	for pair in [["bag-dock", "icon_bag"], ["clue-icon", "icon_clue"], ["tec-dock", "icon_tec"],
 			["infer-icon", "icon_infer"], ["goto-icon", "icon_goto"]]:
 		var ic: Control = _desk.get_node_or_null("icons/" + String(pair[1])) as Control
 		if ic != null and ic.is_visible_in_tree():
-			out.append({"id": String(pair[0]), "rect": ic.get_global_rect()})
+			out.append({"id": String(pair[0]), "rect": ic.get_global_rect(), "inset": 0.0})
 	if _tec != null and is_instance_valid(_tec) and _tec.visible:
 		## 整个 TEC 窗体都是分析落点：拖到标题栏、正文、头像任意位置都能交给 TEC。
-		out.append({"id": "tec-dock", "rect": _tec.get_global_rect()})
+		out.append({"id": "tec-dock", "rect": _tec.get_global_rect(), "inset": 16.0})
 	if _tec_chip != null and is_instance_valid(_tec_chip) and _tec_chip.visible:
-		out.append({"id": "tec-chip", "rect": _tec_chip.get_global_rect()})
+		out.append({"id": "tec-chip", "rect": _tec_chip.get_global_rect(), "inset": 2.0})
 	if _matrix_win != null and is_instance_valid(_matrix_win):
-		out.append({"id": "mx-board", "rect": _matrix_win.board_global_rect()})
+		out.append({"id": "mx-board", "rect": _matrix_win.board_global_rect(), "inset": 4.0})
 	return out
 
 
@@ -3520,76 +3531,47 @@ func _replay_talk(key: String) -> bool:
 	return _open_chat(d, [String(ch.id)])
 
 
-## 拖动中用：命中的落点加 `.over`（图标反白 / 窗与桌布虚线框 / 目标节点反白）
+## 拖动中用：命中的窗口 / 图标 / 卡片统一画一层虚线框
 func _update_drop_over(at_global: Vector2) -> void:
 	var hit_id := ""
+	var hit_rect := Rect2()
+	var hit_inset := 0.0
 	for t in _drop_targets():
 		if (t["rect"] as Rect2).has_point(at_global):
 			hit_id = String(t["id"])
+			hit_rect = t["rect"]
+			hit_inset = float(t.get("inset", 0.0))
 			break
-	if hit_id != _drop_over_id:
-		_clear_drop_over()
-		_drop_over_id = hit_id
-		if hit_id != "":
-			_drop_over_node = _node_of_drop(hit_id)
-			_set_over(_drop_over_node, true)
-	# 目标节点（组合）：只在没有图标 / 窗口命中时高亮
+	# 目标节点（组合）：只在没有图标 / 窗口命中时描边，效果与窗口、图标完全一致。
 	var under := ""
 	if hit_id == "":
 		under = _card_key_at(at_global)
-	if under != _drag_over_card:
-		if _drag_over_card != "" and _cards.has(_drag_over_card):
-			(_cards[_drag_over_card] as NodeCard).set_over(false)
-		_drag_over_card = under
-		if under != "":
-			(_cards[under] as NodeCard).set_over(true)
+	_drag_over_card = under
+	if under != "":
+		_show_drop_outline((_cards[under] as NodeCard).get_global_rect(), 0.0)
+	elif hit_id != "":
+		_show_drop_outline(hit_rect, hit_inset)
+	elif _drop_outline != null and is_instance_valid(_drop_outline):
+		_drop_outline.clear_outline()
+
+
+## 所有落点共用同一层虚线框：窗口内缩到边框内侧，图标 / 卡片贴外框，桌布贴板边。
+func _show_drop_outline(rect_global: Rect2, inset: float) -> void:
+	if _drop_outline == null or not is_instance_valid(_drop_outline):
+		return
+	var inv := _desk.get_global_transform().affine_inverse()
+	var origin := inv * rect_global.position
+	_drop_outline.show_rect(Rect2(origin, rect_global.size).grow(-inset))
 
 
 func _clear_drop_over() -> void:
-	_set_over(_drop_over_node, false)
-	_drop_over_node = null
-	_drop_over_id = ""
-	if _drag_over_card != "" and _cards.has(_drag_over_card):
-		(_cards[_drag_over_card] as NodeCard).set_over(false)
+	if _drop_outline != null and is_instance_valid(_drop_outline):
+		_drop_outline.clear_outline()
 	_drag_over_card = ""
 
 
 func _on_card_spring_finished(_key: String) -> void:
 	_repaint_edges()
-
-
-## 落点悬停高亮的统一入口（TecChip 之类没实现 set_over 的控件自动跳过）
-func _set_over(node: Node, on: bool) -> void:
-	if node != null and is_instance_valid(node) and node.has_method("set_over"):
-		node.call("set_over", on)
-
-
-## 落点 id → 可着色的控件（图标 / 窗口 / 桌布）
-func _node_of_drop(id: String) -> Node:
-	match id:
-		"chat-win":
-			return _chat_win
-		"bag-win":
-			return _bag_win
-		"clue-win":
-			return _ledger_win
-		"bag-dock":
-			return _desk.get_node_or_null("icons/icon_bag")
-		"clue-icon":
-			return _desk.get_node_or_null("icons/icon_clue")
-		"tec-dock":
-			return _tec_btn
-		"infer-icon":
-			return _desk.get_node_or_null("icons/icon_infer")
-		"goto-icon":
-			return _desk.get_node_or_null("icons/icon_goto")
-		"tec-avatar":
-			return _tec if _tec != null and _tec.visible else null
-		"tec-chip":
-			return _tec_chip
-		"mx-board":
-			return _matrix_win
-	return null
 
 
 ## 松手分派：命中落点即消费（卡片回原位）。返回 true 表示已被落点接管。

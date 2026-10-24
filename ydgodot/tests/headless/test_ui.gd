@@ -1605,8 +1605,11 @@ func _initialize() -> void:
 	var actor_to: Vector2 = scene._tec.get_global_rect().get_center()
 	_press(tut_actor_card, actor_from)
 	_motion(tut_actor_card, actor_to)
+	check("G2 拖进 TEC 出现统一虚线框", scene._drop_outline.visible)
+	check("G2 虚线框贴合 TEC 窗体", scene._drop_outline.outline_rect().size.x > 100.0)
 	_release(tut_actor_card, actor_to)
 	await process_frame
+	check("G2 松手后虚线框收起", not scene._drop_outline.visible)
 	check("G2 调查员拖给 TEC 开始分析", scene._tec.is_analyzing())
 	check("G2 拖给 TEC 后调查员节点仍在", tut_actor_card.visible)
 	var actor_node: Dictionary = scene.graph.node(tut_actor_key)
@@ -1627,6 +1630,12 @@ func _initialize() -> void:
 	check("G2 错拖不弹系统 toast", not scene._toast_active)
 	scene._tec_talk()
 	check("G2 点 TEC 仍只指下一步", _last_line(scene._tec).contains("双击"))
+	# 双击线索不能调出证件：证件属于人物，TEC 只口头纠正，步骤和连线都不变。
+	scene._on_card_activated(tut_clue_key)
+	check("G2 双击线索不产出证件",
+		not scene._cards.has(tut_cert_key) and scene._tutorial_step == 1)
+	check("G2 双击线索仍指向人物", _last_line(scene._tec).contains("人物"))
+	check("G2 双击线索不改连线", scene._edge_layer.segment_count() == 1)
 	scene._on_card_activated(tut_actor_key)
 	check("G2 证件边与卡片同帧出现", scene._edge_layer.segment_count() == 2)
 	for i in 3:
@@ -1654,6 +1663,25 @@ func _initialize() -> void:
 	check("G3 图标栏解锁",
 		scene._icon_layer().visible and scene._icon_by_app("bag").visible
 			and scene._icon_by_app("clue").visible and scene._icon_by_app("infer").visible)
+	var bag_rect := Rect2()
+	for t in scene._drop_targets():
+		if String(t["id"]) == "bag-dock":
+			bag_rect = t["rect"]
+	scene._update_drop_over(bag_rect.get_center())
+	check("G3 收纳图标也显示统一虚线框", scene._drop_outline.visible)
+	scene._clear_drop_over()
+	scene._toggle_storage("BAG")
+	await process_frame
+	scene._update_drop_over(scene._bag_win.get_global_rect().get_center())
+	check("G3 收纳窗口也显示统一虚线框", scene._drop_outline.visible)
+	check("G3 窗口虚线框内缩 16px",
+		scene._drop_outline.outline_rect().size == scene._bag_win.size - Vector2(32.0, 32.0))
+	scene._toggle_storage("BAG")
+	await process_frame
+	scene._update_drop_over(tut_actor_card.get_global_rect().get_center())
+	check("G3 卡片目标也显示统一虚线框", scene._drop_outline.visible)
+	scene._update_drop_over(Vector2(8.0, 8.0))
+	check("G3 移出落点虚线框收起", not scene._drop_outline.visible)
 	check("G3 地图 / 档案未出，TEC 图标按普通 app 常驻",
 		not scene._icon_by_app("map").visible and scene._icon_by_app("tec").visible
 			and not scene._icon_by_app("goto").visible)
