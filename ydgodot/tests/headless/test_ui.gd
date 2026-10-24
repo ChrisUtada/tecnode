@@ -1488,6 +1488,28 @@ func _initialize() -> void:
 	check("E4 清场后新消息立即显示", scene._toast_label.text == "队列三" and scene._toast.visible)
 	scene._hide_toast()
 
+	# 详情窗：长简介 + 动作按钮不能溢出窗框；超过视口时由滚动区吸收。
+	scene._hide_toast()
+	var detail_key: String = scene.dbg_ensure("item", "ITEM_shuzhuo")
+	scene.graph.explored["ITEM_shuzhuo"] = true
+	scene._on_card_selected(detail_key)
+	await process_frame
+	await process_frame
+	await process_frame
+	var dlong: DetailWin = scene._detail_win
+	var dbtn: Button = null
+	if dlong != null:
+		for b in dlong.find_children("*", "Button", true, false):
+			var bt := b as Button
+			if bt != null and String(bt.text).begins_with("重看"):
+				dbtn = bt
+				break
+	check("详情窗有滚动区", dlong != null and dlong._scroll != null)
+	check("详情窗动作按钮不溢出窗框",
+		dlong != null and dbtn != null and dlong.get_global_rect().encloses(dbtn.get_global_rect()),
+		"null" if dlong == null or dbtn == null else "%s / %s" % [
+			dlong.get_global_rect(), dbtn.get_global_rect()])
+
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)
 

@@ -22,6 +22,7 @@ var _case: CaseLoader
 var _key := ""
 var _sig := ""
 var _rows: VBoxContainer
+var _scroll: ScrollContainer
 var _head: Label
 var _meta: Label
 
@@ -32,11 +33,19 @@ func setup_detail(p_graph: GraphState, p_case: CaseLoader) -> void:
 	setup("节点详情", W, 260)
 	place_right()
 	closed.connect(hide)
+	_scroll = ScrollContainer.new()
+	_scroll.name = "detail_scroll"
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(_scroll)
 	_rows = VBoxContainer.new()
 	_rows.name = "rows"
 	_rows.add_theme_constant_override("separation", 6)
 	_rows.custom_minimum_size = Vector2(W - 24.0 - 24.0, 0)
-	content.add_child(_rows)
+	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(_rows)
 
 
 ## 贴右上角：右沿按当前视口现算（960 / 1280 / 1920 都贴边）。
@@ -137,13 +146,28 @@ func _rebuild(n: Dictionary) -> void:
 		var mu := _button("播放音乐")
 		mu.pressed.connect(func(): play_music.emit())
 		_rows.add_child(mu)
-	# 高度跟着内容走，不再截到 420
+	# 高度跟着内容走；超过视口可用高度时由 ScrollContainer 滚动，按钮不再被裁。
 	await get_tree().process_frame
-	var h := _rows.get_combined_minimum_size().y
-	set_inner_height(h + SysWindow.BAR_H + 20.0)
-	## 长简介同样不能把窗底顶出画面：贴到底就整体上移
-	if position.y + size.y > 740.0:
-		position.y = maxf(8.0, 740.0 - size.y)
+	await get_tree().process_frame
+	_fit_to_content()
+
+
+func _fit_to_content() -> void:
+	if _rows == null:
+		return
+	var rows_h := _rows.get_combined_minimum_size().y
+	var inner := rows_h + SysWindow.BAR_H + 20.0 + 8.0
+	## 无头环境拿到的视口可能是 1×1 之类的占位值；低于最小窗口高度时按 720 设计高算。
+	var vh := 720.0
+	if is_inside_tree():
+		var raw := get_viewport_rect().size.y
+		if raw >= 320.0:
+			vh = raw
+	var max_inner := maxf(160.0, vh - TOP - 8.0 - SysWindow.PAD * 2.0)
+	set_inner_height(minf(inner, max_inner))
+	## 贴到底就整体上移；长内容由滚动区吸收，不再把按钮顶出窗框。
+	if position.y + size.y > vh - 8.0:
+		position.y = maxf(8.0, vh - 8.0 - size.y)
 
 
 func _intro_text(n: Dictionary, kind: String) -> String:
