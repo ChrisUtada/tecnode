@@ -1595,13 +1595,14 @@ func _initialize() -> void:
 	check("G2 从第①步开始", scene._tutorial_step == 0)
 	var tec_target := Rect2()
 	for t in scene._drop_targets():
-		if String(t["id"]) == "tec-avatar":
+		if String(t["id"]) == "tec-dock":
 			tec_target = t["rect"]
-	check("G2 TEC 头像落点与正式模式一致", tec_target == scene._tec.avatar_global_rect())
+	check("G2 整个 TEC 窗体都是落点", tec_target == scene._tec.get_global_rect())
 	# 用真实鼠标事件走完拖拽收尾，回归「拖到 TEC 后节点被 visible_node 藏掉」。
 	var tut_actor_card: NodeCard = scene._cards[tut_actor_key]
 	var actor_from: Vector2 = tut_actor_card.get_global_rect().get_center()
-	var actor_to: Vector2 = scene._tec.avatar_global_rect().get_center()
+	## 故意丢在 TEC 窗体中央（正文，不是头像），验证整窗都是分析落点。
+	var actor_to: Vector2 = scene._tec.get_global_rect().get_center()
 	_press(tut_actor_card, actor_from)
 	_motion(tut_actor_card, actor_to)
 	_release(tut_actor_card, actor_to)
@@ -1617,6 +1618,7 @@ func _initialize() -> void:
 	check("G2 产出调查员线索并上桌",
 		scene.graph.captured.has("CLUES_INVESTIGATOR") and scene._cards.has(tut_clue_key))
 	check("G2 线索卡带新标记", scene.graph.has_unread(tut_clue_key))
+	check("G2 人物→线索连线立即出现", scene._edge_layer.segment_count() == 1)
 	check("G2 TEC 提示双击节点", _last_line(scene._tec).contains("双击"))
 	# 第②步不该再交节点给 TEC：TEC 口头纠正，不出系统 toast。
 	scene._apply_drop("tec-avatar", tut_actor_key)
@@ -1626,13 +1628,13 @@ func _initialize() -> void:
 	scene._tec_talk()
 	check("G2 点 TEC 仍只指下一步", _last_line(scene._tec).contains("双击"))
 	scene._on_card_activated(tut_actor_key)
+	check("G2 证件边与卡片同帧出现", scene._edge_layer.segment_count() == 2)
 	for i in 3:
 		await process_frame
 	check("G2 双击调查员节点产出证件节点",
 		scene._cards.has(tut_cert_key) and scene._tutorial_step == 2)
 	check("G2 证件连线来自调查员人物", scene.graph.has_edge(tut_actor_key, tut_cert_key))
 	check("G2 证件不再连到线索", not scene.graph.has_edge(tut_clue_key, tut_cert_key))
-	scene._repaint_edges()
 	check("G2 人物→线索、人物→证件两条线", scene._edge_layer.segment_count() == 2)
 	check("G2 TEC 提示把证件拖过去", _last_line(scene._tec).contains("调查员证"))
 	scene._apply_drop("tec-avatar", tut_clue_key)

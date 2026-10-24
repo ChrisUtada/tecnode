@@ -3227,9 +3227,12 @@ func _spawn_card(key: String) -> NodeCard:
 	# 但 fresh 照样消费掉（两次截图的 fresh 状态必须收敛）。
 	if bool(n.get("fresh", false)):
 		graph.consume_fresh(key)
-		if not _shot_mode():
+		## 教学期新节点不做 0.2s 的 pop 淡入：卡片和连线要同帧出现，避免「线慢一拍」。
+		if not _shot_mode() and not _tutorial_active:
 			card.pivot_offset = card.size * 0.5
 			card.play_pop()
+	## 新卡一上画布就重画连线；否则同帧刚建立的边要等下一次布局/交互才出现。
+	_repaint_edges()
 	return card
 
 
@@ -3454,8 +3457,8 @@ func _drop_targets() -> Array:
 		if ic != null and ic.is_visible_in_tree():
 			out.append({"id": String(pair[0]), "rect": ic.get_global_rect()})
 	if _tec != null and is_instance_valid(_tec) and _tec.visible:
-		## 和正式案件完全一致：TEC 只认头像落点，整窗不抢画布事件。
-		out.append({"id": "tec-avatar", "rect": _tec.avatar_global_rect()})
+		## 整个 TEC 窗体都是分析落点：拖到标题栏、正文、头像任意位置都能交给 TEC。
+		out.append({"id": "tec-dock", "rect": _tec.get_global_rect()})
 	if _tec_chip != null and is_instance_valid(_tec_chip) and _tec_chip.visible:
 		out.append({"id": "tec-chip", "rect": _tec_chip.get_global_rect()})
 	if _matrix_win != null and is_instance_valid(_matrix_win):
@@ -5234,7 +5237,7 @@ func _sync_tec_chip() -> void:
 func _tec_drop_hit(at_global: Vector2) -> bool:
 	if _tec_btn != null and _tec_btn.get_global_rect().has_point(at_global):
 		return true
-	if _tec.visible and _tec.avatar_global_rect().has_point(at_global):
+	if _tec.visible and _tec.get_global_rect().has_point(at_global):
 		return true
 	if _tec_chip != null and _tec_chip.visible and _tec_chip.get_global_rect().has_point(at_global):
 		return true
