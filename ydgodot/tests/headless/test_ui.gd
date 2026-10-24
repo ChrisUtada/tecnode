@@ -1504,7 +1504,8 @@ func _initialize() -> void:
 			if bt != null and String(bt.text).begins_with("重看"):
 				dbtn = bt
 				break
-	check("详情窗有滚动区", dlong != null and dlong._scroll != null)
+	check("详情窗不使用滚动条", dlong != null and dlong.content.get_child_count() == 1
+		and dlong.content.get_child(0) == dlong._rows)
 	check("详情窗动作按钮不溢出窗框",
 		dlong != null and dbtn != null and dlong.get_global_rect().encloses(dbtn.get_global_rect()),
 		"null" if dlong == null or dbtn == null else "%s / %s" % [
