@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="CharDef" format=3]
-
-[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="1_char"]
-
-[resource]
-script = ExtResource("1_char")
-id = "CHARS_INVESTIGATOR"
-name = "调查员"
-desc = "你。准确地说，是 T.E.C-OS 从档案里调出的、属于你的那一页。姓名和证件号都还空着。"

@@ -775,27 +775,9 @@ func _initialize() -> void:
 	await process_frame
 	check("桌布窗能打开", mw != null)
 	# 挑一个不压在任何可见卡 / 开着的窗 / 桌布上的松手点（四角 + 四边各试一次）
-	var blank_pt := stage3.get_global_rect().get_center()
-	for off in [Vector2(0, 190), Vector2(-190, 0), Vector2(190, 0), Vector2(0, -190),
-		Vector2(-140, 150), Vector2(140, 150), Vector2(-140, -150), Vector2(140, -150)]:
-		var cand: Vector2 = stage3.get_global_rect().get_center() + off
-		var occupied := false
-		for key in _cards().keys():
-			var c3: NodeCard = _cards()[key]
-			if c3.visible and c3.get_global_rect().has_point(cand):
-				occupied = true
-				break
-		if not occupied and scene._bag_win != null and scene._bag_win.get_global_rect().has_point(cand):
-			occupied = true
-		if not occupied and scene._ledger_win != null and scene._ledger_win.get_global_rect().has_point(cand):
-			occupied = true
-		if not occupied and mw != null and mw._board.get_global_rect().has_point(cand):
-			occupied = true
-		if not occupied:
-			blank_pt = cand
-			break
-	check("测试前提：落点在空画布、桌布外、开着的窗外",
-		not mw._board.get_global_rect().has_point(blank_pt)
+	var blank_pt := _empty_canvas_point(scene)
+	check("测试前提：落点在空画布、桌布外、开着的窗口",
+		not mw.get_global_rect().has_point(blank_pt)
 		and not (scene._bag_win != null and scene._bag_win.get_global_rect().has_point(blank_pt))
 		and not (scene._ledger_win != null and scene._ledger_win.get_global_rect().has_point(blank_pt)),
 		str(blank_pt))
@@ -818,7 +800,7 @@ func _initialize() -> void:
 
 	# 13) 桌布 chip → 画布（带坐标，反向 8 条路径的最后一条）/ chip → 册图标 = 收进册子
 	var clue_key := "clue:CLUES_nm"
-	check("测试前提：松手点在桌布外", not mw._board.get_global_rect().has_point(blank_pt))
+	check("测试前提：松手点在桌布外", not mw.get_global_rect().has_point(blank_pt))
 	scene.dbg_matrix_assign(clue_key)
 	await process_frame
 	var chip_panel: Control = mw._chips.get("CLUES_nm", null) as Control
@@ -945,25 +927,7 @@ func _initialize() -> void:
 	var stage4: Control = scene.get_node("desk/case_win/body/stage")
 	var torch4: NodeCard = _cards()[TORCH]
 	var m_a: Vector2 = torch4.get_global_rect().get_center()
-	var m_blank: Vector2 = stage4.get_global_rect().get_center()
-	for off in [Vector2(0, 190), Vector2(-190, 0), Vector2(190, 0), Vector2(0, -190),
-		Vector2(-140, 150), Vector2(140, 150), Vector2(-140, -150), Vector2(140, -150)]:
-		var cand4: Vector2 = stage4.get_global_rect().get_center() + off
-		var occupied4 := false
-		for key in _cards().keys():
-			var c4: NodeCard = _cards()[key]
-			if c4 != torch4 and c4.visible and c4.get_global_rect().has_point(cand4):
-				occupied4 = true
-				break
-		if not occupied4 and scene._bag_win != null and scene._bag_win.get_global_rect().has_point(cand4):
-			occupied4 = true
-		if not occupied4 and scene._ledger_win != null and scene._ledger_win.get_global_rect().has_point(cand4):
-			occupied4 = true
-		if not occupied4 and mw != null and mw._board.get_global_rect().has_point(cand4):
-			occupied4 = true
-		if not occupied4:
-			m_blank = cand4
-			break
+	var m_blank: Vector2 = _empty_canvas_point(scene)
 	var edges4: EdgeLayer = scene.get_node("desk/case_win/body/stage/cards/edges")
 	_press(torch4, m_a)
 	_motion(torch4, m_blank)
@@ -1576,9 +1540,12 @@ func _initialize() -> void:
 		scene._start_screen.start_requested.emit(false)
 		await process_frame
 	check("G1 开始后进入空白桌面", scene._start_screen == null and scene._tutorial_active)
-	check("G1 图表隐藏、TEC 常驻、调查员节点已出现",
+	check("G1 图表隐藏、TEC 常驻、TEC办公室节点已出现",
 		not scene._icon_layer().visible and scene._tec.visible
-			and scene._cards.has("char:CHARS_INVESTIGATOR"))
+			and scene._cards.has("loc:SCENES_TEC_OFFICE"))
+	var office_g1: NodeCard = scene._cards["loc:SCENES_TEC_OFFICE"]
+	check("G1 TEC办公室没有无文本入口角标",
+		not office_g1._warn and not office_g1._warn_badge.visible)
 	check("G1 TEC 开场白",
 		not scene._tec.dbg_lines().is_empty()
 			and String(scene._tec.dbg_lines()[0]).contains("欢迎来到 TEC"))
@@ -1603,9 +1570,8 @@ func _initialize() -> void:
 	await process_frame
 	check("G1 重开 TEC 后图标收起", not scene._icon_by_app("tec").visible)
 
-	# ── 第 2 幕：拖给 TEC → 双击调查员节点 → 证件交给 TEC 核对 ──
-	var tut_actor_key := "char:CHARS_INVESTIGATOR"
-	var tut_clue_key := "clue:CLUES_INVESTIGATOR"
+	# ── 第 2 幕：TEC办公室 → 调查员证 → 证件交给 TEC 核对 ──
+	var tut_office_key := "loc:SCENES_TEC_OFFICE"
 	var tut_cert_key := "item:ITEMS_investigator_cert"
 	var tut_cert_clue_key := "clue:CLUES_INVESTIGATOR_CERT"
 	check("G2 从第①步开始", scene._tutorial_step == 0)
@@ -1614,61 +1580,56 @@ func _initialize() -> void:
 		if String(t["id"]) == "tec-dock":
 			tec_target = t["rect"]
 	check("G2 整个 TEC 窗体都是落点", tec_target == scene._tec.get_global_rect())
-	# 用真实鼠标事件走完拖拽收尾，回归「拖到 TEC 后节点被 visible_node 藏掉」。
-	var tut_actor_card: NodeCard = scene._cards[tut_actor_key]
-	var actor_from: Vector2 = tut_actor_card.get_global_rect().get_center()
+	# 用真实鼠标事件走完拖拽收尾，回归「拖给 TEC 后节点被 visible_node 藏掉」。
+	var tut_office_card: NodeCard = scene._cards[tut_office_key]
+	var office_from: Vector2 = tut_office_card.get_global_rect().get_center()
 	## 故意丢在 TEC 窗体中央（正文，不是头像），验证整窗都是分析落点。
-	var actor_to: Vector2 = scene._tec.get_global_rect().get_center()
-	_press(tut_actor_card, actor_from)
-	_motion(tut_actor_card, actor_to)
+	var office_to: Vector2 = scene._tec.get_global_rect().get_center()
+	_press(tut_office_card, office_from)
+	_motion(tut_office_card, office_to)
 	check("G2 拖进 TEC 出现统一虚线框", scene._drop_outline.visible)
 	check("G2 虚线框贴合 TEC 窗体", scene._drop_outline.outline_rect().size.x > 100.0)
-	_release(tut_actor_card, actor_to)
+	_release(tut_office_card, office_to)
 	await process_frame
 	check("G2 松手后虚线框收起", not scene._drop_outline.visible)
-	check("G2 调查员拖给 TEC 开始分析", scene._tec.is_analyzing())
-	check("G2 拖给 TEC 后调查员节点仍在", tut_actor_card.visible)
-	var actor_node: Dictionary = scene.graph.node(tut_actor_key)
-	check("G2 调查员拖拽回位锚点正确",
-		tut_actor_card._home == Vector2(float(actor_node["x"]), float(actor_node["y"])))
+	check("G2 TEC办公室拖给 TEC 开始分析", scene._tec.is_analyzing())
+	check("G2 拖给 TEC 后办公室节点仍在", tut_office_card.visible)
+	var office_node: Dictionary = scene.graph.node(tut_office_key)
+	check("G2 办公室拖拽回位锚点正确",
+		tut_office_card._home == Vector2(float(office_node["x"]), float(office_node["y"])))
 	scene.dbg_tec_complete()
 	for i in 6:
 		await process_frame
-	check("G2 产出调查员线索并上桌",
-		scene.graph.captured.has("CLUES_INVESTIGATOR") and scene._cards.has(tut_clue_key))
-	check("G2 线索卡带新标记", scene.graph.has_unread(tut_clue_key))
-	check("G2 人物→线索连线立即出现", scene._edge_layer.segment_count() == 1)
-	check("G2 TEC 提示双击节点", _last_line(scene._tec).contains("双击"))
-	scene._on_card_selected(tut_clue_key)
+	check("G2 TEC 分析办公室只给提示、不产证件",
+		not scene._cards.has(tut_cert_key) and scene._tutorial_step == 0
+			and _last_line(scene._tec).contains("双击"))
+	check("G2 分析后办公室节点仍在", tut_office_card.visible)
+	# 调查员证由 TEC办公室节点本身产出，TEC 分析不产出证件。
+	scene._on_card_activated(tut_office_key)
+	check("G2 双击办公室产出调查员证",
+		scene._cards.has(tut_cert_key) and scene._tutorial_step == 1)
+	check("G2 证件连线来自 TEC办公室", scene.graph.has_edge(tut_office_key, tut_cert_key))
+	check("G2 不再产出调查员线索",
+		not scene.graph.captured.has("CLUES_INVESTIGATOR")
+			and not scene.graph.nodes.has("clue:CLUES_INVESTIGATOR"))
+	check("G2 办公室→证件一条线", scene._edge_layer.segment_count() == 1)
+	check("G2 TEC 提示把证件拖过去", _last_line(scene._tec).contains("调查员证"))
+	scene._on_card_selected(tut_cert_key)
 	check("G2 选中节点显示详情窗",
 		scene._detail_win != null and scene._detail_win.visible)
 	check("G2 详情窗压在 TEC 之上",
 		scene._detail_win.get_index() > scene._tec.get_index())
-	# 第②步不该再交节点给 TEC：TEC 口头纠正，不出系统 toast。
-	scene._apply_drop("tec-avatar", tut_actor_key)
-	check("G2 错拖不启动分析", not scene._tec.is_analyzing())
-	check("G2 错拖由 TEC 口头纠正", _last_line(scene._tec).contains("双击"))
+	# 证件已出现后再双击办公室不会重复产出。
+	scene._on_card_activated(tut_office_key)
+	check("G2 双击办公室不重复产证件",
+		scene.graph.nodes.size() == 2 and scene._tutorial_step == 1)
+	check("G2 双击后 TEC 仍指向证件", _last_line(scene._tec).contains("调查员证"))
+	scene._apply_drop("tec-avatar", tut_office_key)
+	check("G2 办公室不再交给 TEC", not scene._tec.is_analyzing())
+	check("G2 错拖由 TEC 口头纠正", _last_line(scene._tec).contains("调查员证"))
 	check("G2 错拖不弹系统 toast", not scene._toast_active)
 	scene._tec_talk()
-	check("G2 点 TEC 仍只指下一步", _last_line(scene._tec).contains("双击"))
-	# 双击线索不能调出证件：证件属于人物，TEC 只口头纠正，步骤和连线都不变。
-	scene._on_card_activated(tut_clue_key)
-	check("G2 双击线索不产出证件",
-		not scene._cards.has(tut_cert_key) and scene._tutorial_step == 1)
-	check("G2 双击线索仍指向人物", _last_line(scene._tec).contains("人物"))
-	check("G2 双击线索不改连线", scene._edge_layer.segment_count() == 1)
-	scene._on_card_activated(tut_actor_key)
-	check("G2 证件边与卡片同帧出现", scene._edge_layer.segment_count() == 2)
-	for i in 3:
-		await process_frame
-	check("G2 双击调查员节点产出证件节点",
-		scene._cards.has(tut_cert_key) and scene._tutorial_step == 2)
-	check("G2 证件连线来自调查员人物", scene.graph.has_edge(tut_actor_key, tut_cert_key))
-	check("G2 证件不再连到线索", not scene.graph.has_edge(tut_clue_key, tut_cert_key))
-	check("G2 人物→线索、人物→证件两条线", scene._edge_layer.segment_count() == 2)
-	check("G2 TEC 提示把证件拖过去", _last_line(scene._tec).contains("调查员证"))
-	scene._apply_drop("tec-avatar", tut_clue_key)
-	check("G2 线索不交给 TEC", not scene._tec.is_analyzing())
+	check("G2 点 TEC 仍只指证件", _last_line(scene._tec).contains("调查员证"))
 	scene._apply_drop("tec-avatar", tut_cert_key)
 	check("G2 证件拖给 TEC 开始分析", scene._tec.is_analyzing())
 	scene.dbg_tec_complete()
@@ -1677,7 +1638,7 @@ func _initialize() -> void:
 	check("G2 产出调查员证线索",
 		scene.graph.captured.has("CLUES_INVESTIGATOR_CERT") and scene._cards.has(tut_cert_clue_key))
 	check("G2 证书线索从证件连出", scene.graph.has_edge(tut_cert_key, tut_cert_clue_key))
-	check("G2 进入第③幕收纳", scene._tutorial_step == 3)
+	check("G2 进入第③幕收纳", scene._tutorial_step == 2)
 	check("G2 TEC 收尾台词", _last_line(scene._tec).contains("核对完成"))
 
 	# ── 第 3 幕：三枚 app 解锁 + 物品进袋 / 线索进册 ──
@@ -1699,7 +1660,7 @@ func _initialize() -> void:
 		scene._drop_outline.outline_rect().size == scene._bag_win.size - Vector2(20.0, 20.0))
 	scene._toggle_storage("BAG")
 	await process_frame
-	scene._update_drop_over(tut_actor_card.get_global_rect().get_center())
+	scene._update_drop_over(tut_office_card.get_global_rect().get_center())
 	check("G3 卡片目标也显示统一虚线框", scene._drop_outline.visible)
 	scene._update_drop_over(Vector2(8.0, 8.0))
 	check("G3 移出落点虚线框收起", not scene._drop_outline.visible)
@@ -1714,15 +1675,19 @@ func _initialize() -> void:
 	scene._apply_drop("clue-icon", tut_cert_key)
 	check("G3 物品不能进线索册", not scene.graph.stored.has(tut_cert_key))
 	check("G3 错收弹正常提示", scene._toast_active)
-	scene._apply_drop("bag-dock", tut_clue_key)
-	check("G3 线索不能进证物袋", not scene.graph.stored.has(tut_clue_key))
+	scene._apply_drop("bag-dock", tut_cert_clue_key)
+	check("G3 线索不能进证物袋", not scene.graph.stored.has(tut_cert_clue_key))
 	check("G3 错收仍弹正常提示", scene._toast_active)
 	check("G3 TEC 只提醒整理、不强制", _last_line(scene._tec).contains("不整理"))
+	# 非落点窗体也要拦截卡片，不能穿透去碰窗体下面的节点。
+	check("G3 非落点窗体拦截卡片",
+		scene._handle_card_drop(tut_cert_key, scene._detail_win.get_global_rect().get_center()))
+	check("G3 拦截后物品没被误收", not scene.graph.stored.has(tut_cert_key))
 	# 收纳是可选的：不把两样东西收起来，直接打开推演器也要能进入下一幕。
 	scene._toggle_matrix()
 	await process_frame
 	check("G3 不收纳也能打开推演器", scene._matrix_win != null)
-	check("G3 打开推演器即进入推演", scene._tutorial_step == 4)
+	check("G3 打开推演器即进入推演", scene._tutorial_step == 3)
 	check("G3 TEC 改指向已打开的桌布", _last_line(scene._tec).contains("桌布"))
 	scene._toggle_matrix()
 	await process_frame
@@ -1731,12 +1696,12 @@ func _initialize() -> void:
 	for i in 2:
 		await process_frame
 	check("G3 物品进证物袋", String(scene.graph.stored.get(tut_cert_key, "")) == GraphState.BAG)
-	scene._apply_drop("clue-icon", tut_clue_key)
+	scene._apply_drop("clue-icon", tut_cert_clue_key)
 	for i in 4:
 		await process_frame
-	check("G3 线索进线索册", String(scene.graph.stored.get(tut_clue_key, "")) == GraphState.LEDGER)
-	check("G3 收纳不改变当前步骤", scene._tutorial_step == 4)
-	check("G3 收纳重算后调查员仍可见", scene._cards[tut_actor_key].visible)
+	check("G3 线索进线索册", String(scene.graph.stored.get(tut_cert_clue_key, "")) == GraphState.LEDGER)
+	check("G3 收纳不改变当前步骤", scene._tutorial_step == 3)
+	check("G3 收纳重算后办公室仍可见", scene._cards[tut_office_key].visible)
 	check("G3 不自动打开推演器 / 线索册",
 		scene._matrix_win == null and scene._ledger_win == null)
 	check("G3 TEC 仍可拖动", scene._tec.dbg_drag_enabled())
@@ -1754,18 +1719,23 @@ func _initialize() -> void:
 	for i in 3:
 		await process_frame
 	check("G4 配方不齐不进入领证",
-		scene._tutorial_step == 4 and scene._tutorial_cert_win == null)
+		scene._tutorial_step == 3 and scene._tutorial_cert_win == null)
 	check("G4 桌布口头纠正",
 		scene._matrix_win.dbg_hint().contains("配方不对"))
-	scene._assign_to_matrix(tut_clue_key)
-	scene._assign_to_matrix(tut_cert_clue_key)
-	check("G4 两条线索上桌布", scene.graph.matrix_count() == 2)
+	var mx_target := Rect2()
+	for t in scene._drop_targets():
+		if String(t["id"]) == "mx-board":
+			mx_target = t["rect"]
+	check("G4 整扇推演窗都是线索落点", mx_target == scene._matrix_win.get_global_rect())
+	var mx_title: Vector2 = scene._matrix_win.get_global_rect().position + Vector2(40.0, 10.0)
+	check("G4 拖到推演器标题栏也归位", scene._handle_card_drop(tut_cert_clue_key, mx_title))
+	check("G4 单条调查员证线索上桌布", scene.graph.matrix_count() == 1)
 	check("G4 桌布提示长按", scene._matrix_win.dbg_hint().contains("长按"))
 	scene._matrix_win.finish_charge()
 	for i in 7:
 		await process_frame
 	check("G4 推演成功进入领证",
-		scene._tutorial_step == 5 and scene._tutorial_cert_win != null)
+		scene._tutorial_step == 4 and scene._tutorial_cert_win != null)
 	check("G4 桌布窗已收起", scene._matrix_win == null)
 
 	# ── 第 5 幕：姓名 / 编号 / 日期 / 照片 ──
@@ -1914,6 +1884,8 @@ func _blank_point_near(scene: Control, card: NodeCard) -> Vector2:
 				break
 		if not clear:
 			continue
+		if scene._floating_window_at(p) != null:
+			continue
 		for k in scene._cards.keys():
 			var c: NodeCard = scene._cards[k]
 			if c == card or not c.visible:
@@ -1923,7 +1895,7 @@ func _blank_point_near(scene: Control, card: NodeCard) -> Vector2:
 				break
 		if clear:
 			return p
-	return base + Vector2(-40, 30)
+	return _empty_canvas_point(scene)
 
 
 func _press(card: NodeCard, pos: Vector2) -> void:

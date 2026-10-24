@@ -29,16 +29,14 @@ const StartScreenScript := preload("res://ui/StartScreen.gd")
 ## 第 2 幕只在教学迷你案件里跑，不碰 A-001 的存档与节点。数据在
 ## `cases/tutorial/case.tres`；正式案件在第 6 幕选择后再装载。
 const TUTORIAL_CASE_PATH := "res://cases/tutorial/case.tres"
-const TUT_ACTOR_ID := "CHARS_INVESTIGATOR"
-const TUT_CLUE_ID := "CLUES_INVESTIGATOR"
+const TUT_OFFICE_ID := "SCENES_TEC_OFFICE"
 const TUT_CERT_ITEM_ID := "ITEMS_investigator_cert"
 const TUT_CERT_CLUE_ID := "CLUES_INVESTIGATOR_CERT"
 const TUT_ENDING_ID := "TUT_CERT"
 const CertWinScript := preload("res://scenes/windows/CertWin.gd")
 const PhotoWinScript := preload("res://scenes/windows/PhotoWin.gd")
 const DropOutlineScript := preload("res://ui/DropOutline.gd")
-const TUT_ACTOR_KEY := "char:" + TUT_ACTOR_ID
-const TUT_CLUE_KEY := "clue:" + TUT_CLUE_ID
+const TUT_OFFICE_KEY := "loc:" + TUT_OFFICE_ID
 const TUT_CERT_ITEM_KEY := "item:" + TUT_CERT_ITEM_ID
 const TUT_CERT_CLUE_KEY := "clue:" + TUT_CERT_CLUE_ID
 const TUT_CARD_X := 40.0
@@ -46,13 +44,12 @@ const TUT_CARD_STEP_X := 60.0
 const TUT_CARD_STEP_Y := 80.0
 
 enum TutorialStep {
-	DRAG_ACTOR,        # ① 把「调查员」拖给 TEC
-	DOUBLE_CLICK_CLUE, # ② 双击「调查员」线索
-	DRAG_CERT,         # ③ 把「调查员证」拖给 TEC
-	STORE_SUPPLIES,    # ④ 物品进证物袋、线索进线索册
-	INFER,             # ⑤ 两条线索上桌布 + 长按执行者
-	CERT_FORM,         # ⑥ 填写调查员证
-	CHOOSE_CASE,       # ⑦ 在案件地图里选 A-001
+	DOUBLE_CLICK_OFFICE, # ① 双击「TEC办公室」调出调查员证
+	DRAG_CERT,         # ② 把「调查员证」拖给 TEC
+	STORE_SUPPLIES,    # ③ 收纳可选提醒
+	INFER,             # ④ 单线索「调查员证」+ 长按执行者
+	CERT_FORM,         # ⑤ 填写调查员证
+	CHOOSE_CASE,       # ⑥ 在案件地图里选 A-001
 	DONE,
 }
 
@@ -183,8 +180,8 @@ var _inv_path := Investigator.PATH
 var _intro: IntroWin = null
 var _start_screen: Control = null
 var _tutorial_active := false
-var _tutorial_step := TutorialStep.DRAG_ACTOR
-var _tutorial_actor_key := ""
+var _tutorial_step := TutorialStep.DOUBLE_CLICK_OFFICE
+var _tutorial_office_key := ""
 var _tutorial_apps_unlocked := false
 var _tutorial_map_unlocked := false
 var _tutorial_cert_win: SysWindow = null
@@ -543,9 +540,11 @@ func _finish_sdrag(at: Vector2) -> void:
 	if _drop_on_matrix_icon(at) and String(n["kind"]) == "clue":
 		_assign_to_matrix(key)
 		return
-	if _matrix_win != null and is_instance_valid(_matrix_win) \
-		and _matrix_win.board_global_rect().has_point(at) and String(n["kind"]) == "clue":
+	if _matrix_win != null and is_instance_valid(_matrix_win) and _matrix_win.visible \
+		and _matrix_win.get_global_rect().has_point(at):
 		_assign_to_matrix(key)
+		return
+	if _floating_window_at(at) != null:
 		return
 	if not _stage.get_global_rect().has_point(at):
 		# 落在画布之外：什么都不做，东西留在原处（不吞节点）
@@ -2347,7 +2346,7 @@ func _on_start_new(overwrite: bool) -> void:
 ## 不启动正式案件、不出图标栏、不放诊断入口；教学用自己的迷你案件数据。
 func _begin_tutorial() -> void:
 	_tutorial_active = true
-	_tutorial_step = TutorialStep.DRAG_ACTOR
+	_tutorial_step = TutorialStep.DOUBLE_CLICK_OFFICE
 	_tutorial_apps_unlocked = false
 	_tutorial_map_unlocked = false
 	_tutorial_cert_win = null
@@ -2377,7 +2376,7 @@ func _begin_tutorial() -> void:
 	_tec.set_drag_enabled(true)
 	_tec.reset_tec()
 	_tec.append_line("欢迎来到 TEC，你将开始领取你的调查员证，以便展开工作。\n"
-		+ "桌面上是你的档案——把「调查员」拖到我身上。")
+		+ "桌面上是你的办公室——双击「TEC办公室」，把调查员证调出来。")
 	_tutorial_set_hint()
 
 	_view_k = 1.0
@@ -2385,7 +2384,7 @@ func _begin_tutorial() -> void:
 	_view_user = true
 	_apply_view()
 	_place_floating_windows()
-	_spawn_tutorial_actor()
+	_spawn_tutorial_office()
 	## 开场白落定后只做一次居中：之后 TEC 就是普通可拖窗，不再被重排拉回。
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -2412,15 +2411,15 @@ func _hide_tutorial_chrome() -> void:
 			c.visible = false
 
 
-func _spawn_tutorial_actor() -> void:
-	var n := graph.add_node("char", TUT_ACTOR_ID)
-	n["label"] = "调查员"
+func _spawn_tutorial_office() -> void:
+	var n := graph.add_node("loc", TUT_OFFICE_ID)
+	n["label"] = "TEC办公室"
 	n["always_visible"] = true
 	var pos := _tutorial_card_pos(0)
 	n["x"] = pos.x
 	n["y"] = pos.y
-	_tutorial_actor_key = String(n["key"])
-	var card := _spawn_card(_tutorial_actor_key)
+	_tutorial_office_key = String(n["key"])
+	var card := _spawn_card(_tutorial_office_key)
 	if card != null:
 		card.visible = true
 		card.position = pos
@@ -2480,16 +2479,14 @@ func _tutorial_set_hint() -> void:
 	if _tec == null:
 		return
 	match _tutorial_step:
-		TutorialStep.DRAG_ACTOR:
-			_tec.set_guidance("待命 · 等你的档案", "把「调查员」拖到我身上")
-		TutorialStep.DOUBLE_CLICK_CLUE:
-			_tec.set_guidance("待命 · 等你双击人物", "双击人物「调查员」调出证件")
+		TutorialStep.DOUBLE_CLICK_OFFICE:
+			_tec.set_guidance("待命 · 等办公室档案", "双击「TEC办公室」调出调查员证")
 		TutorialStep.DRAG_CERT:
 			_tec.set_guidance("待命 · 等你交证件", "把「调查员证」拖到我身上")
 		TutorialStep.STORE_SUPPLIES:
 			_tec.set_guidance("待命 · 整理可选", "收纳可选 · 双击推演器继续")
 		TutorialStep.INFER:
-			_tec.set_guidance("待命 · 等推演", "桌布拖入两条线索 · 长按执行者")
+			_tec.set_guidance("待命 · 等推演", "桌布放入调查员证 · 长按执行者")
 		TutorialStep.CERT_FORM:
 			_tec.set_guidance("待命 · 等你领证", "填写调查员证")
 		TutorialStep.CHOOSE_CASE:
@@ -2501,16 +2498,14 @@ func _tutorial_set_hint() -> void:
 ## 拖到 TEC 前的教学门：只放行当前步骤该交的节点；其余由 TEC 亲口纠正。
 func _tutorial_talk_line() -> String:
 	match _tutorial_step:
-		TutorialStep.DRAG_ACTOR:
-			return "把你的档案拖到我身上，我给你看看。"
-		TutorialStep.DOUBLE_CLICK_CLUE:
-			return "双击人物「调查员」节点，把证件调出来。"
+		TutorialStep.DOUBLE_CLICK_OFFICE:
+			return "双击桌上的「TEC办公室」，把调查员证调出来；拖给我只能看到它的提示。"
 		TutorialStep.DRAG_CERT:
 			return "把「调查员证」拖给我，我核对一下。"
 		TutorialStep.STORE_SUPPLIES:
 			return "桌面可以整理：物品放证物袋，线索放线索册。不想收也行，直接双击推演器。"
 		TutorialStep.INFER:
-			return "双击「推演器」开桌布；线索在册子里就双击「线索册」。挡住我的话拖开或点「–」收起。"
+			return "双击「推演器」开桌布，把「调查员证」拖上去，再长按执行者。挡住我的话拖开或点「–」收起。"
 		TutorialStep.CERT_FORM:
 			return "先把调查员证填完。"
 		TutorialStep.CHOOSE_CASE:
@@ -2521,12 +2516,10 @@ func _tutorial_talk_line() -> String:
 
 func _tutorial_tec_guard(key: String) -> bool:
 	match _tutorial_step:
-		TutorialStep.DRAG_ACTOR:
-			if key == TUT_ACTOR_KEY:
+		TutorialStep.DOUBLE_CLICK_OFFICE:
+			if key == TUT_OFFICE_KEY:
 				return true
-			_tutorial_say("先把「调查员」拖给我。")
-		TutorialStep.DOUBLE_CLICK_CLUE:
-			_tutorial_say("先双击人物「调查员」节点，把证件调出来。")
+			_tutorial_say("先把「TEC办公室」拖给我，我给你它的提示。")
 		TutorialStep.DRAG_CERT:
 			if key == TUT_CERT_ITEM_KEY:
 				return true
@@ -2534,7 +2527,7 @@ func _tutorial_tec_guard(key: String) -> bool:
 		TutorialStep.STORE_SUPPLIES:
 			_tutorial_say("桌面可以整理，但不是必须。收拾好就双击推演器；不想收也可以直接去。")
 		TutorialStep.INFER:
-			_tutorial_say("线索不要交给我——双击「推演器」打开桌布，把线索拖上去。")
+			_tutorial_say("线索不要交给我——双击「推演器」打开桌布，把「调查员证」拖上去。")
 		TutorialStep.CERT_FORM:
 			_tutorial_say("先把调查员证填完。")
 		TutorialStep.CHOOSE_CASE:
@@ -2544,41 +2537,29 @@ func _tutorial_tec_guard(key: String) -> bool:
 	return false
 
 
-## 双击的教学分支：人物「调查员」和线索「调查员」都能调出证件节点，
-## 避免桌面上两张同名卡让玩家猜哪一张才是正确的入口。
+## 证件由 TEC办公室本身产出；TEC 分析只给提示，不产出证件。
 func _tutorial_on_activate(key: String) -> bool:
-	if _tutorial_step == TutorialStep.DOUBLE_CLICK_CLUE:
-		if key == TUT_ACTOR_KEY:
-			var cert_key := _tutorial_spawn_node("item", TUT_CERT_ITEM_ID, 2)
-			## 证件是「人」的证件：连线从调查员人物节点出发，不从线索出发。
-			graph.link(TUT_ACTOR_KEY, cert_key, "entity")
-			_repaint_edges()
-			_tutorial_step = TutorialStep.DRAG_CERT
-			_tutorial_set_hint()
-			_tutorial_say("这是你的调查员证。把它拖给我，我核对一下。")
-			return true
-		if key == TUT_CLUE_KEY:
-			_tutorial_say("证件要从人物「调查员」调出——双击人物，不要双击线索。")
-			return true
-	elif _tutorial_step == TutorialStep.DRAG_CERT and (key == TUT_CLUE_KEY or key == TUT_ACTOR_KEY):
-		_tutorial_say("证件已经调出来了。把「调查员证」拖给我。")
+	if _tutorial_step == TutorialStep.DOUBLE_CLICK_OFFICE and key == TUT_OFFICE_KEY:
+		var cert_key := _tutorial_spawn_node("item", TUT_CERT_ITEM_ID, 1)
+		graph.link(TUT_OFFICE_KEY, cert_key, "entity")
+		_repaint_edges()
+		_tutorial_step = TutorialStep.DRAG_CERT
+		_tutorial_set_hint()
+		_tutorial_say("这是你的调查员证。把它拖给我，我核对一下。")
 		return true
-	elif _tutorial_step == TutorialStep.DRAG_ACTOR and key == TUT_ACTOR_KEY:
-		_tutorial_say("把它拖到我身上，不是双击。")
+	if _tutorial_step == TutorialStep.DRAG_CERT and (key == TUT_CERT_ITEM_KEY or key == TUT_OFFICE_KEY):
+		_tutorial_say("证件已经调出来了。把「调查员证」拖给我。")
 		return true
 	return false
 
 
-## TEC 分析完成：按步骤发线索，不走进正式案件的反应表。
+## TEC 分析只产生节点相关提示 / 线索；TEC办公室分析不会产出调查员证。
 func _tutorial_on_tec_done(key: String) -> bool:
-	if _tutorial_step == TutorialStep.DRAG_ACTOR and key == TUT_ACTOR_KEY:
-		_tutorial_spawn_clue(TUT_CLUE_ID, key, 1)
-		_tutorial_step = TutorialStep.DOUBLE_CLICK_CLUE
-		_tutorial_set_hint()
-		_tutorial_say("分析完成。这是「调查员」线索——双击人物「调查员」，把证件调出来。")
+	if _tutorial_step == TutorialStep.DOUBLE_CLICK_OFFICE and key == TUT_OFFICE_KEY:
+		_tutorial_say("TEC办公室：档案柜里有你的调查员证。双击办公室把它调出来，而不是拖给我。")
 		return true
 	if _tutorial_step == TutorialStep.DRAG_CERT and key == TUT_CERT_ITEM_KEY:
-		_tutorial_spawn_clue(TUT_CERT_CLUE_ID, key, 3)
+		_tutorial_spawn_clue(TUT_CERT_CLUE_ID, key, 2)
 		_tutorial_step = TutorialStep.STORE_SUPPLIES
 		_tutorial_unlock_apps()
 		_tutorial_set_hint()
@@ -2593,12 +2574,10 @@ func _tutorial_begin_infer() -> void:
 	## 不替玩家打开任何 app：双击「推演器」图标打开桌布，和正式案件完全同一条路径。
 	var opened := _matrix_win != null and is_instance_valid(_matrix_win)
 	if opened:
-		_tutorial_say("桌布已经打开了。把「调查员」和「调查员证」两条线索拖上去；"
-			+ "两条齐了再长按执行者。")
+		_tutorial_say("桌布已经打开了。把「调查员证」拖上去，长按执行者开始推演。")
 	else:
 		_tutorial_say("双击左边「推演器」打开桌布；如果 TEC 挡住，把我拖开或点「–」收起。"
-			+ "线索在册子里就双击「线索册」打开。把「调查员」和「调查员证」两条线索拖上去；"
-			+ "两条齐了再长按执行者。")
+			+ "把「调查员证」拖上桌布，长按执行者开始推演。")
 
 
 func _tutorial_on_matrix_changed() -> void:
@@ -2606,14 +2585,11 @@ func _tutorial_on_matrix_changed() -> void:
 		return
 	if _matrix_win == null or not is_instance_valid(_matrix_win):
 		return
-	var got := 0
-	for id in [TUT_CLUE_ID, TUT_CERT_CLUE_ID]:
-		if graph.matrix_has(String(id)):
-			got += 1
-	if got >= 2:
-		_matrix_win.set_hint("TEC：两条线索齐了。长按执行者，开始推演。")
+	var got := 1 if graph.matrix_has(TUT_CERT_CLUE_ID) else 0
+	if got >= 1:
+		_matrix_win.set_hint("TEC：线索齐了。长按执行者，开始推演。")
 	else:
-		_matrix_win.set_hint("TEC：还需要一条线索——「调查员」和「调查员证」都要上桌布。")
+		_matrix_win.set_hint("TEC：还需要「调查员证」——把它拖上桌布，然后长按执行者。")
 
 
 func _tutorial_on_inference_success(hit: EndingDef) -> void:
@@ -3540,8 +3516,10 @@ func _drop_targets() -> Array:
 		out.append({"id": "tec-dock", "rect": _tec.get_global_rect(), "inset": 10.0})
 	if _tec_chip != null and is_instance_valid(_tec_chip) and _tec_chip.visible:
 		out.append({"id": "tec-chip", "rect": _tec_chip.get_global_rect(), "inset": 2.0})
-	if _matrix_win != null and is_instance_valid(_matrix_win):
-		out.append({"id": "mx-board", "rect": _matrix_win.board_global_rect(), "inset": 4.0})
+	if _matrix_win != null and is_instance_valid(_matrix_win) and _matrix_win.visible:
+		## 整扇推演窗都是线索落点：拖到标题栏 / 板边也算交给当前窗口，
+		## 不再让卡片从窗体缝隙漏到下面的画布节点。
+		out.append({"id": "mx-board", "rect": _matrix_win.get_global_rect(), "inset": 10.0})
 	return out
 
 
@@ -3648,6 +3626,9 @@ func _handle_card_drop(key: String, at_global: Vector2) -> bool:
 		if (t["rect"] as Rect2).has_point(at_global):
 			_apply_drop(String(t["id"]), key)
 			return true
+	## 任何浮动窗都拦截卡片，哪怕它不是落点：松手弹回，不再穿透去和窗体下面的卡组合。
+	if _floating_window_at(at_global) != null:
+		return true
 	return false
 
 
@@ -3746,7 +3727,24 @@ func _center_on(card: NodeCard) -> void:
 
 
 ## 指针下面是哪张卡（world 顺序里最上面那张：从后往前找）
+## 指针下最上层的浮动窗（排除永远铺底的案件主窗）。卡片命中 / 落点都先过这一层，
+## 保证窗体不吃穿透：作用对象只能是当前窗口。
+func _floating_window_at(at_global: Vector2) -> SysWindow:
+	if _desk == null or not is_instance_valid(_desk):
+		return null
+	for i in range(_desk.get_child_count() - 1, -1, -1):
+		var w := _desk.get_child(i) as SysWindow
+		if w == null or not is_instance_valid(w) or not w.visible or w == _case_win:
+			continue
+		if w.get_global_rect().has_point(at_global):
+			return w
+	return null
+
+
 func _card_key_at(at_global: Vector2) -> String:
+	## 指针落在任何浮动窗上时，窗下的卡片不可被选中 / 当作组合目标。
+	if _floating_window_at(at_global) != null:
+		return ""
 	for i in range(_card_layer.get_child_count() - 1, -1, -1):
 		var card := _card_layer.get_child(i) as NodeCard
 		if card == null or not card.visible:
@@ -4279,6 +4277,9 @@ func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
 			_refresh_matrix_views()
 			_commit(before)
 		return
+	## 桌布线索引拖到别的窗体（不是线索册）时留在桌布上，不要穿透窗体掉到下面画布。
+	if _floating_window_at(at_global) != null:
+		return
 	_on_matrix_took(key, at_global)
 
 
@@ -4311,7 +4312,7 @@ func _run_inference() -> void:
 		if hit == null or hit.id != TUT_ENDING_ID:
 			if _matrix_win != null and is_instance_valid(_matrix_win):
 				_matrix_win.show_heartbroken()
-				_matrix_win.set_hint("TEC：配方不对——需要「调查员」+「调查员证」两条线索。")
+				_matrix_win.set_hint("TEC：配方不对——只需要「调查员证」一条线索。")
 			return
 		_tutorial_on_inference_success(hit)
 		return
@@ -4354,7 +4355,8 @@ func _sync_card_shell(card: NodeCard) -> void:
 	card.set_shell_state(graph.is_container_node(card.card_key),
 		graph.explored.has(id), graph.is_collapsed(id), bool(n.get("unread", false)),
 		graph.is_hub(String(n.get("kind", "")), id))
-	card.set_warn(graph.is_no_entry(card.card_key))
+	## 教学是线性引导，不挂「无文本入口」警告；TEC办公室尤其不该因为不需要叙事而被标红。
+	card.set_warn(not _tutorial_active and graph.is_no_entry(card.card_key))
 
 
 ## 供测试钩子 / 后续接线用：把当前选中的节点收进某个收纳处

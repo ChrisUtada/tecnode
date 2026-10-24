@@ -2,12 +2,11 @@
 
 [ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="1_end"]
 [ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_clue"]
-[ext_resource type="Resource" path="res://cases/tutorial/clues/CLUES_INVESTIGATOR.tres" id="3_c1"]
-[ext_resource type="Resource" path="res://cases/tutorial/clues/CLUES_INVESTIGATOR_CERT.tres" id="4_c2"]
+[ext_resource type="Resource" path="res://cases/tutorial/clues/CLUES_INVESTIGATOR_CERT.tres" id="3_cert"]
 
 [resource]
 script = ExtResource("1_end")
 id = "TUT_CERT"
 name = "调查员证"
-recipe = Array[ExtResource("2_clue")]([ExtResource("3_c1"), ExtResource("4_c2")])
-message = "两张线索在桌布上重合。档案上的人、尚未填写的证件，指向同一个结论：你已经有资格领取它了。"
+recipe = Array[ExtResource("2_clue")]([ExtResource("3_cert")])
+message = "「调查员证」在桌布上归位。档案上的人、尚未填写的证件，指向同一个结论：你已经有资格领取它了。"

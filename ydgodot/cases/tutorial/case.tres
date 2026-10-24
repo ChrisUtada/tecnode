@@ -1,22 +1,21 @@
 [gd_resource type="Resource" script_class="CaseDef" format=3]
 
 [ext_resource type="Script" path="res://core/defs/CaseDef.gd" id="1_case"]
-[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="2_char"]
-[ext_resource type="Resource" path="res://cases/tutorial/chars/CHARS_INVESTIGATOR.tres" id="3_inv"]
+[ext_resource type="Script" path="res://core/defs/SceneDef.gd" id="2_scene"]
+[ext_resource type="Resource" path="res://cases/tutorial/scenes/SCENES_TEC_OFFICE.tres" id="3_office"]
 [ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="4_clue"]
-[ext_resource type="Resource" path="res://cases/tutorial/clues/CLUES_INVESTIGATOR.tres" id="5_c1"]
-[ext_resource type="Resource" path="res://cases/tutorial/clues/CLUES_INVESTIGATOR_CERT.tres" id="6_c2"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="7_item"]
-[ext_resource type="Resource" path="res://cases/tutorial/items/ITEMS_investigator_cert.tres" id="8_cert"]
-[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="9_end"]
-[ext_resource type="Resource" path="res://cases/tutorial/endings/TUT_CERT.tres" id="10_tut"]
+[ext_resource type="Resource" path="res://cases/tutorial/clues/CLUES_INVESTIGATOR_CERT.tres" id="5_cert_clue"]
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="6_item"]
+[ext_resource type="Resource" path="res://cases/tutorial/items/ITEMS_investigator_cert.tres" id="7_cert_item"]
+[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="8_end"]
+[ext_resource type="Resource" path="res://cases/tutorial/endings/TUT_CERT.tres" id="9_tut"]
 
 [resource]
 script = ExtResource("1_case")
 id = "TUTORIAL"
 title = "调查员登记"
 now_label = "现在"
-chars = Array[ExtResource("2_char")]([ExtResource("3_inv")])
-items = Array[ExtResource("7_item")]([ExtResource("8_cert")])
-clues = Array[ExtResource("4_clue")]([ExtResource("5_c1"), ExtResource("6_c2")])
-endings = Array[ExtResource("9_end")]([ExtResource("10_tut")])
+scenes = Array[ExtResource("2_scene")]([ExtResource("3_office")])
+items = Array[ExtResource("6_item")]([ExtResource("7_cert_item")])
+clues = Array[ExtResource("4_clue")]([ExtResource("5_cert_clue")])
+endings = Array[ExtResource("8_end")]([ExtResource("9_tut")])
