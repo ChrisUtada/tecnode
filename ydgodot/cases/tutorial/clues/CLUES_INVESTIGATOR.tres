@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ClueDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_clue"]
+
+[resource]
+script = ExtResource("1_clue")
+id = "CLUES_INVESTIGATOR"
+label = "调查员"
+sense = "vision"
+desc = "档案上的人是你。姓名一栏还空着，证件号也尚未生成。"

@@ -1569,8 +1569,58 @@ func _initialize() -> void:
 			and not (scene.get_node("header/btn_调试") as Control).visible
 			and (scene.get_node("header/brand") as Control).visible)
 
+	# ── 第 2 幕：拖给 TEC → 双击线索 → 证件交给 TEC 核对 ──
+	var tut_actor_key := "char:CHARS_INVESTIGATOR"
+	var tut_clue_key := "clue:CLUES_INVESTIGATOR"
+	var tut_cert_key := "item:ITEMS_investigator_cert"
+	var tut_cert_clue_key := "clue:CLUES_INVESTIGATOR_CERT"
+	check("G2 从第①步开始", scene._tutorial_step == 0)
+	var tec_target := Rect2()
+	for t in scene._drop_targets():
+		if String(t["id"]) == "tec-dock":
+			tec_target = t["rect"]
+	check("G2 教学期整个 TEC 窗体都是落点", tec_target == scene._tec.get_global_rect())
+	scene._apply_drop("tec-avatar", tut_actor_key)
+	check("G2 调查员拖给 TEC 开始分析", scene._tec.is_analyzing())
+	scene.dbg_tec_complete()
+	for i in 6:
+		await process_frame
+	check("G2 产出调查员线索并上桌",
+		scene.graph.captured.has("CLUES_INVESTIGATOR") and scene._cards.has(tut_clue_key))
+	check("G2 线索卡带新标记", scene.graph.has_unread(tut_clue_key))
+	check("G2 TEC 提示双击线索", _last_line(scene._tec).contains("双击"))
+	# 第②步不该再交节点给 TEC：TEC 口头纠正，不出系统 toast。
+	scene._apply_drop("tec-avatar", tut_actor_key)
+	check("G2 错拖不启动分析", not scene._tec.is_analyzing())
+	check("G2 错拖由 TEC 口头纠正", _last_line(scene._tec).contains("双击"))
+	check("G2 错拖不弹系统 toast", not scene._toast_active)
+	scene._tec_talk()
+	check("G2 点 TEC 仍只指下一步", _last_line(scene._tec).contains("双击"))
+	scene._on_card_activated(tut_clue_key)
+	for i in 3:
+		await process_frame
+	check("G2 双击线索产出调查员证",
+		scene._cards.has(tut_cert_key) and scene._tutorial_step == 2)
+	check("G2 TEC 提示把证件拖过去", _last_line(scene._tec).contains("调查员证"))
+	scene._apply_drop("tec-avatar", tut_clue_key)
+	check("G2 线索不交给 TEC", not scene._tec.is_analyzing())
+	scene._apply_drop("tec-avatar", tut_cert_key)
+	check("G2 证件拖给 TEC 开始分析", scene._tec.is_analyzing())
+	scene.dbg_tec_complete()
+	for i in 6:
+		await process_frame
+	check("G2 产出调查员证线索",
+		scene.graph.captured.has("CLUES_INVESTIGATOR_CERT") and scene._cards.has(tut_cert_clue_key))
+	check("G2 第②幕完成", scene._tutorial_step == 3)
+	check("G2 TEC 收尾台词", _last_line(scene._tec).contains("核对完成"))
+
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)
+
+
+func _last_line(tec: TecWindow) -> String:
+	var lines := tec.dbg_lines()
+	return String(lines[lines.size() - 1]) if not lines.is_empty() else ""
 
 
 func _cards() -> Dictionary:

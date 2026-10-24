@@ -25,6 +25,29 @@ const WORLD_H := 1300.0
 const AUTOSAVE_DELAY_MSEC := 180
 const StartScreenScript := preload("res://ui/StartScreen.gd")
 
+## ── 开场教学（第 1–6 幕）───────────────────────────────────────────────────
+## 第 2 幕只在教学迷你案件里跑，不碰 A-001 的存档与节点。数据在
+## `cases/tutorial/case.tres`；正式案件在第 6 幕选择后再装载。
+const TUTORIAL_CASE_PATH := "res://cases/tutorial/case.tres"
+const TUT_ACTOR_ID := "CHARS_INVESTIGATOR"
+const TUT_CLUE_ID := "CLUES_INVESTIGATOR"
+const TUT_CERT_ITEM_ID := "ITEMS_investigator_cert"
+const TUT_CERT_CLUE_ID := "CLUES_INVESTIGATOR_CERT"
+const TUT_ACTOR_KEY := "char:" + TUT_ACTOR_ID
+const TUT_CLUE_KEY := "clue:" + TUT_CLUE_ID
+const TUT_CERT_ITEM_KEY := "item:" + TUT_CERT_ITEM_ID
+const TUT_CERT_CLUE_KEY := "clue:" + TUT_CERT_CLUE_ID
+const TUT_CARD_X := 40.0
+const TUT_CARD_STEP_X := 60.0
+const TUT_CARD_STEP_Y := 80.0
+
+enum TutorialStep {
+	DRAG_ACTOR,        # ① 把「调查员」拖给 TEC
+	DOUBLE_CLICK_CLUE, # ② 双击「调查员」线索
+	DRAG_CERT,         # ③ 把「调查员证」拖给 TEC
+	DONE,
+}
+
 ## 页眉几何 —— 逐项来自 Web 的计算布局（tools/pixeldiff/probe_web_rects.cjs 量的
 ## getBoundingClientRect），不是凭感觉的间距。改文案长度要同步改宽度，否则右侧按钮组会错位。
 const HDR_SUB := "节点原型 v2 · 案件 A-001"
@@ -154,6 +177,7 @@ var _inv_path := Investigator.PATH
 var _intro: IntroWin = null
 var _start_screen: Control = null
 var _tutorial_active := false
+var _tutorial_step := TutorialStep.DRAG_ACTOR
 var _tutorial_actor_key := ""
 var _inv_chip: Button = null
 var _cert_win: SysWindow = null
@@ -2134,10 +2158,18 @@ func _on_start_new(overwrite: bool) -> void:
 	_begin_tutorial()
 
 
-## 第 1 幕：空白桌面 + 常驻 TEC + 「调查员」节点。
-## 不启动案件、不出图标栏、不放诊断入口；玩家此刻只需要认识 TEC 和「把节点拖过去」。
+## 第 1–2 幕：空白桌面 + 常驻 TEC + 三步登记教学。
+## 不启动正式案件、不出图标栏、不放诊断入口；教学用自己的迷你案件数据。
 func _begin_tutorial() -> void:
 	_tutorial_active = true
+	_tutorial_step = TutorialStep.DRAG_ACTOR
+	var tutorial := CaseLoader.new(TUTORIAL_CASE_PATH)
+	if tutorial.load_case():
+		case_def = tutorial
+	else:
+		push_error("教学案件装载失败：" + tutorial.load_error)
+	## 教学期不写盘：第 5 幕完成领证后才写第一份档。
+	_save_enabled = false
 	_new_runtime()
 	_case_open = true
 	_case_win.visible = true
@@ -2155,7 +2187,9 @@ func _begin_tutorial() -> void:
 	if mini != null:
 		mini.visible = false
 	_tec.reset_tec()
-	_tec.append_line("欢迎来到 TEC，你将开始领取你的调查员证，以便展开工作。")
+	_tec.append_line("欢迎来到 TEC，你将开始领取你的调查员证，以便展开工作。\n"
+		+ "桌面上是你的档案——把「调查员」拖到我身上。")
+	_tutorial_set_hint()
 
 	_view_k = 1.0
 	_view_pos = Vector2.ZERO
@@ -2191,17 +2225,157 @@ func _hide_tutorial_chrome() -> void:
 
 
 func _spawn_tutorial_actor() -> void:
-	var key := "char:CHARS_INVESTIGATOR"
-	var n := graph.add_node("char", "CHARS_INVESTIGATOR")
+	var n := graph.add_node("char", TUT_ACTOR_ID)
 	n["label"] = "调查员"
-	n["x"] = 40.0
-	n["y"] = maxf(40.0, _stage.size.y - 144.0)
-	_tutorial_actor_key = key
-	var card := _spawn_card(key)
+	var pos := _tutorial_card_pos(0)
+	n["x"] = pos.x
+	n["y"] = pos.y
+	_tutorial_actor_key = String(n["key"])
+	var card := _spawn_card(_tutorial_actor_key)
 	if card != null:
 		card.visible = true
-		card.position = Vector2(float(n["x"]), float(n["y"]))
+		card.position = pos
 		_sync_card_shell(card)
+
+
+## 教学卡片沿左下角向上斜排：调查员 → 线索 → 证件 → 证件线索。
+func _tutorial_card_pos(layer: int) -> Vector2:
+	var y0 := maxf(40.0, _stage.size.y - 144.0)
+	## 阶梯在宽屏上向右展开；窄窗里 TEC 会占掉中间，必须把横向步长收窄到
+	## 卡片仍落在 TEC 左缘之外，否则最后一张线索会钻到 TEC 窗体底下。
+	var step_x := TUT_CARD_STEP_X
+	if _tec != null and _card_layer != null and _tec.visible:
+		var inv := _card_layer.get_global_transform().affine_inverse()
+		var tec_left := (inv * _tec.global_position).x
+		var max_x := tec_left - (GraphState.ENT_W + CARD_PAD * 2.0) - 12.0
+		step_x = minf(step_x, maxf(0.0, (max_x - TUT_CARD_X) / 3.0))
+	var x := TUT_CARD_X + step_x * float(layer)
+	var y := y0 - TUT_CARD_STEP_Y * float(layer)
+	x = minf(x, maxf(20.0, _stage.size.x - 160.0))
+	y = maxf(20.0, y)
+	return Vector2(x, y)
+
+
+func _tutorial_spawn_node(kind: String, id: String, layer: int) -> String:
+	var n := graph.add_node(kind, id)
+	var pos := _tutorial_card_pos(layer)
+	n["x"] = pos.x
+	n["y"] = pos.y
+	var key := String(n["key"])
+	graph.mark_fresh(key)
+	_refresh_or_spawn_card(key)
+	_relayout()
+	return key
+
+
+func _tutorial_spawn_clue(id: String, from_key: String, layer: int) -> String:
+	var key := graph.capture_clue(id, from_key)
+	var n := graph.node(key)
+	var pos := _tutorial_card_pos(layer)
+	n["x"] = pos.x
+	n["y"] = pos.y
+	graph.mark_fresh(key)
+	_refresh_or_spawn_card(key)
+	_relayout()
+	return key
+
+
+func _tutorial_say(text: String) -> void:
+	if _tec == null or not is_instance_valid(_tec):
+		return
+	_tec.append_line(text)
+	_recenter_tutorial_tec()
+
+
+## 教学 TEC 固定在画布中央：内容变高变矮都要重新居中，否则会向下长出画面中心。
+func _recenter_tutorial_tec() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if _tutorial_active and _tec != null and _tec.visible:
+		_place_floating_windows()
+
+
+func _tutorial_set_hint() -> void:
+	if _tec == null:
+		return
+	match _tutorial_step:
+		TutorialStep.DRAG_ACTOR:
+			_tec.set_guidance("待命 · 等你的档案", "把「调查员」拖到我身上")
+		TutorialStep.DOUBLE_CLICK_CLUE:
+			_tec.set_guidance("待命 · 等你双击线索", "双击「调查员」线索")
+		TutorialStep.DRAG_CERT:
+			_tec.set_guidance("待命 · 等你交证件", "把「调查员证」拖到我身上")
+		_:
+			_tec.set_guidance("待命 · 登记完成", "证件信息已核对")
+
+
+## 拖到 TEC 前的教学门：只放行当前步骤该交的节点；其余由 TEC 亲口纠正。
+func _tutorial_talk_line() -> String:
+	match _tutorial_step:
+		TutorialStep.DRAG_ACTOR:
+			return "把你的档案拖到我身上，我给你看看。"
+		TutorialStep.DOUBLE_CLICK_CLUE:
+			return "双击「调查员」线索，看看里面有什么。"
+		TutorialStep.DRAG_CERT:
+			return "把「调查员证」拖给我，我核对一下。"
+		_:
+			return "登记已经完成了。证件信息都齐了。"
+
+
+func _tutorial_tec_guard(key: String) -> bool:
+	match _tutorial_step:
+		TutorialStep.DRAG_ACTOR:
+			if key == TUT_ACTOR_KEY:
+				return true
+			_tutorial_say("先把「调查员」拖给我。")
+		TutorialStep.DOUBLE_CLICK_CLUE:
+			_tutorial_say("先双击「调查员」线索，看看里面有什么。")
+		TutorialStep.DRAG_CERT:
+			if key == TUT_CERT_ITEM_KEY:
+				return true
+			_tutorial_say("把「调查员证」拖给我。")
+		_:
+			_tutorial_say("证件已经核对完了。")
+	return false
+
+
+## 双击的教学分支：只有「调查员」线索会调出证件，其余给一句口头提示。
+func _tutorial_on_activate(key: String) -> bool:
+	if _tutorial_step == TutorialStep.DOUBLE_CLICK_CLUE:
+		if key == TUT_CLUE_KEY:
+			var cert_key := _tutorial_spawn_node("item", TUT_CERT_ITEM_ID, 2)
+			graph.link(TUT_CLUE_KEY, cert_key, "entity")
+			_tutorial_step = TutorialStep.DRAG_CERT
+			_tutorial_set_hint()
+			_tutorial_say("这是你的调查员证。把它拖给我，我核对一下。")
+			return true
+		if key == TUT_ACTOR_KEY:
+			_tutorial_say("双击不会把它交给我——把它拖过来。")
+			return true
+	elif _tutorial_step == TutorialStep.DRAG_CERT and key == TUT_CLUE_KEY:
+		_tutorial_say("证件已经调出来了。把「调查员证」拖给我。")
+		return true
+	elif _tutorial_step == TutorialStep.DRAG_ACTOR and key == TUT_ACTOR_KEY:
+		_tutorial_say("把它拖到我身上，不是双击。")
+		return true
+	return false
+
+
+## TEC 分析完成：按步骤发线索，不走进正式案件的反应表。
+func _tutorial_on_tec_done(key: String) -> bool:
+	if _tutorial_step == TutorialStep.DRAG_ACTOR and key == TUT_ACTOR_KEY:
+		_tutorial_spawn_clue(TUT_CLUE_ID, key, 1)
+		_tutorial_step = TutorialStep.DOUBLE_CLICK_CLUE
+		_tutorial_set_hint()
+		_tutorial_say("分析完成。这是「调查员」线索——双击它，看看能调出什么。")
+		return true
+	if _tutorial_step == TutorialStep.DRAG_CERT and key == TUT_CERT_ITEM_KEY:
+		_tutorial_spawn_clue(TUT_CERT_CLUE_ID, key, 3)
+		_tutorial_step = TutorialStep.DONE
+		_tutorial_set_hint()
+		_tutorial_say("核对完成。证件信息已经齐了。")
+		return true
+	return false
 
 
 func _on_start_continue() -> void:
@@ -2904,7 +3078,10 @@ func _drop_targets() -> Array:
 		if ic != null and ic.is_visible_in_tree():
 			out.append({"id": String(pair[0]), "rect": ic.get_global_rect()})
 	if _tec != null and is_instance_valid(_tec) and _tec.visible:
-		out.append({"id": "tec-avatar", "rect": _tec.avatar_global_rect()})
+		## 教学期 TEC 就是「角色」：整个窗体都接拖拽，玩家不必精准命中头像。
+		## 正式案件仍只认头像，避免挡住 TEC 窗后面的画布操作。
+		out.append({"id": "tec-dock" if _tutorial_active else "tec-avatar",
+			"rect": _tec.get_global_rect() if _tutorial_active else _tec.avatar_global_rect()})
 	if _tec_chip != null and is_instance_valid(_tec_chip) and _tec_chip.visible:
 		out.append({"id": "tec-chip", "rect": _tec_chip.get_global_rect()})
 	if _matrix_win != null and is_instance_valid(_matrix_win):
@@ -3151,6 +3328,8 @@ func _card_key_at(at_global: Vector2) -> String:
 func _on_card_activated(key: String) -> void:
 	var n := graph.node(key)
 	if n.is_empty():
+		return
+	if _tutorial_active and _tutorial_on_activate(key):
 		return
 	var id := String(n["id"])
 	# 线索：双击 = 捕获（Web `runPrimary` 的第一支）。**不跑命令、不弹提示条**，
@@ -4322,7 +4501,10 @@ func _relayout(animated := false, force := false) -> void:
 	var sig := _layout_signature()
 	if force or sig != _layout_sig:
 		_layout_sig = sig
-		_layout_force(animated)
+		if _tutorial_active:
+			_layout_tutorial()
+		else:
+			_layout_force(animated)
 		## 自动档才重框；玩家自己调过镜头（滚轮 / 拖空白 / 定位某张卡）就别动他的视野，
 		## 否则每加一个节点、镜头就被拉开一次 —— 刚放大到某张卡细看时会像「被抢走」。
 		if _opt_reveal and not _view_user:
@@ -4332,6 +4514,20 @@ func _relayout(animated := false, force := false) -> void:
 	_repaint_edges()
 	_reanchor_mem_card()
 	_sync_matrix_occlusion()
+
+
+## 教学桌面不做力导向：三张卡是 TEC 亲手摆的教学道具，位置必须稳定可预期，
+## 否则刚生成的线索会被弹簧/斥力推到画布边上，玩家根本找不到。
+func _layout_tutorial() -> void:
+	for key in _cards.keys():
+		var card: NodeCard = _cards[key]
+		if card == null or not card.visible:
+			continue
+		_kill_move(String(key))
+		var n := graph.node(String(key))
+		var p := Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
+		card.set_home_silent(p)
+		card.position = p
 
 
 ## 力导向：斥力 30000/d²、最小间距 R_a+R_b+14、弹簧 rest 185/300/150、向心 0.0022，260 轮。
@@ -4625,11 +4821,16 @@ func _start_tec_analysis(key: String) -> bool:
 	var n := graph.node(key)
 	if n.is_empty():
 		return false
+	if _tec.is_analyzing():
+		if _tutorial_active:
+			_tutorial_say("让我先看完这个。")
+		else:
+			_show_toast("TEC 正在分析中，请稍候…", true)
+		return false
+	if _tutorial_active and not _tutorial_tec_guard(key):
+		return false
 	if String(n["kind"]) == "clue":
 		_show_toast("线索节点不需要再让 TEC 分析", true)
-		return false
-	if _tec.is_analyzing():
-		_show_toast("TEC 正在分析中，请稍候…", true)
 		return false
 	if not _tec.visible and not _tec_min:
 		_open_tec()
@@ -4760,6 +4961,9 @@ func _tec_talk() -> void:
 		return
 	if not _tec.visible:
 		_open_tec()
+	if _tutorial_active:
+		_tutorial_say(_tutorial_talk_line())
+		return
 	var tec := case_def.char_of("CHARS_TEC")
 	var queue: Array = tec.talk_queue if tec != null else []
 	if queue.is_empty():
@@ -4775,6 +4979,9 @@ func _tec_talk() -> void:
 
 func _on_tec_analysis_done(target: String) -> void:
 	var key := _tec_key(target)
+	if _tutorial_active and _tutorial_on_tec_done(key):
+		_tec_before = {}
+		return
 	var n := graph.node(key)
 	if n.is_empty():
 		_tec_before = {}

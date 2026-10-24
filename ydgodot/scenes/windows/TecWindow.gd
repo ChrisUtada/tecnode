@@ -175,6 +175,14 @@ func _idle_text() -> String:
 	return "待命 · 拖一个节点到我身上"
 
 
+## 教学期由 Desktop 接管状态行与底边提示：只指下一步，不一次灌输全部操作。
+func set_guidance(status: String, hint: String) -> void:
+	if _status != null and not _analyzing:
+		_status.text = status
+	if _hint != null:
+		_hint.text = hint
+
+
 ## 截图 / 演示用：把已落下的台词一次性揭示完，避免画面停在半个字上。
 func finish_typing() -> void:
 	for c in _lines.get_children():

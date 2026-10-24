@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="1_item"]
+
+[resource]
+script = ExtResource("1_item")
+id = "ITEMS_investigator_cert"
+label = "调查员证"
+desc = "一张尚未填写的调查员证。姓名、编号、日期、照片都还空着。"
