@@ -2333,6 +2333,7 @@ func _hide_tutorial_chrome() -> void:
 func _spawn_tutorial_actor() -> void:
 	var n := graph.add_node("char", TUT_ACTOR_ID)
 	n["label"] = "调查员"
+	n["always_visible"] = true
 	var pos := _tutorial_card_pos(0)
 	n["x"] = pos.x
 	n["y"] = pos.y
@@ -2341,6 +2342,7 @@ func _spawn_tutorial_actor() -> void:
 	if card != null:
 		card.visible = true
 		card.position = pos
+		card.set_home_silent(pos)
 		_sync_card_shell(card)
 
 

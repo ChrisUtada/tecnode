@@ -1598,8 +1598,19 @@ func _initialize() -> void:
 		if String(t["id"]) == "tec-avatar":
 			tec_target = t["rect"]
 	check("G2 TEC 头像落点与正式模式一致", tec_target == scene._tec.avatar_global_rect())
-	scene._apply_drop("tec-avatar", tut_actor_key)
+	# 用真实鼠标事件走完拖拽收尾，回归「拖到 TEC 后节点被 visible_node 藏掉」。
+	var tut_actor_card: NodeCard = scene._cards[tut_actor_key]
+	var actor_from: Vector2 = tut_actor_card.get_global_rect().get_center()
+	var actor_to: Vector2 = scene._tec.avatar_global_rect().get_center()
+	_press(tut_actor_card, actor_from)
+	_motion(tut_actor_card, actor_to)
+	_release(tut_actor_card, actor_to)
+	await process_frame
 	check("G2 调查员拖给 TEC 开始分析", scene._tec.is_analyzing())
+	check("G2 拖给 TEC 后调查员节点仍在", tut_actor_card.visible)
+	var actor_node: Dictionary = scene.graph.node(tut_actor_key)
+	check("G2 调查员拖拽回位锚点正确",
+		tut_actor_card._home == Vector2(float(actor_node["x"]), float(actor_node["y"])))
 	scene.dbg_tec_complete()
 	for i in 6:
 		await process_frame
@@ -1655,6 +1666,7 @@ func _initialize() -> void:
 	check("G3 物品进证物袋", String(scene.graph.stored.get(tut_cert_key, "")) == GraphState.BAG)
 	check("G3 收纳后仍未完成第③幕", scene._tutorial_step == 3)
 	check("G3 TEC 提示还差线索", _last_line(scene._tec).contains("线索"))
+	check("G3 收纳重算后调查员仍可见", scene._cards[tut_actor_key].visible)
 	scene._apply_drop("clue-icon", tut_clue_key)
 	for i in 4:
 		await process_frame

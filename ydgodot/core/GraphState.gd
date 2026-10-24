@@ -522,6 +522,10 @@ func char_now_met(id: String) -> bool:
 func visible_node(n: Dictionary) -> bool:
 	if n.is_empty() or hidden.has(String(n["key"])) or stored.has(String(n["key"])):
 		return false
+	## 没有场景上下文的常驻节点（例如教学期由 TEC 直接调出的「调查员」人物）：
+	## 显式豁免「必须在已探索场景里」的判定，避免拖拽收尾 / 收纳重算把它藏掉。
+	if bool(n.get("always_visible", false)):
+		return true
 	if String(n["kind"]) == "char":
 		var id := String(n["id"])
 		if not char_debuted(id):
