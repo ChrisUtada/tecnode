@@ -1570,8 +1570,24 @@ func _initialize() -> void:
 		not (scene.get_node("header/btn_撤销") as Control).visible
 			and not (scene.get_node("header/btn_调试") as Control).visible
 			and (scene.get_node("header/brand") as Control).visible)
+	check("G1 TEC 与普通窗一样可拖 / 可关",
+		scene._tec.dbg_drag_enabled()
+			and (scene._tec.get_node("bar/close") as Control).visible
+			and (scene._tec.get_node("bar/min") as Control).visible)
+	var tec_home: Vector2 = scene._tec.position
+	scene._tec.position = Vector2(40, 120)
+	scene._place_floating_windows()
+	check("G1 TEC 拖动后不被重排拉回", scene._tec.position == Vector2(40, 120))
+	scene._tec.position = tec_home
+	scene._place_floating_windows()
+	scene._close_tec()
+	await process_frame
+	check("G1 关掉 TEC 后出现 TEC 图标", scene._icon_by_app("tec").visible)
+	scene._open_tec()
+	await process_frame
+	check("G1 重开 TEC 后图标收起", not scene._icon_by_app("tec").visible)
 
-	# ── 第 2 幕：拖给 TEC → 双击线索 → 证件交给 TEC 核对 ──
+	# ── 第 2 幕：拖给 TEC → 双击调查员节点 → 证件交给 TEC 核对 ──
 	var tut_actor_key := "char:CHARS_INVESTIGATOR"
 	var tut_clue_key := "clue:CLUES_INVESTIGATOR"
 	var tut_cert_key := "item:ITEMS_investigator_cert"
@@ -1579,9 +1595,9 @@ func _initialize() -> void:
 	check("G2 从第①步开始", scene._tutorial_step == 0)
 	var tec_target := Rect2()
 	for t in scene._drop_targets():
-		if String(t["id"]) == "tec-dock":
+		if String(t["id"]) == "tec-avatar":
 			tec_target = t["rect"]
-	check("G2 教学期整个 TEC 窗体都是落点", tec_target == scene._tec.get_global_rect())
+	check("G2 TEC 头像落点与正式模式一致", tec_target == scene._tec.avatar_global_rect())
 	scene._apply_drop("tec-avatar", tut_actor_key)
 	check("G2 调查员拖给 TEC 开始分析", scene._tec.is_analyzing())
 	scene.dbg_tec_complete()
@@ -1590,7 +1606,7 @@ func _initialize() -> void:
 	check("G2 产出调查员线索并上桌",
 		scene.graph.captured.has("CLUES_INVESTIGATOR") and scene._cards.has(tut_clue_key))
 	check("G2 线索卡带新标记", scene.graph.has_unread(tut_clue_key))
-	check("G2 TEC 提示双击线索", _last_line(scene._tec).contains("双击"))
+	check("G2 TEC 提示双击节点", _last_line(scene._tec).contains("双击"))
 	# 第②步不该再交节点给 TEC：TEC 口头纠正，不出系统 toast。
 	scene._apply_drop("tec-avatar", tut_actor_key)
 	check("G2 错拖不启动分析", not scene._tec.is_analyzing())
@@ -1598,10 +1614,10 @@ func _initialize() -> void:
 	check("G2 错拖不弹系统 toast", not scene._toast_active)
 	scene._tec_talk()
 	check("G2 点 TEC 仍只指下一步", _last_line(scene._tec).contains("双击"))
-	scene._on_card_activated(tut_clue_key)
+	scene._on_card_activated(tut_actor_key)
 	for i in 3:
 		await process_frame
-	check("G2 双击线索产出调查员证",
+	check("G2 双击调查员节点产出证件节点",
 		scene._cards.has(tut_cert_key) and scene._tutorial_step == 2)
 	check("G2 TEC 提示把证件拖过去", _last_line(scene._tec).contains("调查员证"))
 	scene._apply_drop("tec-avatar", tut_clue_key)
@@ -1620,8 +1636,8 @@ func _initialize() -> void:
 	check("G3 图标栏解锁",
 		scene._icon_layer().visible and scene._icon_by_app("bag").visible
 			and scene._icon_by_app("clue").visible and scene._icon_by_app("infer").visible)
-	check("G3 只解锁三枚（地图 / TEC / 档案未出）",
-		not scene._icon_by_app("map").visible and not scene._icon_by_app("tec").visible
+	check("G3 地图 / 档案未出，TEC 图标按普通 app 常驻",
+		not scene._icon_by_app("map").visible and scene._icon_by_app("tec").visible
 			and not scene._icon_by_app("goto").visible)
 	# 错收：物品不能进线索册，线索不能进证物袋，未收纳完不能上推演桌布。
 	scene._apply_drop("clue-icon", tut_cert_key)
@@ -1644,14 +1660,19 @@ func _initialize() -> void:
 		await process_frame
 	check("G3 线索进线索册", String(scene.graph.stored.get(tut_clue_key, "")) == GraphState.LEDGER)
 	check("G3 第③幕完成进入推演", scene._tutorial_step == 4)
-	check("G3 另一条线索一并进册",
-		String(scene.graph.stored.get(tut_cert_clue_key, "")) == GraphState.LEDGER)
-	check("G3 推演桌布与线索册打开",
-		scene._matrix_win != null and scene._ledger_win != null)
-	check("G3 桌布提示还差一条",
-		scene._matrix_win.dbg_hint().contains("还需要"))
+	check("G3 不自动打开推演器 / 线索册",
+		scene._matrix_win == null and scene._ledger_win == null)
+	check("G3 TEC 仍可拖动", scene._tec.dbg_drag_enabled())
 
-	# ── 第 4 幕：两条线索上桌布 + 长按执行者 ──
+	# ── 第 4 幕：玩家自己双击推演器 / 线索册，再上桌布 ──
+	scene._toggle_matrix()
+	scene._toggle_storage(GraphState.LEDGER)
+	for i in 2:
+		await process_frame
+	check("G4 双击推演器打开桌布", scene._matrix_win != null)
+	check("G4 线索册按普通 app 打开", scene._ledger_win != null)
+	check("G4 桌布提示还差一条",
+		scene._matrix_win.dbg_hint().contains("还需要"))
 	scene._matrix_win.finish_charge()
 	for i in 3:
 		await process_frame
@@ -1736,6 +1757,25 @@ func _initialize() -> void:
 	check("G6 TEC 控件恢复",
 		(scene._tec.get_node("bar/close") as Control).visible
 			and (scene._tec.get_node("bar/min") as Control).visible)
+
+	# 签发后的证件复核：内容不溢出，并能更换照片。
+	scene._open_cert_review()
+	await process_frame
+	var review = scene._cert_win
+	check("G6 证件复核窗打开", review != null)
+	check("G6 证件内容不溢出窗框",
+		review != null and review.content.get_combined_minimum_size().y <= review.body.size.y + 1.0)
+	var change_photo := review.find_child("cert_change_photo", true, false) as Button
+	check("G6 有更换照片入口", change_photo != null)
+	if change_photo != null:
+		change_photo.pressed.emit()
+	await process_frame
+	check("G6 更换照片窗打开", scene._photo_win != null)
+	var picker = scene._photo_win
+	if picker != null:
+		picker.dbg_pick("CHARS_ANON")
+	await process_frame
+	check("G6 照片写进证件", scene._investigator.get("avatarId", "") == "CHARS_ANON")
 	Investigator.clear(scene._inv_path)
 
 	print("=== %d 项，失败 %d ===" % [total, fails])

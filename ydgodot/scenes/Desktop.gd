@@ -35,6 +35,7 @@ const TUT_CERT_ITEM_ID := "ITEMS_investigator_cert"
 const TUT_CERT_CLUE_ID := "CLUES_INVESTIGATOR_CERT"
 const TUT_ENDING_ID := "TUT_CERT"
 const CertWinScript := preload("res://scenes/windows/CertWin.gd")
+const PhotoWinScript := preload("res://scenes/windows/PhotoWin.gd")
 const TUT_ACTOR_KEY := "char:" + TUT_ACTOR_ID
 const TUT_CLUE_KEY := "clue:" + TUT_CLUE_ID
 const TUT_CERT_ITEM_KEY := "item:" + TUT_CERT_ITEM_ID
@@ -190,6 +191,10 @@ var _tutorial_map_unlocked := false
 var _tutorial_item_stored := false
 var _tutorial_clue_stored := false
 var _tutorial_cert_win: SysWindow = null
+var _tutorial_tec_placed := false
+var _tutorial_tec_icon_visible := false
+var _tutorial_map_arranged := false
+var _photo_win: SysWindow = null
 var _inv_chip: Button = null
 var _cert_win: SysWindow = null
 var _catalog: CaseCatalog = null
@@ -1296,6 +1301,10 @@ func _refresh_tutorial_icons() -> void:
 		allowed = {"clue": true, "bag": true, "infer": true}
 		if _tutorial_map_unlocked:
 			allowed["map"] = true
+	## TEC 是普通 app：应用栏解锁后它一直有图标；应用栏还没解锁时，
+	## 只在 TEC 被关掉 / 最小化后露出来，保证玩家能把它叫回来。
+	if _tutorial_tec_icon_visible or _tutorial_apps_unlocked:
+		allowed["tec"] = true
 	for app in ["infer", "goto", "clue", "people", "bag", "tec", "log", "map", "music", "garden"]:
 		var b := _icon_by_app(app)
 		if b != null:
@@ -1613,9 +1622,12 @@ func _place_floating_windows() -> void:
 	var vw := _vw()
 	if _tec != null and is_instance_valid(_tec):
 		if _tutorial_active:
-			_tec.position = Vector2(
-				maxf(14.0, (vw - _tec.size.x) * 0.5),
-				maxf(14.0, (desk_h - _tec.size.y) * 0.5 - 24.0))
+			## 只在第一次摆位时居中；之后 TEC 是普通窗口，玩家拖到哪就留在哪。
+			if not _tutorial_tec_placed:
+				_tec.position = Vector2(
+					maxf(14.0, (vw - _tec.size.x) * 0.5),
+					maxf(14.0, (desk_h - _tec.size.y) * 0.5 - 24.0))
+				_tutorial_tec_placed = true
 		else:
 			_tec.position = Vector2(minf(906.0, vw - 14.0 - _tec.size.x),
 				minf(264.0, desk_h - 14.0 - _tec.size.y))
@@ -1655,36 +1667,7 @@ func _place_floating_windows() -> void:
 			maxf(14.0, minf(380.0, vw - 14.0 - _garden_win.size.x)),
 			maxf(14.0, minf(58.0, desk_h - 14.0 - _garden_win.size.y)))
 
-	## 教学第 4 幕：矩阵在左、线索册在右，TEC 先收起来，桌布不被压在窗体下面。
-	if _tutorial_active and _matrix_win != null and is_instance_valid(_matrix_win) \
-			and _matrix_win.visible:
-		## 留出最左侧 86px 的图标栏；桌布 + 线索册作为一组居中，窄窗也不互相压。
-		var gap := 8.0
-		var led_w := 0.0
-		if _ledger_win != null and is_instance_valid(_ledger_win) and _ledger_win.visible:
-			led_w = _ledger_win.size.x + gap
-		var total_w := _matrix_win.size.x + led_w
-		var mx_x := maxf(84.0, (vw - total_w) * 0.5)
-		var mx_y := maxf(4.0, minf(40.0, desk_h - 4.0 - _matrix_win.size.y))
-		_matrix_win.position = Vector2(mx_x, mx_y)
-		if led_w > 0.0:
-			_ledger_win.position = Vector2(
-				mx_x + _matrix_win.size.x + gap,
-				maxf(14.0, minf(60.0, desk_h - 14.0 - _ledger_win.size.y)))
 
-	## 教学第 6 幕：案件地图在左、TEC 在右，两个窗体并排读。
-	if _tutorial_active and _map_win != null and is_instance_valid(_map_win) \
-			and _map_win.visible:
-		var gap := 16.0
-		var tec_w := _tec.size.x if _tec != null and _tec.visible else 0.0
-		var total_w := _map_win.size.x + tec_w + (gap if tec_w > 0.0 else 0.0)
-		## 同样留出图标栏：地图不能压住左侧「案件地图」这枚图标。
-		var left := maxf(96.0, (vw - total_w) * 0.5)
-		_map_win.position = Vector2(left,
-			maxf(14.0, minf(72.0, desk_h - 14.0 - _map_win.size.y)))
-		if _tec != null and _tec.visible:
-			_tec.position = Vector2(left + _map_win.size.x + gap,
-				maxf(14.0, (desk_h - _tec.size.y) * 0.5 - 24.0))
 
 
 func _minimize_music() -> void:
@@ -2286,6 +2269,9 @@ func _begin_tutorial() -> void:
 	_tutorial_item_stored = false
 	_tutorial_clue_stored = false
 	_tutorial_cert_win = null
+	_tutorial_tec_placed = false
+	_tutorial_tec_icon_visible = false
+	_tutorial_map_arranged = false
 	## 新调查从领证开始：不要把上一次的调查员证带进来。
 	Investigator.clear(_inv_path)
 	_investigator = {}
@@ -2305,13 +2291,8 @@ func _begin_tutorial() -> void:
 
 	_tec.visible = true
 	_place_z(_tec, ZR_TEC)
-	_tec.set_drag_enabled(false)
-	var close := _tec.get_node_or_null("bar/close") as Control
-	var mini := _tec.get_node_or_null("bar/min") as Control
-	if close != null:
-		close.visible = false
-	if mini != null:
-		mini.visible = false
+	## TEC 和普通 app 窗一样：可拖、可关、可最小化；关掉后左侧会出现 TEC 图标。
+	_tec.set_drag_enabled(true)
 	_tec.reset_tec()
 	_tec.append_line("欢迎来到 TEC，你将开始领取你的调查员证，以便展开工作。\n"
 		+ "桌面上是你的档案——把「调查员」拖到我身上。")
@@ -2323,17 +2304,16 @@ func _begin_tutorial() -> void:
 	_apply_view()
 	_place_floating_windows()
 	_spawn_tutorial_actor()
-	## TEC 的内容高度会在一帧后落定；再等一帧重新居中，避免它缩高后偏下。
+	## 开场白落定后只做一次居中：之后 TEC 就是普通可拖窗，不再被重排拉回。
 	await get_tree().process_frame
 	await get_tree().process_frame
-	if _tutorial_active:
+	if _tutorial_active and _tec != null and _tec.visible:
+		_tutorial_tec_placed = false
 		_place_floating_windows()
 
 
 func _hide_tutorial_chrome() -> void:
-	var icons := _icon_layer()
-	if icons != null:
-		icons.visible = false
+	_refresh_tutorial_icons()
 	for n in ["btn_撤销", "btn_调试"]:
 		var b := _head.get_node_or_null(n) as Control
 		if b != null:
@@ -2410,15 +2390,6 @@ func _tutorial_say(text: String) -> void:
 	if _tec == null or not is_instance_valid(_tec):
 		return
 	_tec.append_line(text)
-	_recenter_tutorial_tec()
-
-
-## 教学 TEC 固定在画布中央：内容变高变矮都要重新居中，否则会向下长出画面中心。
-func _recenter_tutorial_tec() -> void:
-	await get_tree().process_frame
-	await get_tree().process_frame
-	if _tutorial_active and _tec != null and _tec.visible:
-		_place_floating_windows()
 
 
 func _tutorial_set_hint() -> void:
@@ -2428,13 +2399,13 @@ func _tutorial_set_hint() -> void:
 		TutorialStep.DRAG_ACTOR:
 			_tec.set_guidance("待命 · 等你的档案", "把「调查员」拖到我身上")
 		TutorialStep.DOUBLE_CLICK_CLUE:
-			_tec.set_guidance("待命 · 等你双击线索", "双击「调查员」线索")
+			_tec.set_guidance("待命 · 等你双击节点", "双击「调查员」节点调出证件")
 		TutorialStep.DRAG_CERT:
 			_tec.set_guidance("待命 · 等你交证件", "把「调查员证」拖到我身上")
 		TutorialStep.STORE_SUPPLIES:
 			_tec.set_guidance("待命 · 整理桌面", "物品 → 证物袋 · 线索 → 线索册")
 		TutorialStep.INFER:
-			_tec.set_guidance("待命 · 等推演", "线索拖上桌布 · 长按执行者")
+			_tec.set_guidance("待命 · 等推演", "双击推演器 · TEC 可拖开/收起")
 		TutorialStep.CERT_FORM:
 			_tec.set_guidance("待命 · 等你领证", "填写调查员证")
 		TutorialStep.CHOOSE_CASE:
@@ -2449,13 +2420,13 @@ func _tutorial_talk_line() -> String:
 		TutorialStep.DRAG_ACTOR:
 			return "把你的档案拖到我身上，我给你看看。"
 		TutorialStep.DOUBLE_CLICK_CLUE:
-			return "双击「调查员」线索，看看里面有什么。"
+			return "双击「调查员」节点，把证件调出来。"
 		TutorialStep.DRAG_CERT:
 			return "把「调查员证」拖给我，我核对一下。"
 		TutorialStep.STORE_SUPPLIES:
 			return "物品放进证物袋，线索放进线索册。先把桌面收好。"
 		TutorialStep.INFER:
-			return "把两条线索拖上推演器桌布，然后长按执行者。"
+			return "双击「推演器」开桌布；线索在册子里就双击「线索册」。挡住我的话拖开或点「–」收起。"
 		TutorialStep.CERT_FORM:
 			return "先把调查员证填完。"
 		TutorialStep.CHOOSE_CASE:
@@ -2471,7 +2442,7 @@ func _tutorial_tec_guard(key: String) -> bool:
 				return true
 			_tutorial_say("先把「调查员」拖给我。")
 		TutorialStep.DOUBLE_CLICK_CLUE:
-			_tutorial_say("先双击「调查员」线索，看看里面有什么。")
+			_tutorial_say("先双击「调查员」节点，把证件调出来。")
 		TutorialStep.DRAG_CERT:
 			if key == TUT_CERT_ITEM_KEY:
 				return true
@@ -2479,7 +2450,7 @@ func _tutorial_tec_guard(key: String) -> bool:
 		TutorialStep.STORE_SUPPLIES:
 			_tutorial_say("先把桌面收好：物品进证物袋，线索进线索册。")
 		TutorialStep.INFER:
-			_tutorial_say("线索不要交给我——拖进推演器桌布，再长按执行者。")
+			_tutorial_say("线索不要交给我——双击「推演器」打开桌布，把线索拖上去。")
 		TutorialStep.CERT_FORM:
 			_tutorial_say("先把调查员证填完。")
 		TutorialStep.CHOOSE_CASE:
@@ -2489,20 +2460,18 @@ func _tutorial_tec_guard(key: String) -> bool:
 	return false
 
 
-## 双击的教学分支：只有「调查员」线索会调出证件，其余给一句口头提示。
+## 双击的教学分支：人物「调查员」和线索「调查员」都能调出证件节点，
+## 避免桌面上两张同名卡让玩家猜哪一张才是正确的入口。
 func _tutorial_on_activate(key: String) -> bool:
 	if _tutorial_step == TutorialStep.DOUBLE_CLICK_CLUE:
-		if key == TUT_CLUE_KEY:
+		if key == TUT_CLUE_KEY or key == TUT_ACTOR_KEY:
 			var cert_key := _tutorial_spawn_node("item", TUT_CERT_ITEM_ID, 2)
 			graph.link(TUT_CLUE_KEY, cert_key, "entity")
 			_tutorial_step = TutorialStep.DRAG_CERT
 			_tutorial_set_hint()
 			_tutorial_say("这是你的调查员证。把它拖给我，我核对一下。")
 			return true
-		if key == TUT_ACTOR_KEY:
-			_tutorial_say("双击不会把它交给我——把它拖过来。")
-			return true
-	elif _tutorial_step == TutorialStep.DRAG_CERT and key == TUT_CLUE_KEY:
+	elif _tutorial_step == TutorialStep.DRAG_CERT and (key == TUT_CLUE_KEY or key == TUT_ACTOR_KEY):
 		_tutorial_say("证件已经调出来了。把「调查员证」拖给我。")
 		return true
 	elif _tutorial_step == TutorialStep.DRAG_ACTOR and key == TUT_ACTOR_KEY:
@@ -2517,7 +2486,7 @@ func _tutorial_on_tec_done(key: String) -> bool:
 		_tutorial_spawn_clue(TUT_CLUE_ID, key, 1)
 		_tutorial_step = TutorialStep.DOUBLE_CLICK_CLUE
 		_tutorial_set_hint()
-		_tutorial_say("分析完成。这是「调查员」线索——双击它，看看能调出什么。")
+		_tutorial_say("分析完成。这是「调查员」线索——双击「调查员」节点，把证件调出来。")
 		return true
 	if _tutorial_step == TutorialStep.DRAG_CERT and key == TUT_CERT_ITEM_KEY:
 		_tutorial_spawn_clue(TUT_CERT_CLUE_ID, key, 3)
@@ -2546,31 +2515,10 @@ func _tutorial_on_store_success(where: String, _key: String) -> void:
 func _tutorial_begin_infer() -> void:
 	_tutorial_step = TutorialStep.INFER
 	_tutorial_set_hint()
-	## 第 3 幕只要求「线索收进册子一次」，所以另一条可能还在画布上。
-	## 推演桌布会盖住左侧画布，这里把剩下的教学线索一并收进线索册，
-	## 保证两条都能从同一个窗口拖上桌布，不会出现「看不见也拖不到」的死路。
-	var moved := 0
-	for cid in [TUT_CLUE_ID, TUT_CERT_CLUE_ID]:
-		var ck := graph.key_of("clue", String(cid))
-		if graph.stored.has(ck):
-			continue
-		if graph.ledger_store(ck):
-			moved += 1
-	if moved > 0:
-		_tutorial_clue_stored = true
-		_apply_hidden()
-		_tutorial_say("另一条线索也先放进线索册了，方便一起拖上桌布。")
-	_tutorial_say("桌面收好了。把「调查员」和「调查员证」两条线索拖进推演器桌布。")
-	if _bag_win != null and is_instance_valid(_bag_win):
-		_toggle_storage(GraphState.BAG)
-	if _matrix_win == null or not is_instance_valid(_matrix_win):
-		_toggle_matrix()
-	if _tutorial_clue_stored and (_ledger_win == null or not is_instance_valid(_ledger_win)):
-		_toggle_storage(GraphState.LEDGER)
-	if _tec != null:
-		_tec.visible = false
-	_place_floating_windows()
-	_tutorial_on_matrix_changed()
+	## 不替玩家打开任何 app：双击「推演器」图标打开桌布，和正式案件完全同一条路径。
+	_tutorial_say("桌面收好了。双击左边「推演器」打开桌布；如果 TEC 挡住，把我拖开或点「–」收起。"
+		+ "线索在册子里就双击「线索册」打开。把「调查员」和「调查员证」两条线索拖上去；"
+		+ "两条齐了再长按执行者。")
 
 
 func _tutorial_on_matrix_changed() -> void:
@@ -2604,8 +2552,6 @@ func _tutorial_on_inference_success(hit: EndingDef) -> void:
 	if _bag_win != null and is_instance_valid(_bag_win):
 		_bag_win.queue_free()
 		_bag_win = null
-	if _tec != null:
-		_tec.visible = false
 	_place_floating_windows()
 	_open_cert_form()
 
@@ -2636,12 +2582,36 @@ func _on_tutorial_cert_completed(card: Dictionary) -> void:
 	## 第 5 幕完成即写一份「进入案件」的档：玩家此时退出，下一次「继续」
 	## 也能跳过整段开场。第 6 幕真正选案后会被实际案件进度覆盖。
 	_write_tutorial_entry_save()
-	if _tec != null:
-		_tec.visible = true
-		_tec.set_drag_enabled(false)
+	if _tec != null and _tec.visible:
 		_tec.append_line("证件已签发。现在选择一个案件。")
-		_recenter_tutorial_tec()
+	elif _tec != null:
+		_tutorial_tec_icon_visible = true
+		_refresh_app_icons()
 	_toggle_case_map()
+	_arrange_tutorial_map_once()
+
+
+## 地图是 TEC 主动弹的：第一次打开时把地图和 TEC 并排摆一次，免得 TEC 正好压住
+## 唯一可点的 A-001 行。摆完就是普通窗口，玩家拖到哪都算数，不再自动归位。
+func _arrange_tutorial_map_once() -> void:
+	if _tutorial_map_arranged:
+		return
+	if _map_win == null or not is_instance_valid(_map_win):
+		return
+	_tutorial_map_arranged = true
+	var vw := _vw()
+	var desk_h := _desk.size.y
+	if _tec != null and _tec.visible:
+		var gap := 16.0
+		var total_w := _map_win.size.x + _tec.size.x + gap
+		var left := maxf(96.0, (vw - total_w) * 0.5)
+		_map_win.position = Vector2(left,
+			maxf(14.0, minf(72.0, desk_h - 14.0 - _map_win.size.y)))
+		_tec.position = Vector2(left + _map_win.size.x + gap,
+			maxf(14.0, (desk_h - _tec.size.y) * 0.5 - 24.0))
+	else:
+		_map_win.position = Vector2(maxf(96.0, (vw - _map_win.size.x) * 0.5),
+			maxf(14.0, minf(72.0, desk_h - 14.0 - _map_win.size.y)))
 
 
 func _write_tutorial_entry_save() -> void:
@@ -2836,18 +2806,53 @@ func _on_intro_finished(card: Dictionary) -> void:
 func _open_cert_review() -> void:
 	if _investigator.is_empty():
 		return
+	## 复核窗比较高，底部按钮不要被「已进入案件」toast 压住。
+	_hide_toast()
 	if _cert_win != null and is_instance_valid(_cert_win):
 		_cert_win.queue_free()
 		_cert_win = null
 	var w := SysWindow.new()
 	w.name = "cert_win"
-	w.setup("调查员证", 340, 420)
-	w.position = Vector2(470, 40)
+	w.setup("调查员证", 340, 470)
+	w.position = Vector2(
+		clampf((_vw() - w.size.x) * 0.5, 8.0, maxf(8.0, _vw() - w.size.x - 8.0)),
+		8.0)
 	_desk.add_child(w)
 	_place_z(w, ZR_WIN)
 	w.content.add_child(IntroWin.build_cert(_investigator))
+	var change := TecTheme.button("[ 更换头像 ]")
+	change.name = "cert_change_photo"
+	change.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	change.pressed.connect(_open_photo_picker)
+	w.content.add_child(change)
 	w.tree_exited.connect(func(): _cert_win = null)
 	_cert_win = w
+
+
+func _open_photo_picker() -> void:
+	if _investigator.is_empty():
+		return
+	if _photo_win != null and is_instance_valid(_photo_win):
+		_photo_win.queue_free()
+		_photo_win = null
+	var w := PhotoWinScript.new()
+	w.name = "photo_win"
+	w.setup_photo(String(_investigator.get("avatarId", "CHARS_EXEC")))
+	w.picked.connect(_on_photo_picked)
+	w.closed.connect(func(): _photo_win = null)
+	_desk.add_child(w)
+	_place_z(w, ZR_CERT)
+	w.place_center(_vw(), _desk.size.y)
+	_photo_win = w
+
+
+func _on_photo_picked(avatar_id: String) -> void:
+	_investigator["avatarId"] = avatar_id
+	if not Investigator.save_to(_investigator, _inv_path):
+		push_warning("调查员证照片写入失败：" + _inv_path)
+	_photo_win = null
+	_refresh_chip()
+	_open_cert_review()
 
 
 func _show_toast(text: String, warn: bool = false) -> void:
@@ -3442,10 +3447,8 @@ func _drop_targets() -> Array:
 		if ic != null and ic.is_visible_in_tree():
 			out.append({"id": String(pair[0]), "rect": ic.get_global_rect()})
 	if _tec != null and is_instance_valid(_tec) and _tec.visible:
-		## 教学期 TEC 就是「角色」：整个窗体都接拖拽，玩家不必精准命中头像。
-		## 正式案件仍只认头像，避免挡住 TEC 窗后面的画布操作。
-		out.append({"id": "tec-dock" if _tutorial_active else "tec-avatar",
-			"rect": _tec.get_global_rect() if _tutorial_active else _tec.avatar_global_rect()})
+		## 和正式案件完全一致：TEC 只认头像落点，整窗不抢画布事件。
+		out.append({"id": "tec-avatar", "rect": _tec.avatar_global_rect()})
 	if _tec_chip != null and is_instance_valid(_tec_chip) and _tec_chip.visible:
 		out.append({"id": "tec-chip", "rect": _tec_chip.get_global_rect()})
 	if _matrix_win != null and is_instance_valid(_matrix_win):
@@ -3866,8 +3869,7 @@ func _toggle_storage(kind: String) -> void:
 			return
 		_bag_win = StorageWin.new()
 		_bag_win.name = "bag_win"
-		var bag_w := 220.0 if _tutorial_active else 240.0
-		_bag_win.setup_store("证物袋", GraphState.BAG, graph, case_def, bag_w)
+		_bag_win.setup_store("证物袋", GraphState.BAG, graph, case_def)
 		_bag_win.position = Vector2(150, 300)
 		_bag_win.will_take.connect(_on_storage_will_take)
 		_bag_win.took.connect(_on_storage_took)
@@ -3882,8 +3884,7 @@ func _toggle_storage(kind: String) -> void:
 		return
 	_ledger_win = StorageWin.new()
 	_ledger_win.name = "clue_win"
-	var ledger_w := 220.0 if _tutorial_active else 240.0
-	_ledger_win.setup_store("线索册", GraphState.LEDGER, graph, case_def, ledger_w)
+	_ledger_win.setup_store("线索册", GraphState.LEDGER, graph, case_def)
 	_ledger_win.position = Vector2(410, 300)
 	_ledger_win.will_take.connect(_on_storage_will_take)
 	_ledger_win.took.connect(_on_storage_took)
@@ -4120,6 +4121,8 @@ func _toggle_matrix() -> void:
 	_place_z(_matrix_win, ZR_WIN)
 	_place_floating_windows()
 	_sync_matrix_occlusion.call_deferred()
+	if _tutorial_active and _tutorial_step == TutorialStep.INFER:
+		_tutorial_on_matrix_changed()
 
 
 ## A7：矩阵窗会把正下方的卡片遮得只剩一条白边，看起来像窗口漏了一块。
@@ -5152,6 +5155,9 @@ func _open_tec() -> void:
 	_tec_dot = false
 	if _tec_chip != null:
 		_tec_chip.visible = false
+	if _tutorial_active:
+		_tutorial_tec_icon_visible = false
+		_refresh_app_icons()
 
 
 func _close_tec() -> void:
@@ -5161,6 +5167,9 @@ func _close_tec() -> void:
 	_tec_min = false
 	if _tec_chip != null:
 		_tec_chip.visible = false
+	if _tutorial_active:
+		_tutorial_tec_icon_visible = true
+		_refresh_app_icons()
 
 
 func _minimize_tec() -> void:
@@ -5169,6 +5178,9 @@ func _minimize_tec() -> void:
 	_tec.visible = false
 	_tec_min = true
 	_sync_tec_chip()
+	if _tutorial_active:
+		_tutorial_tec_icon_visible = true
+		_refresh_app_icons()
 
 
 func _hide_tec(reset: bool = false) -> void:

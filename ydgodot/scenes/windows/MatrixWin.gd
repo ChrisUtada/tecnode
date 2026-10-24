@@ -25,11 +25,9 @@ const ANCHORS := {
 	"smell": Vector2(0.3160, 0.7727),
 	"taste": Vector2(0.2029, 0.3073),
 }
-## 推演阵列的几何骨架（虚线圆 / 虚线连线 / 点亮五边形的实线）。
-## 原来是朱红 `#c0392b` —— 整屏唯一的彩色，在纯白桌布上像一根天线。
-## 1-bit 里「错误 / 试错」由**线型**承担：虚线（0.42 alpha 的黑虚线 = 浅灰虚线）。
-## 变量名保留 RED 以免大改调用点，但值已是墨黑。
-const RED := TecTheme.INK
+## 推演阵列的几何骨架：静态虚线用墨黑（由线型表达「未激活」），
+## 长按蓄力的描线用核准红（`SPOT_DANGER`，和 T.E.C 核准印章同一语义色）。
+const RED := TecTheme.SPOT_DANGER
 const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var graph: GraphState
@@ -263,12 +261,12 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 func _draw_board() -> void:
 	_board.draw_rect(Rect2(Vector2.ZERO, _board.size), TecTheme.BG)
 	var center := Vector2(BOARD_W * 0.5, BOARD_H * 0.5)
-	_draw_dashed_circle(center, CIRCLE_R, Color(RED, 0.42), 1.25)
+	_draw_dashed_circle(center, CIRCLE_R, Color(TecTheme.INK, 0.42), 1.25)
 	var pts := _star_points()
 	for i in pts.size():
 		var a: Vector2 = pts[i]
 		var b: Vector2 = pts[(i + 1) % pts.size()]
-		_board.draw_dashed_line(a, b, Color(RED, 0.42), 1.25, 5.0, true, true)
+		_board.draw_dashed_line(a, b, Color(TecTheme.INK, 0.42), 1.25, 5.0, true, true)
 	if _charge > 0.0:
 		_draw_rite(center, pts)
 

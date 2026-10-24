@@ -234,7 +234,7 @@ func _build_preview() -> Control:
 	var level := TecTheme.label("等级：初级调查员", TecTheme.FS_BODY, TecTheme.MUTED)
 	level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(level)
-	var stamp := TecTheme.label("T.E.C 核准", TecTheme.FS_BODY, TecTheme.INK)
+	var stamp := TecTheme.label("T.E.C 核准", TecTheme.FS_BODY, TecTheme.SPOT_DANGER)
 	stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	body.add_child(stamp)
 	return panel

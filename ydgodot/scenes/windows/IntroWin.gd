@@ -489,10 +489,10 @@ static func _stamp() -> Control:
 	holder.custom_minimum_size = Vector2(58, 58)
 	var circle := Panel.new()
 	circle.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var sb := TecTheme.flat(TecTheme.NONE, TecTheme.R_PILL, TecTheme.INK, 2)
+	var sb := TecTheme.flat(TecTheme.NONE, TecTheme.R_PILL, TecTheme.SPOT_DANGER, 2)
 	circle.add_theme_stylebox_override("panel", sb)
 	holder.add_child(circle)
-	var label := TecTheme.label("T.E.C\n核准", TecTheme.FS_BODY, TecTheme.INK)
+	var label := TecTheme.label("T.E.C\n核准", TecTheme.FS_BODY, TecTheme.SPOT_DANGER)
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
