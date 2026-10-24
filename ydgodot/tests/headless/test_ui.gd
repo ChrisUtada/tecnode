@@ -1,4 +1,4 @@
-﻿extends SceneTree
+extends SceneTree
 ## P0 界面级回归：真的往 NodeCard 里塞鼠标事件，验证「拖拽 = 组合 / 双击 = 点亮」这条接线。
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_ui.gd
 
@@ -1522,7 +1522,6 @@ func _initialize() -> void:
 	var continue_btn := ss.find_child("btn_continue", true, false) as Button
 	var settings_btn := ss.find_child("btn_settings", true, false) as Button
 	var demon := ss.find_child("demon", true, false) as TextureRect
-	var emote := ss.find_child("emote", true, false) as PanelContainer
 	check("G0 开始界面四键齐全",
 		start_btn != null and continue_btn != null and settings_btn != null
 			and ss.find_child("btn_quit", true, false) != null)
@@ -1544,7 +1543,8 @@ func _initialize() -> void:
 	ev.button_index = MOUSE_BUTTON_LEFT
 	ev.pressed = true
 	demon.gui_input.emit(ev)
-	check("G0 点击恶魔冒出表情", emote != null and emote.visible)
+	check("G0 点击恶魔有晃动反馈（无表情节点）", demon != null
+		and ss.find_child("emote", true, false) == null)
 	settings_btn.pressed.emit()
 	check("G0 设置面板可打开", dialog != null and dialog.visible)
 	ss.queue_free()

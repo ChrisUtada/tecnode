@@ -8,6 +8,8 @@ const CHAR_MS := 45.0
 var _typing := false
 var _shown := 0.0
 var _reserve_h := 0.0
+## 单字耗时（毫秒）。开始界面标题这类「缓进」场合调慢，其余默认 45ms。
+var char_ms := CHAR_MS
 
 
 func configure(p_text: String, p_size: int = 12, p_color: Color = Color.BLACK) -> void:
@@ -76,13 +78,22 @@ func _update_reserve() -> void:
 		_reserve_h = 0.0
 		custom_minimum_size.y = 0.0
 		return
+	var line_h := maxf(font.get_height(fs), 1.0)
+	## 关换行的单行标签（如开始界面标题）：打字中宽度随字数增长，每次 resize 都拿
+	## 当前窄宽度去算行数，预留高度会反复抖动（实测 32→146→70→32，卡片被撑跳）。
+	## 单行就是单行，直接钉一行高。
+	if autowrap_mode == TextServer.AUTOWRAP_OFF:
+		if absf(_reserve_h - line_h) < 0.5:
+			return
+		_reserve_h = line_h
+		custom_minimum_size.y = line_h
+		return
 	var wrap_w := size.x
 	if wrap_w <= 0.0:
 		wrap_w = custom_minimum_size.x
 	if wrap_w <= 0.0:
 		return
 	var full := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, wrap_w, fs)
-	var line_h := maxf(font.get_height(fs), 1.0)
 	var lines := maxi(1, int(round(full.y / line_h)))
 	var h := full.y + maxf(lines - 1, 0) * float(get_theme_constant("line_spacing"))
 	if absf(_reserve_h - h) < 0.5:
@@ -99,7 +110,7 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	if not _typing:
 		return
-	_shown += delta * (1000.0 / CHAR_MS)
+	_shown += delta * (1000.0 / char_ms)
 	var n := int(_shown)
 	if n >= text.length():
 		finish_typing()
