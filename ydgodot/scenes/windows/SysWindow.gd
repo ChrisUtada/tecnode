@@ -41,6 +41,7 @@ var _over_ring: Control = null
 var _active := true
 var _rules: Array[Control] = []
 var _title_stripes: Control = null
+var _drag_enabled := true
 
 
 func setup(p_title: String, w: float, h: float, radius: int = TecTheme.R_WIN) -> void:
@@ -451,7 +452,14 @@ func _on_close_pressed() -> void:
 		queue_free()
 
 
+## 教学期 TEC 窗体常驻中央：关掉标题栏拖动，避免玩家把「角色」拖走。
+func set_drag_enabled(on: bool) -> void:
+	_drag_enabled = on
+
+
 func _on_bar_input(event: InputEvent) -> void:
+	if not _drag_enabled:
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			_dragging = true

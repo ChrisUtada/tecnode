@@ -153,6 +153,8 @@ var _investigator: Dictionary = {}
 var _inv_path := Investigator.PATH
 var _intro: IntroWin = null
 var _start_screen: Control = null
+var _tutorial_active := false
+var _tutorial_actor_key := ""
 var _inv_chip: Button = null
 var _cert_win: SysWindow = null
 var _catalog: CaseCatalog = null
@@ -1511,8 +1513,13 @@ func _place_floating_windows() -> void:
 	var desk_h := _desk.size.y if _desk != null and is_instance_valid(_desk) else _vh() - HEADER_H
 	var vw := _vw()
 	if _tec != null and is_instance_valid(_tec):
-		_tec.position = Vector2(minf(906.0, vw - 14.0 - _tec.size.x),
-			minf(264.0, desk_h - 14.0 - _tec.size.y))
+		if _tutorial_active:
+			_tec.position = Vector2(
+				maxf(14.0, (vw - _tec.size.x) * 0.5),
+				maxf(14.0, (desk_h - _tec.size.y) * 0.5 - 24.0))
+		else:
+			_tec.position = Vector2(minf(906.0, vw - 14.0 - _tec.size.x),
+				minf(264.0, desk_h - 14.0 - _tec.size.y))
 	if _tec_chip != null and is_instance_valid(_tec_chip):
 		_tec_chip.position = Vector2(minf(1068.0, vw - 16.0 - _tec_chip.size.x),
 			minf(608.0, desk_h - 4.0 - _tec_chip.size.y))
@@ -2124,9 +2131,77 @@ func _on_start_new(overwrite: bool) -> void:
 	_close_start_screen()
 	if overwrite:
 		_clear_case_save()
-	_start_slice()
-	if _intro_allowed() and _investigator.is_empty():
-		_open_intro()
+	_begin_tutorial()
+
+
+## 第 1 幕：空白桌面 + 常驻 TEC + 「调查员」节点。
+## 不启动案件、不出图标栏、不放诊断入口；玩家此刻只需要认识 TEC 和「把节点拖过去」。
+func _begin_tutorial() -> void:
+	_tutorial_active = true
+	_new_runtime()
+	_case_open = true
+	_case_win.visible = true
+	_place_z(_case_win, ZR_CASE)
+	_case_win.set_title("T.E.C-OS // 调查员登记")
+	_hide_tutorial_chrome()
+
+	_tec.visible = true
+	_place_z(_tec, ZR_TEC)
+	_tec.set_drag_enabled(false)
+	var close := _tec.get_node_or_null("bar/close") as Control
+	var mini := _tec.get_node_or_null("bar/min") as Control
+	if close != null:
+		close.visible = false
+	if mini != null:
+		mini.visible = false
+	_tec.reset_tec()
+	_tec.append_line("欢迎来到 TEC，你将开始领取你的调查员证，以便展开工作。")
+
+	_view_k = 1.0
+	_view_pos = Vector2.ZERO
+	_view_user = true
+	_apply_view()
+	_place_floating_windows()
+	_spawn_tutorial_actor()
+	## TEC 的内容高度会在一帧后落定；再等一帧重新居中，避免它缩高后偏下。
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if _tutorial_active:
+		_place_floating_windows()
+
+
+func _hide_tutorial_chrome() -> void:
+	var icons := _icon_layer()
+	if icons != null:
+		icons.visible = false
+	for n in ["btn_撤销", "btn_调试"]:
+		var b := _head.get_node_or_null(n) as Control
+		if b != null:
+			b.visible = false
+	if _brand_sub != null:
+		_brand_sub.visible = false
+	if _crumb != null:
+		_crumb.visible = false
+	if _inv_chip != null:
+		_inv_chip.visible = false
+	for n in ["bar/close", "bar/min"]:
+		var c := _case_win.get_node_or_null(n) as Control
+		if c != null:
+			c.visible = false
+
+
+func _spawn_tutorial_actor() -> void:
+	var key := "char:CHARS_INVESTIGATOR"
+	var n := graph.add_node("char", "CHARS_INVESTIGATOR")
+	n["label"] = "调查员"
+	n["x"] = 40.0
+	n["y"] = maxf(40.0, _stage.size.y - 144.0)
+	_tutorial_actor_key = key
+	var card := _spawn_card(key)
+	if card != null:
+		card.visible = true
+		card.position = Vector2(float(n["x"]), float(n["y"]))
+		_sync_card_shell(card)
 
 
 func _on_start_continue() -> void:
@@ -2139,7 +2214,6 @@ func _on_start_continue() -> void:
 	if _intro_allowed() and _investigator.is_empty():
 		_open_intro()
 	_show_toast("存档不可用，已开始新调查", true)
-
 
 func _clear_case_save() -> void:
 	if _save != null:

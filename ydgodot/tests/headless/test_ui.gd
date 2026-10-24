@@ -1550,15 +1550,24 @@ func _initialize() -> void:
 	ss.queue_free()
 	await process_frame
 
-	# 第 0 幕与 Desktop 接线：开始后撤掉开始界面并进入首局。
+	# 第 0 幕与 Desktop 接线：开始后撤掉开始界面并进入第 1 幕（空白桌面 + TEC + 调查员）。
 	scene._open_start_screen()
 	await process_frame
 	check("G0 Desktop 能挂开始界面", scene._start_screen != null)
 	if scene._start_screen != null:
 		scene._start_screen.start_requested.emit(false)
 		await process_frame
-	check("G0 开始后进入桌面", scene._start_screen == null
-		and scene.graph != null and scene.graph.nodes.has("loc:SCENES_garden"))
+	check("G1 开始后进入空白桌面", scene._start_screen == null and scene._tutorial_active)
+	check("G1 图表隐藏、TEC 常驻、调查员节点已出现",
+		not scene._icon_layer().visible and scene._tec.visible
+			and scene._cards.has("char:CHARS_INVESTIGATOR"))
+	check("G1 TEC 开场白",
+		not scene._tec.dbg_lines().is_empty()
+			and String(scene._tec.dbg_lines()[0]).contains("欢迎来到 TEC"))
+	check("G1 顶栏只剩品牌（撤销/调试隐藏）",
+		not (scene.get_node("header/btn_撤销") as Control).visible
+			and not (scene.get_node("header/btn_调试") as Control).visible
+			and (scene.get_node("header/brand") as Control).visible)
 
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)
