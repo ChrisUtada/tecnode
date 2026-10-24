@@ -1114,8 +1114,8 @@ func _initialize() -> void:
 			str(scene.graph.node(ik21b)))
 	check("正文 [clue:] 照旧建线索（回归）", scene.graph.has("clue", "CLUES_qsan"))
 
-	# 22) z 序（Web 静态 z-index 表）：rank 高的窗永远盖低的，无论谁后开；
-	# icons(24) 在普通窗(25)之下、详情(22)之上；toast(30) 在 TEC(28) 之上；镜像(40) 在 toast 之上
+	# 22) z 序：新打开 / 被点击的系统窗提到浮动窗栈顶；
+	# icons 在浮动窗之下；toast(30) 在 TEC(28) 之上；镜像(40) 在 toast 之上
 	var desk22: Control = scene.get_node("desk")
 	scene._toggle_case_map()
 	await process_frame
@@ -1124,40 +1124,49 @@ func _initialize() -> void:
 	var e_log: Control = scene._log_win
 	var e_map: Control = scene._map_win
 	var e_icons: Control = desk22.get_node("icons")
-	check("z：后开的日志(21) 仍压不过先开的地图(25)", e_log.get_index() < e_map.get_index(),
+	check("z：后开的日志提到浮动窗栈顶", e_log.get_index() > e_map.get_index(),
 		str(e_log.get_index()) + " / " + str(e_map.get_index()))
-	check("z：icons(24) 在普通窗之下", e_icons.get_index() < e_map.get_index())
-	check("z：icons(24) 在日志(21) 之上", e_log.get_index() < e_icons.get_index())
-	# A2：激活态跟随实际层序 —— 低 rank 的日志晚开也不抢地图的激活标题栏
+	check("z：icons(24) 在地图窗之下", e_icons.get_index() < e_map.get_index())
+	check("z：icons(24) 在日志窗之下", e_icons.get_index() < e_log.get_index())
+	# A2：激活态跟随实际层序 —— 刚打开的日志就是当前窗
 	var map_w := e_map as SysWindow
 	var log_w := e_log as SysWindow
-	check("A2：最高可见窗（地图）为激活态", map_w.is_window_active())
-	check("A2：低 rank 日志窗为非激活态", not log_w.is_window_active())
-	check("A2：激活窗保留标题横纹", (map_w._rules[0] as Control).visible)
-	check("A2：非激活窗收起标题横纹", not (log_w._rules[0] as Control).visible)
+	check("A2：当前窗（日志）为激活态", log_w.is_window_active())
+	check("A2：地图窗转为非激活", not map_w.is_window_active())
+	check("A2：激活窗保留标题横纹", (log_w._rules[0] as Control).visible)
+	check("A2：非激活窗收起标题横纹", not (map_w._rules[0] as Control).visible)
 	var map_sb := (map_w.get_node("bg") as Panel).get_theme_stylebox("panel") as StyleBoxFlat
 	var log_sb := (log_w.get_node("bg") as Panel).get_theme_stylebox("panel") as StyleBoxFlat
-	check("A2：激活窗 2px 框", map_sb.border_width_top == 2, str(map_sb.border_width_top))
-	check("A2：非激活窗 1px 框", log_sb.border_width_top == 1, str(log_sb.border_width_top))
+	check("A2：激活窗 2px 框", log_sb.border_width_top == 2, str(log_sb.border_width_top))
+	check("A2：非激活窗 1px 框", map_sb.border_width_top == 1, str(map_sb.border_width_top))
 	check("A2：非激活标题降到 INK_FAINT",
-		log_w._title_label.get_theme_color("font_color") == TecTheme.INK_FAINT)
+		map_w._title_label.get_theme_color("font_color") == TecTheme.INK_FAINT)
 	scene._ensure_detail()
+	scene._detail_win.show()
+	scene._raise_to_front(scene._detail_win)
 	await process_frame
 	var e_detail: Control = scene._detail_win
-	check("z：详情(22) 在 icons(24) 之下", e_detail.get_index() < e_icons.get_index())
-	check("z：详情(22) 在日志(21) 之上", e_log.get_index() < e_detail.get_index())
+	var detail_sb := ((e_detail as SysWindow).get_node("bg") as Panel).get_theme_stylebox("panel") as StyleBoxFlat
+	check("z：详情窗提到 icons 之上", e_icons.get_index() < e_detail.get_index())
+	check("z：详情窗提到日志之上", e_log.get_index() < e_detail.get_index())
+	check("A2：详情窗成为当前窗", (e_detail as SysWindow).is_window_active())
 	scene._open_tec()
 	await process_frame
-	check("z：TEC(28) 盖住先开的地图(25)", scene._map_win.get_index() < scene._tec.get_index())
+	check("z：TEC 提到地图之上", scene._map_win.get_index() < scene._tec.get_index())
+	check("z：TEC 提到详情之上", e_detail.get_index() < scene._tec.get_index())
 	check("z：toast(30) 在 TEC(28) 之上", scene._tec.get_index() < desk22.get_node("toast").get_index())
 	check("A2：TEC 开窗后接管激活态", (scene._tec as SysWindow).is_window_active())
-	check("A2：地图转非激活", not map_w.is_window_active())
-	check("A2：地图框降回 1px", map_sb.border_width_top == 1, str(map_sb.border_width_top))
+	check("A2：详情转非激活", not (e_detail as SysWindow).is_window_active())
+	check("A2：详情框降回 1px", detail_sb.border_width_top == 1, str(detail_sb.border_width_top))
 	scene._hide_tec()
 	await process_frame
-	check("A2：TEC 收起后地图恢复激活", map_w.is_window_active())
+	check("A2：TEC 收起后详情恢复激活", (e_detail as SysWindow).is_window_active())
 	check("A2：收起后的 TEC 为非激活", not (scene._tec as SysWindow).is_window_active())
-	check("A2：地图框恢复 2px", map_sb.border_width_top == 2, str(map_sb.border_width_top))
+	check("A2：详情框恢复 2px", detail_sb.border_width_top == 2, str(detail_sb.border_width_top))
+	check("点地图正文把地图提到 TEC 之上",
+		scene._raise_window_at(scene._map_win.get_global_rect().get_center())
+			and scene._map_win.get_index() > scene._tec.get_index())
+	check("点地图正文后地图重新成为当前窗", map_w.is_window_active())
 
 	# 23) 手感修复三条：双击窗口放宽到 500ms（浏览器 dblclick 默认）/ 按下冻结飞行卡 /
 	#     窗口点击提层走 rank 表（不再 move_to_front 撞翻 icon/toast 之上的层级）
@@ -1187,7 +1196,7 @@ func _initialize() -> void:
 	check("按下后卡不再自己漂", tk23.position.is_equal_approx(frozen23),
 		str(tk23.position) + " / " + str(frozen23))
 	scene._relayout(false, true)   # 数据位照旧收干净
-	# 窗口点击提层走 rank：日志窗按下提层后仍在 icons / 详情之下（不越 rank 盖上）
+	# 窗口点击提层：点正文也要把窗提到浮动窗栈顶，并成为当前激活窗。
 	# 先把日志窗关到已知态（S22 里开着），再开一份新的
 	if scene._log_win != null and is_instance_valid(scene._log_win):
 		scene._toggle_log()   # open → close
@@ -1196,15 +1205,22 @@ func _initialize() -> void:
 	await process_frame
 	var e_icons23: Control = scene.get_node("desk/icons")
 	var d23b: Vector2 = (scene._log_win as Control).get_global_rect().get_center() - Vector2(0, 80)
+	scene._raise_to_front(scene._map_win)
+	check("前提：地图窗先压住日志", scene._map_win.get_index() > scene._log_win.get_index())
+	check("前提：地图为当前窗", (scene._map_win as SysWindow).is_window_active())
+	check("点日志正文后提到地图之上", scene._raise_window_at(d23b)
+		and scene._log_win.get_index() > scene._map_win.get_index())
+	check("点正文提层后也在 icons 之上", scene._log_win.get_index() > e_icons23.get_index(),
+		str(scene._log_win.get_index()) + " / " + str(e_icons23.get_index()))
+	check("点正文提层后成为当前窗", (scene._log_win as SysWindow).is_window_active())
+	check("窗提层 rank 未变", int(scene._log_win.get_meta("zrank", -1)) == 21)
 	var ev23 := InputEventMouseButton.new()
 	ev23.button_index = MOUSE_BUTTON_LEFT
 	ev23.pressed = true
 	ev23.global_position = d23b
 	(scene._log_win as Control)._on_bar_input(ev23)
 	await process_frame
-	check("窗提层后仍在 icons 之下", scene._log_win.get_index() < e_icons23.get_index(),
-		str(scene._log_win.get_index()) + " / " + str(e_icons23.get_index()))
-	check("窗提层 rank 未变", int(scene._log_win.get_meta("zrank", -1)) == 21)
+	check("标题栏按下仍提到栈顶", scene._log_win.get_index() > scene._map_win.get_index())
 	scene._toggle_log()
 	await process_frame
 
@@ -1623,6 +1639,11 @@ func _initialize() -> void:
 	check("G2 线索卡带新标记", scene.graph.has_unread(tut_clue_key))
 	check("G2 人物→线索连线立即出现", scene._edge_layer.segment_count() == 1)
 	check("G2 TEC 提示双击节点", _last_line(scene._tec).contains("双击"))
+	scene._on_card_selected(tut_clue_key)
+	check("G2 选中节点显示详情窗",
+		scene._detail_win != null and scene._detail_win.visible)
+	check("G2 详情窗压在 TEC 之上",
+		scene._detail_win.get_index() > scene._tec.get_index())
 	# 第②步不该再交节点给 TEC：TEC 口头纠正，不出系统 toast。
 	scene._apply_drop("tec-avatar", tut_actor_key)
 	check("G2 错拖不启动分析", not scene._tec.is_analyzing())
@@ -1674,39 +1695,48 @@ func _initialize() -> void:
 	await process_frame
 	scene._update_drop_over(scene._bag_win.get_global_rect().get_center())
 	check("G3 收纳窗口也显示统一虚线框", scene._drop_outline.visible)
-	check("G3 窗口虚线框内缩 16px",
-		scene._drop_outline.outline_rect().size == scene._bag_win.size - Vector2(32.0, 32.0))
+	check("G3 窗口虚线框在窗框外 4px",
+		scene._drop_outline.outline_rect().size == scene._bag_win.size - Vector2(20.0, 20.0))
 	scene._toggle_storage("BAG")
 	await process_frame
 	scene._update_drop_over(tut_actor_card.get_global_rect().get_center())
 	check("G3 卡片目标也显示统一虚线框", scene._drop_outline.visible)
 	scene._update_drop_over(Vector2(8.0, 8.0))
 	check("G3 移出落点虚线框收起", not scene._drop_outline.visible)
+	var ghost_at := Vector2(520.0, 330.0)
+	var ghost_expect: Vector2 = scene._desk.get_global_transform().affine_inverse() * ghost_at + Vector2(12.0, 10.0)
+	check("G3 收纳拖拽幽灵使用 desk 局部坐标",
+		scene._sdrag_ghost_position(ghost_at) == ghost_expect)
 	check("G3 地图 / 档案未出，TEC 图标按普通 app 常驻",
 		not scene._icon_by_app("map").visible and scene._icon_by_app("tec").visible
 			and not scene._icon_by_app("goto").visible)
-	# 错收：物品不能进线索册，线索不能进证物袋，未收纳完不能上推演桌布。
+	# 错收走正常游戏反馈：物品不能进线索册，线索不能进证物袋。
 	scene._apply_drop("clue-icon", tut_cert_key)
 	check("G3 物品不能进线索册", not scene.graph.stored.has(tut_cert_key))
-	check("G3 错收由 TEC 纠正", _last_line(scene._tec).contains("线索册"))
+	check("G3 错收弹正常提示", scene._toast_active)
 	scene._apply_drop("bag-dock", tut_clue_key)
 	check("G3 线索不能进证物袋", not scene.graph.stored.has(tut_clue_key))
-	check("G3 错收提示去证物袋", _last_line(scene._tec).contains("证物袋"))
-	scene._assign_to_matrix(tut_clue_key)
-	check("G3 收纳未完成不能上桌布",
-		scene._matrix_win == null and not scene.graph.stored.has(tut_clue_key))
+	check("G3 错收仍弹正常提示", scene._toast_active)
+	check("G3 TEC 只提醒整理、不强制", _last_line(scene._tec).contains("不整理"))
+	# 收纳是可选的：不把两样东西收起来，直接打开推演器也要能进入下一幕。
+	scene._toggle_matrix()
+	await process_frame
+	check("G3 不收纳也能打开推演器", scene._matrix_win != null)
+	check("G3 打开推演器即进入推演", scene._tutorial_step == 4)
+	check("G3 TEC 改指向已打开的桌布", _last_line(scene._tec).contains("桌布"))
+	scene._toggle_matrix()
+	await process_frame
+	# 正常收纳继续可用，并且不再反过来推进/卡住教学步骤。
 	scene._apply_drop("bag-dock", tut_cert_key)
 	for i in 2:
 		await process_frame
 	check("G3 物品进证物袋", String(scene.graph.stored.get(tut_cert_key, "")) == GraphState.BAG)
-	check("G3 收纳后仍未完成第③幕", scene._tutorial_step == 3)
-	check("G3 TEC 提示还差线索", _last_line(scene._tec).contains("线索"))
-	check("G3 收纳重算后调查员仍可见", scene._cards[tut_actor_key].visible)
 	scene._apply_drop("clue-icon", tut_clue_key)
 	for i in 4:
 		await process_frame
 	check("G3 线索进线索册", String(scene.graph.stored.get(tut_clue_key, "")) == GraphState.LEDGER)
-	check("G3 第③幕完成进入推演", scene._tutorial_step == 4)
+	check("G3 收纳不改变当前步骤", scene._tutorial_step == 4)
+	check("G3 收纳重算后调查员仍可见", scene._cards[tut_actor_key].visible)
 	check("G3 不自动打开推演器 / 线索册",
 		scene._matrix_win == null and scene._ledger_win == null)
 	check("G3 TEC 仍可拖动", scene._tec.dbg_drag_enabled())
@@ -1788,6 +1818,11 @@ func _initialize() -> void:
 		not scene._tutorial_active and scene._active_case == "A001"
 			and scene.case_def.case_def.id == "a001")
 	check("G6 起始场景已上桌", scene.graph.nodes.has("loc:SCENES_garden"))
+	scene._on_card_selected("loc:SCENES_garden")
+	await process_frame
+	check("G6 换案后节点详情仍可用",
+		scene._detail_win != null and scene._detail_win.visible
+			and scene._detail_win._graph == scene.graph)
 	check("G6 完整图标栏恢复",
 		scene._icon_layer().visible and scene._icon_by_app("goto").visible
 			and scene._icon_by_app("people").visible and scene._icon_by_app("tec").visible

@@ -187,8 +187,6 @@ var _tutorial_step := TutorialStep.DRAG_ACTOR
 var _tutorial_actor_key := ""
 var _tutorial_apps_unlocked := false
 var _tutorial_map_unlocked := false
-var _tutorial_item_stored := false
-var _tutorial_clue_stored := false
 var _tutorial_cert_win: SysWindow = null
 var _tutorial_tec_placed := false
 var _tutorial_tec_icon_visible := false
@@ -447,7 +445,7 @@ func _process(_dt: float) -> void:
 		_sdrag_started = true
 		_sdrag_ghost = _make_drag_ghost(_sdrag_label)
 	else:
-		_sdrag_ghost.position = at + Vector2(12, 10)
+		_sdrag_ghost.position = _sdrag_ghost_position(at)
 	_update_drop_over(at)
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_finish_sdrag(at)
@@ -493,8 +491,16 @@ func _make_drag_ghost(text: String) -> PanelContainer:
 	p.add_child(l)
 	_desk.add_child(p)
 	p.z_index = 40
-	p.position = _sdrag_origin + Vector2(12, 10)
+	p.position = _sdrag_ghost_position(_sdrag_origin)
 	return p
+
+
+## 收纳清单拖拽幽灵挂在 `_desk` 下，位置必须用 desk 局部坐标；
+## 指针是屏幕/全局坐标，直接赋值会整整偏一个顶栏高度。
+func _sdrag_ghost_position(at_global: Vector2) -> Vector2:
+	if _desk == null or not is_instance_valid(_desk):
+		return at_global + Vector2(12, 10)
+	return _desk.get_global_transform().affine_inverse() * at_global + Vector2(12, 10)
 
 
 func _sdrag_cancel() -> void:
@@ -1118,9 +1124,10 @@ const ICON_DEFS := [
 	["案件地图", "map", "map"],
 ]
 
-# ── z 序（Web 静态 z-index 表，05-apps.css / 06-shell.css / 03-desktop.css 抄录）──
-# Web 没有点击置顶：层序只由「每类窗口的固定 z 值 + 同级打开顺序（后来者在上）」决定。
-# 同 rank 依旧按打开顺序，高一档的窗永远盖低一档的 —— 日志(21)、详情(22) 开得再晚也压不过 TEC(28)。
+# ── z 序基准（Web 静态 z-index 表，05-apps.css / 06-shell.css / 03-desktop.css 抄录）──
+# 这些 rank 决定初始/打开时的层序；系统窗打开或被点击后会提到浮动窗栈顶，
+# 因此「日志(21)、详情(22) 开得再晚也压不过 TEC(28)」不再是硬规则。
+# toast / 拖拽描边 / 拖拽镜像 / 领证窗在浮动窗之上，点击提层不会越过它们。
 const ZR_CASE := 1        # #case-win：永远在最底
 const ZR_PW := 15         # .pw-pop：压过卡片、被诗行/叙事卡和其它窗口压住
 const ZR_NARR := 16       # .narr-card / .bubble：回放叙事小卡
@@ -1162,19 +1169,83 @@ func _place_z(ctrl: Control, rank: int) -> void:
 			at = i - 1 if i > self_idx else i
 			break
 	_desk.move_child(ctrl, at)
+	## 新打开的系统窗就是当前窗：放到浮动窗栈顶，但仍压在 toast / 拖拽描边 / 拖拽镜像之下。
+	if ctrl is SysWindow and ctrl != _case_win and rank < ZR_DROP \
+		and (ctrl as SysWindow).participates_in_activation() and ctrl.visible:
+		_raise_to_front(ctrl, false)
 	_refresh_window_activation()
 
 
-## 窗口标题栏 / 历史卡按下的提层请求：用**自己的 rank** 重新插队（同 rank 仍按顺序，
-## 重按 = 挪到同 rank 组尾部，即 Web 里后来者在上）
+## 把一扇已经打开的窗口提到浮动窗栈顶（不改变它的默认 zrank）。
+## 这样点任何窗口都能成为当前窗，但 toast、拖拽虚线框、拖拽镜像和领证窗仍在最上层。
+func _raise_to_front(w: Control, refresh := true) -> void:
+	if w == null or not is_instance_valid(w) or w.get_parent() != _desk:
+		return
+	if not (w is SysWindow) or w == _case_win or not w.visible:
+		return
+	if int(w.get_meta("zrank", ZR_WIN)) >= ZR_DROP:
+		return
+	var target := _desk.get_child_count()
+	var self_idx := w.get_index()
+	for i in range(_desk.get_child_count()):
+		if i == self_idx:
+			continue
+		var c := _desk.get_child(i) as Control
+		if c == null:
+			continue
+		if int(c.get_meta("zrank", ZR_CASE)) >= ZR_DROP:
+			target = i - 1 if i > self_idx else i
+			break
+	_desk.move_child(w, target)
+	if refresh:
+		_refresh_window_activation()
+
+
+## 指针按下：把指针下最上层的可见系统窗提为当前窗；点空白 / 卡片 / 图标不改层级。
+func _raise_window_at(at_global: Vector2) -> bool:
+	if _desk == null or not is_instance_valid(_desk):
+		return false
+	for i in range(_desk.get_child_count() - 1, -1, -1):
+		var c := _desk.get_child(i) as Control
+		if c == null or not is_instance_valid(c) or not c.visible:
+			continue
+		if not c.get_global_rect().has_point(at_global):
+			continue
+		if not (c is SysWindow):
+			if c.mouse_filter != Control.MOUSE_FILTER_IGNORE:
+				return false
+			continue
+		var w := c as SysWindow
+		if w == _case_win:
+			return false
+		if int(w.get_meta("zrank", ZR_WIN)) >= ZR_DROP:
+			return false
+		_raise_to_front(w)
+		return true
+	return false
+
+
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
+		return
+	if _start_screen != null and is_instance_valid(_start_screen):
+		return
+	if _drag_key != "" or _sdrag_key != "" or _panning:
+		return
+	_raise_window_at(mb.global_position)
+
+
+## 窗口标题栏 / 历史卡按下的提层请求：提到浮动窗栈顶，并成为当前激活窗。
 func _on_window_raise(w: Control) -> void:
-	_place_z(w, int(w.get_meta("zrank", ZR_WIN)))
+	_raise_to_front(w)
 
 
-## A2：激活态只看**实际层序**，不看谁最后被点击 —— 低 rank 的窗口即使后开 / 重按，
-## 也不会在视觉上压过高 rank 的窗，不能让它抢走「激活」标题栏。
-## 从 `_desk` 子序末尾往前找第一扇可见系统窗；隐藏、最小化、关窗后自动把
-## 激活态交还给仍露在最上面的那扇。
+## A2：激活态只看**实际层序**。系统窗打开或被点击后会提到栈顶，因此当前窗就是
+## `_desk` 子序里最靠后的可见系统窗；隐藏、最小化、关窗后自动让位。
+## 从 `_desk` 子序末尾往前找第一扇可见系统窗。
 func _refresh_window_activation() -> void:
 	if _desk == null or not is_instance_valid(_desk):
 		return
@@ -2149,6 +2220,11 @@ func _new_runtime() -> void:
 	if _log_win != null and is_instance_valid(_log_win):
 		_log_win.queue_free()
 	_log_win = null
+	## 换案 / 教学 ↔ 正式案件会换整个 graph。详情窗持有旧 graph 引用，
+	## 不销毁的话下一次选中新节点会查到空节点并 hide()，看起来就是「节点详情消失」。
+	if _detail_win != null and is_instance_valid(_detail_win):
+		_detail_win.queue_free()
+		_detail_win = null
 	# 日志是「本次调查的案卷」：重来 / 换案才清（Web 17-boot.js:20），撤销不回滚
 	_log_unread = 0
 	_set_badge(_log_badge, "")
@@ -2274,8 +2350,6 @@ func _begin_tutorial() -> void:
 	_tutorial_step = TutorialStep.DRAG_ACTOR
 	_tutorial_apps_unlocked = false
 	_tutorial_map_unlocked = false
-	_tutorial_item_stored = false
-	_tutorial_clue_stored = false
 	_tutorial_cert_win = null
 	_tutorial_tec_placed = false
 	_tutorial_tec_icon_visible = false
@@ -2413,9 +2487,9 @@ func _tutorial_set_hint() -> void:
 		TutorialStep.DRAG_CERT:
 			_tec.set_guidance("待命 · 等你交证件", "把「调查员证」拖到我身上")
 		TutorialStep.STORE_SUPPLIES:
-			_tec.set_guidance("待命 · 整理桌面", "物品 → 证物袋 · 线索 → 线索册")
+			_tec.set_guidance("待命 · 整理可选", "收纳可选 · 双击推演器继续")
 		TutorialStep.INFER:
-			_tec.set_guidance("待命 · 等推演", "双击推演器 · TEC 可拖开/收起")
+			_tec.set_guidance("待命 · 等推演", "桌布拖入两条线索 · 长按执行者")
 		TutorialStep.CERT_FORM:
 			_tec.set_guidance("待命 · 等你领证", "填写调查员证")
 		TutorialStep.CHOOSE_CASE:
@@ -2434,7 +2508,7 @@ func _tutorial_talk_line() -> String:
 		TutorialStep.DRAG_CERT:
 			return "把「调查员证」拖给我，我核对一下。"
 		TutorialStep.STORE_SUPPLIES:
-			return "物品放进证物袋，线索放进线索册。先把桌面收好。"
+			return "桌面可以整理：物品放证物袋，线索放线索册。不想收也行，直接双击推演器。"
 		TutorialStep.INFER:
 			return "双击「推演器」开桌布；线索在册子里就双击「线索册」。挡住我的话拖开或点「–」收起。"
 		TutorialStep.CERT_FORM:
@@ -2458,7 +2532,7 @@ func _tutorial_tec_guard(key: String) -> bool:
 				return true
 			_tutorial_say("把「调查员证」拖给我。")
 		TutorialStep.STORE_SUPPLIES:
-			_tutorial_say("先把桌面收好：物品进证物袋，线索进线索册。")
+			_tutorial_say("桌面可以整理，但不是必须。收拾好就双击推演器；不想收也可以直接去。")
 		TutorialStep.INFER:
 			_tutorial_say("线索不要交给我——双击「推演器」打开桌布，把线索拖上去。")
 		TutorialStep.CERT_FORM:
@@ -2508,32 +2582,23 @@ func _tutorial_on_tec_done(key: String) -> bool:
 		_tutorial_step = TutorialStep.STORE_SUPPLIES
 		_tutorial_unlock_apps()
 		_tutorial_set_hint()
-		_tutorial_say("核对完成。桌面要整理一下：物品卡放进证物袋，线索放进线索册。")
+		_tutorial_say("核对完成。桌面可以整理：物品放证物袋，线索放线索册，但不整理也能继续。")
 		return true
 	return false
-
-
-func _tutorial_on_store_success(where: String, _key: String) -> void:
-	if where == GraphState.BAG:
-		_tutorial_item_stored = true
-	else:
-		_tutorial_clue_stored = true
-	if _tutorial_item_stored and _tutorial_clue_stored:
-		_tutorial_begin_infer()
-		return
-	if not _tutorial_item_stored:
-		_tutorial_say("收好了。再把「调查员证」放进证物袋。")
-	else:
-		_tutorial_say("收好了。再把一条线索放进线索册。")
 
 
 func _tutorial_begin_infer() -> void:
 	_tutorial_step = TutorialStep.INFER
 	_tutorial_set_hint()
 	## 不替玩家打开任何 app：双击「推演器」图标打开桌布，和正式案件完全同一条路径。
-	_tutorial_say("桌面收好了。双击左边「推演器」打开桌布；如果 TEC 挡住，把我拖开或点「–」收起。"
-		+ "线索在册子里就双击「线索册」打开。把「调查员」和「调查员证」两条线索拖上去；"
-		+ "两条齐了再长按执行者。")
+	var opened := _matrix_win != null and is_instance_valid(_matrix_win)
+	if opened:
+		_tutorial_say("桌布已经打开了。把「调查员」和「调查员证」两条线索拖上去；"
+			+ "两条齐了再长按执行者。")
+	else:
+		_tutorial_say("双击左边「推演器」打开桌布；如果 TEC 挡住，把我拖开或点「–」收起。"
+			+ "线索在册子里就双击「线索册」打开。把「调查员」和「调查员证」两条线索拖上去；"
+			+ "两条齐了再长按执行者。")
 
 
 func _tutorial_on_matrix_changed() -> void:
@@ -3281,6 +3346,9 @@ func _on_card_selected(key: String) -> void:
 		_sync_card_shell(_cards.get(key, null))
 	_apply_focus()
 	_refresh_detail()
+	## 选中节点时把详情窗提到当前层，避免被 TEC / 后开的窗口压在下面。
+	if _detail_win != null and is_instance_valid(_detail_win) and _detail_win.visible:
+		_raise_to_front(_detail_win)
 
 
 ## 卡片按下（未拖未点都算）：把它的重排落位补间杀掉——卡冻结在指针下面，
@@ -3457,11 +3525,11 @@ func _on_card_pin_toggled(key: String) -> void:
 func _drop_targets() -> Array:
 	var out: Array = []
 	if _chat_win != null and is_instance_valid(_chat_win) and _chat_win.is_visible_in_tree():
-		out.append({"id": "chat-win", "rect": _chat_win.get_global_rect(), "inset": 16.0})
+		out.append({"id": "chat-win", "rect": _chat_win.get_global_rect(), "inset": 10.0})
 	if _bag_win != null and is_instance_valid(_bag_win) and _bag_win.is_visible_in_tree():
-		out.append({"id": "bag-win", "rect": _bag_win.get_global_rect(), "inset": 16.0})
+		out.append({"id": "bag-win", "rect": _bag_win.get_global_rect(), "inset": 10.0})
 	if _ledger_win != null and is_instance_valid(_ledger_win) and _ledger_win.is_visible_in_tree():
-		out.append({"id": "clue-win", "rect": _ledger_win.get_global_rect(), "inset": 16.0})
+		out.append({"id": "clue-win", "rect": _ledger_win.get_global_rect(), "inset": 10.0})
 	for pair in [["bag-dock", "icon_bag"], ["clue-icon", "icon_clue"], ["tec-dock", "icon_tec"],
 			["infer-icon", "icon_infer"], ["goto-icon", "icon_goto"]]:
 		var ic: Control = _desk.get_node_or_null("icons/" + String(pair[1])) as Control
@@ -3469,7 +3537,7 @@ func _drop_targets() -> Array:
 			out.append({"id": String(pair[0]), "rect": ic.get_global_rect(), "inset": 0.0})
 	if _tec != null and is_instance_valid(_tec) and _tec.visible:
 		## 整个 TEC 窗体都是分析落点：拖到标题栏、正文、头像任意位置都能交给 TEC。
-		out.append({"id": "tec-dock", "rect": _tec.get_global_rect(), "inset": 16.0})
+		out.append({"id": "tec-dock", "rect": _tec.get_global_rect(), "inset": 10.0})
 	if _tec_chip != null and is_instance_valid(_tec_chip) and _tec_chip.visible:
 		out.append({"id": "tec-chip", "rect": _tec_chip.get_global_rect(), "inset": 2.0})
 	if _matrix_win != null and is_instance_valid(_matrix_win):
@@ -3555,7 +3623,7 @@ func _update_drop_over(at_global: Vector2) -> void:
 		_drop_outline.clear_outline()
 
 
-## 所有落点共用同一层虚线框：窗口内缩到边框内侧，图标 / 卡片贴外框，桌布贴板边。
+## 所有落点共用同一层虚线框：窗口在可见边框外 4px（PAD-4），图标 / 卡片贴外框，桌布贴板边。
 func _show_drop_outline(rect_global: Rect2, inset: float) -> void:
 	if _drop_outline == null or not is_instance_valid(_drop_outline):
 		return
@@ -3613,31 +3681,17 @@ func _store_into(where: String, key: String) -> void:
 	var n := graph.node(key)
 	if n.is_empty():
 		return
-	var tut_store := _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES
-	if tut_store:
-		if where == GraphState.BAG and String(n["kind"]) != "item":
-			_tutorial_say("证物袋收物品；线索要放进线索册。")
-			return
-		if where == GraphState.LEDGER and String(n["kind"]) != "clue":
-			_tutorial_say("线索册只收线索。物品放进证物袋。")
-			return
 	if graph.stored.has(key):
-		if tut_store:
-			_tutorial_say("这个已经收好了。")
-		else:
-			_show_toast("它已经在收纳里了", true)
+		_show_toast("它已经在收纳里了", true)
 		return
 	if graph.is_container_node(key):
-		if tut_store:
-			_tutorial_say("容器不能直接收起来。")
-		else:
-			_show_toast("场景与容器收不进收纳袋", true)
+		_show_toast("场景与容器收不进收纳袋", true)
+		return
+	if where == GraphState.BAG and String(n["kind"]) != "item":
+		_show_toast("只有物品能进证物袋", true)
 		return
 	if where == GraphState.LEDGER and String(n["kind"]) != "clue":
-		if tut_store:
-			_tutorial_say("线索册只收线索。物品放进证物袋。")
-		else:
-			_show_toast("只有线索能进线索册", true)
+		_show_toast("只有线索能进线索册", true)
 		return
 	var before := _save.snapshot()
 	var ok := graph.bag_store(key) if where == GraphState.BAG else graph.ledger_store(key)
@@ -3645,11 +3699,8 @@ func _store_into(where: String, key: String) -> void:
 		return
 	_apply_hidden()
 	_refresh_storage_wins()
-	if tut_store:
-		_tutorial_on_store_success(where, key)
-	else:
-		_show_toast("「%s」收进%s" % [String(n.get("label", "")),
-			"证物袋" if where == GraphState.BAG else "线索册"])
+	_show_toast("「%s」收进%s" % [String(n.get("label", "")),
+		"证物袋" if where == GraphState.BAG else "线索册"])
 	_commit(before)
 
 
@@ -4115,6 +4166,9 @@ func _toggle_matrix() -> void:
 	_matrix_win.item_rect_changed.connect(_sync_matrix_occlusion)
 	_desk.add_child(_matrix_win)
 	_place_z(_matrix_win, ZR_WIN)
+	## 打开推演器就算离开「整理桌面」的提醒步骤；收纳不是硬门槛。
+	if _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES:
+		_tutorial_begin_infer()
 	_place_floating_windows()
 	_sync_matrix_occlusion.call_deferred()
 	if _tutorial_active and _tutorial_step == TutorialStep.INFER:
@@ -4165,9 +4219,6 @@ func _assign_to_matrix(key: String) -> bool:
 	var n := graph.node(key)
 	if n.is_empty():
 		return false
-	if _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES:
-		_tutorial_say("先把桌面收好：物品进证物袋，线索进线索册。")
-		return false
 	if String(n["kind"]) != "clue":
 		if _tutorial_active and _tutorial_step == TutorialStep.INFER:
 			_tutorial_say("推演桌布只收线索。")
@@ -4177,6 +4228,9 @@ func _assign_to_matrix(key: String) -> bool:
 	var cl := case_def.clue_of(String(n["id"]))
 	if cl == null:
 		return false
+	## 收纳是可选的：直接拖线索上桌布也视为进入推演，不把玩家卡在证物袋/线索册。
+	if _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES:
+		_tutorial_begin_infer()
 	var before := _save.snapshot()
 	if not graph.matrix_assign(key):
 		_show_toast("「%s」的感官类型是%s，归位失败" % [n.get("label", ""), GraphState.SENSE_NAMES.get(cl.sense, cl.sense)], true)

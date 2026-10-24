@@ -469,7 +469,7 @@ func _on_bar_input(event: InputEvent) -> void:
 			_dragging = true
 			_press = event.global_position
 			_grab = position
-			# 点击提层：Desktop 会把窗按 rank 重新插队（批 4 z 序）；不在桌面里用就地置顶兜底
+			# 点击提层：Desktop 会把窗提到浮动窗栈顶；不在桌面里用就地置顶兜底
 			if raise_now.is_valid():
 				raise_now.call(self)
 			else:
