@@ -24,6 +24,8 @@ var _sig := ""
 var _rows: VBoxContainer
 var _head: Label
 var _meta: Label
+var _para_label: TypewriterLabel
+var _fit_queued := false
 
 
 func setup_detail(p_graph: GraphState, p_case: CaseLoader) -> void:
@@ -37,6 +39,9 @@ func setup_detail(p_graph: GraphState, p_case: CaseLoader) -> void:
 	_rows.add_theme_constant_override("separation", 6)
 	_rows.custom_minimum_size = Vector2(W - 24.0 - 24.0, 0)
 	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	## 内容最小尺寸每次变化（重排）都重贴窗高：一次性「等两帧再量」对字体度量
+	## 晚落定的情况不可靠（实测真实渲染与无头行数不同），窗高必须跟随内容。
+	_rows.sort_children.connect(_queue_fit)
 	content.add_child(_rows)
 
 
@@ -115,6 +120,9 @@ func _rebuild(n: Dictionary) -> void:
 	_rows.add_child(_meta)
 	var para := _para(_intro_text(n, kind))
 	_rows.add_child(para)
+	_para_label = para
+	if not para.typing_finished.is_connected(_queue_fit):
+		para.typing_finished.connect(_queue_fit)
 	para.start_typing()
 	var st := _status_text(n, kind)
 	if st != "":
@@ -144,20 +152,33 @@ func _rebuild(n: Dictionary) -> void:
 	_fit_to_content()
 
 
+## 内容重排时重贴窗高（去抖到帧末一次）。窗高变化本身会引发一次 sort，
+## 但量出的目标高度相同就直接返回，循环一拍即停。
+func _queue_fit() -> void:
+	if _fit_queued:
+		return
+	_fit_queued = true
+	await get_tree().process_frame
+	_fit_queued = false
+	_fit_to_content()
+
+
 func _fit_to_content() -> void:
 	if _rows == null:
 		return
 	var rows_h := _rows.get_combined_minimum_size().y
-	var inner := rows_h + SysWindow.BAR_H + 20.0 + 8.0
 	var vh := 720.0
 	if is_inside_tree():
 		var raw := get_viewport_rect().size.y
 		if raw >= 320.0:
 			vh = raw
-	set_inner_height(inner)
+	var inner := rows_h + SysWindow.BAR_H + 20.0 + 8.0
+	## 不设滚动条（用户口径）：窗高封顶在视口内，超高内容时窗口上移而不是出滚动条。
+	inner = minf(inner, maxf(160.0, vh - TOP - 8.0 - SysWindow.PAD * 2.0))
+	if absf(size.y - (inner + SysWindow.PAD * 2.0)) >= 1.0:
+		set_inner_height(inner)
 	## 窗口完整地留在视口内：先按 TOP 放，放不下就往上抬到 8px。
-	var top := _vh_pos(TOP, vh - 8.0 - size.y)
-	position.y = top
+	position.y = _vh_pos(TOP, vh - 8.0 - size.y)
 
 
 func _vh_pos(preferred: float, max_top: float) -> float:
