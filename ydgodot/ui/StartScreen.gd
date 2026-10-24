@@ -10,7 +10,7 @@ signal quit_requested
 
 const DEMON_ART := "res://assets/raw/executor-avatar.png"
 const EMOTE_ART := "res://assets/raw/emote-heartbroken.png"
-const DEMON_PX := 216.0
+const DEMON_PX := 72.0
 
 var has_save := false
 var _continue_btn: Button
@@ -39,22 +39,10 @@ func set_has_save(on: bool) -> void:
 func _build() -> void:
 	var bg := ColorRect.new()
 	bg.name = "start_bg"
-	bg.color = TecTheme.INK
+	bg.color = TecTheme.DESK_GRAY
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
-
-	var frame := Panel.new()
-	frame.name = "start_frame"
-	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
-	frame.offset_left = 12
-	frame.offset_top = 12
-	frame.offset_right = -12
-	frame.offset_bottom = -12
-	frame.add_theme_stylebox_override("panel",
-		TecTheme.flat(TecTheme.NONE, 0, TecTheme.white(0.55), 1))
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(frame)
 
 	var center := CenterContainer.new()
 	center.name = "start_center"
@@ -62,23 +50,37 @@ func _build() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
 
+	var card := PanelContainer.new()
+	card.name = "start_card"
+	card.custom_minimum_size = Vector2(360, 0)
+	card.add_theme_stylebox_override("panel",
+		TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 1))
+	center.add_child(card)
+
+	var pad := MarginContainer.new()
+	pad.add_theme_constant_override("margin_left", 24)
+	pad.add_theme_constant_override("margin_right", 24)
+	pad.add_theme_constant_override("margin_top", 20)
+	pad.add_theme_constant_override("margin_bottom", 20)
+	card.add_child(pad)
+
 	var col := VBoxContainer.new()
 	col.name = "start_col"
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 8)
-	center.add_child(col)
+	pad.add_child(col)
 
-	var brand := TecTheme.brand_label("T.E.C-OS", TecTheme.FS_DISPLAY, TecTheme.CARD)
-	brand.name = "start_brand"
-	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	brand.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(brand)
+	var title := TecTheme.label("异动区域已被锁定", TecTheme.FS_DISPLAY, TecTheme.TEXT)
+	title.name = "start_title"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(title)
 
-	var sub := TecTheme.label("T.E.C // 调查终端", TecTheme.FS_BODY, TecTheme.white(0.55))
-	sub.name = "start_sub"
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(sub)
+	var version := TecTheme.label("demo v1.0", TecTheme.FS_BODY, TecTheme.MUTED)
+	version.name = "start_version"
+	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	version.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(version)
 
 	var holder := Control.new()
 	holder.name = "demon_holder"
@@ -86,6 +88,14 @@ func _build() -> void:
 	holder.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	holder.mouse_filter = Control.MOUSE_FILTER_PASS
 	col.add_child(holder)
+
+	var demon_frame := Panel.new()
+	demon_frame.name = "demon_frame"
+	demon_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	demon_frame.add_theme_stylebox_override("panel",
+		TecTheme.flat(TecTheme.BG, TecTheme.R_WIN, TecTheme.EDGE, 1))
+	demon_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(demon_frame)
 
 	_demon = TextureRect.new()
 	_demon.name = "demon"
@@ -101,23 +111,27 @@ func _build() -> void:
 
 	_emote = PanelContainer.new()
 	_emote.name = "emote"
-	_emote.position = Vector2(DEMON_PX * 0.5 - 22.0, -6.0)
-	_emote.add_theme_stylebox_override("panel",
-		TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.INK, 1))
+	_emote.position = Vector2(DEMON_PX * 0.5 - 14.0, -22.0)
+	var emote_style := TecTheme.flat(TecTheme.BG, TecTheme.R_WIN, TecTheme.INK, 1)
+	emote_style.content_margin_left = 4
+	emote_style.content_margin_right = 4
+	emote_style.content_margin_top = 4
+	emote_style.content_margin_bottom = 4
+	_emote.add_theme_stylebox_override("panel", emote_style)
 	_emote.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_emote.visible = false
 	holder.add_child(_emote)
 	var emote_img := TextureRect.new()
 	emote_img.name = "emote_art"
 	emote_img.texture = load(EMOTE_ART)
-	emote_img.custom_minimum_size = Vector2(32, 32)
+	emote_img.custom_minimum_size = Vector2(16, 16)
 	emote_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	emote_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	emote_img.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	emote_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_emote.add_child(emote_img)
 
-	var hint := TecTheme.label("点击恶魔", TecTheme.FS_BODY, TecTheme.white(0.35))
+	var hint := TecTheme.label("点击恶魔", TecTheme.FS_BODY, TecTheme.INK_FAINT)
 	hint.name = "start_hint"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -137,9 +151,6 @@ func _build() -> void:
 	_continue_btn = _menu_button("继续")
 	_continue_btn.name = "btn_continue"
 	_continue_btn.disabled = not has_save
-	_continue_btn.add_theme_color_override("font_disabled_color", TecTheme.white(0.28))
-	_continue_btn.add_theme_stylebox_override("disabled",
-		TecTheme.flat(TecTheme.NONE, TecTheme.R_BTN, TecTheme.white(0.18), 1))
 	_continue_btn.pressed.connect(func(): continue_requested.emit())
 	buttons.add_child(_continue_btn)
 
@@ -157,8 +168,8 @@ func _build() -> void:
 
 
 func _menu_button(text: String, primary: bool = false) -> Button:
-	var b := TecTheme.header_button(text, primary)
-	b.custom_minimum_size = Vector2(220, 36)
+	var b := TecTheme.primary_button(text) if primary else TecTheme.button(text)
+	b.custom_minimum_size = Vector2(200, 32)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	return b
 
@@ -269,9 +280,9 @@ func _on_demon_input(event: InputEvent) -> void:
 func _shake_demon() -> void:
 	var base := _demon.position
 	var tw := create_tween()
-	tw.tween_property(_demon, "position:x", base.x + 4.0, 0.035)
-	tw.tween_property(_demon, "position:x", base.x - 4.0, 0.07)
-	tw.tween_property(_demon, "position:x", base.x + 3.0, 0.06)
+	tw.tween_property(_demon, "position:x", base.x + 3.0, 0.035)
+	tw.tween_property(_demon, "position:x", base.x - 3.0, 0.07)
+	tw.tween_property(_demon, "position:x", base.x + 2.0, 0.06)
 	tw.tween_property(_demon, "position:x", base.x, 0.04)
 
 
