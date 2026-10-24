@@ -19,8 +19,8 @@ func _initialize() -> void:
 	print("=== P0 垂直切片回归 ===")
 	var c := CaseLoader.new()
 	check("装载 data/case-a001.json", c.load_case(), c.load_error)
-	check("案件有 11 个场景 / 36 件物品 / 20 条线索",
-		c.scenes.size() == 11 and c.items.size() == 36 and c.clues.size() == 20,
+	check("案件有 11 个场景 / 35 件物品 / 20 条线索",
+		c.scenes.size() == 11 and c.items.size() == 35 and c.clues.size() == 20,
 		"%d/%d/%d" % [c.scenes.size(), c.items.size(), c.clues.size()])
 	check("文本协议：标签换成中文名", c.strip_tags("花园里有[item:ITEM_something]。") == "花园里有黑影。")
 	check("<br> 变成换行", c.strip_tags("一<br>二").contains("\n"))

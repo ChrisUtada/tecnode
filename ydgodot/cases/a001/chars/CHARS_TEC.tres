@@ -20,7 +20,7 @@
 script = ExtResource("1_aydq0")
 trigger_id = "ITEMS_hy"
 item = ExtResource("2_kqcwc")
-text = "三张合影似乎是不同时间拍的……6月2日，显然不是普通的一天！可以前往看看。"
+text = "三张合影似乎是不同时间拍的……6月2日，显然不是普通的一天！可以去看看。"
 
 [sub_resource type="Resource" id="Resource_7po4p"]
 script = ExtResource("1_aydq0")
@@ -38,7 +38,7 @@ text = "就是真结局。"
 script = ExtResource("1_aydq0")
 trigger_id = "ITEM_sxbj"
 item = ExtResource("5_24uom")
-text = "我记得有一张纸，上面好像写了某种植物，找到那个植物，并出示给它试试。"
+text = "我记得有一张纸，上面好像写了某种植物，找到那个植物，把它拖给对应的人或物试试。"
 
 [sub_resource type="Resource" id="Resource_iji5q"]
 script = ExtResource("6_7kdd8")
@@ -48,12 +48,12 @@ lines = Array[String](["绷带是可以用剪刀剪开的。", "嗯……似乎�
 [sub_resource type="Resource" id="Resource_1rnt3"]
 script = ExtResource("6_7kdd8")
 scene = ExtResource("8_whqk6")
-lines = Array[String](["黑影，你应该已经知道是什么了，所以出示照明工具看看清楚吧。查询一下物品档案，看看是否有合适的工具。"])
+lines = Array[String](["黑影，你应该已经知道是什么了。找一件能照明的东西，把它拖到黑影上，看清楚它。"])
 
 [sub_resource type="Resource" id="Resource_b5lyr"]
 script = ExtResource("6_7kdd8")
 scene = ExtResource("9_dodtm")
-lines = Array[String](["出示一下木盒让我看看。"])
+lines = Array[String](["把木盒拖给我看看。"])
 
 [sub_resource type="Resource" id="Resource_i76to"]
 script = ExtResource("6_7kdd8")
@@ -73,7 +73,7 @@ lines = Array[String](["已确认权限。以下是7月4日可解密档案。", 
 [sub_resource type="Resource" id="Resource_83a78"]
 script = ExtResource("6_7kdd8")
 scene = ExtResource("13_3e7x8")
-lines = Array[String](["出示这张合影给我，我有一些想法。", "黑胶可以放入唱机中播放，或许有新的发现。"])
+lines = Array[String](["把这张合影拖给我，我有一些想法。", "黑胶可以放入唱机中播放，或许有新的发现。"])
 
 [sub_resource type="Resource" id="Resource_hytok"]
 script = ExtResource("6_7kdd8")
@@ -86,6 +86,6 @@ id = "CHARS_TEC"
 name = "TEC"
 desc = "您忠实的AI助手！"
 avatar = "images/avatar_CHARS_TEC.png"
-talk_queue = Array[String](["我是您忠实的AI助手！祝您捕获顺利！", "我会出现在某些特定的场景中，帮助你获得更多的信息。", "像我“出示”一些物品，或许我会给你一些有用的提示。"])
+talk_queue = Array[String](["我是您忠实的AI助手！祝您捕获顺利！", "我会出现在某些特定的场景中，帮助你获得更多的信息。", "把物品拖给我，或许我会给你一些有用的提示。"])
 scene_talks = Array[ExtResource("6_7kdd8")]([SubResource("Resource_iji5q"), SubResource("Resource_1rnt3"), SubResource("Resource_b5lyr"), SubResource("Resource_i76to"), SubResource("Resource_mohrn"), SubResource("Resource_c5m12"), SubResource("Resource_83a78"), SubResource("Resource_hytok")])
 item_reactions = Array[ExtResource("1_aydq0")]([SubResource("Resource_01pqr"), SubResource("Resource_7po4p"), SubResource("Resource_rf7p0"), SubResource("Resource_7q1gj")])

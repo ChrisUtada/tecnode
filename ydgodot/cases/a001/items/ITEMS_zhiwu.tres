@@ -87,7 +87,7 @@ fail_message = "疯长的植物层层叠叠"
 
 [sub_resource type="Resource" id="Resource_gnb8l"]
 script = ExtResource("17_hhwqr")
-message = "你拨开了疯长的大豕草，一扇隐蔽的铁门出现在你的面前，门的后面隐约有声音传出。（如果你已做好准备，请在互动指令中输入“前往 门的后面”）"
+message = "你拨开了疯长的大豕草，一扇隐蔽的铁门出现在你的面前，门的后面隐约有声音传出。"
 
 [sub_resource type="Resource" id="Resource_kaqga"]
 script = ExtResource("18_umswc")

@@ -18,6 +18,11 @@ extends SceneTree
 const JSON_PATH := "res://data/case-a001.json"
 const OUT_ROOT := "res://cases/a001"
 const REPORT := "res://docs/migration_report.md"
+## G13：旧文本命令话术黑名单。JSON 是迁移源，若这里回灌旧文案，迁移直接失败。
+const LEGACY_COPY := [
+	"查询 真名", "查询 [item:", "查询一下物品档案", "指令交互", "互动指令",
+	"SYNC_MATRIX_INFERENCE", "ITEM_cmd", "出示 ", "前往 ", "捕获 [item:",
+]
 
 var data: Dictionary = {}
 var idx: Dictionary = {}          # id -> Resource
@@ -33,6 +38,9 @@ var data_issues: Array = []      # 数据自身的问题（不是迁移错误）
 func _initialize() -> void:
 	if not _load_json():
 		quit(1)
+		return
+	if not _validate_legacy_copy():
+		quit(3)
 		return
 	_clean_old()
 	_make_shells()
@@ -58,6 +66,19 @@ func _load_json() -> bool:
 		return false
 	data = j.data
 	return true
+
+
+## G13：迁移前先拦住旧文本命令（查询 / 捕获 / 出示 / 前往、ITEM_cmd、SYNC 按钮）。
+func _validate_legacy_copy() -> bool:
+	var blob := JSON.stringify(data)
+	var dirty: Array[String] = []
+	for term in LEGACY_COPY:
+		if blob.contains(term):
+			dirty.append(term)
+	if dirty.is_empty():
+		return true
+	push_error("G13：JSON 仍含旧文本命令话术：" + ", ".join(dirty))
+	return false
 
 
 func _clean_old() -> void:

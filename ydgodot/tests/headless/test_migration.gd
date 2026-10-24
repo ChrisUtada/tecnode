@@ -20,10 +20,19 @@ func check(name: String, cond: bool, detail: String = "") -> void:
 func _initialize() -> void:
 	print("=== P1.1 迁移回归（JSON ↔ Resource）===")
 	var f := FileAccess.open("res://data/case-a001.json", FileAccess.READ)
+	var json_text := f.get_as_text()
 	var j := JSON.new()
-	j.parse(f.get_as_text())
+	j.parse(json_text)
 	f.close()
 	jd = j.data
+	# G13：旧文本命令话术不得回灌（查询 / 捕获 / 出示 / 前往、ITEM_cmd、SYNC 按钮）。
+	var legacy_terms := ["查询 真名", "查询 [item:", "查询一下物品档案", "指令交互",
+		"互动指令", "SYNC_MATRIX_INFERENCE", "ITEM_cmd", "出示 ", "前往 ", "捕获 [item:"]
+	var dirty: Array = []
+	for term in legacy_terms:
+		if json_text.contains(String(term)):
+			dirty.append(String(term))
+	check("G13 JSON 不含旧命令话术", dirty.is_empty(), str(dirty))
 
 	c = load("res://cases/a001/case.tres") as CaseDef
 	check("case.tres 可加载", c != null)
