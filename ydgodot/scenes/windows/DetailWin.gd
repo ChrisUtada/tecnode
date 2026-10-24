@@ -212,6 +212,8 @@ func _intro_text(n: Dictionary, kind: String) -> String:
 
 
 func _status_text(n: Dictionary, kind: String) -> String:
+	if kind == "loc" and _graph.is_no_entry(_key):
+		return "暂未发现入口 · 先探索其他地点"
 	if _graph.is_container_node(_key):
 		## 折叠要单独报：卡面副标删掉之后，「收起来了」只剩画布上「白纸 + 虚线框」
 		## 这一个很轻的形态线索（未探索是「纸色 + 虚线」），详情窗得把话说清楚。

@@ -306,12 +306,12 @@ func _build(w: float, h: float) -> void:
 
 	# 角标：字统一 12px 后跟着放大（9px 时「无文本入口」是 45px 宽，12px 要 60px）。
 	# 位置仍按 Web 的「右上 / 左上出沿」口径，只把宽度让出来。
-	_warn_badge = TecTheme.label("无文本入口", TecTheme.FS_BODY, TecTheme.TEXT)
+	_warn_badge = TecTheme.label("暂未发现入口", TecTheme.FS_BODY, TecTheme.TEXT)
 	_warn_badge.name = "warn"
 	_warn_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_warn_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_warn_badge.position = Vector2(PAD + w - 64.0, -2.0)
-	_warn_badge.size = Vector2(72.0, 20.0)
+	_warn_badge.position = Vector2(PAD + w - 80.0, -2.0)
+	_warn_badge.size = Vector2(88.0, 20.0)
 	_warn_badge.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, TecTheme.R_PILL,
 		TecTheme.TEXT, 2))
 	_warn_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -409,6 +409,7 @@ func set_warn(on: bool) -> void:
 		return
 	_warn = on
 	_warn_badge.visible = on and _lod_show_title()
+	tooltip_text = "暂未发现入口：先探索其他地点，或把相关节点交给 TEC 分析。" if on else ""
 
 
 ## 文字与角标只在「接近原生格」的倍率出现（0.88x 实测已缺笔、0.78x 完全认不出）

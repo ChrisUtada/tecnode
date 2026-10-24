@@ -171,6 +171,9 @@ func _test_desktop_flow() -> void:
 	await process_frame
 	check("配方不全：不触发结局", not bool(scene.dbg_state()["ending_visible"]))
 	check("配方不全：执行者弹出心碎", mw != null and mw.emote_visible())
+	check("配方不全：失败提示指向检查配方",
+		mw != null and mw.dbg_hint().contains("检查配方"),
+		mw.dbg_hint() if mw != null else "null")
 
 	# 补齐 TRUE_E 配方 → 长按推演 → 真名遮罩
 	var true_e := c.ending_by_id("TRUE_E")

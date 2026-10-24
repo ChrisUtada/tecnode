@@ -70,7 +70,12 @@ func refresh_store() -> void:
 		_rows.remove_child(c)
 		c.queue_free()
 	if list.is_empty():
-		var empty := TecTheme.label("空。", TecTheme.FS_BODY, TecTheme.FAINT)
+		var hint := "证物袋是空的。把物品拖到左侧「证物袋」图标或窗口上收纳；点一行可取回。"
+		if store_kind == GraphState.LEDGER:
+			hint = "线索册是空的。把线索拖到左侧「线索册」图标或窗口上收纳；点一行可取回。"
+		var empty := TecTheme.label(hint, TecTheme.FS_BODY, TecTheme.MUTED)
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empty.custom_minimum_size = Vector2(180.0, 0)
 		_rows.add_child(empty)
 		return
 	for key in list:

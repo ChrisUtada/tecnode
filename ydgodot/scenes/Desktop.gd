@@ -4352,10 +4352,15 @@ func _run_inference() -> void:
 			_matrix_win.set_hint("TEC：取证流程已经走完了。")
 		return
 	if hit == null:
+		## 失败要指向下一步：空桌布 vs 有线索但配方/数量不对。
+		var why := "桌布上还没有线索。先把线索拖上桌布。"
+		if graph.matrix_count() > 0:
+			why = "当前线索组合没有对应结局。检查配方与线索数量，取回多余线索再试。"
 		if _matrix_win != null and is_instance_valid(_matrix_win):
 			_matrix_win.show_heartbroken()
-		_log("推演失败：当前阵列不匹配任何结局配方", "warn")
-		_show_toast("推演失败：当前阵列不匹配任何结局配方", true)
+			_matrix_win.set_hint("TEC：" + why)
+		_log("推演失败：" + why, "warn")
+		_show_toast("推演失败：" + why, true)
 		return
 	var before := _save.snapshot()
 	graph.mark_ending(hit.id)

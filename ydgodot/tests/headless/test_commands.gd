@@ -110,6 +110,9 @@ func _test_conditional() -> void:
 		g.captured[cond.clue.id] = true
 	var good := cs.execute(g.key_of("item", "ITEMS_zhiwu"), cmd)
 	check("线索齐了：放行并说出铁门", bool(good.get("ok", false)) and String(good.get("message", "")).contains("铁门"))
+	check("线索齐了：产出「门的后面」场景",
+		(good.get("reveal", []) as Array).has("loc:SCENES_mdhm") or g.has("loc", "SCENES_mdhm"))
+	check("线索齐了：成功文案提示双击进入", String(good.get("message", "")).contains("双击"))
 
 
 # ── 5. password：木盒 0321（错的不推进、对的开箱给东西）────────────────

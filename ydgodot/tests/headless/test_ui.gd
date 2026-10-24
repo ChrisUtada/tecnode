@@ -838,18 +838,17 @@ func _initialize() -> void:
 
 	# ── 批 3（报告 §3.3 P2 残留）：warn 药丸 · pop 入场 · hover 光标 · dim 0.32 · 场景命令 · 拖动镜像 ──
 
-	# 14) V5 warn 药丸：mdhm 是 a001 里唯一「无文本入口」的未探索场景
-	# （零 [loc:] 入边 · 零命令产出 · 自己也没有出口）
-	check("谓词：mdhm 未探索前提", not (scene.dbg_state()["explored"] as Array).has("SCENES_mdhm"))
+	# 14) G2 修复后，「门的后面」有命令产出通路，不再是「无文本入口」。
+	check("谓词：mdhm 未探索前", not (scene.dbg_state()["explored"] as Array).has("SCENES_mdhm"))
 	check("谓词：枢纽花园（5 条入边）不算", not scene.graph.is_no_entry("loc:SCENES_garden"))
 	check("谓词：命令产出的 choutiyi 不算", not scene.graph.is_no_entry("loc:SCENES_choutiyi"))
 	var md_key: String = scene.dbg_ensure("loc", "SCENES_mdhm")
 	await process_frame
-	check("谓词：mdhm 无文本入口", scene.graph.is_no_entry(md_key))
+	check("谓词：mdhm 有产出通路后不算无入口", not scene.graph.is_no_entry(md_key))
 	var md_card: NodeCard = _cards().get(md_key, null)
 	check("mdhm 上卡", md_card != null)
-	check("无文本入口药丸挂上了", md_card != null and md_card._warn and md_card._warn_badge.visible,
-		str(md_card != null and md_card._warn))
+	check("mdhm 不再挂无文本入口药丸",
+		md_card != null and not md_card._warn and not md_card._warn_badge.visible)
 	check("已探索的花园不挂药丸", (_cards()["loc:SCENES_garden"] as NodeCard)._warn == false)
 
 	# 15) V4 pop：fresh 节点初生 0.4→1.12→1（0.45s）；fresh 一次性消费、「新」角标保留
@@ -1663,6 +1662,9 @@ func _initialize() -> void:
 	scene._clear_drop_over()
 	scene._toggle_storage("BAG")
 	await process_frame
+	var bag_empty := scene._bag_win._rows.get_child(0) as Label
+	check("G3 空证物袋有收纳指引",
+		bag_empty != null and bag_empty.text.contains("拖"))
 	scene._update_drop_over(scene._bag_win.get_global_rect().get_center())
 	check("G3 收纳窗口也显示统一虚线框", scene._drop_outline.visible)
 	check("G3 窗口虚线框在窗框外 4px",

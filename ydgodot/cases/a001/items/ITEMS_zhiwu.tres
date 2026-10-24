@@ -19,6 +19,7 @@
 [ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="17_hhwqr"]
 [ext_resource type="Script" path="res://core/defs/commands/ConditionalCommandDef.gd" id="18_umswc"]
 [ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="19_c8qb6"]
+[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_mdhm.tres" id="20_mdhm"]
 
 [sub_resource type="Resource" id="Resource_0uc8v"]
 script = ExtResource("2_8jja2")
@@ -87,7 +88,8 @@ fail_message = "疯长的植物层层叠叠"
 
 [sub_resource type="Resource" id="Resource_gnb8l"]
 script = ExtResource("17_hhwqr")
-message = "你拨开了疯长的大豕草，一扇隐蔽的铁门出现在你的面前，门的后面隐约有声音传出。"
+message = "你拨开了疯长的大豕草，一扇隐蔽的铁门出现在你的面前，门的后面隐约有声音传出。「门的后面」已经出现在画布上，双击进入。"
+scene = ExtResource("20_mdhm")
 
 [sub_resource type="Resource" id="Resource_kaqga"]
 script = ExtResource("18_umswc")
