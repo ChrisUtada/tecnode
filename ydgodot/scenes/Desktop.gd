@@ -130,6 +130,7 @@ var _active_win: SysWindow = null     # A2：当前最上层的激活窗
 var _bag_win: StorageWin = null
 var _ledger_win: StorageWin = null
 var _matrix_win: MatrixWin = null
+var _matrix_pair_layout := false   # G3：桌布与花园并排过 → 花园关闭时复位
 var _matrix_faded: Array = []      # A7：被矩阵窗盖住的卡片，关窗 / 拖动时恢复
 var _archive_win: ArchiveWin = null
 var _mem_card: MemCard = null
@@ -1522,9 +1523,31 @@ func _place_floating_windows() -> void:
 		## 对话窗在 1280 本来就是贴右 4px 的 858，别拿 14px 去夹它。
 		_chat_win.position = Vector2(minf(858.0, vw - 4.0 - _chat_win.size.x),
 			minf(58.0, desk_h - 14.0 - _chat_win.size.y))
-	if _garden_win != null and is_instance_valid(_garden_win):
-		_garden_win.position = Vector2(minf(380.0, vw - 14.0 - _garden_win.size.x),
-			minf(58.0, desk_h - 14.0 - _garden_win.size.y))
+	## G3：结局种子在桌布上。桌布与花园同时开时，能并排就并排（1280 及以上），
+	## 让种子与花圃同屏；小窗口仍按原位置，玩家按 toast 指引把种子拖到花园图标。
+	var matrix_ok := _matrix_win != null and is_instance_valid(_matrix_win) and _matrix_win.visible
+	var garden_ok := _garden_win != null and is_instance_valid(_garden_win) and _garden_win.visible
+	var paired := false
+	if matrix_ok and garden_ok:
+		var gap := 12.0
+		var total_w := _matrix_win.size.x + _garden_win.size.x + gap
+		var need_h := maxf(_matrix_win.size.y, _garden_win.size.y)
+		if total_w <= vw - 28.0 and need_h <= desk_h - 54.0:
+			var left := maxf(14.0, (vw - total_w) * 0.5)
+			_matrix_win.position = Vector2(left,
+				maxf(14.0, minf(40.0, desk_h - 14.0 - _matrix_win.size.y)))
+			_garden_win.position = Vector2(left + _matrix_win.size.x + gap,
+				maxf(14.0, minf(58.0, desk_h - 14.0 - _garden_win.size.y)))
+			paired = true
+	if matrix_ok and not paired and _matrix_pair_layout:
+		_matrix_win.position = Vector2(
+			maxf(14.0, minf(336.0, vw - 14.0 - _matrix_win.size.x)),
+			maxf(14.0, minf(40.0, desk_h - 14.0 - _matrix_win.size.y)))
+	_matrix_pair_layout = paired
+	if garden_ok and not paired:
+		_garden_win.position = Vector2(
+			maxf(14.0, minf(380.0, vw - 14.0 - _garden_win.size.x)),
+			maxf(14.0, minf(58.0, desk_h - 14.0 - _garden_win.size.y)))
 
 
 func _minimize_music() -> void:
@@ -1661,7 +1684,7 @@ func _on_ending_finished() -> void:
 	if _matrix_win != null and is_instance_valid(_matrix_win):
 		_matrix_win.refresh_seed()
 	_refresh_app_icons()
-	_show_toast("花盆里多了一枚种子。去花园种下它。")
+	_show_toast("结局留下了一枚种子。把桌布上的种子拖到左侧「花园」图标。")
 
 
 func _build_case_park() -> void:
@@ -3374,6 +3397,7 @@ func _toggle_matrix() -> void:
 		_restore_matrix_occlusion()
 		_matrix_win.queue_free()
 		_matrix_win = null
+		_place_floating_windows()
 		return
 	_matrix_win = MatrixWin.new()
 	_matrix_win.name = "matrix_win"
@@ -3383,11 +3407,14 @@ func _toggle_matrix() -> void:
 	_matrix_win.clue_dropped.connect(_on_matrix_dropped)
 	_matrix_win.inference_requested.connect(_run_inference)
 	_matrix_win.seed_dropped.connect(_on_seed_dropped)
+	## A7：用户点窗内 × 关闭时也要恢复被淡出的卡片；不能只覆盖图标开关那条路径。
+	_matrix_win.closed.connect(_on_matrix_closed)
 	# 线索卡拖动的镜像挂在桌面上（桌布自己 clip_contents，镜像挂里面拖到边缘会被裁掉）
 	_matrix_win.drag_host = _desk
 	_matrix_win.item_rect_changed.connect(_sync_matrix_occlusion)
 	_desk.add_child(_matrix_win)
 	_place_z(_matrix_win, ZR_WIN)
+	_place_floating_windows()
 	_sync_matrix_occlusion.call_deferred()
 
 
@@ -3422,6 +3449,12 @@ func _restore_matrix_occlusion() -> void:
 			c.modulate.a = 1.0
 			c.process_mode = Node.PROCESS_MODE_INHERIT
 	_matrix_faded.clear()
+
+
+func _on_matrix_closed() -> void:
+	_restore_matrix_occlusion()
+	_matrix_win = null
+	_place_floating_windows()
 
 
 ## 画布 / 册子 → 桌布。感官自动取线索自身的 sense（与 Web 的 assignClue 一致）。

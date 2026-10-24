@@ -284,6 +284,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("撤销后播放器释放", scene.dbg_music_win() == null)
 
 	check("真名结局可播", scene.dbg_ending() != null)
+	scene._hide_toast()
 	scene.dbg_play_true_ending()
 	check("结局遮罩已开", scene.dbg_ending().visible)
 	scene.dbg_confirm_ending()
@@ -293,6 +294,9 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("narr 是真名说明", String(g.garden.get("narr", "")) == GardenSystem.true_ending_message(c))
 	check("花园图标出现", scene.dbg_garden_icon_visible())
 	check("花园种子角标", scene.dbg_garden_badge_text() == "种子", scene.dbg_garden_badge_text())
+	check("G3 种子提示指向左侧花园图标",
+		scene.dbg_toast_text().contains("拖") and scene.dbg_toast_text().contains("左侧")
+			and scene.dbg_toast_text().contains("花园"), scene.dbg_toast_text())
 	check("重复确认不再发", not GardenSystem.grant_seed(g, "x", c))
 	check("重复确认不改 narr", String(g.garden.get("narr", "")) == GardenSystem.true_ending_message(c))
 
@@ -305,6 +309,13 @@ func _test_desktop(c: CaseLoader) -> void:
 		return
 	check("花园窗标题", garden.title == "花园", garden.title)
 	check("花园宽 520", garden.size.x == 548.0, str(garden.size))
+	check("G3 桌布与花园并排、不互相遮挡",
+		not matrix.get_global_rect().intersects(garden.get_global_rect()),
+		"%s / %s" % [matrix.get_global_rect(), garden.get_global_rect()])
+	var view_rect := Rect2(Vector2.ZERO, Vector2(scene._vw(), scene._vh()))
+	check("G3 桌布与花园都在视口内",
+		view_rect.encloses(matrix.get_global_rect()) and view_rect.encloses(garden.get_global_rect()),
+		"%s / %s" % [matrix.get_global_rect(), garden.get_global_rect()])
 	var field: Rect2 = garden.field_global_rect()
 	check("花圃有宽度", field.size.x > 400.0 and field.size.y == 260.0, str(field))
 	check("花圃在窗内", garden.get_global_rect().encloses(field), str(garden.get_global_rect()))
@@ -385,6 +396,24 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("存档 at 保留", int((g2.garden["plots"] as Array)[0]["at"]) == int(plot["at"]))
 	check("存档 hit 保留", bool((g2.garden["plots"] as Array)[0]["hit"]))
 	check("存档 narr 保留", String(g2.garden.get("narr", "")) == String(g.garden.get("narr", "")))
+
+	# A7：点桌布窗内 × 关闭时，被遮罩淡出的卡片必须恢复（用户截图：节点消失、连线还在）。
+	var probe: NodeCard = null
+	for key in scene._cards.keys():
+		var c2 := scene._cards[key] as NodeCard
+		if c2 != null and c2.visible:
+			probe = c2
+			break
+	if probe != null:
+		var saved_global := probe.global_position
+		probe.global_position = matrix.global_position + Vector2(20, 20)
+		scene._sync_matrix_occlusion()
+		check("A7 矩阵覆盖的卡淡出", probe.modulate.a == 0.0, str(probe.modulate.a))
+		matrix._on_close_pressed()
+		await process_frame
+		check("A7 关闭矩阵后引用清空", scene.dbg_matrix_win() == null)
+		check("A7 关闭矩阵后覆盖卡恢复", probe.modulate.a == 1.0, str(probe.modulate.a))
+		probe.global_position = saved_global
 
 	scene.queue_free()
 	await process_frame
