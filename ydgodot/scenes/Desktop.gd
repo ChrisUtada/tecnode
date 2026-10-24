@@ -2468,7 +2468,9 @@ func _tutorial_on_activate(key: String) -> bool:
 	if _tutorial_step == TutorialStep.DOUBLE_CLICK_CLUE:
 		if key == TUT_CLUE_KEY or key == TUT_ACTOR_KEY:
 			var cert_key := _tutorial_spawn_node("item", TUT_CERT_ITEM_ID, 2)
-			graph.link(TUT_CLUE_KEY, cert_key, "entity")
+			## 证件是「人」的证件：连线从调查员人物节点出发，不从线索出发。
+			graph.link(TUT_ACTOR_KEY, cert_key, "entity")
+			_repaint_edges()
 			_tutorial_step = TutorialStep.DRAG_CERT
 			_tutorial_set_hint()
 			_tutorial_say("这是你的调查员证。把它拖给我，我核对一下。")
@@ -3215,6 +3217,7 @@ func _spawn_card(key: String) -> NodeCard:
 	card.drag_finished.connect(_on_card_drag_finished)
 	card.combo_requested.connect(_on_card_combo)
 	card.pin_toggled.connect(_on_card_pin_toggled)
+	card.spring_finished.connect(_on_card_spring_finished)
 	_card_layer.add_child(card)
 	_cards[key] = card
 	## 新卡上画布时立刻对齐当前倍率，否则缩小状态下新出现的卡会带着「完整两行」出现
@@ -3343,6 +3346,8 @@ func _drop_card_mirror(card: NodeCard) -> void:
 
 ## 松手：落点由 `_handle_card_drop` 分派；没命中就停在松手处并把坐标写回数据
 func _on_card_drag_finished(key: String, pos: Vector2, handled: bool) -> void:
+	## 松手后的 spring_back 会走 0.3s；这段期间连线必须跟着卡片走，不能停在落点。
+	_follow_frames = maxi(_follow_frames, 40)
 	var finished_card: NodeCard = _cards.get(key, null)
 	_drop_card_mirror(finished_card)
 	_drag_key = ""
@@ -3544,6 +3549,10 @@ func _clear_drop_over() -> void:
 	if _drag_over_card != "" and _cards.has(_drag_over_card):
 		(_cards[_drag_over_card] as NodeCard).set_over(false)
 	_drag_over_card = ""
+
+
+func _on_card_spring_finished(_key: String) -> void:
+	_repaint_edges()
 
 
 ## 落点悬停高亮的统一入口（TecChip 之类没实现 set_over 的控件自动跳过）

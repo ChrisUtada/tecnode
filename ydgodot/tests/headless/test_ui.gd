@@ -1630,6 +1630,10 @@ func _initialize() -> void:
 		await process_frame
 	check("G2 双击调查员节点产出证件节点",
 		scene._cards.has(tut_cert_key) and scene._tutorial_step == 2)
+	check("G2 证件连线来自调查员人物", scene.graph.has_edge(tut_actor_key, tut_cert_key))
+	check("G2 证件不再连到线索", not scene.graph.has_edge(tut_clue_key, tut_cert_key))
+	scene._repaint_edges()
+	check("G2 人物→线索、人物→证件两条线", scene._edge_layer.segment_count() == 2)
 	check("G2 TEC 提示把证件拖过去", _last_line(scene._tec).contains("调查员证"))
 	scene._apply_drop("tec-avatar", tut_clue_key)
 	check("G2 线索不交给 TEC", not scene._tec.is_analyzing())
@@ -1640,6 +1644,7 @@ func _initialize() -> void:
 		await process_frame
 	check("G2 产出调查员证线索",
 		scene.graph.captured.has("CLUES_INVESTIGATOR_CERT") and scene._cards.has(tut_cert_clue_key))
+	check("G2 证书线索从证件连出", scene.graph.has_edge(tut_cert_key, tut_cert_clue_key))
 	check("G2 进入第③幕收纳", scene._tutorial_step == 3)
 	check("G2 TEC 收尾台词", _last_line(scene._tec).contains("核对完成"))
 

@@ -27,6 +27,8 @@ signal drag_moved(key: String, at_global: Vector2)
 ## 松手：handled=true 表示被落点消费（已弹回原位）；false 表示停在原位（pos 已夹回边界）
 signal drag_finished(key: String, pos: Vector2, handled: bool)
 signal pin_toggled(key: String)
+## 松手弹回原位结束（Desktop 用它补一次连线重绘，避免线停在半路）。
+signal spring_finished(key: String)
 
 const PAD := 8.0
 const DRAG_THRESHOLD := 5.0
@@ -780,7 +782,8 @@ func _spring_to(target: Vector2) -> void:
 		.set_ease(Tween.EASE_OUT)
 	_spring.finished.connect(func():
 		position = target
-		_home = target)
+		_home = target
+		spring_finished.emit(card_key))
 
 
 ## 松手时指针下面是哪张卡（排除自己；折叠的容器也算，交给 Desktop 决定放不放行）
