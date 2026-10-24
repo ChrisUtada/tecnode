@@ -23,6 +23,7 @@ const MEM_CARD_MIN_X := 132.0
 const WORLD_W := 2000.0
 const WORLD_H := 1300.0
 const AUTOSAVE_DELAY_MSEC := 180
+const StartScreenScript := preload("res://ui/StartScreen.gd")
 
 ## 页眉几何 —— 逐项来自 Web 的计算布局（tools/pixeldiff/probe_web_rects.cjs 量的
 ## getBoundingClientRect），不是凭感觉的间距。改文案长度要同步改宽度，否则右侧按钮组会错位。
@@ -151,6 +152,7 @@ var _storage_before: Dictionary = {}
 var _investigator: Dictionary = {}
 var _inv_path := Investigator.PATH
 var _intro: IntroWin = null
+var _start_screen: Control = null
 var _inv_chip: Button = null
 var _cert_win: SysWindow = null
 var _catalog: CaseCatalog = null
@@ -346,12 +348,10 @@ func _ready() -> void:
 	_update_case_chrome()
 	_update_case_park_ui()
 	_refresh_chip()
-	if _resume_allowed() and _resume_from_save():
-		_show_toast("已继续上次进度")
+	if _start_screen_allowed():
+		_open_start_screen()
 	else:
-		_start_slice()
-	if _intro_allowed() and _investigator.is_empty():
-		_open_intro()
+		_boot_session()
 	if _has_arg("--shot-p2"):
 		_shot_p2_flow.call_deferred()
 	elif _has_arg("--shot-p3"):
@@ -2082,6 +2082,71 @@ func _intro_allowed() -> bool:
 	if DisplayServer.get_name() == "headless":
 		return false
 	return not _shot_mode() and not _has_arg("--no-intro")
+
+
+## 第 0 幕：正常启动（非无头 / 非截图 / 未显式 --no-start）先停在开始界面。
+func _start_screen_allowed() -> bool:
+	if DisplayServer.get_name() == "headless":
+		return false
+	return not _shot_mode() and not _has_arg("--no-start")
+
+
+func _open_start_screen() -> void:
+	if _start_screen != null and is_instance_valid(_start_screen):
+		return
+	var has_save := _save_enabled and _catalog != null and _catalog.has_save(_active_case)
+	_start_screen = StartScreenScript.new()
+	_start_screen.name = "start_screen"
+	_start_screen.z_index = 100
+	_start_screen.setup(has_save)
+	_start_screen.start_requested.connect(_on_start_new)
+	_start_screen.continue_requested.connect(_on_start_continue)
+	_start_screen.quit_requested.connect(func(): get_tree().quit())
+	add_child(_start_screen)
+
+
+func _close_start_screen() -> void:
+	if _start_screen != null and is_instance_valid(_start_screen):
+		_start_screen.queue_free()
+	_start_screen = null
+
+
+func _boot_session() -> void:
+	if _resume_allowed() and _resume_from_save():
+		_show_toast("已继续上次进度")
+	else:
+		_start_slice()
+	if _intro_allowed() and _investigator.is_empty():
+		_open_intro()
+
+
+func _on_start_new(overwrite: bool) -> void:
+	_close_start_screen()
+	if overwrite:
+		_clear_case_save()
+	_start_slice()
+	if _intro_allowed() and _investigator.is_empty():
+		_open_intro()
+
+
+func _on_start_continue() -> void:
+	_close_start_screen()
+	if _resume_allowed() and _resume_from_save():
+		_show_toast("已继续上次进度")
+		return
+	## 存档损坏 / 被外部删掉：退回新调查，不把玩家卡在空桌面。
+	_start_slice()
+	if _intro_allowed() and _investigator.is_empty():
+		_open_intro()
+	_show_toast("存档不可用，已开始新调查", true)
+
+
+func _clear_case_save() -> void:
+	if _save != null:
+		_save.clear_save()
+	var path := SaveSystem.save_path_for(_case_id())
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 func _refresh_chip() -> void:

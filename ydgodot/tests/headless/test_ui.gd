@@ -2,6 +2,8 @@
 ## P0 界面级回归：真的往 NodeCard 里塞鼠标事件，验证「拖拽 = 组合 / 双击 = 点亮」这条接线。
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_ui.gd
 
+const StartScreenScript := preload("res://ui/StartScreen.gd")
+
 var fails := 0
 var total := 0
 var scene: Control
@@ -1510,6 +1512,53 @@ func _initialize() -> void:
 		dlong != null and dbtn != null and dlong.get_global_rect().encloses(dbtn.get_global_rect()),
 		"null" if dlong == null or dbtn == null else "%s / %s" % [
 			dlong.get_global_rect(), dbtn.get_global_rect()])
+
+	# 第 0 幕：开始界面。无档时「继续」禁用；有档时开始要先确认覆盖。
+	var ss = StartScreenScript.new()
+	ss.setup(false)
+	root.add_child(ss)
+	await process_frame
+	var start_btn := ss.find_child("btn_start", true, false) as Button
+	var continue_btn := ss.find_child("btn_continue", true, false) as Button
+	var settings_btn := ss.find_child("btn_settings", true, false) as Button
+	var demon := ss.find_child("demon", true, false) as TextureRect
+	var emote := ss.find_child("emote", true, false) as PanelContainer
+	check("G0 开始界面四键齐全",
+		start_btn != null and continue_btn != null and settings_btn != null
+			and ss.find_child("btn_quit", true, false) != null)
+	check("G0 无档时继续置灰", continue_btn != null and continue_btn.disabled)
+	var started: Array = []
+	ss.start_requested.connect(func(overwrite: bool): started.append(overwrite))
+	start_btn.pressed.emit()
+	check("G0 无档时开始直接新调查", started == [false], str(started))
+	ss.set_has_save(true)
+	check("G0 有档时继续可用", continue_btn != null and not continue_btn.disabled)
+	start_btn.pressed.emit()
+	var dialog := ss.find_child("dialog_layer", true, false) as Control
+	check("G0 有档时开始先确认覆盖", dialog != null and dialog.visible)
+	var overwrite_btn := ss.find_child("dialog_btn_覆盖并开始", true, false) as Button
+	if overwrite_btn != null:
+		overwrite_btn.pressed.emit()
+	check("G0 确认覆盖后发出 overwrite=true", started.size() == 2 and bool(started[1]))
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	demon.gui_input.emit(ev)
+	check("G0 点击恶魔冒出表情", emote != null and emote.visible)
+	settings_btn.pressed.emit()
+	check("G0 设置面板可打开", dialog != null and dialog.visible)
+	ss.queue_free()
+	await process_frame
+
+	# 第 0 幕与 Desktop 接线：开始后撤掉开始界面并进入首局。
+	scene._open_start_screen()
+	await process_frame
+	check("G0 Desktop 能挂开始界面", scene._start_screen != null)
+	if scene._start_screen != null:
+		scene._start_screen.start_requested.emit(false)
+		await process_frame
+	check("G0 开始后进入桌面", scene._start_screen == null
+		and scene.graph != null and scene.graph.nodes.has("loc:SCENES_garden"))
 
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)
