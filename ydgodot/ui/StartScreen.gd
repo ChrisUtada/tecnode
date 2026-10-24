@@ -396,6 +396,13 @@ func _toggle_fullscreen() -> void:
 	_show_settings()
 
 
+## 读档失败等外部错误：留在开始界面给玩家一个可读提示，不关闭界面。
+func show_notice(title: String, body: String) -> void:
+	if _dialog_layer == null:
+		return
+	_open_dialog(title, body, [["知道了", true, _close_dialog]])
+
+
 func _open_dialog(title: String, body: String, actions: Array) -> void:
 	_dialog_title.text = title
 	_dialog_body.text = body

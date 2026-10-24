@@ -128,6 +128,13 @@ func _test_intro_ui() -> void:
 	check("标题切到调查员证", w.dbg_title() == "调查员证", w.dbg_title())
 	var cert := w.find_child("cert", true, false)
 	check("证件版式已生成", cert != null)
+	# G8：写盘失败必须留在领证页，不能假装成功关闭。
+	w.store_path = "user://"
+	w.dbg_confirm()
+	check("G8 写盘失败留在领证页", w.dbg_step() == "card", str(w.dbg_step()))
+	var intro_err := w.find_child("intro_error", true, false) as Label
+	check("G8 写盘失败给出提示", intro_err != null and intro_err.visible and intro_err.text != "")
+	w.store_path = TEMP_INV
 	var got := {"card": {}}
 	w.finished.connect(func(card: Dictionary): got["card"] = card)
 	w.dbg_confirm()
@@ -178,6 +185,13 @@ func _test_desktop() -> void:
 	await process_frame
 	check("可回看调查员证", scene.dbg_cert_open())
 	scene._reset_case()
+	await process_frame
+	check("重置先弹确认", scene._confirm_win != null and scene._confirm_win.visible)
+	if scene._confirm_win != null:
+		scene._confirm_win.dbg_cancel()
+	await process_frame
+	check("取消后确认窗关闭", scene._confirm_win == null)
+	scene._reset_case(true)
 	check("重来不清调查员", String(scene.dbg_investigator().get("name", "")) == "执行者")
 	scene.dbg_clear_investigator()
 	check("清证后内存为空", scene.dbg_investigator().is_empty())

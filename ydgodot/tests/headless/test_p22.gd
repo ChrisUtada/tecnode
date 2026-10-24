@@ -296,7 +296,7 @@ func _test_desktop() -> void:
 	check("分析中", bool(scene.dbg_tec_info()["win"]["analyzing"]))
 	scene.dbg_tec_open()
 	await process_frame
-	scene._reset_case()
+	scene._reset_case(true)
 	await process_frame
 	await process_frame
 	info = scene.dbg_tec_info()

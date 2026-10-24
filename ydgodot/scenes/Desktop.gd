@@ -35,6 +35,7 @@ const TUT_CERT_CLUE_ID := "CLUES_INVESTIGATOR_CERT"
 const TUT_ENDING_ID := "TUT_CERT"
 const CertWinScript := preload("res://scenes/windows/CertWin.gd")
 const PhotoWinScript := preload("res://scenes/windows/PhotoWin.gd")
+const ConfirmWinScript := preload("res://ui/ConfirmWin.gd")
 const DropOutlineScript := preload("res://ui/DropOutline.gd")
 const TUT_OFFICE_KEY := "loc:" + TUT_OFFICE_ID
 const TUT_CERT_ITEM_KEY := "item:" + TUT_CERT_ITEM_ID
@@ -189,6 +190,7 @@ var _tutorial_tec_placed := false
 var _tutorial_tec_icon_visible := false
 var _tutorial_map_arranged := false
 var _photo_win: SysWindow = null
+var _confirm_win: Control = null
 var _drop_outline: DropOutline = null
 var _inv_chip: Button = null
 var _cert_win: SysWindow = null
@@ -2230,9 +2232,30 @@ func _new_runtime() -> void:
 	_refresh_app_icons()
 
 
-func _reset_case() -> void:
+## 不可逆操作：默认先弹确认；测试 / 调试可传 force=true 直接重置。
+func _reset_case(force := false) -> void:
 	if not _require_case():
 		return
+	if force:
+		_reset_case_now()
+		return
+	if _confirm_win != null and is_instance_valid(_confirm_win):
+		return
+	var w := ConfirmWinScript.new()
+	w.name = "confirm_reset"
+	w.setup("重置本案？", "当前案件的进度、节点和日志都会被清除，且无法撤销。", "重置", "取消")
+	w.confirmed.connect(_reset_case_now)
+	w.cancelled.connect(func(): _confirm_win = null)
+	w.tree_exited.connect(func(): _confirm_win = null)
+	w.z_index = 90
+	add_child(w)
+	_confirm_win = w
+
+
+func _reset_case_now() -> void:
+	if _confirm_win != null and is_instance_valid(_confirm_win):
+		_confirm_win.queue_free()
+		_confirm_win = null
 	if _save != null:
 		_save.clear_save()
 	_start_slice()
@@ -2594,6 +2617,8 @@ func _tutorial_on_matrix_changed() -> void:
 
 func _tutorial_on_inference_success(hit: EndingDef) -> void:
 	graph.mark_ending(hit.id)
+	## 教学桌布用完即收：清空配方，避免领证/选案期间重开推演器误触正式结局。
+	graph.clear_matrix()
 	_tutorial_step = TutorialStep.CERT_FORM
 	_tutorial_set_hint()
 	_tutorial_say("推演成立。调查员证已经生成——把姓名、编号、日期和照片补齐。")
@@ -2770,14 +2795,18 @@ func _restore_full_chrome() -> void:
 
 
 func _on_start_continue() -> void:
-	_close_start_screen()
 	if _resume_allowed() and _resume_from_save():
+		_close_start_screen()
 		_show_toast("已继续上次进度")
 		return
-	## 存档损坏 / 被外部删掉：退回新调查的完整开场，不把玩家卡在空桌面，
-	## 也不再落回旧的测验式 IntroWin。
-	_begin_tutorial()
-	_show_toast("存档不可用，已开始新调查", true)
+	## 读档失败：留在开始界面报错，不动调查员证；清证只由「开始新调查」的确认路径负责。
+	if _start_screen != null and is_instance_valid(_start_screen):
+		_start_screen.show_notice("读档失败",
+			"存档无法读取。你的调查员证不会被清除；请重试，或从「开始」进入新调查。")
+		return
+	_start_slice()
+	_show_toast("存档不可用，已回到桌面", true)
+
 
 func _clear_case_save() -> void:
 	if _save != null:
@@ -4308,13 +4337,19 @@ func _refresh_matrix_views() -> void:
 ## 长按蓄力完成 → 配方判定（Web 的 executeInference）：恰好命中才算，多余线索也失败
 func _run_inference() -> void:
 	var hit := graph.match_ending()
-	if _tutorial_active and _tutorial_step == TutorialStep.INFER:
-		if hit == null or hit.id != TUT_ENDING_ID:
-			if _matrix_win != null and is_instance_valid(_matrix_win):
-				_matrix_win.show_heartbroken()
-				_matrix_win.set_hint("TEC：配方不对——只需要「调查员证」一条线索。")
+	if _tutorial_active:
+		if _tutorial_step == TutorialStep.INFER:
+			if hit == null or hit.id != TUT_ENDING_ID:
+				if _matrix_win != null and is_instance_valid(_matrix_win):
+					_matrix_win.show_heartbroken()
+					_matrix_win.set_hint("TEC：配方不对——只需要「调查员证」一条线索。")
+				return
+			_tutorial_on_inference_success(hit)
 			return
-		_tutorial_on_inference_success(hit)
+		## 领证 / 选案阶段重开推演器：教学已经结束，不能落入正式结局幕。
+		if _matrix_win != null and is_instance_valid(_matrix_win):
+			_matrix_win.show_heartbroken()
+			_matrix_win.set_hint("TEC：取证流程已经走完了。")
 		return
 	if hit == null:
 		if _matrix_win != null and is_instance_valid(_matrix_win):

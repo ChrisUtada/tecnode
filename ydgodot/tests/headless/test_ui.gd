@@ -1537,6 +1537,15 @@ func _initialize() -> void:
 	await process_frame
 	check("G0 Desktop 能挂开始界面", scene._start_screen != null)
 	if scene._start_screen != null:
+		scene._investigator = {"name": "保留的调查员"}
+		scene._on_start_continue()
+		await process_frame
+		check("C8 读档失败仍留在开始界面", scene._start_screen != null)
+		check("C8 读档失败不清调查员证",
+			String(scene._investigator.get("name", "")) == "保留的调查员")
+		check("C8 读档失败给出可读提示",
+			scene._start_screen._dialog_layer != null and scene._start_screen._dialog_layer.visible)
+		scene._start_screen._close_dialog()
 		scene._start_screen.start_requested.emit(false)
 		await process_frame
 	check("G1 开始后进入空白桌面", scene._start_screen == null and scene._tutorial_active)
@@ -1737,6 +1746,15 @@ func _initialize() -> void:
 	check("G4 推演成功进入领证",
 		scene._tutorial_step == 4 and scene._tutorial_cert_win != null)
 	check("G4 桌布窗已收起", scene._matrix_win == null)
+	check("G4 教学推演后桌布清空", scene.graph.matrix_count() == 0)
+	scene._toggle_matrix()
+	await process_frame
+	scene._matrix_win.finish_charge()
+	await process_frame
+	check("G4 领证期重开推演不弹正式结局",
+		not scene._ending.visible and scene._tutorial_step == 4)
+	scene._toggle_matrix()
+	await process_frame
 
 	# ── 第 5 幕：姓名 / 编号 / 日期 / 照片 ──
 	var cert = scene._tutorial_cert_win

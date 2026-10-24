@@ -25,6 +25,7 @@ var _panel: PanelContainer
 var _panel_shadow: ColorRect
 var _box: VBoxContainer
 var _name_edit: LineEdit = null
+var _error: Label = null
 
 
 func setup(p_pool: Array = [], p_names: Dictionary = {}, p_locked: int = 0) -> void:
@@ -75,6 +76,7 @@ func _build() -> void:
 func _render() -> void:
 	_clear()
 	_name_edit = null
+	_error = null
 	match _step:
 		"name":
 			_render_name()
@@ -360,6 +362,12 @@ func _render_card() -> void:
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center.add_child(build_cert(card))
 	_box.add_child(center)
+	_error = TecTheme.label("", TecTheme.FS_BODY, TecTheme.SPOT_DANGER)
+	_error.name = "intro_error"
+	_error.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_error.custom_minimum_size = Vector2(WIDTH - 36.0, 0)
+	_error.visible = false
+	_box.add_child(_error)
 	var btn := _primary("[ 确认领证 ]")
 	btn.pressed.connect(_confirm_card)
 	var back := TecTheme.button("[ 换一张头像 ]")
@@ -375,6 +383,10 @@ func _confirm_card() -> void:
 	card["avatarId"] = _avatar_id
 	if not Investigator.save_to(card, store_path):
 		push_warning("调查员证写入失败：" + store_path)
+		if _error != null:
+			_error.text = "证件写入失败，请检查存档目录后重试。"
+			_error.visible = true
+		return
 	_step = "done"
 	finished.emit(card.duplicate(true))
 	var t := create_tween()

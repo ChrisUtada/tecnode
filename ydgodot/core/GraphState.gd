@@ -699,6 +699,12 @@ func matrix_count() -> int:
 	return matrix_ids().size()
 
 
+## 清空桌布上的线索（教学推演完成后用；线索仍保留在 stored=MATRIX，不会重新上桌）。
+func clear_matrix() -> void:
+	for sense in SENSES:
+		matrix[sense] = []
+
+
 func matrix_has(id: String) -> bool:
 	return matrix_ids().has(id)
 
