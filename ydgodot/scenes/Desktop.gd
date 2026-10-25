@@ -503,6 +503,9 @@ func _process(_dt: float) -> void:
 		_anchor_card_to(_mem_card, _mem_anchor_key)
 	if _sdrag_key == "":
 		return
+	if _card_mirror != null and is_instance_valid(_card_mirror):
+		_dbg_storage_flow("行拖拽期间发现残留卡片镜像，强制移除")
+		_drop_card_mirror(null)
 	var at := _desk.get_global_mouse_position()
 	if not _sdrag_started:
 		if at.distance_to(_sdrag_origin) < 5.0:
@@ -524,9 +527,10 @@ func _process(_dt: float) -> void:
 			str((_sdrag_ghost as Control).global_position) if _sdrag_ghost != null else "无幽灵"])
 		_dbg_storage_flow("拖拽幽灵生成 global=%s size=%s cursor=%s" % [
 			str((_sdrag_ghost as Control).global_position), str((_sdrag_ghost as Control).size), at])
-		_dbg_storage_flow("鼠标坐标对照 os=%s win=%s viewport=%s desk=%s" % [
+		_dbg_storage_flow("鼠标坐标对照 os=%s win=%s viewport=%s desk=%s scale=%s window=%s" % [
 			DisplayServer.mouse_get_position(), get_window().position,
-			get_viewport().get_mouse_position(), _desk.get_global_mouse_position()])
+			get_viewport().get_mouse_position(), _desk.get_global_mouse_position(),
+			str(DisplayServer.screen_get_scale()), str(get_window().size)])
 	else:
 		_sdrag_ghost.position = _sdrag_ghost_position(at)
 		if _dbg_trace_key != "":
@@ -568,19 +572,24 @@ func _storage_win_of(key: String) -> Control:
 
 ## 收纳窗里按住一行（StorageWin.row_pressed）→ 开启拖拽会话
 func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void:
-	## 行拖拽开始前先结束任何残留的画布平移：否则拖行时镜头还在跟鼠标走，
-	## 看起来就是「幽灵在光标处、节点在别处」。
+	## 行拖拽开始前先结束任何残留的画布平移 / 卡片镜像，
+	## 否则行拖时可能同时看到「小幽灵在光标」和「整张卡片镜像在旧位」。
 	_panning = false
 	if _stage != null:
 		_stage.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	if _drag_key != "":
+		_abort_card_drag()
+	else:
+		_drop_card_mirror(null)
 	_sdrag_key = key
 	_sdrag_from = from_kind
 	_sdrag_origin = at_global
 	_sdrag_started = false
 	_sdrag_label = String(graph.node(key).get("label", key))
 	var rc := _cards.get(key, null) as NodeCard
-	_dbg_storage_flow("行按下 key=%s from=%s at=%s card=%s visible=%s" % [key, from_kind,
-		at_global, str(rc.position) if rc != null else "无卡", str(rc.visible) if rc != null else "-"])
+	_dbg_storage_flow("行按下 key=%s from=%s at=%s card=%s visible=%s mirror=%s" % [key, from_kind,
+		at_global, str(rc.position) if rc != null else "无卡", str(rc.visible) if rc != null else "-",
+		str(_card_mirror.global_position) if _card_mirror != null and is_instance_valid(_card_mirror) else "无镜像"])
 	## 行在袋里时，真实卡片必须不可见；若历史补间/刷新把它留在了旧位置，这里强制收掉，
 	## 避免拖拽时看到「幽灵在光标处、节点却在旧坐标」。
 	if rc != null:
@@ -631,6 +640,8 @@ func _finish_sdrag(at: Vector2) -> void:
 	var key := _sdrag_key
 	var card0 := _cards.get(key, null) as NodeCard
 	var ghost0 := _sdrag_ghost
+	## 行拖结算前再清一次镜像：绝不能让它和真实卡片同时出现在画布层。
+	_drop_card_mirror(null)
 	_dbg_storage_flow("松手结算 key=%s at=%s stored=%s card=%s visible=%s ghost=%s" % [
 		key, at, str(graph != null and graph.stored.has(key)) if graph != null else "no-graph",
 		str(card0.position) if card0 != null else "无卡",
