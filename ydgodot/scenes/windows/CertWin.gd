@@ -300,10 +300,10 @@ func _confirm() -> void:
 			_error.text = "姓名不能为空"
 		_shake()
 		return
+	## C4：证件只留姓名 / 编号 / 日期 / 照片，数据层不再写 sense 残值。
 	card = {
 		"name": _name,
 		"id": _cert_id,
-		"sense": "vision",
 		"date": _date,
 		"avatarId": _avatar_id,
 	}

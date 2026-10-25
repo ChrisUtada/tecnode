@@ -57,6 +57,10 @@ func _test_catalog() -> void:
 	check("标记 A001 完成", c.mark_completed("A001"))
 	check("重复完成返回 false", not c.mark_completed("A001"))
 	c.last = "A002"
+	check("C2 上次案件数据未接入时回退 A001", c.resume_case_id() == "A001", c.resume_case_id())
+	c.last = "A001"
+	check("C2 上次案件可装载时直接返回", c.resume_case_id() == "A001", c.resume_case_id())
+	c.last = "A002"
 	check("进度写盘", c.save_progress())
 	check("进度文件存在", FileAccess.file_exists(TEMP_PROGRESS))
 

@@ -85,6 +85,14 @@ func is_unlocked(id: String) -> bool:
 	return unlocked.has(id)
 
 
+## C2/S14：继续 = 回到上次游玩且可真正装载的案件；旧档没有 last / 数据未接入时回 A-001。
+func resume_case_id() -> String:
+	var last_id := String(last).strip_edges()
+	if last_id != "" and exists(last_id) and is_unlocked(last_id) and data_ready(last_id):
+		return last_id
+	return DEFAULT_ID
+
+
 func is_completed(id: String) -> bool:
 	return completed.has(id)
 

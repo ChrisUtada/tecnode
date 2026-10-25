@@ -1859,14 +1859,27 @@ func _initialize() -> void:
 	check("G3 地图 / 档案未出，TEC 图标按普通 app 常驻",
 		not scene._icon_by_app("map").visible and scene._icon_by_app("tec").visible
 			and not scene._icon_by_app("goto").visible)
-	# 错收走正常游戏反馈：物品不能进线索册，线索不能进证物袋。
+	# C5：教学期错收由 TEC 口头纠正，不弹系统 toast。
+	var tutorial_soft := _last_line(scene._tec)
+	check("G3 TEC 只提醒整理、不强制", tutorial_soft.contains("不整理"), tutorial_soft)
+	scene._hide_toast()
 	scene._apply_drop("clue-icon", tut_cert_key)
 	check("G3 物品不能进线索册", not scene.graph.stored.has(tut_cert_key))
-	check("G3 错收弹正常提示", scene._toast_active)
+	check("C5 教学期错收走 TEC，不弹 toast", not scene._toast_active)
+	check("C5 物品进线索册由 TEC 纠正", _last_line(scene._tec).contains("线索册"),
+		_last_line(scene._tec))
+	scene._hide_toast()
 	scene._apply_drop("bag-dock", tut_cert_clue_key)
 	check("G3 线索不能进证物袋", not scene.graph.stored.has(tut_cert_clue_key))
-	check("G3 错收仍弹正常提示", scene._toast_active)
-	check("G3 TEC 只提醒整理、不强制", _last_line(scene._tec).contains("不整理"))
+	check("C5 线索进证物袋也不弹 toast", not scene._toast_active)
+	check("C5 线索进证物袋由 TEC 纠正", _last_line(scene._tec).contains("证物袋"),
+		_last_line(scene._tec))
+	# C5：非线索拖到推演器图标也只走 TEC。
+	scene._hide_toast()
+	scene._apply_drop("infer-icon", tut_office_key)
+	check("C5 非线索上桌布不弹 toast", not scene._toast_active)
+	check("C5 非线索上桌布由 TEC 纠正", _last_line(scene._tec).contains("线索"),
+		_last_line(scene._tec))
 	# 非落点窗体也要拦截卡片，不能穿透去碰窗体下面的节点。
 	check("G3 非落点窗体拦截卡片",
 		scene._handle_card_drop(tut_cert_key, scene._detail_win.get_global_rect().get_center()))
@@ -1910,6 +1923,21 @@ func _initialize() -> void:
 	check("G3 不自动打开推演器 / 线索册",
 		scene._matrix_win == null and scene._ledger_win == null)
 	check("G3 TEC 仍可拖动", scene._tec.dbg_drag_enabled())
+
+	# C6：线索册行内「去推演」也必须走 STORE_SUPPLIES → INFER 的教学守卫。
+	scene._tutorial_step = 2
+	scene._on_ledger_to_matrix(tut_cert_clue_key)
+	check("C6 线索册按钮推进到推演步", scene._tutorial_step == 3,
+		str(scene._tutorial_step))
+	check("C6 线索册按钮由 TEC 提示桌布",
+		_last_line(scene._tec).contains("桌布") or _last_line(scene._tec).contains("推演"),
+		_last_line(scene._tec))
+	scene.graph.matrix_take(tut_cert_clue_key)
+	scene._apply_hidden()
+	scene._refresh_matrix_views()
+	scene._store_into(GraphState.LEDGER, tut_cert_clue_key)
+	check("C6 测试后线索回册", String(scene.graph.stored.get(tut_cert_clue_key, "")) == GraphState.LEDGER,
+		String(scene.graph.stored.get(tut_cert_clue_key, "")))
 
 	# ── 第 4 幕：玩家自己双击推演器 / 线索册，再上桌布 ──
 	scene._toggle_matrix()
@@ -1985,6 +2013,8 @@ func _initialize() -> void:
 		scene._investigator.get("name", "") == "测试调查员"
 			and saved.get("name", "") == "测试调查员"
 			and saved.get("avatarId", "") == "CHARS_TEC")
+	check("C4 证件数据层不含 sense", not scene._investigator.has("sense"))
+	check("C4 读盘证件不含 sense", not saved.has("sense"))
 	check("G5 领证窗关闭", scene._tutorial_cert_win == null)
 	check("G5 案件地图弹出", scene._map_win != null)
 	check("G5 地图图标解锁", scene._icon_by_app("map").visible)

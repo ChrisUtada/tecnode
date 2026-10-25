@@ -69,16 +69,19 @@ static func load_from(p_path: String = PATH) -> Dictionary:
 	var id := String(d.get("id", "")).strip_edges()
 	if name == "" or id == "":
 		return {}
-	var sense := String(d.get("sense", "vision"))
-	if not SENSE_NAMES.has(sense):
-		sense = "vision"
 	var date := String(d.get("date", ""))
 	if date == "":
 		date = Time.get_date_string_from_system()
 	var avatar := String(d.get("avatarId", d.get("avatar_id", AVATAR_DEFAULT_ID)))
 	if avatar == "":
 		avatar = AVATAR_DEFAULT_ID
-	return {"name": name, "id": id, "sense": sense, "date": date, "avatarId": avatar}
+	var out := {"name": name, "id": id, "date": date, "avatarId": avatar}
+	## C4：新证件不写 sense；旧 IntroWin 档案里若还有，只在读取时原样保留，不补默认值。
+	if d.has("sense"):
+		var sense := String(d.get("sense", ""))
+		if SENSE_NAMES.has(sense):
+			out["sense"] = sense
+	return out
 
 
 static func save_to(p_card: Dictionary, p_path: String = PATH) -> bool:

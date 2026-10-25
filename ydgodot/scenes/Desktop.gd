@@ -402,6 +402,8 @@ func _ready() -> void:
 	_progress_path = "user://shot_progress.json" if _shot_mode() else CaseCatalog.PROGRESS_PATH
 	_progress_read_only = DisplayServer.get_name() == "headless" and not _shot_mode()
 	_catalog = CaseCatalog.new(_progress_path)
+	## C2/S14：继续 = 上次游玩的案件；last 不可用（老档 / 数据未接入）时回 A-001。
+	_active_case = _catalog.resume_case_id()
 	case_def = CaseLoader.new(CaseCatalog.path_of(_active_case))
 	if not case_def.load_case():
 		push_error("案件数据装载失败：" + case_def.load_error)
@@ -4027,6 +4029,14 @@ func _drop_blocker_at(at_global: Vector2) -> String:
 	return ""
 
 
+## C5：教学期错误统一由 TEC 口头纠正，不落系统 toast。
+func _tutorial_correct(text: String) -> bool:
+	if _tutorial_active and _tutorial_step != TutorialStep.DONE:
+		_tutorial_say(text)
+		return true
+	return false
+
+
 ## K6：所有拒收统一「warning toast + 日志」，话术由调用方按目标分派。
 func _reject_drop(text: String) -> void:
 	if text == "":
@@ -4074,7 +4084,8 @@ func _dispatch_drop(key: String, target_id: String, _at_global: Vector2, source:
 				_reject_drop("先从%s把「%s」取回画布，再拖给 TEC 分析。" % [_source_name(source), label])
 		"infer-icon", "mx-board":
 			if kind != "clue":
-				_reject_drop("只有线索能放到推演桌布。")
+				if not _tutorial_correct("推演桌布只收线索。"):
+					_reject_drop("只有线索能放到推演桌布。")
 			elif source != "matrix":
 				_assign_to_matrix(key)
 		"chat-win":
@@ -4123,16 +4134,22 @@ func _store_into(where: String, key: String) -> void:
 		return
 	var target_name := "证物袋" if where == GraphState.BAG else "线索册"
 	if graph.stored.has(key):
-		_reject_drop("「%s」已经在%s里了。" % [String(n.get("label", key)), target_name])
+		var already := "「%s」已经在%s里了。" % [String(n.get("label", key)), target_name]
+		if not _tutorial_correct(already):
+			_reject_drop(already)
 		return
 	if graph.is_container_node(key):
-		_reject_drop("场景与容器收不进%s。" % target_name)
+		var container_msg := "场景与容器收不进%s。" % target_name
+		if not _tutorial_correct(container_msg):
+			_reject_drop(container_msg)
 		return
 	if where == GraphState.BAG and String(n["kind"]) != "item":
-		_reject_drop("只有物品能进证物袋。")
+		if not _tutorial_correct("只有物品能进证物袋。"):
+			_reject_drop("只有物品能进证物袋。")
 		return
 	if where == GraphState.LEDGER and String(n["kind"]) != "clue":
-		_reject_drop("只有线索能进线索册。")
+		if not _tutorial_correct("只有线索能进线索册。"):
+			_reject_drop("只有线索能进线索册。")
 		return
 	var before := _save.snapshot()
 	var ok := graph.bag_store(key) if where == GraphState.BAG else graph.ledger_store(key)
@@ -4938,13 +4955,19 @@ func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
 
 
 func _on_ledger_to_matrix(key: String) -> void:
+	## C6：线索册行内按钮必须和拖到推演器图标走同一条教学守卫，
+	## 不能绕开「收纳可选 → 推演」的步骤切换。
+	if _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES:
+		_tutorial_begin_infer()
 	var before := _save.snapshot()
 	if graph.matrix_assign(key):
 		_apply_hidden()
 		_refresh_matrix_views()
+		_tutorial_on_matrix_changed()
 		_commit(before)
 	else:
-		_reject_drop("这条线索没有可用的感官槽位。")
+		if not _tutorial_correct("这条线索没有可用的感官槽位。"):
+			_reject_drop("这条线索没有可用的感官槽位。")
 
 
 func _refresh_matrix_views() -> void:
