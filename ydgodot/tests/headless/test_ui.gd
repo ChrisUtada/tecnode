@@ -1700,6 +1700,23 @@ func _initialize() -> void:
 	check("G3 不收纳也能打开推演器", scene._matrix_win != null)
 	check("G3 打开推演器即进入推演", scene._tutorial_step == 3)
 	check("G3 TEC 改指向已打开的桌布", _last_line(scene._tec).contains("桌布"))
+	# 重叠窗口：上面的推演窗必须优先接住落点，不能被下面的 TEC 抢走。
+	var old_tec_pos: Vector2 = scene._tec.position
+	var old_mx_pos: Vector2 = scene._matrix_win.position
+	scene._tec.position = Vector2(400.0, 120.0)
+	scene._matrix_win.position = Vector2(450.0, 150.0)
+	scene._raise_to_front(scene._matrix_win)
+	var overlap_pt: Vector2 = scene._tec.get_global_rect() \
+		.intersection(scene._matrix_win.get_global_rect()).get_center()
+	var top_target: Dictionary = scene._drop_target_at(overlap_pt)
+	check("G3 重叠落点命中上层推演窗",
+		not top_target.is_empty() and String(top_target["id"]) == "mx-board")
+	scene._update_drop_over(overlap_pt)
+	check("G3 重叠区域虚线框贴合上层推演窗",
+		scene._drop_outline.outline_rect().size == scene._matrix_win.size - Vector2(20.0, 20.0))
+	scene._clear_drop_over()
+	scene._tec.position = old_tec_pos
+	scene._matrix_win.position = old_mx_pos
 	scene._toggle_matrix()
 	await process_frame
 	# 正常收纳继续可用，并且不再反过来推进/卡住教学步骤。

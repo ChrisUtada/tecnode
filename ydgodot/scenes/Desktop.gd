@@ -522,31 +522,32 @@ func _finish_sdrag(at: Vector2) -> void:
 		return
 	var n := graph.node(key)
 	var before := _save.snapshot()
+	var target := _drop_target_at(at)
+	var tid := String(target.get("id", "")) if not target.is_empty() else ""
 	var to := ""
-	if _bag_win != null and is_instance_valid(_bag_win) and _bag_win.is_visible_in_tree() \
-		and _bag_win.get_global_rect().has_point(at):
+	if tid == "bag-win" or tid == "bag-dock":
 		to = GraphState.BAG
-	elif _ledger_win != null and is_instance_valid(_ledger_win) and _ledger_win.is_visible_in_tree() \
-		and _ledger_win.get_global_rect().has_point(at):
+	elif tid == "clue-win" or tid == "clue-icon":
 		to = GraphState.LEDGER
 	if to != "" and to != from:
 		if to == GraphState.LEDGER and String(n["kind"]) != "clue":
 			_show_toast("只有线索能进线索册", true)
 			return
+		if to == GraphState.BAG and String(n["kind"]) != "item":
+			_show_toast("只有物品能进证物袋", true)
+			return
 		if graph.restash(key, from, to):
 			_refresh_storage_wins()
 			_apply_hidden()
-			_show_toast("「%s」搬到%s" % [String(n["label"]), "证物袋" if to == GraphState.BAG else "线索册"])
+			_show_toast("「%s」搬到%s" % [String(n["label"]),
+				"证物袋" if to == GraphState.BAG else "线索册"])
 			_commit(before)
 		return
-	if _drop_on_matrix_icon(at) and String(n["kind"]) == "clue":
+	if tid == "infer-icon" or tid == "mx-board":
 		_assign_to_matrix(key)
 		return
-	if _matrix_win != null and is_instance_valid(_matrix_win) and _matrix_win.visible \
-		and _matrix_win.get_global_rect().has_point(at):
-		_assign_to_matrix(key)
-		return
-	if _floating_window_at(at) != null:
+	## 落在任何窗体上（含 TEC / 对话 / 推演标题栏）都交给当前窗，不再掉回下面画布。
+	if not target.is_empty() or _floating_window_at(at) != null:
 		return
 	if not _stage.get_global_rect().has_point(at):
 		# 落在画布之外：什么都不做，东西留在原处（不吞节点）
@@ -566,10 +567,6 @@ func _finish_sdrag(at: Vector2) -> void:
 	_repaint_edges()
 	_commit(before)
 
-
-func _drop_on_matrix_icon(at: Vector2) -> bool:
-	var ic: Control = _desk.get_node_or_null("icons/icon_infer") as Control
-	return ic != null and ic.is_visible_in_tree() and ic.get_global_rect().has_point(at)
 
 
 ## 命令行参数（`--` 之后的用户参数）
@@ -3530,26 +3527,53 @@ func _on_card_pin_toggled(key: String) -> void:
 func _drop_targets() -> Array:
 	var out: Array = []
 	if _chat_win != null and is_instance_valid(_chat_win) and _chat_win.is_visible_in_tree():
-		out.append({"id": "chat-win", "rect": _chat_win.get_global_rect(), "inset": 10.0})
+		out.append({"id": "chat-win", "rect": _chat_win.get_global_rect(), "inset": 10.0,
+			"depth": _target_depth(_chat_win)})
 	if _bag_win != null and is_instance_valid(_bag_win) and _bag_win.is_visible_in_tree():
-		out.append({"id": "bag-win", "rect": _bag_win.get_global_rect(), "inset": 10.0})
+		out.append({"id": "bag-win", "rect": _bag_win.get_global_rect(), "inset": 10.0,
+			"depth": _target_depth(_bag_win)})
 	if _ledger_win != null and is_instance_valid(_ledger_win) and _ledger_win.is_visible_in_tree():
-		out.append({"id": "clue-win", "rect": _ledger_win.get_global_rect(), "inset": 10.0})
+		out.append({"id": "clue-win", "rect": _ledger_win.get_global_rect(), "inset": 10.0,
+			"depth": _target_depth(_ledger_win)})
 	for pair in [["bag-dock", "icon_bag"], ["clue-icon", "icon_clue"], ["tec-dock", "icon_tec"],
 			["infer-icon", "icon_infer"], ["goto-icon", "icon_goto"]]:
 		var ic: Control = _desk.get_node_or_null("icons/" + String(pair[1])) as Control
 		if ic != null and ic.is_visible_in_tree():
-			out.append({"id": String(pair[0]), "rect": ic.get_global_rect(), "inset": 0.0})
+			out.append({"id": String(pair[0]), "rect": ic.get_global_rect(), "inset": 0.0,
+				"depth": _target_depth(ic)})
 	if _tec != null and is_instance_valid(_tec) and _tec.visible:
 		## 整个 TEC 窗体都是分析落点：拖到标题栏、正文、头像任意位置都能交给 TEC。
-		out.append({"id": "tec-dock", "rect": _tec.get_global_rect(), "inset": 10.0})
+		out.append({"id": "tec-dock", "rect": _tec.get_global_rect(), "inset": 10.0,
+			"depth": _target_depth(_tec)})
 	if _tec_chip != null and is_instance_valid(_tec_chip) and _tec_chip.visible:
-		out.append({"id": "tec-chip", "rect": _tec_chip.get_global_rect(), "inset": 2.0})
+		out.append({"id": "tec-chip", "rect": _tec_chip.get_global_rect(), "inset": 2.0,
+			"depth": _target_depth(_tec_chip)})
 	if _matrix_win != null and is_instance_valid(_matrix_win) and _matrix_win.visible:
 		## 整扇推演窗都是线索落点：拖到标题栏 / 板边也算交给当前窗口，
 		## 不再让卡片从窗体缝隙漏到下面的画布节点。
-		out.append({"id": "mx-board", "rect": _matrix_win.get_global_rect(), "inset": 10.0})
+		out.append({"id": "mx-board", "rect": _matrix_win.get_global_rect(), "inset": 10.0,
+			"depth": _target_depth(_matrix_win)})
+	## 落点优先级跟随真实层序：后提上来的窗（含推演窗）先命中。
+	## 固定顺序会让下面的 TEC 抢走上面推演窗的拖放，看起来就是「功能穿透」。
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a.get("depth", -1)) > int(b.get("depth", -1)))
 	return out
+
+
+func _target_depth(ctrl: Control) -> int:
+	if ctrl == null or not is_instance_valid(ctrl):
+		return -1
+	var n: Node = ctrl
+	while n != null and n.get_parent() != _desk:
+		n = n.get_parent()
+	return n.get_index() if n != null else -1
+
+
+func _drop_target_at(at_global: Vector2) -> Dictionary:
+	for t in _drop_targets():
+		if (t["rect"] as Rect2).has_point(at_global):
+			return t
+	return {}
 
 
 ## 节点详情窗（Web `#detail-win`）：选中即显示，点空白即收起
@@ -3651,10 +3675,10 @@ func _on_card_spring_finished(_key: String) -> void:
 
 ## 松手分派：命中落点即消费（卡片回原位）。返回 true 表示已被落点接管。
 func _handle_card_drop(key: String, at_global: Vector2) -> bool:
-	for t in _drop_targets():
-		if (t["rect"] as Rect2).has_point(at_global):
-			_apply_drop(String(t["id"]), key)
-			return true
+	var target := _drop_target_at(at_global)
+	if not target.is_empty():
+		_apply_drop(String(target["id"]), key)
+		return true
 	## 任何浮动窗都拦截卡片，哪怕它不是落点：松手弹回，不再穿透去和窗体下面的卡组合。
 	if _floating_window_at(at_global) != null:
 		return true
@@ -4294,20 +4318,17 @@ func _on_matrix_took(key: String, at_global: Vector2 = Vector2(-1.0, -1.0)) -> v
 ## 桌布上的线索拖到线索册（窗**或册图标**，Web `overLedgerDrop` 的两条）= 改归册子；
 ## 拖出桌布落到别处 = **带坐标**取回画布（反向 8 条路径的最后一条）
 func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
-	var ic := _desk.get_node_or_null("icons/icon_clue") as Control
-	var on_ledger := _ledger_win != null and is_instance_valid(_ledger_win) \
-		and _ledger_win.is_visible_in_tree() and _ledger_win.get_global_rect().has_point(at_global)
-	if ic != null and ic.is_visible_in_tree() and ic.get_global_rect().has_point(at_global):
-		on_ledger = true
-	if on_ledger:
+	var target := _drop_target_at(at_global)
+	var tid := String(target.get("id", "")) if not target.is_empty() else ""
+	if tid == "clue-win" or tid == "clue-icon":
 		var before := _save.snapshot()
 		if graph.restash(key, GraphState.MATRIX, GraphState.LEDGER):
 			_apply_hidden()
 			_refresh_matrix_views()
 			_commit(before)
 		return
-	## 桌布线索引拖到别的窗体（不是线索册）时留在桌布上，不要穿透窗体掉到下面画布。
-	if _floating_window_at(at_global) != null:
+	## 桌布线索引拖到别的窗体（包括被推演窗盖住的 TEC）时留在桌布上，不要穿透掉落。
+	if not target.is_empty() or _floating_window_at(at_global) != null:
 		return
 	_on_matrix_took(key, at_global)
 
