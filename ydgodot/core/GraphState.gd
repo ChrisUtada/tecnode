@@ -232,7 +232,10 @@ func reveal_scene(sid: String) -> Array:
 		var id: String = tag["id"]
 		var existed := has(kind, id)
 		var n := add_node(kind, id)
-		if String(n.get("home_scene", "")) == "":
+		## 场景 / 时间点通过 `node_locs` 连过来是「通路」，不是「被场景装下」。
+		## 若把目的地场景的 home_scene 写成当前场景，会和反向通路组成环，
+		## 两边都折叠时会互相隐藏，最后整张画布清空。
+		if not is_scene_kind(kind) and String(n.get("home_scene", "")) == "":
 			n["home_scene"] = sid
 		if not existed:
 			fresh.append(n["key"])
@@ -286,7 +289,9 @@ func reveal_container(kind: String, id: String) -> Array:
 		var cid: String = tag["id"]
 		var existed := has(k, cid)
 		var n := add_node(k, cid)
-		if String(n.get("home_scene", "")) == "":
+		## 同 reveal_scene：`node_locs` 是通路，不是归属。书桌的 node_locs 里
+		## 回指花园，不能把花园的 home_scene 改成书桌，否则折叠会成环。
+		if not is_scene_kind(k) and String(n.get("home_scene", "")) == "":
 			n["home_scene"] = id
 		if not existed:
 			fresh.append(n["key"])
@@ -943,6 +948,11 @@ func recompute_hidden() -> void:
 		(adj[b] as Array).append(a)
 	var by_scene := {}
 	for key in nodes.keys():
+		var node_kind := String((nodes[key] as Dictionary).get("kind", ""))
+		## 场景 / 时间点永远是根：即使旧存档把 home_scene 写成了某个物品（历史成环数据），
+		## 也不能因为那个容器折叠而把整张场景卡藏掉。
+		if is_scene_kind(node_kind):
+			continue
 		var home := String((nodes[key] as Dictionary).get("home_scene", ""))
 		if home == "":
 			continue

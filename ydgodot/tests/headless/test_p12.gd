@@ -127,6 +127,30 @@ func _test_collapse_hidden() -> void:
 	g2.uncollapse("ITEM_shuzhuo")
 	check("展开后：孩子重新可见", g2.is_visible(lamp) and g2.is_visible(book))
 
+	# 场景通路不是归属：花园 ↔ 书桌的 node_locs 互相指，不能把场景挂到物品下。
+	var g9 := GraphState.new(c)
+	g9.reveal_scene("SCENES_garden")
+	g9.reveal_container("item", "ITEM_shuzhuo")
+	check("场景通路不反向改 home_scene",
+		String(g9.node("loc:SCENES_garden").get("home_scene", "")) == "",
+		str(g9.node("loc:SCENES_garden")))
+	g9.collapse("SCENES_garden")
+	g9.collapse("ITEM_shuzhuo")
+	check("连续折叠花园与书桌：花园场景仍在", g9.is_visible("loc:SCENES_garden"),
+		str(g9.hidden.keys()))
+	check("连续折叠花园与书桌：书桌随花园收起", not g9.is_visible("item:ITEM_shuzhuo"))
+
+	# 旧存档可能已经写成环：场景节点的 home_scene 被误记成物品。重算时场景仍必须当根。
+	var g10 := GraphState.new(c)
+	var old_garden := g10.add_node("loc", "SCENES_garden")
+	old_garden["home_scene"] = "ITEM_shuzhuo"
+	g10.add_node("item", "ITEM_shuzhuo")
+	g10.add_node("item", "ITEM_taideng")["home_scene"] = "ITEM_shuzhuo"
+	g10.collapse("SCENES_garden")
+	g10.collapse("ITEM_shuzhuo")
+	check("旧存档成环数据：场景卡仍不消失", g10.is_visible("loc:SCENES_garden"),
+		str(g10.hidden.keys()))
+
 
 # ── 6. useItem 判定顺序：先零件，后发光 ───────────────────────────────
 func _test_use_item_order() -> void:
