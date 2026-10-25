@@ -327,6 +327,13 @@ func _test_glyph() -> void:
 			not wcard._title.visible and wcard._glyph.visible and wcard._glyph.size.x > 60.0,
 			"%.0f" % wcard._glyph.size.x)
 		wcard.set_lod(1.0)
+	scene.dbg_select(item)
+	scene._refresh_detail(true)
+	var detail: DetailWin = scene._detail_win
+	check("物品详情标出可用作证据原料", detail != null and not detail._status_text(
+		scene.graph.node(item), "item").is_empty()
+			and detail._status_text(scene.graph.node(item), "item").contains("可用作证据原料"),
+		"" if detail == null else detail._status_text(scene.graph.node(item), "item"))
 
 	# 画布合成：Desktop 入口也要把产物上画布、记案卷、弹 toast。
 	scene.dbg_ensure("item", "ITEM_taideng")

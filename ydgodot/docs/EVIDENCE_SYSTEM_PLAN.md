@@ -1,6 +1,6 @@
 # 证据系统执行计划（档案卡玩法层）
 
-> 状态：**2026-10-25 已按 A–D 完整执行**；随后按 `ZHENG_MODEL_PLAN.md` 完成模型收敛，现行回归为 `tests/headless/test_evidence.gd`（112 项）。
+> 状态：**2026-10-25 已按 A–D 完整执行**；随后按 `ZHENG_MODEL_PLAN.md` 完成模型收敛，现行回归为 `tests/headless/test_evidence.gd`（113 项）。
 > **后续**：本稿的「物/词/证」分类已被最终模型取代——「线索」退役、「证」一元化、物品本体担当「物」，
 > 收敛执行见 **`ZHENG_MODEL_PLAN.md`**（本稿保留作 v1 实施记录）。
 > 日期：2026-10-25
