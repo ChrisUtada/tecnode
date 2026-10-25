@@ -525,6 +525,11 @@ func _process(_dt: float) -> void:
 			_sdrag_key, _sdrag_origin, at,
 			str(_sdrag_ghost.global_position) if _sdrag_ghost != null else "无幽灵",
 			str(_sdrag_ghost.size) if _sdrag_ghost != null else "-"])
+		if _sdrag_ghost != null:
+			var gc := _sdrag_ghost.global_position + _sdrag_ghost.size * 0.5
+			_dbg_storage_flow("拖拽对齐 cursor=%s ghost_topleft=%s ghost_center=%s delta_top=%.1f" % [
+				at, _sdrag_ghost.global_position, gc,
+				(_sdrag_ghost.global_position - at).length()])
 		_dbg_storage_flow("鼠标坐标对照 os=%s win=%s viewport=%s desk=%s scale=%s window=%s" % [
 			DisplayServer.mouse_get_position(), get_window().position,
 			get_viewport().get_mouse_position(), _desk.get_global_mouse_position(),
@@ -538,7 +543,7 @@ func _process(_dt: float) -> void:
 					_sdrag_ghost.global_position, at, gd])
 	_update_drop_over(at)
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		_dbg_storage_flow("松手 key=%s at=%s started=%s" % [_sdrag_key, at, _sdrag_started])
+		_dbg_storage_flow("松手 cursor=%s key=%s started=%s" % [at, _sdrag_key, _sdrag_started])
 		_finish_sdrag(at)
 
 
@@ -660,8 +665,8 @@ func _finish_sdrag(at: Vector2) -> void:
 	var key := _sdrag_key
 	var card0 := _cards.get(key, null) as NodeCard
 	var ghost0 := _sdrag_ghost
-	_dbg_storage_flow("松手结算 key=%s at=%s stored=%s card=%s visible=%s ghost=%s" % [
-		key, at, str(graph != null and graph.stored.has(key)) if graph != null else "no-graph",
+	_dbg_storage_flow("松手结算 cursor=%s key=%s stored=%s card=%s visible=%s ghost=%s" % [
+		at, key, str(graph != null and graph.stored.has(key)) if graph != null else "no-graph",
 		str(card0.position) if card0 != null else "无卡",
 		str(card0.visible) if card0 != null else "-",
 		str((ghost0 as Control).global_position) if ghost0 != null and is_instance_valid(ghost0) else "无幽灵"])
