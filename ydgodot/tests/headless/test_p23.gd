@@ -292,6 +292,28 @@ func _test_ui() -> void:
 	check("放映卡无滚动条", card != null and card.find_children("*", "ScrollContainer", true, false).is_empty())
 	check("放映卡预排全文行", card != null and card._rows.size() == card.line_count(),
 		str(card._rows.size()) if card != null else "null")
+	# W1：点标题栏不能冒泡到 MemCard 的 advance（不翻行、不补全）。
+	if card != null:
+		var mem_bar := card.get_node("bar") as Control
+		var mem_bar_at: Vector2 = mem_bar.get_global_rect().position + Vector2(26.0, mem_bar.size.y * 0.5)
+		var mem_idx := card.index()
+		var mem_typing := card.is_typing()
+		var mem_down := InputEventMouseButton.new()
+		mem_down.button_index = MOUSE_BUTTON_LEFT
+		mem_down.pressed = true
+		mem_down.position = mem_bar_at
+		mem_down.global_position = mem_bar_at
+		root.push_input(mem_down, true)
+		var mem_up := InputEventMouseButton.new()
+		mem_up.button_index = MOUSE_BUTTON_LEFT
+		mem_up.pressed = false
+		mem_up.position = mem_bar_at
+		mem_up.global_position = mem_bar_at
+		root.push_input(mem_up, true)
+		await process_frame
+		check("W1 MemCard 点标题栏不翻行", card.index() == mem_idx,
+			"%d -> %d" % [mem_idx, card.index()])
+		check("W1 MemCard 点标题栏不补全", card.is_typing() == mem_typing)
 	var mem_border: Control = null
 	if card != null:
 		mem_border = card.get_node_or_null("mem_border") as Control

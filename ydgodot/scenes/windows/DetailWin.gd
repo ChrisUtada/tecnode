@@ -26,14 +26,19 @@ var _head: Label
 var _meta: Label
 var _para_label: TypewriterLabel
 var _fit_queued := false
+## W6：× 关闭是「玩家收起」而不是销毁；后台 commit 不能把它重新弹出来。
+var _user_closed := false
+## U2：叙事播完后补显示详情时，简介整段出现，不再二次打字。
+var _show_full_once := false
 
 
 func setup_detail(p_graph: GraphState, p_case: CaseLoader) -> void:
 	_graph = p_graph
 	_case = p_case
 	setup("节点详情", W, 260)
+	enable_controls("", "关闭详情", false)
 	place_right()
-	closed.connect(hide)
+	closed.connect(_on_user_closed)
 	_rows = VBoxContainer.new()
 	_rows.name = "rows"
 	_rows.add_theme_constant_override("separation", 6)
@@ -57,9 +62,20 @@ func place_right(vw: float = -1.0) -> void:
 
 
 ## 选中变化 / 图状态变化都调这里；内容逐字没变就不重建（免得滚动位置跳回顶部）
-func show_node(key: String) -> void:
+func show_node(key: String, force := false) -> void:
+	if key != _key or force:
+		_user_closed = false
 	_key = key
 	refresh()
+
+
+func show_full_once() -> void:
+	_show_full_once = true
+
+
+func _on_user_closed() -> void:
+	_user_closed = true
+	hide()
 
 
 func current_key() -> String:
@@ -73,9 +89,15 @@ func refresh() -> void:
 	if n.is_empty():
 		hide()
 		return
+	if _user_closed:
+		return
 	show()
 	var html := _compose(n)
 	if html == _sig:
+		if _show_full_once:
+			_show_full_once = false
+			if _para_label != null:
+				_para_label.finish_typing()
 		return
 	_sig = html
 	_rebuild(n)
@@ -123,7 +145,11 @@ func _rebuild(n: Dictionary) -> void:
 	_para_label = para
 	if not para.typing_finished.is_connected(_queue_fit):
 		para.typing_finished.connect(_queue_fit)
-	para.start_typing()
+	if _show_full_once:
+		_show_full_once = false
+		para.finish_typing()
+	else:
+		para.start_typing()
 	var st := _status_text(n, kind)
 	if st != "":
 		_rows.add_child(_line("状态：" + st, TecTheme.FS_BODY, TecTheme.MUTED))

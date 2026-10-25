@@ -55,7 +55,7 @@ func _build_content() -> void:
 	_avatar.setup("res://assets/raw/tec-avatar.png", 60.0, "T")
 	_avatar.mouse_filter = Control.MOUSE_FILTER_STOP
 	_avatar.tooltip_text = "TEC 助手：拖节点到我身上分析，点对话窗任意位置闲聊"
-	_avatar.gui_input.connect(_on_talk_input)
+	_avatar.gui_input.connect(_on_avatar_input)
 	av_col.add_child(_avatar)
 
 	var av_label := TecTheme.label("TEC", TecTheme.FS_BODY, TecTheme.MUTED)
@@ -183,25 +183,54 @@ func set_guidance(status: String, hint: String) -> void:
 		_hint.text = hint
 
 
-## 截图 / 演示用：把已落下的台词一次性揭示完，避免画面停在半个字上。
+## 截图 / 演示 / W26：把已落下的台词一次性揭示完，避免画面停在半个字上。
 func finish_typing() -> void:
 	for c in _lines.get_children():
 		if c is TypewriterLabel:
 			(c as TypewriterLabel).finish_typing()
 
 
+func is_typing() -> bool:
+	for c in _lines.get_children():
+		if c is TypewriterLabel and (c as TypewriterLabel).is_typing():
+			return true
+	return false
+
+
+## 最后一条已落下的台词（重复提示判重 / 测试用）。
+func last_line_text() -> String:
+	for i in range(_lines.get_child_count() - 1, -1, -1):
+		var c := _lines.get_child(i)
+		if c is TypewriterLabel:
+			return (c as TypewriterLabel).text
+	return ""
+
+
 func _gui_input(event: InputEvent) -> void:
-	_on_talk_input(event)
+	if _on_talk_input(event):
+		accept_event()
 
 
-func _on_talk_input(event: InputEvent) -> void:
+## W1：头像自己吞掉事件，避免同一次点击继续冒泡到窗体的 `_gui_input` 再聊一句。
+func _on_avatar_input(event: InputEvent) -> void:
+	if _on_talk_input(event) and _avatar != null:
+		_avatar.accept_event()
+
+
+func _on_talk_input(event: InputEvent) -> bool:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		talk_requested.emit()
+		return true
+	return false
 
 
 func append_line(text: String, color: Color = TecTheme.TEXT) -> void:
 	if text == "":
 		return
+	## W26：同一时刻只允许一条在打字；新行落下前先把上一行补全。
+	## 这样快速连点不会出现「多行同时逐字」，也不会把上一句只留半截。
+	if is_typing():
+		finish_typing()
 	var l := TecTheme.narrative_label(text, color)
 	_lines.add_child(l)
 	l.start_typing()

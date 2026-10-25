@@ -1,11 +1,23 @@
 class_name TecChip
-extends Button
+extends Control
+## U7：从 Button 改为自管手势的 Control —— 按下可拖，松手未拖才 emit pressed。
+
+signal pressed
+signal moved
 
 const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
+var _bg: Panel
 var _status: Label
 var _bar: ProgressBar
 var _dot: PanelContainer
+var _normal_style: StyleBoxFlat
+var _hover_style: StyleBoxFlat
+var _down := false
+var _dragged := false
+var _press_global := Vector2.ZERO
+var _grab := Vector2.ZERO
+var _user_placed := false
 
 
 func setup_chip() -> void:
@@ -13,11 +25,19 @@ func setup_chip() -> void:
 	custom_minimum_size = Vector2(196, 56)
 	size = Vector2(196, 56)
 	focus_mode = Control.FOCUS_NONE
-	tooltip_text = "TEC 已收起：单击展开对话窗"
-	var normal := TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN)
-	add_theme_stylebox_override("normal", normal)
-	add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.BG, TecTheme.R_WIN))
-	add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.FACE_LO, TecTheme.R_WIN))
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	tooltip_text = "TEC 已收起：拖动可挪位置 · 单击展开对话窗"
+	_normal_style = TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN)
+	_hover_style = TecTheme.flat(TecTheme.BG, TecTheme.R_WIN, TecTheme.INK, 2)
+	_bg = Panel.new()
+	_bg.name = "chip_bg"
+	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bg.add_theme_stylebox_override("panel", _normal_style)
+	add_child(_bg)
+	mouse_entered.connect(func(): _bg.add_theme_stylebox_override("panel", _hover_style))
+	mouse_exited.connect(func(): _bg.add_theme_stylebox_override("panel", _normal_style))
+	gui_input.connect(_on_chip_input)
 	_add_dot()
 	_build_content()
 
@@ -96,6 +116,57 @@ func set_analyzing(label: String, ratio: float = 0.0) -> void:
 	_bar.value = clampf(ratio, 0.0, 1.0) * 100.0
 	_dot.visible = false
 	_status.text = "分析中 · " + label
+
+
+func _on_chip_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_down = true
+			_dragged = false
+			_press_global = event.global_position
+			_grab = position
+			accept_event()
+		elif _down:
+			var was_dragged := _dragged
+			_down = false
+			_dragged = false
+			if not was_dragged:
+				pressed.emit()
+			accept_event()
+		return
+	if event is InputEventMouseMotion and _down:
+		var at := (event as InputEventMouseMotion).global_position
+		var d := at - _press_global
+		if not _dragged and absf(d.x) + absf(d.y) < 5.0:
+			return
+		if not _dragged:
+			_dragged = true
+			move_to_front()
+		position = _clamp_pos(_grab + d)
+		_user_placed = true
+		moved.emit()
+		accept_event()
+
+
+func user_placed() -> bool:
+	return _user_placed
+
+
+func clamp_into_parent() -> void:
+	position = _clamp_pos(position)
+
+
+func reset_place() -> void:
+	_user_placed = false
+
+
+func _clamp_pos(p: Vector2) -> Vector2:
+	var parent := get_parent() as Control
+	if parent == null:
+		return p
+	return Vector2(
+		clampf(p.x, 0.0, maxf(0.0, parent.size.x - size.x)),
+		clampf(p.y, 0.0, maxf(0.0, parent.size.y - size.y)))
 
 
 func status_text() -> String:

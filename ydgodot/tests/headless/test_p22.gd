@@ -93,6 +93,12 @@ func _test_desktop() -> void:
 	var lines: Array = scene.dbg_tec_win().dbg_lines()
 	check("闲聊第一条", lines.size() == 1 and String(lines[0]) == scene.case_def.char_of("CHARS_TEC").talk_queue[0],
 		str(lines))
+	# W26：打字中再点只补全当前行，不叠加下一句。
+	scene.dbg_tec_talk()
+	check("W26 打字中点击只补全", scene.dbg_tec_win().line_count() == 1
+		and not scene.dbg_tec_win().is_typing(),
+		"lines=%d typing=%s" % [scene.dbg_tec_win().line_count(), scene.dbg_tec_win().is_typing()])
+	check("W26 补全不推进闲聊进度", int(scene.graph.tec_prog.get("_def", 0)) == 1)
 	# A5 截图辅助：演示 / 截图时一次揭示完，避免画面停在半个字上。
 	scene.dbg_tec_win().finish_typing()
 	var typing_left := false
@@ -102,7 +108,9 @@ func _test_desktop() -> void:
 	check("A5 finish_typing 一次揭示完", not typing_left)
 	check("闲聊进度 1", int(scene.graph.tec_prog.get("_def", 0)) == 1)
 	scene.dbg_tec_talk()
+	scene.dbg_tec_win().finish_typing()
 	scene.dbg_tec_talk()
+	scene.dbg_tec_win().finish_typing()
 	check("闲聊共 3 条", scene.dbg_tec_win().line_count() == 3, str(scene.dbg_tec_win().line_count()))
 	check("闲聊进度 3", int(scene.graph.tec_prog.get("_def", 0)) == 3)
 	scene.dbg_tec_talk()
@@ -124,7 +132,49 @@ func _test_desktop() -> void:
 	check("收起后卡片可见", bool(info["chip_visible"]))
 	check("收起后状态文案", chip.status_text().contains("助手已收起"), chip.status_text())
 	check("收起后不忙", not chip.is_busy())
-	chip.pressed.emit()
+	# U7：TEC 胶囊可拖，resize 不吸回；未拖动松手才还原。
+	var chip_home: Vector2 = chip.position
+	var chip_at: Vector2 = chip.get_global_rect().get_center()
+	var chip_down := InputEventMouseButton.new()
+	chip_down.button_index = MOUSE_BUTTON_LEFT
+	chip_down.pressed = true
+	chip_down.position = chip_at
+	chip_down.global_position = chip_at
+	chip.gui_input.emit(chip_down)
+	var chip_move := InputEventMouseMotion.new()
+	chip_move.button_mask = MOUSE_BUTTON_MASK_LEFT
+	chip_move.position = chip_at + Vector2(-160, -90)
+	chip_move.global_position = chip_at + Vector2(-160, -90)
+	chip.gui_input.emit(chip_move)
+	var chip_up := InputEventMouseButton.new()
+	chip_up.button_index = MOUSE_BUTTON_LEFT
+	chip_up.pressed = false
+	chip_up.position = chip_at + Vector2(-160, -90)
+	chip_up.global_position = chip_at + Vector2(-160, -90)
+	chip.gui_input.emit(chip_up)
+	await process_frame
+	check("U7 TEC 胶囊可拖动", chip.position != chip_home, str(chip.position) + " / " + str(chip_home))
+	check("U7 TEC 胶囊拖动后仍在桌面内",
+		scene._desk.get_global_rect().encloses(chip.get_global_rect()), str(chip.get_global_rect()))
+	var chip_dragged_pos: Vector2 = chip.position
+	scene._place_floating_windows()
+	check("U7 TEC 胶囊 resize 不被吸回", chip.position == chip_dragged_pos,
+		str(chip.position) + " / " + str(chip_dragged_pos))
+	chip.reset_place()
+	scene._place_floating_windows()
+	var chip_click: Vector2 = chip.get_global_rect().get_center()
+	var chip_cdown := InputEventMouseButton.new()
+	chip_cdown.button_index = MOUSE_BUTTON_LEFT
+	chip_cdown.pressed = true
+	chip_cdown.position = chip_click
+	chip_cdown.global_position = chip_click
+	chip.gui_input.emit(chip_cdown)
+	var chip_cup := InputEventMouseButton.new()
+	chip_cup.button_index = MOUSE_BUTTON_LEFT
+	chip_cup.pressed = false
+	chip_cup.position = chip_click
+	chip_cup.global_position = chip_click
+	chip.gui_input.emit(chip_cup)
 	info = scene.dbg_tec_info()
 	check("点卡片还原 TEC 窗", bool(info["visible"]) and not bool(info["min"]))
 	check("还原后卡片隐藏", not bool(info["chip_visible"]))
@@ -285,6 +335,7 @@ func _test_desktop() -> void:
 		and scene.dbg_toast_text().contains("助手卡片"), scene.dbg_toast_text())
 
 	scene.dbg_tec_open()
+	scene.dbg_tec_win().finish_typing()
 	var click_ev := InputEventMouseButton.new()
 	click_ev.button_index = MOUSE_BUTTON_LEFT
 	click_ev.pressed = true
@@ -293,6 +344,55 @@ func _test_desktop() -> void:
 	check("G7 点窗内闲聊仍给分级提示", scene.dbg_tec_win().line_count() == lines_before + 1,
 		str(scene.dbg_tec_win().line_count()))
 	check("闲聊进度已满", int(scene.graph.tec_prog.get("_def", 0)) == 3)
+
+	# W1：真实事件路由。点头像只出一句；拖标题栏不再白聊一句。
+	scene.dbg_tec_win().finish_typing()
+	var w1_before: int = scene.dbg_tec_win().line_count()
+	var av_center: Vector2 = scene.dbg_tec_win().avatar_global_rect().get_center()
+	var av_down := InputEventMouseButton.new()
+	av_down.button_index = MOUSE_BUTTON_LEFT
+	av_down.pressed = true
+	av_down.position = av_center
+	av_down.global_position = av_center
+	root.push_input(av_down, true)
+	await process_frame
+	check("W1 点头像一次只出一句", scene.dbg_tec_win().line_count() == w1_before + 1,
+		"%d -> %d" % [w1_before, scene.dbg_tec_win().line_count()])
+	var av_up := InputEventMouseButton.new()
+	av_up.button_index = MOUSE_BUTTON_LEFT
+	av_up.pressed = false
+	av_up.position = av_center
+	av_up.global_position = av_center
+	root.push_input(av_up, true)
+	scene.dbg_tec_win().finish_typing()
+
+	var tec_home: Vector2 = scene._tec.position
+	var w1_talk_before: int = scene.dbg_tec_win().line_count()
+	var bar := scene._tec.get_node("bar") as Control
+	var bar_at: Vector2 = bar.get_global_rect().position + Vector2(28.0, bar.size.y * 0.5)
+	var bar_down := InputEventMouseButton.new()
+	bar_down.button_index = MOUSE_BUTTON_LEFT
+	bar_down.pressed = true
+	bar_down.position = bar_at
+	bar_down.global_position = bar_at
+	root.push_input(bar_down, true)
+	var bar_move := InputEventMouseMotion.new()
+	bar_move.button_mask = MOUSE_BUTTON_MASK_LEFT
+	bar_move.position = bar_at + Vector2(24, 16)
+	bar_move.global_position = bar_at + Vector2(24, 16)
+	root.push_input(bar_move, true)
+	var bar_up := InputEventMouseButton.new()
+	bar_up.button_index = MOUSE_BUTTON_LEFT
+	bar_up.pressed = false
+	bar_up.position = bar_at + Vector2(24, 16)
+	bar_up.global_position = bar_at + Vector2(24, 16)
+	root.push_input(bar_up, true)
+	await process_frame
+	check("W1 拖 TEC 标题栏不再白聊", scene.dbg_tec_win().line_count() == w1_talk_before,
+		"%d -> %d" % [w1_talk_before, scene.dbg_tec_win().line_count()])
+	check("W1 标题栏拖动仍生效", scene._tec.position != tec_home,
+		str(scene._tec.position) + " / " + str(tec_home))
+	scene._tec.position = tec_home
 
 	scene.dbg_ensure("loc", "SCENES_0704")
 	scene.dbg_tec_analyze_key("loc:SCENES_0704")
@@ -320,6 +420,15 @@ func _test_desktop() -> void:
 	check("G7 再次展开/收起不重复提示",
 		scene.dbg_tec_win().line_count() == lines_after_first,
 		str(scene.dbg_tec_win().line_count() - lines_after_first))
+
+	# W26：同文本提示不重复追加。
+	scene.dbg_tec_win().finish_typing()
+	var dup0: int = scene.dbg_tec_win().line_count()
+	scene._tec_hint("W26-重复提示")
+	scene.dbg_tec_win().finish_typing()
+	scene._tec_hint("W26-重复提示")
+	check("W26 同文本提示只追加一次", scene.dbg_tec_win().line_count() == dup0 + 1,
+		"%d -> %d" % [dup0, scene.dbg_tec_win().line_count()])
 
 	scene.dbg_tec_analyze("loc:SCENES_garden")
 	check("分析中", bool(scene.dbg_tec_info()["win"]["analyzing"]))

@@ -462,6 +462,11 @@ func dbg_drag_enabled() -> bool:
 
 
 func _on_bar_input(event: InputEvent) -> void:
+	## W1：标题栏事件必须在 bar 上吞掉，否则会继续冒泡到窗体的 `_gui_input`
+	## （TEC → 白聊一句、MemCard → 翻行）。拖动禁用时也要吞，标题栏不能透给内容区。
+	var bar := get_node_or_null("bar") as Control
+	if bar != null:
+		bar.accept_event()
 	if not _drag_enabled:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:

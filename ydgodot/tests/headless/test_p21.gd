@@ -147,7 +147,49 @@ func _test_desktop() -> void:
 	scene._place_case_dock()
 	check("dock 模式无图标角标", not bool(info["badge_visible"]))
 	check("dock 卡片有内容", scene._dock_title.text != "" and scene._dock_sub.text != "")
-	scene.dbg_reopen_case()
+	# U7：案件卡片可拖，重排不吸回；未拖动松手才展开。
+	var dock_home: Vector2 = scene._dock_card.position
+	var dock_at: Vector2 = scene._dock_card.get_global_rect().get_center()
+	var dock_down := InputEventMouseButton.new()
+	dock_down.button_index = MOUSE_BUTTON_LEFT
+	dock_down.pressed = true
+	dock_down.position = dock_at
+	dock_down.global_position = dock_at
+	scene._dock_card.gui_input.emit(dock_down)
+	var dock_move := InputEventMouseMotion.new()
+	dock_move.button_mask = MOUSE_BUTTON_MASK_LEFT
+	dock_move.position = dock_at + Vector2(-140, -90)
+	dock_move.global_position = dock_at + Vector2(-140, -90)
+	scene._dock_card.gui_input.emit(dock_move)
+	var dock_up := InputEventMouseButton.new()
+	dock_up.button_index = MOUSE_BUTTON_LEFT
+	dock_up.pressed = false
+	dock_up.position = dock_at + Vector2(-140, -90)
+	dock_up.global_position = dock_at + Vector2(-140, -90)
+	scene._dock_card.gui_input.emit(dock_up)
+	await process_frame
+	check("U7 案件卡片可拖动", scene._dock_card.position != dock_home,
+		str(scene._dock_card.position) + " / " + str(dock_home))
+	check("U7 案件卡片拖动后仍在桌面内",
+		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
+		str(scene._dock_card.get_global_rect()))
+	var dock_dragged: Vector2 = scene._dock_card.position
+	scene._place_case_dock()
+	check("U7 案件卡片重排不被吸回", scene._dock_card.position == dock_dragged,
+		str(scene._dock_card.position) + " / " + str(dock_dragged))
+	var dock_click: Vector2 = scene._dock_card.get_global_rect().get_center()
+	var dock_cdown := InputEventMouseButton.new()
+	dock_cdown.button_index = MOUSE_BUTTON_LEFT
+	dock_cdown.pressed = true
+	dock_cdown.position = dock_click
+	dock_cdown.global_position = dock_click
+	scene._dock_card.gui_input.emit(dock_cdown)
+	var dock_cup := InputEventMouseButton.new()
+	dock_cup.button_index = MOUSE_BUTTON_LEFT
+	dock_cup.pressed = false
+	dock_cup.position = dock_click
+	dock_cup.global_position = dock_click
+	scene._dock_card.gui_input.emit(dock_cup)
 	info = scene.dbg_case_info()
 	check("点 dock 重新展开", bool(info["open"]) and not bool(info["dock_visible"]))
 

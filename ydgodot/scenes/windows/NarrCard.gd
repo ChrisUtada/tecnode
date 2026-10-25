@@ -2,6 +2,8 @@ class_name NarrCard
 extends SysWindow
 ## 场景叙事卡：展开场景时浮在画布上，正文一次性预留高度并逐字打出。
 
+signal typing_finished
+
 var _text: TypewriterLabel
 var _width := 470.0
 
@@ -18,8 +20,26 @@ func setup_narr(scene_title: String, text: String, w: float = 470.0, h: float = 
 	_text.name = "narr_text"
 	_text.custom_minimum_size = Vector2(w - 72.0, 0)
 	content.add_child(_text)
+	_text.typing_finished.connect(func(): typing_finished.emit())
 	_text.start_typing()
 	call_deferred("_fit_height")
+
+
+func is_typing() -> bool:
+	return _text != null and _text.is_typing()
+
+
+## U2/W17：单击补全整段（与 MemCard 的单击补全同口径）。
+func finish_typing() -> void:
+	if _text != null:
+		_text.finish_typing()
+
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		if is_typing():
+			finish_typing()
+		accept_event()
 
 
 func _fit_height() -> void:

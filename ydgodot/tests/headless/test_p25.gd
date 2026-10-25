@@ -286,8 +286,48 @@ func _test_desktop(c: CaseLoader) -> void:
 		check("E3 dock 键也是 18×18 且同步播放中",
 			dock._toggle_btn.size == Vector2(18, 18) and dock._toggle_btn._mode == "pause",
 			str(dock._toggle_btn.size))
+		# U7：音乐坞可拖，resize 不吸回；未拖动松手才还原。
+		var dock_home: Vector2 = dock.position
+		var dock_at: Vector2 = dock.get_global_rect().get_center()
+		var dock_down := InputEventMouseButton.new()
+		dock_down.button_index = MOUSE_BUTTON_LEFT
+		dock_down.pressed = true
+		dock_down.position = dock_at
+		dock_down.global_position = dock_at
+		dock.gui_input.emit(dock_down)
+		var dock_move := InputEventMouseMotion.new()
+		dock_move.button_mask = MOUSE_BUTTON_MASK_LEFT
+		dock_move.position = dock_at + Vector2(-150, -80)
+		dock_move.global_position = dock_at + Vector2(-150, -80)
+		dock.gui_input.emit(dock_move)
+		var dock_up := InputEventMouseButton.new()
+		dock_up.button_index = MOUSE_BUTTON_LEFT
+		dock_up.pressed = false
+		dock_up.position = dock_at + Vector2(-150, -80)
+		dock_up.global_position = dock_at + Vector2(-150, -80)
+		dock.gui_input.emit(dock_up)
+		await process_frame
+		check("U7 音乐坞可拖动", dock.position != dock_home, str(dock.position) + " / " + str(dock_home))
+		check("U7 音乐坞拖动后仍在桌面内",
+			scene._desk.get_global_rect().encloses(dock.get_global_rect()), str(dock.get_global_rect()))
+		var dock_dragged: Vector2 = dock.position
+		scene._place_music_windows()
+		check("U7 音乐坞 resize 不被吸回", dock.position == dock_dragged,
+			str(dock.position) + " / " + str(dock_dragged))
+		var dock_click: Vector2 = dock.get_global_rect().get_center()
+		var dock_cdown := InputEventMouseButton.new()
+		dock_cdown.button_index = MOUSE_BUTTON_LEFT
+		dock_cdown.pressed = true
+		dock_cdown.position = dock_click
+		dock_cdown.global_position = dock_click
+		dock.gui_input.emit(dock_cdown)
+		var dock_cup := InputEventMouseButton.new()
+		dock_cup.button_index = MOUSE_BUTTON_LEFT
+		dock_cup.pressed = false
+		dock_cup.position = dock_click
+		dock_cup.global_position = dock_click
+		dock.gui_input.emit(dock_cup)
 	check("收起后音频继续", bool(st["playing"]))
-	scene.dbg_restore_music()
 	st = scene.dbg_music_state()
 	check("dock 还原窗", bool(st["win_visible"]) and not bool(st["dock_visible"]))
 

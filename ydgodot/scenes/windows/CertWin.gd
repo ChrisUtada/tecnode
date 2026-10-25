@@ -34,7 +34,8 @@ func setup_cert(p_name: String = "") -> void:
 	_cert_id = Investigator.gen_id()
 	_date = Time.get_date_string_from_system()
 	setup("调查员证 · 签发", 640, 438)
-	set_drag_enabled(false)
+	## W27：签发期可以没有 ×（流程强制），但标题栏拖动必须保留。
+	set_drag_enabled(true)
 	var close := get_node_or_null("bar/close") as Control
 	if close != null:
 		close.visible = false

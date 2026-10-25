@@ -171,6 +171,9 @@ var _archive_win: ArchiveWin = null
 var _mem_card: MemCard = null
 var _chat_win: ChatWindow = null
 var _detail_win: DetailWin = null
+## U2：叙事打字期间挂起的详情；播完 / 点击补全 / 关闭叙事后再补显示。
+var _pending_detail := false
+var _detail_full_once := false
 var dialogues: DialogueSystem = null
 var _archive_btn: Button = null
 var _archive_badge: PanelContainer = null
@@ -211,7 +214,7 @@ var _case_docked := false
 var _map_win: CaseMapWin = null
 var _map_btn: Button = null
 var _map_badge: PanelContainer = null
-var _dock_card: Button = null
+var _dock_card: PanelContainer = null
 var _dock_code: Label = null
 var _dock_title: Label = null
 var _dock_sub: Label = null
@@ -222,6 +225,14 @@ var _garden_btn: Button = null
 var _garden_badge: PanelContainer = null
 var _garden_win: GardenWin = null
 var _garden_drop_before: Dictionary = {}
+## U7：案件卡片拖动状态 / 玩家是否亲手摆过（resize 不再吸回右下角）。
+var _dock_down := false
+var _dock_dragged := false
+var _dock_press_global := Vector2.ZERO
+var _dock_grab := Vector2.ZERO
+var _dock_user_placed := false
+var _normal_style: StyleBoxFlat = null
+var _hover_style: StyleBoxFlat = null
 ## 批 1（差距报告 I1 / I2 / I3）：日志窗 + 人物名册 + 四个计数角标
 var _people_win: PeopleWin = null
 var _people_card = null
@@ -1777,6 +1788,7 @@ func _ensure_music_dock() -> MusicDock:
 	_music_dock.restore_requested.connect(_restore_music)
 	_music_dock.toggle_requested.connect(_toggle_music)
 	_music_dock.stop_requested.connect(_stop_music)
+	_music_dock.moved.connect(_place_toast_anchor)
 	_desk.add_child(_music_dock)
 	_music_dock.visible = false
 	_place_music_windows()
@@ -1800,9 +1812,50 @@ func _place_case_dock() -> void:
 		return
 	var desk_w := _desk.size.x if _desk != null and is_instance_valid(_desk) else _vw()
 	var desk_h := _desk.size.y if _desk != null and is_instance_valid(_desk) else _vh() - HEADER_H
+	if _dock_user_placed:
+		_dock_card.position = _clamp_dock_pos(_dock_card.position, desk_w, desk_h)
+		return
 	_dock_card.position = Vector2(
 		maxf(14.0, desk_w - 16.0 - _dock_card.size.x),
 		maxf(14.0, desk_h - 16.0 - _dock_card.size.y))
+
+
+func _clamp_dock_pos(p: Vector2, desk_w: float, desk_h: float) -> Vector2:
+	return Vector2(
+		clampf(p.x, 0.0, maxf(0.0, desk_w - _dock_card.size.x)),
+		clampf(p.y, 0.0, maxf(0.0, desk_h - _dock_card.size.y)))
+
+
+func _on_case_dock_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_dock_down = true
+			_dock_dragged = false
+			_dock_press_global = event.global_position
+			_dock_grab = _dock_card.position
+			_dock_card.accept_event()
+		elif _dock_down:
+			var was_dragged := _dock_dragged
+			_dock_down = false
+			_dock_dragged = false
+			if not was_dragged:
+				_reopen_case()
+			_dock_card.accept_event()
+		return
+	if event is InputEventMouseMotion and _dock_down:
+		var at := (event as InputEventMouseMotion).global_position
+		var d := at - _dock_press_global
+		if not _dock_dragged and absf(d.x) + absf(d.y) < 5.0:
+			return
+		if not _dock_dragged:
+			_dock_dragged = true
+			_dock_card.move_to_front()
+		var desk_w := _desk.size.x if _desk != null and is_instance_valid(_desk) else _vw()
+		var desk_h := _desk.size.y if _desk != null and is_instance_valid(_desk) else _vh() - HEADER_H
+		_dock_card.position = _clamp_dock_pos(_dock_grab + d, desk_w, desk_h)
+		_dock_user_placed = true
+		_place_toast_anchor()
+		_dock_card.accept_event()
 
 
 func _place_music_windows() -> void:
@@ -1812,9 +1865,12 @@ func _place_music_windows() -> void:
 			minf(906.0, _vw() - 14.0 - _music_win.size.x),
 			minf(414.0, desk_h - 12.0 - _music_win.size.y))
 	if _music_dock != null and is_instance_valid(_music_dock):
-		_music_dock.position = Vector2(
-			minf(1026.0, _vw() - 16.0 - _music_dock.size.x),
-			minf(532.0, desk_h - 16.0 - _music_dock.size.y))
+		if _music_dock.user_placed():
+			_music_dock.clamp_into_parent()
+		else:
+			_music_dock.position = Vector2(
+				minf(1026.0, _vw() - 16.0 - _music_dock.size.x),
+				minf(532.0, desk_h - 16.0 - _music_dock.size.y))
 
 
 ## 1280 下的浮窗坐标是量出来的；小窗口只收越界的那一轴，避免 TEC / 对话窗
@@ -1834,8 +1890,11 @@ func _place_floating_windows() -> void:
 			_tec.position = Vector2(minf(906.0, vw - 14.0 - _tec.size.x),
 				minf(264.0, desk_h - 14.0 - _tec.size.y))
 	if _tec_chip != null and is_instance_valid(_tec_chip):
-		_tec_chip.position = Vector2(minf(1068.0, vw - 16.0 - _tec_chip.size.x),
-			minf(608.0, desk_h - 4.0 - _tec_chip.size.y))
+		if _tec_chip.user_placed():
+			_tec_chip.clamp_into_parent()
+		else:
+			_tec_chip.position = Vector2(minf(1068.0, vw - 16.0 - _tec_chip.size.x),
+				minf(608.0, desk_h - 4.0 - _tec_chip.size.y))
 	if _archive_win != null and is_instance_valid(_archive_win):
 		_archive_win.position = Vector2(minf(458.0, vw - 14.0 - _archive_win.size.x),
 			minf(84.0, desk_h - 14.0 - _archive_win.size.y))
@@ -2024,18 +2083,22 @@ func _on_ending_finished() -> void:
 
 
 func _build_case_park() -> void:
-	_dock_card = Button.new()
+	## U7：案件卡片改成自管手势的 PanelContainer；按下可拖，松手未拖才展开案件。
+	_dock_card = PanelContainer.new()
 	_dock_card.name = "case_dock"
 	_dock_card.size = Vector2(170, 56)
+	_dock_card.custom_minimum_size = Vector2(170, 56)
 	_dock_card.position = Vector2(1094, 678)
-	_dock_card.focus_mode = Control.FOCUS_NONE
-	var normal := TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 1)
-	_dock_card.add_theme_stylebox_override("normal", normal)
-	## 悬停 = 键线 1px → 2px（与全站按钮同一套语法）。原来是 `CARD → BG`，
-	## 两个常量在单色版里都是纯白，等于没有反馈。
-	_dock_card.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 2))
-	_dock_card.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 2))
-	_dock_card.pressed.connect(_reopen_case)
+	_dock_card.mouse_filter = Control.MOUSE_FILTER_STOP
+	_dock_card.tooltip_text = "案件已收起 · 拖动可挪位置 · 单击展开"
+	_normal_style = TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 1)
+	_hover_style = TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 2)
+	_dock_card.add_theme_stylebox_override("panel", _normal_style)
+	_dock_card.mouse_entered.connect(func():
+		_dock_card.add_theme_stylebox_override("panel", _hover_style))
+	_dock_card.mouse_exited.connect(func():
+		_dock_card.add_theme_stylebox_override("panel", _normal_style))
+	_dock_card.gui_input.connect(_on_case_dock_input)
 	_dock_card.visible = false
 	_desk.add_child(_dock_card)
 	_place_z(_dock_card, ZR_DOCK)
@@ -2091,6 +2154,7 @@ func _build_tec_chip() -> void:
 	_tec_chip.position = Vector2(1068, 608)
 	_tec_chip.visible = false
 	_tec_chip.pressed.connect(_open_tec)
+	_tec_chip.moved.connect(_place_toast_anchor)
 	_desk.add_child(_tec_chip)
 	_place_z(_tec_chip, ZR_DOCK)
 
@@ -2352,6 +2416,10 @@ func _new_runtime() -> void:
 	if _music_dock != null and is_instance_valid(_music_dock):
 		_music_dock.queue_free()
 	_music_dock = null
+	## U7：换案 / 重置恢复默认贴边位（同一局内的玩家摆位仍保留）。
+	_dock_user_placed = false
+	if _tec_chip != null and is_instance_valid(_tec_chip):
+		_tec_chip.reset_place()
 	if _garden_win != null and is_instance_valid(_garden_win):
 		_garden_win.queue_free()
 	_garden_win = null
@@ -3555,7 +3623,7 @@ func _on_card_selected(key: String) -> void:
 		graph.clear_fresh(key)
 		_sync_card_shell(_cards.get(key, null))
 	_apply_focus()
-	_refresh_detail()
+	_refresh_detail(true)
 	## 选中节点时把详情窗提到当前层，避免被 TEC / 后开的窗口压在下面。
 	if _detail_win != null and is_instance_valid(_detail_win) and _detail_win.visible:
 		_raise_to_front(_detail_win)
@@ -3813,7 +3881,17 @@ func _ensure_detail() -> DetailWin:
 	return _detail_win
 
 
-func _refresh_detail() -> void:
+func _refresh_detail(force := false) -> void:
+	## U2：叙事还在打字时，详情先挂起。玩家主动选别的节点（force）则先补全叙事；
+	## `_commit` 等后台刷新走非 force，只记 pending，等打字结束再补。
+	if _narr != null and is_instance_valid(_narr) and _narr.is_typing():
+		if force:
+			_narr.finish_typing()
+		else:
+			_pending_detail = _selected != "" and graph != null and graph.nodes.has(_selected)
+			if _pending_detail and _detail_win != null and is_instance_valid(_detail_win):
+				_detail_win.hide()
+			return
 	if _detail_win == null or not is_instance_valid(_detail_win):
 		if _selected == "" or graph == null or not graph.nodes.has(_selected):
 			return
@@ -3821,7 +3899,13 @@ func _refresh_detail() -> void:
 	if _selected == "" or graph == null or not graph.nodes.has(_selected):
 		_detail_win.hide()
 		return
-	_detail_win.show_node(_selected)
+	if _detail_full_once:
+		_detail_win.show_full_once()
+		_detail_full_once = false
+	if force:
+		_detail_win.show_node(_selected, true)
+	else:
+		_detail_win.show_node(_selected)
 
 
 ## 「重看对话」：把这个人已经说过的台词整段重放进对话窗（Web `renarrTalk`）
@@ -5154,12 +5238,32 @@ func _show_narr(sid: String) -> void:
 	_narr.setup_narr(case_def.scene_title(sid), body, 340, 300)
 	_narr.position = Vector2(700, 290)
 	_narr.closed.connect(_on_narr_closed)
+	_narr.typing_finished.connect(_on_narr_typing_finished)
 	_desk.add_child(_narr)
 	_place_z(_narr, ZR_NARR)
+	## U2：叙事先播，详情后显示；已有详情先收起，等这一段打完。
+	_pending_detail = _selected != "" and graph.nodes.has(_selected)
+	if _detail_win != null and is_instance_valid(_detail_win):
+		_detail_win.hide()
+	if not _narr.is_typing():
+		_on_narr_typing_finished()
+
+
+func _on_narr_typing_finished() -> void:
+	if not _pending_detail:
+		return
+	_pending_detail = false
+	## U2：补显示时简介整段出现，不再二次打字。
+	_detail_full_once = true
+	_refresh_detail()
 
 
 func _on_narr_closed() -> void:
 	_narr = null
+	if _pending_detail:
+		_pending_detail = false
+		_detail_full_once = true
+		_refresh_detail()
 
 
 # ── 档案 / 时间图层 / 回忆放映 ─────────────────────────────────────────
@@ -6022,6 +6126,11 @@ func _tec_reaction_text(kind: String, id: String) -> String:
 func _tec_hint(text: String, announce := false, log_it := false) -> void:
 	if text == "" or _tec == null or not is_instance_valid(_tec):
 		return
+	## W26：同一条提示不重复追加；如果它还在打字，点一下只负责补全。
+	if _tec.last_line_text() == text:
+		if _tec.is_typing():
+			_tec.finish_typing()
+		return
 	_tec.append_line(text, TecTheme.MUTED)
 	if log_it:
 		_log("TEC：" + text, "sys")
@@ -6111,6 +6220,10 @@ func _tec_talk() -> void:
 		return
 	if not _tec.visible:
 		_open_tec()
+	## W26：打字中再点只补全当前行，不叠加下一句（对齐 MemCard 单击补全惯例）。
+	if _tec.is_typing():
+		_tec.finish_typing()
+		return
 	if _tutorial_active:
 		_tutorial_say(_tutorial_talk_line())
 		return

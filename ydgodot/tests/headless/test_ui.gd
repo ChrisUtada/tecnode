@@ -809,6 +809,49 @@ func _initialize() -> void:
 			"%s / size %s" % [dw.position, dw.size])
 		dw.place_right()
 
+		# W6：× 只收起，不再销毁；后台 commit 不能把它重新弹开。
+		dw._on_close_pressed()
+		await process_frame
+		check("W6 × 关闭详情窗", not dw.visible)
+		check("W6 关闭后实例保留（可再次打开）", is_instance_valid(dw))
+		var commit_before: Dictionary = scene._save.snapshot()
+		scene.graph.mark_fresh(vis_card.card_key)
+		scene._commit(commit_before)
+		await process_frame
+		check("W6 任意操作不复活已关闭详情", not dw.visible)
+		scene._on_card_selected(vis_card.card_key)
+		await process_frame
+		check("W6 再点卡片可重新打开详情", dw.visible)
+
+		# U2：叙事打字中详情挂起，播完 / 点击补全后整段出现。
+		scene._show_narr("SCENES_garden")
+		await process_frame
+		var u2_narr: NarrCard = scene._narr
+		var u2_para: TypewriterLabel = null
+		if dw != null:
+			u2_para = dw.find_child("dt_desc", true, false) as TypewriterLabel
+		check("U2 叙事卡开始打字", u2_narr != null and u2_narr.is_typing())
+		check("U2 打字中详情先收起", not dw.visible)
+		scene._refresh_detail()
+		await process_frame
+		check("U2 打字中后台刷新不弹详情", not dw.visible)
+		if u2_narr != null:
+			var narr_click := InputEventMouseButton.new()
+			narr_click.button_index = MOUSE_BUTTON_LEFT
+			narr_click.pressed = true
+			narr_click.global_position = u2_narr.get_global_rect().get_center()
+			u2_narr._gui_input(narr_click)
+		await process_frame
+		await process_frame
+		check("W17 单击叙事卡补全", u2_narr == null or not u2_narr.is_typing())
+		check("U2 叙事播完补显示详情", dw.visible)
+		check("U2 补显示不二次打字", u2_para != null and not u2_para.is_typing(),
+			"null" if u2_para == null else str(u2_para.is_typing()))
+		if scene._narr != null and is_instance_valid(scene._narr):
+			scene._narr.queue_free()
+		scene._narr = null
+		scene._pending_detail = false
+
 	# 10) 反应表：把物品拖给人物要能说出话来（14 条反应表此前完全不可达）
 	var item_key: String = scene.dbg_ensure("item", "ITEMS_changji")
 	var char_key: String = scene.dbg_ensure("char", "CHARS_zs")
@@ -1912,6 +1955,9 @@ func _initialize() -> void:
 	# ── 第 5 幕：姓名 / 编号 / 日期 / 照片 ──
 	var cert = scene._tutorial_cert_win
 	check("G5 领证窗打开", cert != null)
+	check("W27 签发窗标题栏可拖动", cert != null and cert.dbg_drag_enabled())
+	var cert_close := cert.get_node_or_null("bar/close") as Control if cert != null else null
+	check("W27 签发期仍隐藏 ×（流程强制）", cert_close == null or not cert_close.visible)
 	check("G5 四项字段齐全",
 		cert != null and cert.find_child("cert_name", true, false) != null
 			and cert.find_child("cert_id_value", true, false) != null

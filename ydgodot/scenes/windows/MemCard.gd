@@ -280,11 +280,13 @@ func _on_card_input(event: InputEvent) -> void:
 			_pressing = false
 			if not _dragged:
 				advance()
+		accept_event()
 	elif event is InputEventMouseMotion and _pressing:
 		if not _dragged and event.global_position.distance_to(_drag_press) > 4.0:
 			_dragged = true
 		if _dragged:
 			position = _drag_grab + (event.global_position - _drag_press)
+		accept_event()
 	# 「点击提层」走 SysWindow.raise_now（Desktop._place_z 接进来的 rank 表回调）
 
 

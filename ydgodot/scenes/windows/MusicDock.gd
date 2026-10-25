@@ -6,6 +6,7 @@ extends PanelContainer
 signal restore_requested
 signal toggle_requested
 signal stop_requested
+signal moved
 
 const DOCK_W := 238.0
 const DOCK_H := 60.0
@@ -17,6 +18,12 @@ var _time: Label
 var _toggle_btn: TransportButton
 var _close_btn: TransportButton
 var _state: Dictionary = {}
+## U7：拖动最小化部件。按下记原点，位移超阈值才进入拖动；松手若拖过则吞掉「还原」。
+var _down := false
+var _dragged := false
+var _press_global := Vector2.ZERO
+var _grab := Vector2.ZERO
+var _user_placed := false
 
 
 func setup_dock() -> void:
@@ -24,7 +31,7 @@ func setup_dock() -> void:
 	custom_minimum_size = Vector2(DOCK_W, DOCK_H)
 	size = Vector2(DOCK_W, DOCK_H)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	tooltip_text = "播放器 · 单击还原"
+	tooltip_text = "播放器 · 拖动可挪位置 · 单击还原"
 	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.EDGE, 1)
 	sb.content_margin_left = 9
 	sb.content_margin_right = 9
@@ -80,8 +87,50 @@ func _mini_button(mode: String, tip: String) -> TransportButton:
 
 
 func _on_gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		restore_requested.emit()
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_down = true
+			_dragged = false
+			_press_global = event.global_position
+			_grab = position
+			accept_event()
+		elif _down:
+			var was_dragged := _dragged
+			_down = false
+			_dragged = false
+			if not was_dragged:
+				restore_requested.emit()
+			accept_event()
+		return
+	if event is InputEventMouseMotion and _down:
+		var at := (event as InputEventMouseMotion).global_position
+		var d := at - _press_global
+		if not _dragged and absf(d.x) + absf(d.y) < 5.0:
+			return
+		if not _dragged:
+			_dragged = true
+			move_to_front()
+		position = _clamp_pos(_grab + d)
+		_user_placed = true
+		moved.emit()
+		accept_event()
+
+
+func user_placed() -> bool:
+	return _user_placed
+
+
+func clamp_into_parent() -> void:
+	position = _clamp_pos(position)
+
+
+func _clamp_pos(p: Vector2) -> Vector2:
+	var parent := get_parent() as Control
+	if parent == null:
+		return p
+	return Vector2(
+		clampf(p.x, 0.0, maxf(0.0, parent.size.x - size.x)),
+		clampf(p.y, 0.0, maxf(0.0, parent.size.y - size.y)))
 
 
 func update_state(s: Dictionary) -> void:
