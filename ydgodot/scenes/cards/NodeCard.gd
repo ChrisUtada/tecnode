@@ -403,10 +403,10 @@ func _apply_shell() -> void:
 	_badge.visible = _unread and _lod_show_title()
 	_warn_badge.visible = _warn and _lod_show_title()
 	_pin_badge.visible = _pinned and _lod_show_title()
-	## 1-bit 不再有「发光」—— `_glow` 是径向无极渐变，在纯白纸上是整套硬边语言里
-	## 唯一一块软调子，留着就破功。点亮的强调改由 `_border.thick_line`（2px 黑粗框）承担。
+	## 点亮态保留暖色光晕：手电筒 / 台灯需要一个「正在发光」的直观信号；
+	## 卡面本身仍保持白底 + 2px 粗框，光晕只垫在卡片外侧，不破坏文字对比度。
 	if _glow != null:
-		_glow.visible = false
+		_glow.visible = lit
 
 
 ## 「无文本入口」谓词每帧在 Desktop 算（is_no_entry），这里只负责显示态回灌
@@ -572,7 +572,8 @@ func _apply_lit_look() -> void:
 	_border.visible = true
 	_border.queue_redraw()
 	if _glow != null:
-		_glow.visible = false
+		_glow.visible = true
+		_glow.modulate = Color(1, 1, 1, 0.95)
 
 
 ## Web `.node.over{background:linear-gradient(150deg,#38372f,#1f1f19);color:var(--card);transform:scale(1.06)}`

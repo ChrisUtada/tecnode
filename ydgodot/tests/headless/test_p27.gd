@@ -113,8 +113,10 @@ func _initialize() -> void:
 			mid.is_equal_approx(TecTheme.CARD), str(mid))
 		check("V2：点亮走 2px 粗框（thick_line）",
 			torch._border.visible and torch._border.thick_line)
-		check("V2：不再有发光（光晕贴图关闭）",
-			torch._glow == null or not torch._glow.visible)
+		check("V2：点亮出现暖色光晕",
+			torch._glow != null and torch._glow.visible and torch._glow.texture != null
+				and torch._glow.modulate.a > 0.9,
+			"null" if torch._glow == null else str(torch._glow.visible))
 
 		_double_click(torch)
 		await process_frame
