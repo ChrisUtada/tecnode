@@ -31,7 +31,7 @@ text = "辛苦了，陆。"
 
 [sub_resource type="Resource" id="Resource_3vhmo"]
 script = ExtResource("8_wvwr2")
-text = "获得线索：[clue:CLUES_JS]"
+text = "获得线索：植物学家槿杉"
 clues = Array[ExtResource("6_0imy8")]([ExtResource("7_jo4i7")])
 
 [sub_resource type="Resource" id="Resource_aepsf"]

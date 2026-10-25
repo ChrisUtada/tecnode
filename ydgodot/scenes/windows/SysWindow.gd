@@ -139,6 +139,8 @@ func _build(radius: int) -> void:
 	_title_stripes.position = Vector2.ZERO
 	_title_stripes.size = Vector2(inner_w, BAR_H - 1.0)
 	_title_stripes.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	## C-B：新窗默认激活，横纹走强调青；非激活时由 set_active 换回墨色。
+	(_title_stripes as TitleStripes).col = TecTheme.SPOT_ACCENT
 	bar.add_child(_title_stripes)
 	_rules.append(_title_stripes)
 
@@ -214,7 +216,15 @@ func _sync_title_area() -> void:
 	var bar := _title_label.get_parent() as Control
 	if bar == null:
 		return
-	var controls := 47.0 if bar.get_node_or_null("min") != null else 24.0
+	## A9：按钮区按**实占可见按钮**计算。CertWin 隐藏 × 且没有 – 时，
+	## 条纹必须补到右沿，不能留下一个 24px 的空缺口。
+	var min_btn := bar.get_node_or_null("min") as Control
+	var controls := 0.0
+	if min_btn != null and min_btn.visible:
+		## – 在 × 左侧 23px；只要 – 在，按钮区就占到 inner_w-47。
+		controls = 47.0
+	elif _close_btn != null and _close_btn.visible:
+		controls = 24.0
 	var margin := controls + 8.0
 	var max_w := maxf(_inner_w - margin * 2.0, 24.0)
 	var font := _title_label.get_theme_font("font")
@@ -231,7 +241,7 @@ func _sync_title_area() -> void:
 	_title_stripes.size = Vector2(_inner_w, BAR_H - 1.0)
 	var stripes := _title_stripes as TitleStripes
 	stripes.line_left = 10.0
-	stripes.line_right = maxf(_inner_w - controls - 8.0, 10.0)
+	stripes.line_right = maxf(_inner_w - controls - (8.0 if controls > 0.0 else 2.0), 10.0)
 	stripes.gap_left = x - 7.0
 	stripes.gap_right = x + w + 7.0
 	stripes.queue_redraw()
@@ -244,15 +254,16 @@ class TitleStripes extends Control:
 	var line_right := 10.0
 	var gap_left := 0.0
 	var gap_right := 0.0
+	var col := TecTheme.SPOT_ACCENT
 
 	func _draw() -> void:
 		var mid := size.y * 0.5
 		for i in 3:
 			var y := mid - 4.5 + float(i) * 4.0
 			if gap_left > line_left:
-				draw_line(Vector2(line_left, y), Vector2(gap_left, y), TecTheme.INK, 1.0)
+				draw_line(Vector2(line_left, y), Vector2(gap_left, y), col, 1.0)
 			if line_right > gap_right:
-				draw_line(Vector2(gap_right, y), Vector2(line_right, y), TecTheme.INK, 1.0)
+				draw_line(Vector2(gap_right, y), Vector2(line_right, y), col, 1.0)
 
 
 func _mini_button(text: String) -> Button:
@@ -341,9 +352,10 @@ func set_active(on: bool) -> void:
 	if _active == on:
 		return
 	_active = on
-	for rule in _rules:
-		if rule != null and is_instance_valid(rule):
-			rule.visible = on
+	## C-B：横纹始终保留；激活 = 强调青，非激活 = 墨色。A2 的层次改由颜色承担。
+	if _title_stripes != null and is_instance_valid(_title_stripes):
+		(_title_stripes as TitleStripes).col = TecTheme.SPOT_ACCENT if on else TecTheme.INK
+		(_title_stripes as TitleStripes).queue_redraw()
 	if _title_label != null:
 		_title_label.add_theme_color_override("font_color",
 			TecTheme.TEXT if on else TecTheme.INK_FAINT)

@@ -14,6 +14,8 @@ var session: DialogueSession
 var case_def: CaseLoader
 
 var _line_box: VBoxContainer
+var _scroll: ScrollContainer
+var _area: Control
 var _rows: Array = []
 var _hint_rule: ColorRect
 var _hint_box: MarginContainer
@@ -29,6 +31,25 @@ func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader) ->
 	setup(_chat_title(p_entry, initial_ids), 390, 200)
 	content.add_theme_constant_override("separation", 0)
 
+	## W9：对话越长越不能把窗撑出桌布。正文放进滚动区，窗高封顶；
+	## 结构照抄 TEC 的 area + ScrollContainer，滚轮 / 拖动滚动条都能回看旧台词。
+	_area = Control.new()
+	_area.name = "chat_area"
+	_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_area.custom_minimum_size = Vector2(0, 96)
+	_area.clip_contents = true
+	_area.mouse_filter = Control.MOUSE_FILTER_PASS
+	content.add_child(_area)
+
+	_scroll = ScrollContainer.new()
+	_scroll.name = "chat_scroll"
+	_scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	_area.add_child(_scroll)
+
 	var pad := MarginContainer.new()
 	pad.name = "chat_pad"
 	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -37,7 +58,7 @@ func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader) ->
 	pad.add_theme_constant_override("margin_top", 4)
 	pad.add_theme_constant_override("margin_bottom", 4)
 	pad.mouse_filter = Control.MOUSE_FILTER_PASS
-	content.add_child(pad)
+	_scroll.add_child(pad)
 
 	_line_box = VBoxContainer.new()
 	_line_box.name = "chat_lines"
@@ -126,7 +147,7 @@ func _build_rows() -> void:
 	var first := true
 	for line in session.entry.script_lines:
 		var raw := String(line.text)
-		var text := case_def.strip_tags(raw).strip_edges()
+		var text := raw.strip_edges()
 		var built: Array
 		if String(line.kind) == "say" and line.who != null:
 			built = _say_row(line.who.id, line.who.name, text)
@@ -160,6 +181,7 @@ func _append_line(_line: DialogueLineDef) -> void:
 	_cur.start_typing()
 	_lines_shown += 1
 	call_deferred("_fit_height")
+	_scroll_to_end()
 
 
 func _say_row(who_id: String, who_name: String, text: String) -> Array:
@@ -224,17 +246,29 @@ func set_hint(text: String) -> void:
 	call_deferred("_fit_height")
 
 
-## Web 的 `.chat-win` 高度随内容长；Godot 里同样只改内高，宽度和顶边保持贴右上。
+## Web 的 `.chat-win` 高度随内容长；W9 起封顶 380，超出部分进滚动区。
 func _fit_height() -> void:
-	if content == null or body == null:
+	if content == null or body == null or _line_box == null:
 		return
 	if not is_inside_tree():
 		await tree_entered
 	await get_tree().process_frame
-	var content_h := content.get_combined_minimum_size().y
-	var target := SysWindow.BAR_H + 20.0 + content_h
+	var lines_h := _line_box.get_combined_minimum_size().y
+	var hint_h := 0.0
+	if _hint_box != null and _hint_box.visible:
+		hint_h = _hint_box.get_combined_minimum_size().y + 1.0
+	var target := clampf(SysWindow.BAR_H + 20.0 + lines_h + hint_h, 200.0, 380.0)
 	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:
 		set_inner_height(target)
+
+
+func _scroll_to_end() -> void:
+	if _scroll == null or not is_instance_valid(_scroll) or not is_inside_tree():
+		return
+	await get_tree().process_frame
+	if not is_inside_tree() or _scroll == null or not is_instance_valid(_scroll):
+		return
+	_scroll.set_deferred("scroll_vertical", 1 << 20)
 
 
 func hint_text() -> String:

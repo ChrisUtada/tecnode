@@ -139,7 +139,8 @@ func _make_row(c: Dictionary, last: bool = false) -> Control:
 		state_text = "锁定"
 		state_kind = "lock"
 	elif current:
-		state_text = "当前" if case_open else "进入"
+		## W28：当前案件统一显示「进行中」，不再用「当前 / 进入」两套词。
+		state_text = "进行中"
 		state_kind = "on"
 	elif not CaseCatalog.data_ready(id):
 		state_text = "待接入"
@@ -204,7 +205,7 @@ func dbg_row_state(id: String) -> String:
 		return ""
 	for child in row.find_children("*", "Label", true, false):
 		var text := String((child as Label).text)
-		if text in ["当前", "进入", "锁定", "待接入", "可进入"]:
+		if text in ["进行中", "当前", "进入", "锁定", "待接入", "可进入"]:
 			return text
 	return ""
 

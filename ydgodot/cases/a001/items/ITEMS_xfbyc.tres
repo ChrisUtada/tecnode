@@ -9,7 +9,7 @@
 
 [sub_resource type="Resource" id="Resource_yvsjb"]
 script = ExtResource("5_lid06")
-text = "很明显是一道[clue:CLUES_gcs]"
+text = "很明显是一道贯穿伤"
 clues = Array[ExtResource("3_2kcli")]([ExtResource("4_dn40h")])
 
 [resource]
@@ -18,3 +18,7 @@ id = "ITEMS_xfbyc"
 label = "下腹部右侧"
 desc = "裂开的绷带之下，是一道血淋淋的伤口，某种利器刺入其中，但现场似乎没有发现凶器。"
 hidden_clue = SubResource("Resource_yvsjb")
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

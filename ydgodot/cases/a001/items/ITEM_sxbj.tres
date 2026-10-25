@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="ItemDef" format=3]
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_pichl"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_4qea2"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_kuvrc"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_dlh.tres" id="3_4qea2"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_yjh.tres" id="4_fmts2"]
@@ -26,3 +27,7 @@ id = "ITEM_sxbj"
 label = "手写笔记"
 desc = "各式各样的手写植物笔记，堆满了书桌。纸页上密密麻麻写着植物的名字与习性；光线不足时，字迹便隐进昏暗里。"
 commands = Array[ExtResource("1_pichl")]([SubResource("Resource_5y5ds")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

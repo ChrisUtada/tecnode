@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_blf3u"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_0ock6"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_u28f1"]
 [ext_resource type="Script" path="res://core/defs/commands/TextCommandDef.gd" id="3_u28f1"]
 [ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="4_qqq15"]
 
@@ -22,3 +23,7 @@ lit_on_message = "打开了，一束苍白的光柱在黑暗里切出一道口�
 lit_off_message = "关上了，光柱熄灭"
 lit_fail_message = "还没有打开，照不出任何东西。"
 commands = Array[ExtResource("1_blf3u")]([SubResource("Resource_r0ms8")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

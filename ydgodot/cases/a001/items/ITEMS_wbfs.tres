@@ -21,7 +21,7 @@ target_char = ExtResource("4_jqchf")
 
 [sub_resource type="Resource" id="Resource_2a062"]
 script = ExtResource("7_vfueq")
-text = "获得线索：[clue:CLUES_JS]"
+text = "获得线索：植物学家槿杉"
 clues = Array[ExtResource("5_va8ov")]([ExtResource("6_7vf7y")])
 
 [resource]
@@ -32,3 +32,7 @@ desc = "纸上用潦草的笔记写着：姓名：槿杉 生日：7月4日 症�
 can_be_picked = true
 excerpts = Array[ExtResource("2_wte6e")]([SubResource("Resource_ob2bn"), SubResource("Resource_5padp")])
 hidden_clue = SubResource("Resource_2a062")
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

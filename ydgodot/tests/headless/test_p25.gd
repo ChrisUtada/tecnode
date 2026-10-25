@@ -245,6 +245,31 @@ func _test_desktop(c: CaseLoader) -> void:
 	await process_frame
 	st = scene.dbg_music_state()
 	check("进度可跳转", float(st["time"]) > float(st["duration"]) * 0.4, str(st))
+	# W18：进度条按住拖动，不是只能点一下。
+	var w18_prog := w.find_child("music_prog", true, false) as ProgressBar
+	check("W18 进度条存在", w18_prog != null)
+	if w18_prog != null:
+		var w18_fill := w18_prog.get_theme_stylebox("fill") as StyleBoxFlat
+		check("C-B 播放进度条用强调青",
+			w18_fill != null and w18_fill.bg_color.is_equal_approx(TecTheme.SPOT_ACCENT))
+	if w18_prog != null:
+		var w18_down := InputEventMouseButton.new()
+		w18_down.button_index = MOUSE_BUTTON_LEFT
+		w18_down.pressed = true
+		w18_down.position = Vector2(6.0, 5.0)
+		w._on_prog_input(w18_down)
+		check("W18 按下进入拖动", w._prog_dragging)
+		var w18_move := InputEventMouseMotion.new()
+		w18_move.position = Vector2(w18_prog.size.x * 0.75, 5.0)
+		w._on_prog_input(w18_move)
+		st = scene.dbg_music_state()
+		check("W18 按住拖动跟手", float(st["time"]) > float(st["duration"]) * 0.6, str(st))
+		var w18_up := InputEventMouseButton.new()
+		w18_up.button_index = MOUSE_BUTTON_LEFT
+		w18_up.pressed = false
+		w18_up.position = w18_move.position
+		w._on_prog_input(w18_up)
+		check("W18 松手结束拖动", not w._prog_dragging)
 	check("同曲再点暂停", not scene.dbg_music_toggle())
 	st = scene.dbg_music_state()
 	check("暂停状态", bool(st["paused"]) and not bool(st["playing"]), str(st))
@@ -347,6 +372,9 @@ func _test_desktop(c: CaseLoader) -> void:
 		str(scene.dbg_history_size()))
 	check("S4 撤销无关操作", scene.dbg_undo())
 	await process_frame
+	# F3：撤销走 card_key 增量 reconcile，不再把整批卡片销毁重建。
+	var f3_stats: Dictionary = scene.dbg_last_rebuild_stats()
+	check("F3 撤销复用已有卡片", int(f3_stats.get("reused", 0)) > 0, str(f3_stats))
 	st = scene.dbg_music_state()
 	check("S4 撤销无关操作后播放器还在", scene.dbg_music_win() != null)
 	check("S4 撤销无关操作不掐音乐",
@@ -460,6 +488,12 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("拖动已种下的株", garden.dbg_drag_plant(0, 25, 40))
 	plot = (g.garden["plots"] as Array)[0]
 	check("拖动后坐标更新", int(plot["x"]) == 25 and int(plot["y"]) == 40, str(plot))
+	# F9：阶段未变时不再重载贴图 / 重建 stylebox / 改标签。
+	var f9_before: int = garden._stage_refreshes
+	garden._refresh_growth()
+	garden._refresh_growth()
+	check("F9 同阶段刷新不重复换装", garden._stage_refreshes == f9_before,
+		"%d -> %d" % [f9_before, garden._stage_refreshes])
 
 	check("写临时存档", scene.dbg_save())
 	check("存档文件存在", FileAccess.file_exists(TEMP_SAVE))
@@ -474,10 +508,13 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("存档 narr 保留", String(g2.garden.get("narr", "")) == String(g.garden.get("narr", "")))
 
 	# A7：点桌布窗内 × 关闭时，被遮罩淡出的卡片必须恢复（用户截图：节点消失、连线还在）。
+	# S16 会给未读节点补入场 pop，pop 未结束的卡 alpha < 1；等它跑完再挑「正常可见」的卡。
+	for i in 30:
+		await process_frame
 	var probe: NodeCard = null
 	for key in scene._cards.keys():
 		var c2 := scene._cards[key] as NodeCard
-		if c2 == null or not c2.visible:
+		if c2 == null or not c2.visible or c2.modulate.a < 0.99:
 			continue
 		if probe == null:
 			probe = c2

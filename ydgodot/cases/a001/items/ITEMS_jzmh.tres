@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="ItemDef" format=3]
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_jk3ud"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_liuy5"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_qmfls"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_htys.tres" id="3_liuy5"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_rxbs.tres" id="4_75yg0"]
@@ -26,3 +27,7 @@ label = "精致的木盒"
 desc = "带着精致花纹的木盒，需要密码才能打开。"
 can_be_picked = true
 commands = Array[ExtResource("1_jk3ud")]([SubResource("Resource_o4675")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

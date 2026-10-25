@@ -22,7 +22,7 @@ const CASE_PATH := "res://cases/a001/case.tres"
 
 var data: Dictionary = {}
 var case_def: CaseDef = null
-var loader := CaseLoader.new()   # 只用它的 tags_of（与运行时同一份正则，别另写一套）
+var tag_re: RegEx
 var missing: Array = []
 var report: Array = []
 
@@ -31,6 +31,8 @@ func _initialize() -> void:
 	if not _load_json():
 		quit(1)
 		return
+	tag_re = RegEx.new()
+	tag_re.compile("\\[(item|loc|char|clue|data):([^\\]]+)\\]")
 	case_def = load(CASE_PATH) as CaseDef
 	if case_def == null:
 		push_error("加载不了 " + CASE_PATH)
@@ -78,9 +80,11 @@ func _fill(res: Resource, raw: String, host_kind: String, id: String) -> void:
 	var chars := PackedStringArray()
 	var locs := PackedStringArray()
 	var clues := PackedStringArray()
-	for tag in loader.tags_of(raw):
-		var k := String(tag["kind"])
-		var tid := String(tag["id"])
+	for m in tag_re.search_all(raw):
+		var k := String(m.get_string(1))
+		if k == "scene":
+			k = "loc"
+		var tid := String(m.get_string(2))
 		if k == "char" and tid == "CHARS_TEC":
 			continue                      # TEC 是常驻对话方，不上画布（与旧行为一致）
 		match k:

@@ -58,7 +58,9 @@ func _build_content() -> void:
 	_avatar.gui_input.connect(_on_avatar_input)
 	av_col.add_child(_avatar)
 
-	var av_label := TecTheme.label("TEC", TecTheme.FS_BODY, TecTheme.MUTED)
+	## C-B：TEC 品牌符号用强调青，是全窗唯一一块「系统正在注意」的青。
+	var av_label := TecTheme.label("TEC", TecTheme.FS_BODY, TecTheme.SPOT_ACCENT)
+	av_label.name = "tec_brand"
 	av_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	av_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	av_col.add_child(av_label)
@@ -99,7 +101,7 @@ func _build_content() -> void:
 	_bar.custom_minimum_size = Vector2(0, 6)
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var bg := TecTheme.flat(TecTheme.FACE_LO, 0, TecTheme.FACE_LO, 0)
-	var fill := TecTheme.flat(TecTheme.LINE, 0, TecTheme.LINE, 0)
+	var fill := TecTheme.flat(TecTheme.SPOT_ACCENT, 0, TecTheme.SPOT_ACCENT, 0)
 	_bar.add_theme_stylebox_override("background", bg)
 	_bar.add_theme_stylebox_override("fill", fill)
 	_analysis.add_child(_bar)
@@ -231,9 +233,39 @@ func append_line(text: String, color: Color = TecTheme.TEXT) -> void:
 	## 这样快速连点不会出现「多行同时逐字」，也不会把上一句只留半截。
 	if is_typing():
 		finish_typing()
-	var l := TecTheme.narrative_label(text, color)
+	_append_label(TecTheme.narrative_label(text, color))
+
+
+## G14：真名结局相关线索的提醒行。不用红字（红=错误语义）：
+## 反白底 + 纸白字 + 左侧 3×9 强调青符号 + 开打前停 260ms。
+func append_true_clue(text: String) -> void:
+	if text == "":
+		return
+	if is_typing():
+		finish_typing()
+	var l := TecTheme.narrative_label(text, TecTheme.CARD)
+	var sb := TecTheme.flat(TecTheme.INK, 0, TecTheme.INK, 0)
+	sb.content_margin_left = 14
+	sb.content_margin_right = 8
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 4
+	l.add_theme_stylebox_override("normal", sb)
+	l.add_theme_color_override("font_color", TecTheme.CARD)
+	l.pause_ms = 260.0
+	var mark := ColorRect.new()
+	mark.name = "true_clue_mark"
+	mark.color = TecTheme.SPOT_ACCENT
+	mark.position = Vector2(5, 6)
+	mark.size = Vector2(3, 9)
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.add_child(mark)
+	_append_label(l)
+
+
+func _append_label(l: Label) -> void:
 	_lines.add_child(l)
-	l.start_typing()
+	if l is TypewriterLabel:
+		(l as TypewriterLabel).start_typing()
 	if _empty != null:
 		_empty.visible = false
 	var gap := Control.new()

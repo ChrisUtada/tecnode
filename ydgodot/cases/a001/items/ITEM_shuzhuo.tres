@@ -16,7 +16,10 @@ id = "ITEM_shuzhuo"
 label = "书桌"
 desc = "木制的书桌上堆放着大量手写笔记，在靠近桌子的边缘，有一盏老式台灯，从灯罩中伸出一条黄铜的链子，拉动它似乎可以点亮台灯。书桌的两个抽屉闭合着，没有上锁。桌脚处摆着一个堆满灰烬的垃圾桶。
 "
-content = "木制的书桌上堆放着大量[item:ITEM_sxbj]，在靠近桌子的边缘，有一盏老式[item:ITEM_taideng]，从灯罩中伸出一条黄铜的链子，拉动它似乎可以点亮台灯。<br>书桌的两个[item:ITEM_chouti]闭合着，没有上锁。桌脚处摆着一个堆满灰烬的[item:ITEMS_ljt]。<br><br>返回 [loc:SCENES_garden]"
+content = "木制的书桌上堆放着大量手写笔记，在靠近桌子的边缘，有一盏老式台灯，从灯罩中伸出一条黄铜的链子，拉动它似乎可以点亮台灯。
+书桌的两个抽屉闭合着，没有上锁。桌脚处摆着一个堆满灰烬的垃圾桶。
+
+返回 植物学家的花园"
 hidden_clue = SubResource("Resource_1yjr7")
 node_items = PackedStringArray("ITEM_sxbj", "ITEM_taideng", "ITEM_chouti", "ITEMS_ljt")
 node_chars = PackedStringArray()

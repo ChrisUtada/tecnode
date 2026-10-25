@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_ly2og"]
 [ext_resource type="Script" path="res://core/defs/ChoiceOptionDef.gd" id="2_i4iou"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_moej5"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_moej5"]
 [ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_choutiyi.tres" id="4_66vs6"]
 [ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="5_qa4r7"]
@@ -40,3 +41,7 @@ id = "ITEM_chouti"
 label = "抽屉"
 desc = "书桌的两个抽屉紧闭着，但没有上锁。"
 commands = Array[ExtResource("1_ly2og")]([SubResource("Resource_56t56")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

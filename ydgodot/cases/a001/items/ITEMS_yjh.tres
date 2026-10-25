@@ -9,7 +9,7 @@
 
 [sub_resource type="Resource" id="Resource_ahqy5"]
 script = ExtResource("5_nqgrg")
-text = "获得线索：[clue:CLUES_yjhds]"
+text = "获得线索：洋金花毒素"
 clues = Array[ExtResource("3_nrjm1")]([ExtResource("4_15pq0")])
 
 [resource]
@@ -19,3 +19,7 @@ label = "洋金花"
 desc = "洋金花是茄科曼陀罗属一年生草本植物。"
 can_be_picked = true
 hidden_clue = SubResource("Resource_ahqy5")
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

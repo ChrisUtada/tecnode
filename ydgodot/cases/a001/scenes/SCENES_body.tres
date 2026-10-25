@@ -8,14 +8,21 @@
 
 [sub_resource type="Resource" id="Resource_h2gs8"]
 script = ExtResource("3_n8as6")
-text = "死者身份：植物学家[clue:CLUES_V_luheng]"
+text = "死者身份：植物学家植物学家陆珩松"
 clues = Array[ExtResource("1_v2wky")]([ExtResource("2_0y1ex")])
 
 [resource]
 script = ExtResource("4_ff8nh")
 id = "SCENES_body"
 title = "尸体"
-content = "黑影被手电筒照亮，出现在眼前的是一具吊死的尸体。<br>死者修长的身体被绑带[item:ITEMS_bd]紧紧缠绕着。头部只露出了紧闭的双眼。<br>[item:ITEMS_xfbyc]流出的血液浸透了绷带。<br>[item:ITEMS_ccss]从屋顶垂下，绕过死者的脖颈，勒出了一条深深的[item:ITEMS_xh]。<br>尸体上散发而出的气味，并非腐臭，而是淡淡的湿青草气味。<br><br>问问[char:CHARS_TEC]<br>返回 [loc:SCENES_garden]"
+content = "黑影被手电筒照亮，出现在眼前的是一具吊死的尸体。
+死者修长的身体被绑带绷带紧紧缠绕着。头部只露出了紧闭的双眼。
+下腹部右侧流出的血液浸透了绷带。
+粗糙的绳索从屋顶垂下，绕过死者的脖颈，勒出了一条深深的血痕。
+尸体上散发而出的气味，并非腐臭，而是淡淡的湿青草气味。
+
+问问TEC
+返回 植物学家的花园"
 desc = "一具被吊死的尸体，你上前仔细查看。"
 can_be_picked = true
 hidden_clue = SubResource("Resource_h2gs8")

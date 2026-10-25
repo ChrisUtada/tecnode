@@ -9,7 +9,7 @@
 
 [sub_resource type="Resource" id="Resource_75dod"]
 script = ExtResource("5_dur3o")
-text = "获得线索：[clue:CLUES_cjdcy]"
+text = "获得线索：初级调查员"
 clues = Array[ExtResource("3_2ebrt")]([ExtResource("4_jsb7b")])
 
 [resource]
@@ -18,3 +18,7 @@ id = "ITEMS_cjdcy"
 label = "初级调查员"
 desc = "调查员分为初级、中级、高级三个等级，每一个等级能够介入的因果各有不同，获得的T.E.C-OS的权限也不同。"
 hidden_clue = SubResource("Resource_75dod")
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

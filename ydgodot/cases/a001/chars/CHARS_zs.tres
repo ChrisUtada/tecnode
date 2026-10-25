@@ -45,7 +45,7 @@ text = "只要按下按钮，一切就会结束。"
 
 [sub_resource type="Resource" id="Resource_s7ld1"]
 script = ExtResource("9_viu4f")
-text = "获得线索：[clue:CLUES_zs]"
+text = "获得线索：朱穗"
 clues = Array[ExtResource("7_ancoo")]([ExtResource("8_iknas")])
 
 [sub_resource type="Resource" id="Resource_xr3we"]
@@ -87,7 +87,7 @@ text = "献祭……捕获……我不知道陆老师和槿老师在忙些什么
 [sub_resource type="Resource" id="Resource_vtx1p"]
 script = ExtResource("16_awbfv")
 scene = ExtResource("17_cvyly")
-lines = Array[String](["“你是谁？”", "“请救救我们……”", "“陆老师……用绳子把我们勒住……醒来的时候我们就在这里了……”", "“那个人是植物所的所长傅柏。”", "“按钮……[clue:CLUES_qsan]，按下它我们就能出去了！”（TEC：在收集线索前请务必再次确认，此次选择有可能涉入过深，导致因果崩塌。）"])
+lines = Array[String](["“你是谁？”", "“请救救我们……”", "“陆老师……用绳子把我们勒住……醒来的时候我们就在这里了……”", "“那个人是植物所的所长傅柏。”", "“按钮……墙上的按钮，按下它我们就能出去了！”（TEC：在收集线索前请务必再次确认，此次选择有可能涉入过深，导致因果崩塌。）"])
 
 [sub_resource type="Resource" id="Resource_x5b0m"]
 script = ExtResource("16_awbfv")
@@ -109,3 +109,4 @@ scene_talks = Array[ExtResource("16_awbfv")]([SubResource("Resource_vtx1p"), Sub
 clue_reactions = Array[ExtResource("1_cns6i")]([SubResource("Resource_22evp"), SubResource("Resource_sbw7e"), SubResource("Resource_ex3ui"), SubResource("Resource_4y46l")])
 item_reactions = Array[ExtResource("1_cns6i")]([SubResource("Resource_xr3we"), SubResource("Resource_fxijx"), SubResource("Resource_glsr5"), SubResource("Resource_3knbn"), SubResource("Resource_0y6xo"), SubResource("Resource_6ggx2")])
 hidden_clue = SubResource("Resource_s7ld1")
+metadata/changed = true

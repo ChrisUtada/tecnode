@@ -12,7 +12,7 @@ extends Control
 ##     落在空白 → **夹回 world 边界并写回数据**（`drag_finished`），不弹回；
 ##   - 右键 = 钉住 / 取消钉住（唯一入口，拖动不再自动钉住）。
 ##
-## 坐标基准（见 INTERACTION_GAP_REPORT §4.1）：`position` 是**含 8px 阴影余量的外框**左上角，
+## 坐标基准：`position` 是**含 8px 阴影余量的外框**左上角，
 ## 视觉框 = `position + (PAD, PAD)`，尺寸 `_w × _h`。布局 / 连线端点 / 命中判定一律走
 ## `visual_rect()`，禁止各自手算。
 
@@ -27,6 +27,8 @@ signal drag_moved(key: String, at_global: Vector2)
 ## 松手：handled=true 表示被落点消费（已弹回原位）；false 表示停在原位（pos 已夹回边界）
 signal drag_finished(key: String, pos: Vector2, handled: bool)
 signal pin_toggled(key: String)
+## K11：右键 = 打开上下文菜单（钉住 / 查看详情），不再直接改状态。
+signal context_requested(key: String, at_global: Vector2)
 ## 松手弹回原位结束（Desktop 用它补一次连线重绘，避免线停在半路）。
 signal spring_finished(key: String)
 
@@ -38,7 +40,8 @@ const DRAG_THRESHOLD := 5.0
 ## 边长取 **9**（≈ 字面 3/4）：试过 11（= 字号 − 1），方块几乎与字面等高，下沿压到字脚、
 ## 看着比文字「低半格」；缩到 9 后上下各留 1~2px，读作标记而不是第二个字。
 ## P2：字牌从 16 放到 18，才容得下 10px 汉字（10px 墨高约 14，16 圈内径只有 13.8）。
-const GLYPH_BOX := 18.0
+## U1：字牌外径 20，给 12px 原生字留出四边呼吸缝（旧 18px 圈配 10px 重采样字）。
+const GLYPH_BOX := 20.0
 const GLYPH_GAP := 6.0
 ## 标题 Label 的固定高度（单行，副标已删）
 const TITLE_H := 16.0
@@ -102,7 +105,8 @@ var node_data: Dictionary = {}
 ## 这些状态本来就由边框与填充编码过一次 —— 实线=已探索、虚线+纸色=未探索、金框=亮着、
 ## 深色反白=已捕获。每张卡再写一遍等于「标签通胀」：一屏五六张卡都在喊同一句话，
 ## 玩家两天后就整行屏蔽了，连带把真正有用的也一起忽略。类型名同理，改由类型色符号承担。
-const LOD_TITLE := 0.86
+## U1/W13：0.95 以下就切纯符号档。0.89 这类「差一点点」的倍率不再显示被重采样的标题。
+const LOD_TITLE := 0.95
 var _lod := 1.0
 
 
@@ -158,6 +162,8 @@ class DashBorder extends Control:
 	var rect := Rect2()
 	var radius := 11.0
 	var color := TecTheme.CARD_DASH
+	## C-B：选中环用强调青，和「已捕获/点亮」的黑/白语法区分开。
+	var sel_color := TecTheme.SPOT_ACCENT
 	## 枢纽场景用 CSS 的 `3px double`：外 1px 线、1px 空隙、内 1px 线。
 	## 不能拿虚线凑 —— 两者语义不同（虚线=未探索，双线=枢纽），在 Web 里也是两套规则。
 	var double_line := false
@@ -173,7 +179,7 @@ class DashBorder extends Control:
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = TecTheme.NONE
 		sb.set_border_width_all(2)
-		sb.border_color = TecTheme.INK
+		sb.border_color = sel_color
 		sb.set_corner_radius_all(0)
 		## AA **开着**（P4.1）：卡片恢复了 5px 圆角，弧段没有 AA 就是一圈锯齿；
 		## 正交直线本来就落在整数像素上，AA 不会把它们抹灰 —— 只有拐角变柔。
@@ -657,7 +663,7 @@ func _gui_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_RIGHT:
 			if mb.pressed:
-				pin_toggled.emit(card_key)
+				context_requested.emit(card_key, mb.global_position)
 				accept_event()
 			return
 		if mb.button_index != MOUSE_BUTTON_LEFT:
@@ -792,7 +798,9 @@ func _card_under(global_pos: Vector2) -> String:
 	var parent := get_parent()
 	if parent == null:
 		return ""
-	for c in parent.get_children():
+	## W8：从后往前取最上层，和 `_card_key_at` 的悬停高亮保持同一张卡。
+	for i in range(parent.get_child_count() - 1, -1, -1):
+		var c := parent.get_child(i)
 		if c == self or not (c is NodeCard):
 			continue
 		var card := c as NodeCard
@@ -866,6 +874,8 @@ func build_mirror() -> NodeCard:
 	m.setup(card_key, kind, node_data, _w, _h)
 	m.set_shell_state(_container, _explored, _collapsed, _unread, _hub)
 	m.set_warn(_warn)
+	## W14：镜像拷贝当前 LOD，否则缩小档下原件只剩符号、镜像仍是完整标题。
+	m.set_lod(_lod)
 	m.position = position
 	_strip_input(m)
 	return m

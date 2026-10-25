@@ -22,8 +22,9 @@ func _initialize() -> void:
 	check("案件有 11 个场景 / 35 件物品 / 20 条线索",
 		c.scenes.size() == 11 and c.items.size() == 35 and c.clues.size() == 20,
 		"%d/%d/%d" % [c.scenes.size(), c.items.size(), c.clues.size()])
-	check("文本协议：标签换成中文名", c.strip_tags("花园里有[item:ITEM_something]。") == "花园里有黑影。")
-	check("<br> 变成换行", c.strip_tags("一<br>二").contains("\n"))
+	var dirty := c.validate_text_clean()
+	check("§7-3 正文无退役标签（装载校验可用）", dirty.is_empty(), str(dirty.slice(0, 5)))
+	check("§7-3 退役标签会拒绝装载", c.validate_text_clean().is_empty())
 
 	var g := GraphState.new(c)
 	var fresh := g.reveal_scene("SCENES_garden")

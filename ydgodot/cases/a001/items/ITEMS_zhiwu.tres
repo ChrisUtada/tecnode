@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_drn6t"]
 [ext_resource type="Script" path="res://core/defs/ConditionDef.gd" id="2_8jja2"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_i13nu"]
 [ext_resource type="Resource" path="res://cases/a001/clues/CLUES_JS.tres" id="3_i13nu"]
 [ext_resource type="Resource" path="res://cases/a001/clues/CLUES_wmhj.tres" id="4_bwhb6"]
 [ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zhpt.tres" id="5_h665q"]
@@ -103,3 +104,7 @@ id = "ITEMS_zhiwu"
 label = "植物"
 desc = "常见或不常见的植物被放置在不同的地方，有的被打翻在地，有的甚至已经被踩烂。它们被遗落在此地，自生自灭。"
 commands = Array[ExtResource("1_drn6t")]([SubResource("Resource_kaqga")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

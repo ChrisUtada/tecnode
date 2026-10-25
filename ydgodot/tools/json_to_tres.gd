@@ -208,6 +208,10 @@ func _fill_scene(r: Resource, d: Dictionary) -> void:
 	r.set("image", String(d.get("image", "")))
 	r.set("can_be_picked", bool(d.get("canBePicked", false)))
 	r.set("hidden_clue", _hidden(d.get("hiddenClue", null)))
+	r.set("node_items", _packed(d.get("nodeItems", [])))
+	r.set("node_chars", _packed(d.get("nodeChars", [])))
+	r.set("node_locs", _packed(d.get("nodeLocs", [])))
+	r.set("node_clues", _packed(d.get("nodeClues", [])))
 	var scene_cmds: Array[CommandDef] = []
 	for c in d.get("commands", []):
 		var s_cmd := _command(c)
@@ -227,6 +231,10 @@ func _fill_item(r: Resource, d: Dictionary) -> void:
 	r.set("lit_off_message", String(d.get("litOffMessage", "")))
 	r.set("lit_fail_message", String(d.get("litFailMessage", "")))
 	r.set("hidden_clue", _hidden(d.get("hiddenClue", null)))
+	r.set("node_items", _packed(d.get("nodeItems", [])))
+	r.set("node_chars", _packed(d.get("nodeChars", [])))
+	r.set("node_locs", _packed(d.get("nodeLocs", [])))
+	r.set("node_clues", _packed(d.get("nodeClues", [])))
 
 	var cmds: Array[CommandDef] = []
 	for c in d.get("commands", []):
@@ -254,6 +262,9 @@ func _fill_char(r: Resource, d: Dictionary) -> void:
 	r.set("name", String(d.get("name", "")))
 	r.set("desc", String(d.get("desc", "")))
 	r.set("avatar", String(d.get("avatar", "")))
+	r.set("role", String(d.get("role", "")))
+	r.set("fate", String(d.get("fate", "")))
+	r.set("relation", String(d.get("relation", "")))
 	if d.get("debut", null) != null:
 		r.set("debut", _ref(String(d["debut"]), "SceneDef") as SceneDef)
 	r.set("talk_queue", _str_list(d.get("talkQueue", [])))
@@ -276,6 +287,8 @@ func _reactions(map: Dictionary, kind: String) -> Array[ReactionDef]:
 	for key in map.keys():
 		var rec := ReactionDef.new()
 		rec.trigger_id = String(key)
+		var rec_data := _dict(map[key])
+		rec.clues = _clue_refs(rec_data.get("clues", []))
 		var target: Resource = idx.get(String(key), null)
 		if target == null:
 			data_issues.append("%s 反应表指向不存在的实体 `%s`（Web 版同样永不触发；已保留 trigger_id）" % [kind, key])
@@ -287,8 +300,8 @@ func _reactions(map: Dictionary, kind: String) -> Array[ReactionDef]:
 				rec.item = target as ItemDef
 			else:
 				refs_missing.append("%s 类型不符（%s 反应表）" % [key, kind])
-		rec.text = String((map[key] as Dictionary).get("text", ""))
-		rec.results = _dict((map[key] as Dictionary).get("results", null))
+		rec.text = String(rec_data.get("text", ""))
+		rec.results = _dict(rec_data.get("results", null))
 		out.append(rec)
 	return out
 
@@ -340,6 +353,14 @@ func _script(rows) -> Array[DialogueLineDef]:
 		if row.get("who", null) != null:
 			line.who = _ref(String(row["who"]), "CharDef") as CharDef
 		out.append(line)
+	return out
+
+
+func _packed(arr) -> PackedStringArray:
+	var out := PackedStringArray()
+	if arr is Array:
+		for v in arr:
+			out.append(String(v))
 	return out
 
 
@@ -409,6 +430,7 @@ func _command(c: Dictionary) -> CommandDef:
 	cmd.label = String(c.get("label", ""))
 	cmd.fail_message = String(c.get("failMessage", ""))
 	cmd.requires_lit = _item_refs(c.get("requiresLit", []))
+	cmd.clues = _clue_refs(c.get("clues", []))
 	return cmd
 
 
@@ -420,6 +442,7 @@ func _payload(p, fallback_message := "") -> PayloadDef:
 	if p.get("scene", null) != null:
 		pay.scene = _ref(String(p["scene"]), "SceneDef") as SceneDef
 	pay.items = _item_refs(p.get("items", []))
+	pay.clues = _clue_refs(p.get("clues", []))
 	return pay
 
 

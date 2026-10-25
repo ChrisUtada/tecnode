@@ -33,13 +33,19 @@ func setup_cert(p_name: String = "") -> void:
 	_name = p_name.strip_edges()
 	_cert_id = Investigator.gen_id()
 	_date = Time.get_date_string_from_system()
+	## A10：与其他浮层同一套出场语法 —— 右下 3px 偏移影 + 120ms 淡入。
+	offset_shadow = true
 	setup("调查员证 · 签发", 640, 438)
 	## W27：签发期可以没有 ×（流程强制），但标题栏拖动必须保留。
 	set_drag_enabled(true)
 	var close := get_node_or_null("bar/close") as Control
 	if close != null:
 		close.visible = false
+	_sync_title_area()
 	_build_content()
+	modulate.a = 0.0
+	var fade := create_tween()
+	fade.tween_property(self, "modulate:a", 1.0, 0.12)
 
 
 func place_center(vw: float, vh: float) -> void:

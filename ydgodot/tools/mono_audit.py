@@ -40,6 +40,17 @@ ROOT = os.path.dirname(HERE)
 PALETTE_FILE = "ui/TecTheme.gd"
 SKIP_DIRS = {"addons", ".git", ".godot"}
 
+# C-D：三层体系的常量和材质色文件域。
+REQUIRED_CONSTANTS = {"SPOT_ACCENT", "MAT_FLAME", "MAT_EMBER", "MAT_DUST", "MAT_ASH", "MAT_PLANT"}
+MATERIAL_CONSTANTS = {"MAT_FLAME", "MAT_EMBER", "MAT_DUST", "MAT_ASH", "MAT_PLANT"}
+# 材质色只允许出现在画布 / 特效 / 内容容器相关文件；铬件（窗、按钮、页眉）引用即报错。
+MATERIAL_ALLOWED = (
+    "scenes/cards/",
+    "scenes/windows/GardenWin.gd",
+    "scenes/windows/MemCard.gd",
+    "ui/effects/",
+)
+
 # Color("rrggbb") / Color("rrggbbaa") / Color('#rrggbb')
 RE_HEX = re.compile(r'Color\(\s*[\'"]#?([0-9a-fA-F]{3,8})[\'"]\s*\)')
 # Color(0.1, 0.2, 0.3) / Color(0.1, 0.2, 0.3, 0.4)（允许换行、允许行尾注释）
@@ -188,16 +199,54 @@ def report_md(hits):
         print(f"| `#{val}` | {len(spots)} | {where} |")
 
 
+def palette_constants():
+    """返回 TecTheme 里 `const NAME :=` 的常量名集合。"""
+    path = os.path.join(ROOT, PALETTE_FILE)
+    names = set()
+    if not os.path.exists(path):
+        return names
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for raw_line in fh:
+            line = strip_comment(raw_line)
+            m = re.match(r"\s*const\s+([A-Z0-9_]+)\s*:=", line)
+            if m:
+                names.add(m.group(1))
+    return names
+
+
+def material_violations():
+    """C-D：MAT_* 只能出现在允许域；同时检查六个三层常量都已登记。"""
+    bad = []
+    missing = sorted(REQUIRED_CONSTANTS - palette_constants())
+    if missing:
+        bad.append(f"TecTheme 缺少三层常量：{', '.join(missing)}")
+    for rel, path in iter_gd(with_tests=False, palette_too=False):
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for no, raw_line in enumerate(fh, 1):
+                line = strip_comment(raw_line)
+                for name in MATERIAL_CONSTANTS:
+                    if f"TecTheme.{name}" not in line:
+                        continue
+                    if not any(rel.startswith(prefix) for prefix in MATERIAL_ALLOWED):
+                        bad.append(f"{rel}:{no}  材质色 {name} 出现在非内容域")
+    return bad
+
+
 def report_check(hits, strict_palette: bool):
     """门槛模式：字面量必须全部收进 TecTheme，或者等于调色板里的某个值。"""
     ok = palette_values() if not strict_palette else set()
     bad = [h for h in hits if h[2] not in ok]
-    if not bad:
-        print(f"✅ 通过：{len(hits)} 处字面量全部命中 TecTheme 调色板。")
+    mat_bad = material_violations()
+    if not bad and not mat_bad:
+        print(f"✅ 通过：{len(hits)} 处字面量全部命中 TecTheme 调色板；"
+              f"三层常量齐全，材质色文件域合规。")
         return 0
-    print(f"❌ 有 {len(bad)} 处字面量不在调色板里：")
-    for rel, no, val, snippet in bad:
-        print(f"    {rel}:{no}   #{val}   {snippet}")
+    if bad:
+        print(f"❌ 有 {len(bad)} 处字面量不在调色板里：")
+        for rel, no, val, snippet in bad:
+            print(f"    {rel}:{no}   #{val}   {snippet}")
+    for msg in mat_bad:
+        print(f"❌ {msg}")
     return 1
 
 

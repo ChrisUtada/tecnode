@@ -9,7 +9,7 @@
 
 [sub_resource type="Resource" id="Resource_8yr0e"]
 script = ExtResource("5_a48v2")
-text = "获得线索：[clue:CLUES_mgd]"
+text = "获得线索：染血的美工刀"
 clues = Array[ExtResource("3_lwy00")]([ExtResource("4_utxmt")])
 
 [resource]
@@ -19,3 +19,7 @@ label = "染血的美工刀"
 desc = "一把染血的美工刀，与陆珩松身上的伤口匹配，看来是正是凶器。"
 can_be_picked = true
 hidden_clue = SubResource("Resource_8yr0e")
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

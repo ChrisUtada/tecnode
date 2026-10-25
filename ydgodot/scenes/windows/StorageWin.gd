@@ -15,6 +15,9 @@ signal row_pressed(key: String, from_kind: String, at_global: Vector2)
 var store_kind: String = GraphState.BAG
 var graph: GraphState
 var case_def: CaseLoader
+## S11：案件收起后禁止再写进度（取回 / 拖出 / 去推演）。
+var writes_enabled := true
+var _action_btns: Array[Button] = []
 var _rows: VBoxContainer
 var _scroll: ScrollContainer
 var _list_sig := ""
@@ -152,19 +155,36 @@ func _make_row(key: String) -> Control:
 		to_mx.custom_minimum_size = Vector2(54, 22)
 		to_mx.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		to_mx.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
-		to_mx.pressed.connect(func(): to_matrix.emit(key))
+		to_mx.pressed.connect(func():
+			if writes_enabled:
+				to_matrix.emit(key))
+		to_mx.disabled = not writes_enabled
+		_action_btns.append(to_mx)
 		actions.add_child(to_mx)
 
 	var btn := TecTheme.button("取回画布")
 	btn.custom_minimum_size = Vector2(66, 22)
 	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	btn.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
-	btn.pressed.connect(func(): _take(key))
+	btn.pressed.connect(func():
+		if writes_enabled:
+			_take(key))
+	btn.disabled = not writes_enabled
+	_action_btns.append(btn)
 	actions.add_child(btn)
 	return row
 
 
+func set_writes_enabled(on: bool) -> void:
+	writes_enabled = on
+	for b in _action_btns:
+		if b != null and is_instance_valid(b):
+			b.disabled = not on
+
+
 func _on_row_input(ev: InputEvent, key: String) -> void:
+	if not writes_enabled:
+		return
 	if ev is InputEventMouseButton:
 		var mb := ev as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
@@ -173,7 +193,7 @@ func _on_row_input(ev: InputEvent, key: String) -> void:
 
 
 func _take(key: String) -> void:
-	if graph == null or not graph.stored.has(key):
+	if not writes_enabled or graph == null or not graph.stored.has(key):
 		return
 	will_take.emit(key)
 	if not graph.take_back(key):

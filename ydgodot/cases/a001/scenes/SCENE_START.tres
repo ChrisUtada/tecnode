@@ -13,7 +13,17 @@ text = "尝到一股血腥的气味。"
 script = ExtResource("3_0w0wx")
 id = "SCENE_START"
 title = "T.E.C-OS"
-content = "你好，[item:ITEMS_cjdcy]。<br>[item:ITEMS_ydqy]已被锁定。欢迎进入[item:ITEMS_tec]。<br>在你的权限范围内能够进入的区域，已经向你开放。<br>[char:CHARS_TEC]将协助你揭示异动区域的[item:ITEMS_turename]。<br><br>双击节点可以展开；把一个节点拖到另一个节点上可以组合；单击节点查看详情；把节点拖给 TEC 可以分析。<br><br>请务必注意安全，避免遭受因果污染。<br>一切就绪后，点击进入[loc:SCENES_garden]。<br><br>祝你一切顺利。"
+content = "你好，初级调查员。
+异动区域已被锁定。欢迎进入T.E.C-OS。
+在你的权限范围内能够进入的区域，已经向你开放。
+TEC将协助你揭示异动区域的真名。
+
+双击节点可以展开；把一个节点拖到另一个节点上可以组合；单击节点查看详情；把节点拖给 TEC 可以分析。
+
+请务必注意安全，避免遭受因果污染。
+一切就绪后，点击进入植物学家的花园。
+
+祝你一切顺利。"
 desc = "你好，初级调查员，欢迎进入T.E.C-OS。"
 hidden_clue = SubResource("Resource_8fmy7")
 node_items = PackedStringArray("ITEMS_cjdcy", "ITEMS_ydqy", "ITEMS_tec", "ITEMS_turename")

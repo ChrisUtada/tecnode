@@ -278,6 +278,12 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("条目数等于案卷条数", lw.entry_count() == scene.graph.log_count(),
 		"%d / %d" % [lw.entry_count(), scene.graph.log_count()])
 	check("kind 逐条对齐", lw.kinds() == scene.dbg_log_kinds(), str(lw.kinds()))
+	# F6：新增一条只追加 1 行控件，不再全量重建历史。
+	var f6_rows_built: int = lw._rows_built
+	scene.dbg_add_log("F6 增量追加探针", "sys")
+	lw.refresh_log()
+	check("F6 日志只追加新行", lw._rows_built - f6_rows_built == 1,
+		"%d -> %d" % [f6_rows_built, lw._rows_built])
 
 	var sys_row := ""
 	var warn_row := ""

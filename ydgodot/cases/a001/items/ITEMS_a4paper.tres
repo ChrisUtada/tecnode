@@ -9,7 +9,7 @@
 
 [sub_resource type="Resource" id="Resource_l60as"]
 script = ExtResource("5_gsdif")
-text = "获得线索：[clue:CLUES_a4]"
+text = "获得线索：A4大小的纸"
 clues = Array[ExtResource("3_rhvvm")]([ExtResource("4_b27vu")])
 
 [resource]
@@ -19,3 +19,7 @@ label = "A4大小的纸"
 desc = "纸上写着：献祭捕获。"
 can_be_picked = true
 hidden_clue = SubResource("Resource_l60as")
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

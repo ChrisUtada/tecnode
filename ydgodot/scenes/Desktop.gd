@@ -98,7 +98,9 @@ const ZOOM_MIN := 0.45
 const ZOOM_MAX := 2.0
 const ZOOM_STEP := 1.12
 ## 「适应窗口」只放大到 1.3：再大就是单卡特写，不是「适应」了
-const FIT_MAX := 1.3
+## U1/W10：自动「适应窗口」只缩小不放大。1x 是点阵字唯一原生格倍率，
+## 单卡开局顶到 1.3 会让玩家第一眼看到糊字。
+const FIT_MAX := 1.0
 ## 吸附带：|k−1| < 6% 直接落到 1.0 —— 100% 是点阵字唯一绝对对齐原生格的倍率，
 ## 玩家从任意起点滚回来看上去「停在整」的位置，顺手就能拿到最锐利的那一档。
 const ZOOM_SNAP := 0.06
@@ -202,6 +204,9 @@ var _tutorial_map_arranged := false
 var _photo_win: SysWindow = null
 var _confirm_win: Control = null
 var _drop_outline: DropOutline = null
+## K11：节点右键上下文菜单。
+var _card_ctx: PanelContainer = null
+var _card_ctx_key := ""
 var _inv_chip: Button = null
 var _cert_win: SysWindow = null
 var _catalog: CaseCatalog = null
@@ -316,7 +321,8 @@ func _layout_root() -> void:
 		_detail_win.place_right(vw)
 	if _desk.size.y != _icon_layout_h:
 		_icon_layout_h = _desk.size.y
-		_reset_icon_positions()
+		## W7：窗口拉高只更新拖动边界并夹回图标，不能把玩家亲手摆的位置全部归位。
+		_sync_icon_bounds()
 	_place_toast_anchor()
 	_place_music_windows()
 	_place_case_dock()
@@ -449,6 +455,15 @@ func _notification(what: int) -> void:
 func _process(_dt: float) -> void:
 	if _autosave_pending and Time.get_ticks_msec() >= _autosave_due_msec:
 		_autosave()
+	## F1：分帧力导向。每帧只推进 8 轮，卡片随收敛缓慢落位，主线程不再整帧卡死。
+	if _layout_job != null:
+		_layout_job.step(LAYOUT_FRAME_ROUNDS)
+		_apply_layout_job(false, true)
+		_edges_dirty = true
+		if _layout_job.done():
+			_layout_job = null
+			if _opt_reveal and not _view_user:
+				_fit_cards()
 	var edges_due := _edges_dirty
 	if _follow_frames > 0:
 		_follow_frames -= 1
@@ -564,7 +579,8 @@ func _finish_sdrag(at: Vector2) -> void:
 	if _floating_window_at(at) != null or _person_card_blocks(at):
 		return
 	if not _stage.get_global_rect().has_point(at):
-		# 落在画布之外：什么都不做，东西留在原处（不吞节点）
+		# 落在画布之外：东西留在原处，并给一句反馈（W23）。
+		_show_toast("这里放不下，已留在原处。", true)
 		return
 	var world := (at - _stage.get_global_position() - _view_pos) / maxf(_view_k, 0.01)
 	world.x = maxf(0.0, world.x)
@@ -1311,7 +1327,63 @@ func _input(event: InputEvent) -> void:
 		return
 	if _drag_key != "" or _sdrag_key != "" or _panning:
 		return
+	if _card_ctx != null and is_instance_valid(_card_ctx) \
+			and not _card_ctx.get_global_rect().has_point(mb.global_position):
+		_close_card_context()
 	_raise_window_at(mb.global_position)
+
+
+## W11：最小键盘层。Esc = 关最上层窗（先收密码浮层 / 人物卡），Ctrl+Z = 撤销。
+## 不做全局快捷键表，避免和输入框、浏览器/系统快捷键打架。
+func _unhandled_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return
+	if key.ctrl_pressed and key.keycode == KEY_Z:
+		_undo()
+		get_viewport().set_input_as_handled()
+		return
+	if key.keycode != KEY_ESCAPE:
+		return
+	if _start_screen != null and is_instance_valid(_start_screen):
+		return
+	if _intro != null and is_instance_valid(_intro) and _intro.visible:
+		return
+	if _ending != null and _ending.visible:
+		return
+	if _card_ctx != null and is_instance_valid(_card_ctx):
+		_close_card_context()
+		get_viewport().set_input_as_handled()
+		return
+	if _pw_pop != null and is_instance_valid(_pw_pop):
+		_pw_pop.queue_free()
+		_pw_pop = null
+		_pw_ctx = {}
+		get_viewport().set_input_as_handled()
+		return
+	if _people_card != null and is_instance_valid(_people_card) and _people_card.visible:
+		_close_person_card()
+		get_viewport().set_input_as_handled()
+		return
+	if _close_top_window():
+		get_viewport().set_input_as_handled()
+
+
+## 关掉层序最上面的可见系统窗。案件主窗排最后：有浮窗时先收浮窗，只剩案件时才收起。
+func _close_top_window() -> bool:
+	if _desk == null or not is_instance_valid(_desk):
+		return false
+	for i in range(_desk.get_child_count() - 1, -1, -1):
+		var w := _desk.get_child(i) as SysWindow
+		if w == null or not is_instance_valid(w) or not w.visible or w == _case_win:
+			continue
+		if w is CertWin and (_tutorial_cert_win == w or _cert_win == w):
+			continue
+		w._on_close_pressed()
+		return true
+	if _case_win != null and is_instance_valid(_case_win) and _case_win.visible and _case_open:
+		return _park_case("icon")
+	return false
 
 
 ## 窗口标题栏 / 历史卡按下的提层请求：提到浮动窗栈顶，并成为当前激活窗。
@@ -1538,7 +1610,24 @@ func _reset_icon_positions() -> void:
 	for i in order.size():
 		var ic := order[i] as DeskIcon
 		ic.position = Vector2(ICON_LEFT, ICON_TOP + float(i) * pitch)
+		ic.set_bounds(Rect2(Vector2.ZERO, _desk.size))
 		ic.place_badges()
+
+
+## W7：桌布尺寸变化时不重排，只同步每枚图标的拖动边界，并把已拖出屏的夹回来。
+func _sync_icon_bounds() -> void:
+	var layer := _icon_layer()
+	if layer == null:
+		return
+	var bounds := Rect2(Vector2.ZERO, _desk.size)
+	for c in layer.get_children():
+		if not (c is DeskIcon):
+			continue
+		var ic := c as DeskIcon
+		ic.set_bounds(bounds)
+		ic.position = Vector2(
+			clampf(ic.position.x, 0.0, maxf(0.0, bounds.size.x - ic.size.x)),
+			clampf(ic.position.y, 0.0, maxf(0.0, bounds.size.y - ic.size.y)))
 
 
 ## 图标层（`desk/icons`）：只做分组，不排版。
@@ -1567,7 +1656,8 @@ func _icon_by_app(app: String) -> Button:
 func _on_icon_pressed(app: String, icon: DeskIcon) -> void:
 	## K9：音乐图标和其它图标同一条规则 —— 单击选中、双击打开。
 	var now := Time.get_ticks_msec()
-	if _icon_last_app == app and now - _icon_last_ms <= 300:
+	## W20：图标双击窗口与卡片统一为 500ms。
+	if _icon_last_app == app and now - _icon_last_ms <= 500:
 		_icon_last_app = ""
 		_icon_last_ms = -100000
 		_open_icon_app(app)
@@ -1996,6 +2086,7 @@ func _open_garden() -> void:
 	_garden_win = GardenWin.new()
 	_garden_win.name = "garden_win"
 	_garden_win.setup_garden(graph, case_def)
+	_garden_win.writes_enabled = _case_open
 	_garden_win.closed.connect(func(): _garden_win = null)
 	_garden_win.plant_moved.connect(func(_idx): _autosave())
 	_garden_win.garden_changed.connect(_on_garden_changed)
@@ -2325,6 +2416,7 @@ func _reopen_case() -> void:
 
 
 func _close_case_transients() -> void:
+	_close_card_context()
 	if _pw_pop != null and is_instance_valid(_pw_pop):
 		_pw_pop.queue_free()
 	_pw_pop = null
@@ -2342,6 +2434,9 @@ func _close_case_transients() -> void:
 	_selected = ""
 	if graph != null:
 		graph.selected = ""
+	## S11：案件收起后详情窗也收起，避免留下上一案的陈旧内容。
+	if _detail_win != null and is_instance_valid(_detail_win):
+		_detail_win.hide()
 
 
 func _update_case_park_ui() -> void:
@@ -2355,8 +2450,16 @@ func _update_case_park_ui() -> void:
 			_place_z(_dock_card, ZR_DOCK)
 	if _map_badge != null:
 		_map_badge.visible = _case_held
+		_set_badge(_map_badge, "进行中" if _case_held else "")
 	if _map_win != null and is_instance_valid(_map_win):
 		_map_win.set_case_state(_active_case, _case_open)
+	## S11：案件收起后，仍开着的收纳窗 / 花园不能继续写进度。
+	if _bag_win != null and is_instance_valid(_bag_win):
+		_bag_win.set_writes_enabled(_case_open)
+	if _ledger_win != null and is_instance_valid(_ledger_win):
+		_ledger_win.set_writes_enabled(_case_open)
+	if _garden_win != null and is_instance_valid(_garden_win):
+		_garden_win.set_writes_enabled(_case_open)
 
 
 func _resume_allowed() -> bool:
@@ -2378,6 +2481,8 @@ func _new_runtime() -> void:
 	_cmds = CommandSystem.new(case_def, graph)
 	_save = SaveSystem.new(graph, _case_id())
 	dialogues = DialogueSystem.new(case_def, graph)
+	_layout_job = null
+	_close_card_context()
 	_selected = ""
 	graph.selected = ""
 	_last_ending_id = ""
@@ -2481,7 +2586,7 @@ func _resume_from_save() -> bool:
 	if not _save.load_from_disk():
 		_save.clear_history()
 		return false
-	_rebuild_from_graph()
+	_rebuild_from_graph(true)
 	_sync_case_progress_from_graph()
 	return true
 
@@ -3257,7 +3362,7 @@ func _autosave() -> void:
 	_autosave_pending = false
 	if _save == null or not _save_enabled:
 		return
-	if not _save.save_to_disk():
+	if not _save.flush_pending():
 		push_warning("自动存档失败：" + _save.last_error)
 
 
@@ -3272,8 +3377,13 @@ func _queue_autosave() -> void:
 func _commit(before: Dictionary) -> void:
 	if before.is_empty() or _save == null:
 		return
-	if JSON.stringify(before) == JSON.stringify(_save.snapshot()):
+	## F4：只序列化当前快照一次。`last_json` 是上一次入账后的基准；
+	## 没变化就不压栈，也不再像旧版那样把 before/current 各 stringify 一遍。
+	var current_json := _save.snapshot_json()
+	if current_json == _save.last_json:
 		return
+	_save.last_json = current_json
+	_save.pending_json = current_json
 	_save.push_history_snapshot(before)
 	_sync_canvas()
 	_queue_autosave()
@@ -3292,6 +3402,10 @@ func dbg_history_size() -> int:
 	return _save.history.size() if _save != null else 0
 
 
+func dbg_last_rebuild_stats() -> Dictionary:
+	return _last_rebuild_stats.duplicate(true)
+
+
 func dbg_save() -> bool:
 	return _save.save_to_disk() if _save != null else false
 
@@ -3299,7 +3413,7 @@ func dbg_save() -> bool:
 func dbg_load() -> bool:
 	if _save == null or not _save.load_from_disk():
 		return false
-	_rebuild_from_graph()
+	_rebuild_from_graph(true)
 	return true
 
 
@@ -3346,12 +3460,16 @@ func _undo() -> bool:
 
 
 ## 按当前图状态重建所有卡片（撤销 / 续档共用）
-func _rebuild_from_graph() -> void:
-	for c in _card_layer.get_children():
-		if c is NodeCard:
-			_card_layer.remove_child(c)
-			c.queue_free()
-	_cards.clear()
+func _rebuild_from_graph(fit_camera := false) -> void:
+	_cancel_layout_job()
+	_close_card_context()
+	var was_analyzing := _tec != null and _tec.is_analyzing()
+	var fresh_before := {}
+	for raw_key in graph.nodes.keys():
+		if bool((graph.nodes[raw_key] as Dictionary).get("fresh", false)):
+			fresh_before[String(raw_key)] = true
+	## F3：按 card_key 增量 reconcile。读档 / 撤销时大多数节点还是同一张卡，
+	## 不销毁重建 500+ 子控件；只更新数据、显隐与坐标，缺的才 spawn，多的才 despawn。
 	_selected = ""
 	graph.selected = ""
 	_storage_before = {}
@@ -3378,24 +3496,81 @@ func _rebuild_from_graph() -> void:
 	if _archive_win != null and is_instance_valid(_archive_win):
 		_archive_win.queue_free()
 	_archive_win = null
-	_clear_archive_new()
 	_ending.visible = false
 	if _tec != null:
 		_tec.cancel_analysis()
 		_sync_tec_chip()
+	if was_analyzing:
+		_log("撤销 / 读档取消了进行中的 TEC 分析", "warn")
+		_show_toast("已取消进行中的 TEC 分析", true)
 	_suppress_archive_new = true
-	for key in graph.nodes.keys():
-		_spawn_card(String(key))
+	var alive := {}
+	_last_rebuild_stats = {"reused": 0, "spawned": 0, "despawned": 0}
+	for raw_key in graph.nodes.keys():
+		var key := String(raw_key)
+		var n: Dictionary = graph.nodes[raw_key]
+		alive[key] = true
+		var card: NodeCard = _cards.get(key, null)
+		if card != null and is_instance_valid(card):
+			card.node_data = n
+			card.visible = graph.visible_node(n)
+			card.position = Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
+			card.set_home_silent(card.position)
+			card.set_lod(_view_k)
+			_sync_card_shell(card)
+			_last_rebuild_stats["reused"] += 1
+		else:
+			_spawn_card(key)
+			_last_rebuild_stats["spawned"] += 1
+	for key in _cards.keys():
+		if not alive.has(String(key)):
+			_despawn_card(String(key))
+			_last_rebuild_stats["despawned"] += 1
 	_suppress_archive_new = false
 	_apply_hidden()
+	## S9：撤销 / 读档后按当前图重新补档案「新」角标，而不是一律清掉。
+	_refresh_archive_new_from_graph()
+	## S16：读档后 fresh 已被消费；未读节点用 unread 再补一次入场 pop。
+	_replay_unread_pops(fresh_before)
+	## S10：卡片全部重建后，推演桌布的遮挡淡出必须重算。
+	if _matrix_win != null and is_instance_valid(_matrix_win) and _matrix_win.visible:
+		_matrix_faded.clear()
+		_sync_matrix_occlusion.call_deferred()
 	# 读档 / 撤销后摆位是存档里那一份，不能被下一次互动的重排顺手推走 —— 签名就地认下来。
 	_layout_sig = _layout_signature()
 	_refresh_matrix_views()
 	_last_ending_id = String(graph.endings.keys()[0]) if not graph.endings.is_empty() else ""
 	var sid := graph.last_scene
 	_set_crumb(_case_label() + " // " + case_def.scene_title(sid) if sid != "" else _case_label())
+	if fit_camera:
+		## S2：读档后镜头回到「适应窗口」，而不是停在上一局的 (0,0)@1.0。
+		_reset_camera()
+		_fit_cards()
 	_update_case_chrome()
 	_refresh_app_icons()
+
+
+func _refresh_archive_new_from_graph() -> void:
+	_clear_archive_new()
+	for raw_key in graph.nodes.keys():
+		var n: Dictionary = graph.nodes[raw_key]
+		if String(n.get("kind", "")) == "time" and graph.has_unread(String(raw_key)):
+			_mark_archive_new()
+			return
+
+
+func _replay_unread_pops(skip: Dictionary) -> void:
+	if _shot_mode() or _tutorial_active:
+		return
+	for raw_key in graph.nodes.keys():
+		var k := String(raw_key)
+		if skip.has(k) or not graph.has_unread(k):
+			continue
+		var card := _cards.get(k, null) as NodeCard
+		if card == null:
+			continue
+		card.pivot_offset = card.size * 0.5
+		card.play_pop()
 
 
 # ── 画布手势（Web `15-desktop.js`）────────────────────────────────────────
@@ -3417,6 +3592,7 @@ func _on_stage_input(event: InputEvent) -> void:
 			if absf(k2 - _view_k) > 0.0001:
 				_view_pos = mp - (mp - _view_pos) * (k2 / _view_k)
 				_view_k = k2
+				_view_pos = _clamp_view_pos(_view_pos)
 				_view_user = true
 				_apply_view()
 			accept_event()
@@ -3432,14 +3608,31 @@ func _on_stage_input(event: InputEvent) -> void:
 			_panning = true
 			_pan_from = mb.position
 			_pan_origin = _view_pos
+			if _stage != null:
+				_stage.mouse_default_cursor_shape = Control.CURSOR_DRAG
 			_clear_selection()
 		else:
 			_panning = false
+			if _stage != null:
+				_stage.mouse_default_cursor_shape = Control.CURSOR_ARROW
 		return
 	if event is InputEventMouseMotion and _panning:
-		_view_pos = _pan_origin + ((event as InputEventMouseMotion).position - _pan_from)
+		_view_pos = _clamp_view_pos(_pan_origin
+			+ ((event as InputEventMouseMotion).position - _pan_from))
 		_view_user = true
 		_apply_view()
+
+
+## W12：平移 / 缩放后世界不能被整个推出视口。四边各留 80px 世界可见。
+func _clamp_view_pos(p: Vector2) -> Vector2:
+	if _stage == null or not is_instance_valid(_stage):
+		return p
+	var keep := 80.0
+	var world := Vector2(WORLD_W, WORLD_H) * maxf(_view_k, 0.01)
+	var stage := _stage.size
+	return Vector2(
+		clampf(p.x, keep - world.x, maxf(keep - world.x, stage.x - keep)),
+		clampf(p.y, keep - world.y, maxf(keep - world.y, stage.y - keep)))
 
 
 ## 拖动会话没收尾就遇到新的按下：把卡按当前坐标落地并清掉镜像。
@@ -3476,6 +3669,7 @@ func _apply_view() -> void:
 		_edge_layer.set_zoom(_view_k)
 	_apply_lod()
 	_reanchor_mem_card()
+	_sync_card_mirror(null)
 
 
 ## 把当前倍率分发给每张卡（NodeCard.set_lod 自己判档并早退，重复调用不吃性能）
@@ -3573,6 +3767,7 @@ func _spawn_card(key: String) -> NodeCard:
 	card.drag_finished.connect(_on_card_drag_finished)
 	card.combo_requested.connect(_on_card_combo)
 	card.pin_toggled.connect(_on_card_pin_toggled)
+	card.context_requested.connect(_open_card_context)
 	card.spring_finished.connect(_on_card_spring_finished)
 	_card_layer.add_child(card)
 	_cards[key] = card
@@ -3634,10 +3829,13 @@ func _on_card_selected(key: String) -> void:
 ## 卡片按下（未拖未点都算）：把它的重排落位补间杀掉——卡冻结在指针下面，
 ## 双击不会因为卡「飞走了」而落空，拖动起手也不会跟 0.34s 过渡打架
 func _on_card_pressed(key: String) -> void:
+	## F1：玩家接管某张卡时停止后台收敛，避免每帧把卡从他手边推走。
+	_cancel_layout_job()
 	_kill_move(key)
 
 
 func _on_card_dragged(key: String) -> void:
+	_cancel_layout_job()
 	_kill_move(key)
 	# Web 的拖动不改选中；但这里选中一下能让「聚焦选中」不把正在拖的卡淡化掉，
 	# 属于报告 §3.1 ② 里点名的有意偏离。
@@ -3691,8 +3889,16 @@ func _mount_card_mirror(card: NodeCard) -> void:
 
 
 func _sync_card_mirror(card: NodeCard) -> void:
-	if _card_mirror == null or not is_instance_valid(_card_mirror) or card == null:
+	if _card_mirror == null or not is_instance_valid(_card_mirror):
 		return
+	if card == null and _drag_key != "":
+		card = _cards.get(_drag_key, null) as NodeCard
+	if card == null or not is_instance_valid(card):
+		return
+	## W14：缩放 / 平移中拖卡，镜像的 scale 与 LOD 必须跟原件一起走，
+	## 否则 0.95 以下原件只剩符号，镜像还挂着完整标题，读作两张不同的卡。
+	_card_mirror.scale = card.get_global_transform().get_scale()
+	_card_mirror.set_lod(_view_k)
 	_card_mirror.global_position = card.get_global_position()
 
 
@@ -3797,6 +4003,55 @@ func _on_card_drag_released(key: String, at_global: Vector2) -> void:
 
 
 ## 右键 = 钉住 / 取消钉住（Web 里这是唯一入口，拖动不再顺手钉住）
+func _open_card_context(key: String, at_global: Vector2) -> void:
+	_close_card_context()
+	if graph == null or not graph.nodes.has(key):
+		return
+	var n := graph.node(key)
+	var menu := PanelContainer.new()
+	menu.name = "card_context"
+	menu.mouse_filter = Control.MOUSE_FILTER_STOP
+	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.INK, 1)
+	sb.content_margin_left = 4
+	sb.content_margin_right = 4
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	menu.add_theme_stylebox_override("panel", sb)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 2)
+	menu.add_child(col)
+	var pin := TecTheme.button("取消钉住" if bool(n.get("pinned", false)) else "钉住")
+	pin.name = "ctx_pin"
+	pin.custom_minimum_size = Vector2(104, 26)
+	pin.pressed.connect(func():
+		_on_card_pin_toggled(key)
+		_close_card_context())
+	col.add_child(pin)
+	var detail := TecTheme.button("查看详情")
+	detail.name = "ctx_detail"
+	detail.custom_minimum_size = Vector2(104, 26)
+	detail.pressed.connect(func():
+		_on_card_selected(key)
+		_close_card_context())
+	col.add_child(detail)
+	_desk.add_child(menu)
+	_place_z(menu, ZR_TOAST)
+	menu.reset_size()
+	var pos := at_global - _desk.get_global_position()
+	pos.x = clampf(pos.x, 8.0, maxf(8.0, _desk.size.x - menu.size.x - 8.0))
+	pos.y = clampf(pos.y, 8.0, maxf(8.0, _desk.size.y - menu.size.y - 8.0))
+	menu.position = pos
+	_card_ctx = menu
+	_card_ctx_key = key
+
+
+func _close_card_context() -> void:
+	if _card_ctx != null and is_instance_valid(_card_ctx):
+		_card_ctx.queue_free()
+	_card_ctx = null
+	_card_ctx_key = ""
+
+
 func _on_card_pin_toggled(key: String) -> void:
 	var n := graph.node(key)
 	if n.is_empty():
@@ -3920,7 +4175,9 @@ func _replay_talk(key: String) -> bool:
 	var ch := case_def.char_of(String(n["id"]))
 	if ch == null:
 		return false
-	var prog := mini(int(graph.talk_prog.get(key, 0)), ch.talk_queue.size())
+	## S13：重看对话要覆盖 talkQueue + 当前 home_scene 的场景限定台词。
+	var queue := graph.char_talk_queue(String(ch.id))
+	var prog := mini(int(graph.talk_prog.get(key, 0)), queue.size())
 	if prog <= 0:
 		return false
 	var d := DialogueDef.new()
@@ -3931,7 +4188,7 @@ func _replay_talk(key: String) -> bool:
 		var line := DialogueLineDef.new()
 		line.kind = "say"
 		line.who = ch
-		line.text = ch.talk_queue[i]
+		line.text = String(queue[i])
 		d.script_lines.append(line)
 	return _open_chat(d, [String(ch.id)])
 
@@ -4015,6 +4272,7 @@ func _handle_card_drop(key: String, at_global: Vector2) -> bool:
 		return true
 	## 任何浮动窗 / 人物档案卡都拦截卡片，哪怕它不是落点：松手弹回，不穿透到下面。
 	if _floating_window_at(at_global) != null or _person_card_blocks(at_global):
+		_show_toast("这里不能放节点，已弹回。", true)
 		return true
 	return false
 
@@ -4140,6 +4398,9 @@ func _store_into(where: String, key: String) -> void:
 		return
 	if graph.is_container_node(key):
 		var container_msg := "场景与容器收不进%s。" % target_name
+		if String(n["kind"]) == "item":
+			container_msg = "「%s」是现场的一部分，收不走；它装着的东西可以单独收。" \
+				% String(n.get("label", key))
 		if not _tutorial_correct(container_msg):
 			_reject_drop(container_msg)
 		return
@@ -4400,6 +4661,7 @@ func _toggle_storage(kind: String) -> void:
 		_bag_win = StorageWin.new()
 		_bag_win.name = "bag_win"
 		_bag_win.setup_store("证物袋", GraphState.BAG, graph, case_def)
+		_bag_win.writes_enabled = _case_open
 		_bag_win.position = Vector2(150, 300)
 		_bag_win.will_take.connect(_on_storage_will_take)
 		_bag_win.took.connect(_on_storage_took)
@@ -4415,6 +4677,7 @@ func _toggle_storage(kind: String) -> void:
 	_ledger_win = StorageWin.new()
 	_ledger_win.name = "clue_win"
 	_ledger_win.setup_store("线索册", GraphState.LEDGER, graph, case_def)
+	_ledger_win.writes_enabled = _case_open
 	_ledger_win.position = Vector2(410, 300)
 	_ledger_win.will_take.connect(_on_storage_will_take)
 	_ledger_win.took.connect(_on_storage_took)
@@ -4646,7 +4909,7 @@ func _person_photo(id: String, ch: CharDef) -> String:
 
 
 func _first_sentence(text: String) -> String:
-	var clean := case_def.strip_tags(text).strip_edges() if case_def != null else text.strip_edges()
+	var clean := text.strip_edges()
 	if clean == "":
 		return ""
 	var idx := clean.find("。")
@@ -4713,8 +4976,6 @@ func _say_next_line(id: String) -> bool:
 	var before := _save.snapshot() if _save != null else {}
 	graph.talk_prog[key] = prog + 1
 	var line := String(queue[prog])
-	var got := _capture_text_clues(line, key)
-	_refresh_clue_keys(got)
 	var d := DialogueDef.new()
 	d.id = "talk_" + String(ch.id)
 	var parts: Array[CharDef] = [ch]
@@ -4725,8 +4986,6 @@ func _say_next_line(id: String) -> bool:
 	ld.text = line
 	d.script_lines.append(ld)
 	_open_chat(d, [String(ch.id)])
-	if not got.is_empty():
-		_log("「%s」的话里提到了线索：%s" % [ch.name, "、".join(_labels_of(got))], "cap")
 	_commit(before)
 	return true
 
@@ -4950,6 +5209,7 @@ func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
 		return
 	## K4：拖到画布之外（顶栏 / 桌面空白）不写回负坐标，留在桌布原处。
 	if not _stage.get_global_rect().has_point(at_global):
+		_show_toast("这里放不下，已留在桌布上。", true)
 		return
 	_on_matrix_took(key, at_global)
 
@@ -5120,6 +5380,10 @@ func _open_password(node_key: String) -> void:
 		var r := card.get_global_rect()
 		base = Vector2(r.position.x - _desk.get_global_rect().position.x,
 			r.end.y - _desk.get_global_rect().position.y + 10.0)
+	## W15：密码浮层也要夹在桌面内；卡片贴底边时不能把输入框裁到看不见。
+	var desk_size := _desk.size if _desk != null and is_instance_valid(_desk) else Vector2(_vw(), _vh())
+	base.x = clampf(base.x, 8.0, maxf(8.0, desk_size.x - _pw_pop.size.x - 8.0))
+	base.y = clampf(base.y, 8.0, maxf(8.0, desk_size.y - _pw_pop.size.y - 8.0))
 	_pw_pop.position = base
 	_pw_pop.submitted.connect(_submit_password)
 	_desk.add_child(_pw_pop)
@@ -5259,7 +5523,11 @@ func _show_narr(sid: String) -> void:
 	_narr = NarrCard.new()
 	_narr.name = "narr_card"
 	_narr.setup_narr(case_def.scene_title(sid), body, 340, 300)
-	_narr.position = Vector2(700, 290)
+	## W22：不再写死 (700,290)；按桌布实际尺寸收进视口。
+	var desk_size := _desk.size if _desk != null and is_instance_valid(_desk) else Vector2(_vw(), _vh())
+	_narr.position = Vector2(
+		minf(700.0, maxf(24.0, desk_size.x - _narr.size.x - 24.0)),
+		minf(290.0, maxf(24.0, desk_size.y - _narr.size.y - 24.0)))
 	_narr.closed.connect(_on_narr_closed)
 	_narr.typing_finished.connect(_on_narr_typing_finished)
 	_desk.add_child(_narr)
@@ -5441,7 +5709,7 @@ func _memory_lines(tid: String) -> Array:
 	if s == null:
 		return out
 	var body := s.content if s.content.strip_edges() != "" else s.desc
-	for raw in case_def.strip_tags(body).split("\n"):
+	for raw in body.split("\n"):
 		var line := String(raw).strip_edges()
 		if line != "":
 			out.append(line)
@@ -5456,7 +5724,7 @@ func _memory_lines(tid: String) -> Array:
 			if st == null or st.scene == null or st.scene.id != tid:
 				continue
 			for raw in st.lines:
-				var talk_line := case_def.strip_tags(String(raw)).strip_edges()
+				var talk_line := String(raw).strip_edges()
 				if talk_line != "":
 					out.append("——%s：%s" % [ch.name, talk_line])
 	return out
@@ -5467,7 +5735,7 @@ func _memory_play_lines(mem: MemoryDef) -> Array:
 	for line in mem.script_lines:
 		if line == null:
 			continue
-		var text := case_def.strip_tags(line.text).strip_edges()
+		var text := String(line.text).strip_edges()
 		if text == "":
 			continue
 		var kind := "say" if line.kind == "say" else "narr"
@@ -5655,6 +5923,14 @@ func _clear_archive_new() -> void:
 ## 对齐 Web `09-commands.js`：「开关灯只重绘（重排会让灯自己跳位置）」—— 那边只有真长出
 ## 新节点的分支才 `layout()`。
 var _layout_sig := ""
+## F1：分帧力导向作业。非空时 _process 每帧推进几轮；无头 / 截图 / 手动重排仍一次跑完。
+## 用 preload 而不是依赖全局 class_name，避免新脚本还没进 global_script_class_cache 时无头装载失败。
+const ForceLayoutScript = preload("res://core/ForceLayout.gd")
+var _layout_job = null
+const LAYOUT_QUICK_ROUNDS := 8
+const LAYOUT_FRAME_ROUNDS := 5
+## F3 基准：最近一次 reconcile 的复用 / 新建 / 移除数量。
+var _last_rebuild_stats := {"reused": 0, "spawned": 0, "despawned": 0}
 
 
 func _layout_signature() -> String:
@@ -5683,7 +5959,7 @@ func _relayout(animated := false, force := false) -> void:
 		if _tutorial_active:
 			_layout_tutorial()
 		else:
-			_layout_force(animated)
+			_layout_force(animated, force)
 		## 自动档才重框；玩家自己调过镜头（滚轮 / 拖空白 / 定位某张卡）就别动他的视野，
 		## 否则每加一个节点、镜头就被拉开一次 —— 刚放大到某张卡细看时会像「被抢走」。
 		if _opt_reveal and not _view_user:
@@ -5711,111 +5987,41 @@ func _layout_tutorial() -> void:
 
 ## 力导向：斥力 30000/d²、最小间距 R_a+R_b+14、弹簧 rest 185/300/150、向心 0.0022，260 轮。
 ## 参数照抄 `src/js/07-render.js`；R 用视觉半径（半对角线），与 Web 的 80 / 68 同口径。
-func _layout_force(animated: bool = false) -> void:
+func _layout_force(animated: bool = false, force := false) -> void:
 	var list: Array = []
 	for key in _cards.keys():
 		if (_cards[key] as NodeCard).visible:
 			list.append(String(key))
 	if list.is_empty():
 		return
-	# 1) 播种：容器（场景 / 书桌）按 5 列网格，实体围在画布中央撒开
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 0x5EED
-	var ci := 0
-	var first_place: Dictionary = {}
-	for key in list:
-		# 播种（可能写 n.x/n.y）之前先记录「这个节点还没落过位」—— x<0 = 新上画
-		first_place[key] = float(graph.node(key).get("x", -1.0)) < 0.0
-		var n := graph.node(key)
-		if float(n.get("x", -1.0)) >= 0.0 and float(n.get("y", -1.0)) >= 0.0:
-			ci += 1
+	_layout_job = ForceLayoutScript.new()
+	_layout_job.prepare(graph, list)
+	## 无头 / 截图 / 页眉「立即重排」：一次跑完，坐标语义不变。
+	## 常规展开：先跑 40 轮把大致形状铺开，剩余 220 轮交给 _process 每帧 8 轮，
+	## 避免 60 节点时 46 万次对迭代把一帧卡死（F1）。
+	var sync := force or _shot_mode() or DisplayServer.get_name() == "headless"
+	_layout_job.step(ForceLayoutScript.TOTAL_ROUNDS if sync else LAYOUT_QUICK_ROUNDS)
+	_apply_layout_job(animated, not sync)
+	if sync:
+		_layout_job = null
+
+
+func _cancel_layout_job() -> void:
+	_layout_job = null
+
+
+## 把求解器当前坐标写回图与卡片。progressive=true 时逐帧直落（物理收敛观感），
+## 不启动 0.34s 补间，否则每帧都会重新起一条 tween。
+func _apply_layout_job(animated: bool, progressive: bool) -> void:
+	if _layout_job == null:
+		return
+	for key in _layout_job.keys:
+		var n := graph.node(String(key))
+		if n.is_empty():
 			continue
-		if graph.is_container_node(key):
-			n["x"] = 200.0 + float(ci % 5) * 380.0
-			n["y"] = 160.0 + float((ci / 5) as int) * 300.0
-		else:
-			n["x"] = 700.0 + (rng.randf() - 0.5) * 420.0
-			n["y"] = 560.0 + (rng.randf() - 0.5) * 420.0
-		ci += 1
-	var pos := {}
-	for key in list:
-		var n := graph.node(key)
-		pos[key] = Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
-	var free := {}
-	for key in list:
-		free[key] = not bool(graph.node(key).get("pinned", false))
-	var radius := {}
-	for key in list:
-		var r := 68.0
-		if graph.is_container_node(key):
-			r = 80.0
-		radius[key] = r
-
-	for _it in 260:
-		for i in list.size():
-			var a: String = list[i]
-			for j in range(i + 1, list.size()):
-				var b: String = list[j]
-				var pa: Vector2 = pos[a]
-				var pb: Vector2 = pos[b]
-				var delta: Vector2 = pb - pa
-				var d2 := delta.length_squared()
-				if d2 < 1.0:
-					delta = Vector2(rng.randf() - 0.5, rng.randf() - 0.5)
-					d2 = 1.0
-				var d := sqrt(d2)
-				var u := delta / d
-				var rep := 30000.0 / d2
-				if free[a]:
-					pa -= u * rep
-				if free[b]:
-					pb += u * rep
-				var min_d: float = float(radius[a]) + float(radius[b]) + 14.0
-				if d < min_d:
-					var push := (min_d - d) * 0.5
-					if free[a]:
-						pa -= u * push
-					if free[b]:
-						pb += u * push
-				pos[a] = pa
-				pos[b] = pb
-		for e in graph.edges:
-			var a := String(e.get("a", ""))
-			var b := String(e.get("b", ""))
-			if not pos.has(a) or not pos.has(b):
-				continue
-			var pa: Vector2 = pos[a]
-			var pb: Vector2 = pos[b]
-			var delta: Vector2 = pb - pa
-			var d := delta.length()
-			if d < 0.001:
-				continue
-			var u := delta / d
-			var rest := 185.0
-			if String(e.get("rel", "entity")) == "move":
-				rest = 300.0
-			elif String(e.get("rel", "entity")) == "cond":
-				rest = 150.0
-			var f := (d - rest) * 0.014
-			if free[a]:
-				pa += u * f
-			if free[b]:
-				pb -= u * f
-			pos[a] = pa
-			pos[b] = pb
-		for key in list:
-			if not free[key]:
-				continue
-			var p: Vector2 = pos[key]
-			p += Vector2(WORLD_W * 0.5 - p.x, WORLD_H * 0.5 - p.y) * 0.0022
-			pos[key] = p
-
-	for key in list:
-		var n := graph.node(key)
-		var card: NodeCard = _cards[key]
-		var p: Vector2 = pos[key]
-		var fp: bool = bool(first_place.get(key, false))
-		if not free[key]:
+		var card: NodeCard = _cards.get(String(key), null)
+		var p: Vector2 = _layout_job.pos[key]
+		if not bool(_layout_job.free[key]):
 			n["x"] = p.x
 			n["y"] = p.y
 			continue
@@ -5826,17 +6032,15 @@ func _layout_force(animated: bool = false) -> void:
 		p = p.snapped(Vector2(8, 8))
 		n["x"] = p.x
 		n["y"] = p.y
-		var before_pos: Vector2 = card.position   # 先记原位：set_home_silent 只改锚点不挪卡
+		if card == null or not is_instance_valid(card):
+			continue
+		var before_pos: Vector2 = card.position
 		card.set_home_silent(p)
-		# Web 的 .node 过渡 = `left/top 0.34s cubic-bezier(.4,0,.2,1)`：已有节点位置动了才播过渡；
-		# 新上画的节点（Web 是 createElement 时直接定 left/top，初绘没有“从哪里来”）与
-		# 截图流水线一律直接落位。动画期间连线逐帧跟画（Web paintEdgesFor(420) 同口径）；
-		# 折叠 / 展开触发的那次重排才播动画（`_relayout(true)`），普通重排默认秒到——
-		# 无头回归与坐标语义都建立在「重排=即刻就位」上，不能整体动。
-		if fp or not animated or _shot_mode() or before_pos.distance_to(p) < 2.0:
+		var fp: bool = bool(_layout_job.first_place.get(String(key), false))
+		if progressive or fp or not animated or _shot_mode() or before_pos.distance_to(p) < 2.0:
 			card.position = p
 		else:
-			_start_move_tween(key, card, p)
+			_start_move_tween(String(key), card, p)
 
 
 var _move_twens: Dictionary = {}      # key -> 卡片落位补间（下一次重排前先杀）
@@ -5897,6 +6101,9 @@ func _fit_cards() -> void:
 	var k := minf((_stage.size.x - pad * 2.0) / bounds.size.x,
 		(_stage.size.y - pad * 2.0) / bounds.size.y)
 	_view_k = clampf(k, ZOOM_MIN, FIT_MAX)
+	## U1：fit 结果也过一遍 1.0 吸附带，别让「适应窗口」停在 0.97 这种非原生倍率。
+	if absf(_view_k - 1.0) < ZOOM_SNAP:
+		_view_k = 1.0
 	var z := _zoom_override()
 	if z > 0.0:
 		_view_k = z
@@ -6044,24 +6251,31 @@ func _on_tec_analysis_progress(ratio: float) -> void:
 		_tec_chip.set_analyzing(_tec.target_label(), ratio)
 
 
-func _capture_text_clues(text: String, from_key: String = "") -> Array:
-	var got: Array = []
-	for tag in case_def.tags_of(text):
-		if tag["kind"] != "clue":
-			continue
-		var cid := String(tag["id"])
-		if graph.captured.has(cid):
-			continue
-		got.append(graph.capture_clue(cid, from_key))
-	return got
-
-
 func _refresh_clue_keys(keys: Array) -> void:
 	if keys.is_empty():
 		return
 	for key in keys:
 		_refresh_or_spawn_card(String(key))
 	_relayout()
+
+
+## G14：这组线索里有没有「真名结局」配方需要的条目。
+## 只用于 TEC 输出行的提醒样式，不向玩家指名具体是哪一条。
+func _has_true_name_clue(keys: Array) -> bool:
+	if case_def == null or keys.is_empty():
+		return false
+	var ending := case_def.ending_by_id("TRUE_E")
+	if ending == null or ending.recipe.is_empty():
+		return false
+	var recipe := {}
+	for clue in ending.recipe:
+		if clue != null:
+			recipe[String(clue.id)] = true
+	for key in keys:
+		var n := graph.node(String(key))
+		if recipe.has(String(n.get("id", ""))):
+			return true
+	return false
 
 
 func _hidden_clue_of(kind: String, id: String) -> HiddenClueDef:
@@ -6091,15 +6305,8 @@ func _capture_node_hidden_clues(kind: String, id: String, host_key: String) -> D
 		seen[clue.id] = true
 		got.append(graph.capture_clue(clue.id, host_key))
 		names.append(clue.label)
-	for tag in case_def.tags_of(hc.text):
-		var cid := String(tag["id"])
-		if tag["kind"] != "clue" or graph.captured.has(cid) or seen.has(cid):
-			continue
-		seen[cid] = true
-		got.append(graph.capture_clue(cid, host_key))
-		names.append(case_def.label_of("clue", cid))
 	_refresh_clue_keys(got)
-	return {"keys": got, "names": names, "text": case_def.strip_tags(hc.text)}
+	return {"keys": got, "names": names, "text": hc.text}
 
 
 ## TEC 解读完成后捕获 hiddenClue（场景 / 物品同一套字段；当前先接场景分析链路）
@@ -6123,10 +6330,10 @@ func _tec_talk_lines(sid: String) -> Array:
 
 
 ## 这条物品 / 线索在 TEC 那里有没有专属反应。首次展开救济与密码连错提示共用。
-func _tec_reaction_text(kind: String, id: String) -> String:
+func _tec_reaction_hit(kind: String, id: String) -> Dictionary:
 	var tec := case_def.char_of("CHARS_TEC") if case_def != null else null
 	if tec == null:
-		return ""
+		return {}
 	var groups: Array = []
 	if kind == "item":
 		groups = [tec.item_reactions]
@@ -6140,8 +6347,12 @@ func _tec_reaction_text(kind: String, id: String) -> String:
 				continue
 			if (r.item != null and r.item.id == id) or (r.clue != null and r.clue.id == id) \
 					or r.trigger_id == id:
-				return String(r.text)
-	return ""
+				return {"text": r.text, "clues": r.clues}
+	return {}
+
+
+func _tec_reaction_text(kind: String, id: String) -> String:
+	return String(_tec_reaction_hit(kind, id).get("text", ""))
 
 
 ## G7：TEC 亲口留提示。默认只落进 TEC 对话（不污染「只记结果」的日志）；
@@ -6189,14 +6400,19 @@ func _tec_reaction(key: String) -> bool:
 	if case_def.char_of("CHARS_TEC") == null:
 		return false
 	var id := String(n["id"])
-	var raw := _tec_reaction_text(String(n["kind"]), id)
+	var hit := _tec_reaction_hit(String(n["kind"]), id)
+	var raw := String(hit.get("text", ""))
 	if raw == "":
 		_tec.append_line("关于「%s」，我暂时没有更多线索。试试把它和别的节点组合。" % String(n["label"]))
 		_log("TEC 对「%s」没有特别的反应" % String(n["label"]), "warn")
 		graph.tried[key + ">tec-dock"] = true
 		return false
-	_tec.append_line("（分析 %s）%s" % [String(n["label"]), case_def.strip_tags(raw)])
-	var got := _capture_text_clues(raw)
+	var got := graph.capture_clue_refs(hit.get("clues", []), key)
+	var reaction_line := "（分析 %s）%s" % [String(n["label"]), raw]
+	if _has_true_name_clue(got):
+		_tec.append_true_clue(reaction_line)
+	else:
+		_tec.append_line(reaction_line)
 	_refresh_clue_keys(got)
 	return true
 
@@ -6258,7 +6474,7 @@ func _tec_talk() -> void:
 	var idx := int(graph.tec_prog.get("_def", 0))
 	if idx < queue.size():
 		graph.tec_prog["_def"] = idx + 1
-		_tec.append_line(case_def.strip_tags(String(queue[idx])))
+		_tec.append_line(String(queue[idx]))
 		_autosave()
 		return
 	_tec_hint(_tec_next_hint())
@@ -6283,8 +6499,12 @@ func _on_tec_analysis_done(target: String) -> void:
 		var unread := talks.size() - prog
 		var hidden := _capture_node_hidden_clues(kind, id, key)
 		if not (hidden["keys"] as Array).is_empty():
-			_tec.append_line("分析完成：「%s」中提取到线索 —— %s。（已落到画布上，可自由拖动）"
-				% [label, "、".join(hidden["names"])])
+			var hidden_line := "分析完成：「%s」中提取到线索 —— %s。（已落到画布上，可自由拖动）" \
+				% [label, "、".join(hidden["names"])]
+			if _has_true_name_clue(hidden["keys"]):
+				_tec.append_true_clue(hidden_line)
+			else:
+				_tec.append_line(hidden_line)
 			if String(hidden["text"]) != "":
 				_tec.append_line(String(hidden["text"]))
 			_log("TEC 捕获「%s」的隐藏线索：%s" % [label, "、".join(hidden["names"])], "cap")
@@ -6295,8 +6515,7 @@ func _on_tec_analysis_done(target: String) -> void:
 		if not talks.is_empty() and unread > 0:
 			var line := String(talks[prog])
 			graph.tec_prog[id] = prog + 1
-			_tec.append_line(case_def.strip_tags(line))
-			_refresh_clue_keys(_capture_text_clues(line))
+			_tec.append_line(line)
 			_log("TEC 解读了「%s」的档案（%d/%d）" % [label, prog + 1, talks.size()], "sys")
 		elif not talks.is_empty():
 			_tec.append_line("「%s」的档案已经全部解读完毕。" % label)
@@ -6304,8 +6523,12 @@ func _on_tec_analysis_done(target: String) -> void:
 		_tec_reaction(key)
 		var ent_hidden := _capture_node_hidden_clues(kind, id, key)
 		if not (ent_hidden["keys"] as Array).is_empty():
-			_tec.append_line("分析完成：「%s」中提取到线索 —— %s。（已落到画布上，可自由拖动）"
-				% [label, "、".join(ent_hidden["names"])])
+			var ent_line := "分析完成：「%s」中提取到线索 —— %s。（已落到画布上，可自由拖动）" \
+				% [label, "、".join(ent_hidden["names"])]
+			if _has_true_name_clue(ent_hidden["keys"]):
+				_tec.append_true_clue(ent_line)
+			else:
+				_tec.append_line(ent_line)
 			if String(ent_hidden["text"]) != "":
 				_tec.append_line(String(ent_hidden["text"]))
 			_log("TEC 捕获「%s」的隐藏线索：%s" % [label, "、".join(ent_hidden["names"])], "cap")

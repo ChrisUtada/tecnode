@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="ItemDef" format=3]
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_i0lad"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_v4lky"]
 [ext_resource type="Script" path="res://core/defs/ConditionDef.gd" id="2_vyhmu"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_v4lky"]
 [ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="4_njeom"]
@@ -23,3 +24,7 @@ id = "ITEMS_tzl"
 label = "铁栅栏"
 desc = "一道铁栅栏。"
 commands = Array[ExtResource("1_i0lad")]([SubResource("Resource_y05if")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

@@ -244,6 +244,16 @@ func _test_json_and_disk() -> void:
 		String(g.notes.get("CHARS_zs", "")))
 	check("存档：读档清空撤销栈", not ss.can_undo())
 	check("存档：坏文件读失败", not ss.load_from_disk("user://test_p15_missing.save"))
+	# F4：自动写盘复用 _commit 已算好的 JSON，不再 snapshot/stringify 第三遍。
+	ss.dbg_snapshot_calls = 0
+	ss.dbg_json_calls = 0
+	var f4_json := ss.snapshot_json()
+	ss.last_json = f4_json
+	ss.pending_json = f4_json
+	check("F4 自动写盘复用待写 JSON", ss.flush_pending(p))
+	check("F4 一次提交只快照/序列化一次",
+		ss.dbg_snapshot_calls == 1 and ss.dbg_json_calls == 1,
+		"%d/%d" % [ss.dbg_snapshot_calls, ss.dbg_json_calls])
 	ss.clear_save(p)
 	check("存档：删除成功", not ss.has_save(p))
 

@@ -54,7 +54,7 @@ func execute(node_key: String, cmd: CommandDef) -> Dictionary:
 # ── 六型 ────────────────────────────────────────────────────────────────
 
 func _run_text(node_key: String, n: Dictionary, cmd: TextCommandDef) -> Dictionary:
-	var out := _ok(case_def.strip_tags(cmd.value))
+	var out := _ok(cmd.value)
 	if cmd.requires_lit.is_empty():
 		# 纯文本也可能顺手开关灯（手电筒 / 台灯）
 		var it := case_def.item_of(String(n["id"]))
@@ -63,18 +63,19 @@ func _run_text(node_key: String, n: Dictionary, cmd: TextCommandDef) -> Dictiona
 			out["lit_changed"] = true
 			out["lit"] = bool(n["lit"])
 			var flavor := it.lit_on_message if n["lit"] else it.lit_off_message
-			out["flavor"] = case_def.strip_tags(flavor)
-	out["captured"] = _capture_clues(String(out.get("message", "")))
+			out["flavor"] = flavor
+	out["captured"] = graph.capture_clue_refs(cmd.clues, node_key)
 	return out
 
 
 func _run_choice(node_key: String, cmd: ChoiceCommandDef) -> Dictionary:
 	var messages: Array = []
 	var spawn: Array = []
+	var captured: Array = []
 	for i in cmd.options.size():
 		var o: ChoiceOptionDef = cmd.options[i]
 		if o.message != "":
-			messages.append(case_def.strip_tags(o.message))
+			messages.append(o.message)
 		if o.payload != null:
 			if o.payload.scene != null:
 				# 选项 = 场景：**只把选项节点摆上画布**（Web `spawnChoiceNodes` 走的是
@@ -95,9 +96,10 @@ func _run_choice(node_key: String, cmd: ChoiceCommandDef) -> Dictionary:
 				var r := _apply_payload(o.payload, node_key)
 				spawn.append_array(r.get("spawn", []))
 				spawn.append_array(r.get("reveal", []))
+				captured.append_array(r.get("captured", []))
 	return {
 		"ok": true, "message": "", "messages": messages, "spawn": spawn,
-		"blocked": false, "needs_password": false,
+		"captured": captured, "blocked": false, "needs_password": false,
 	}
 
 
@@ -107,17 +109,17 @@ func _run_conditional(node_key: String, cmd: ConditionalCommandDef) -> Dictionar
 			continue
 		if not graph.captured.has(cond.clue.id):
 			var why := cond.fail_message if cond.fail_message != "" else "条件不足。"
-			return _blocked(case_def.strip_tags(why))
+			return _blocked(why)
 	var r := _apply_payload(cmd.on_success, node_key)
 	var text := cmd.success_message
 	if text == "":
 		text = String(r.get("message", ""))
-	var out := _ok(case_def.strip_tags(text))
+	var out := _ok(text)
 	out["spawn"] = r.get("spawn", [])
 	out["reveal"] = r.get("reveal", [])
 	out["next_scene"] = r.get("next_scene", "")
 	out["first_scene"] = r.get("first_scene", "")
-	out["captured"] = _capture_clues(cmd.success_message)
+	out["captured"] = _merge_captured(cmd.clues, r, node_key)
 	return out
 
 
@@ -136,24 +138,24 @@ func _run_use_item(node_key: String, n: Dictionary, cmd: UseItemCommandDef) -> D
 		var installed: Dictionary = n.get("installed", {})
 		if not installed.has(req.id):
 			var why2 := cmd.fail_message if cmd.fail_message != "" else "还缺「%s」没装上，现在做不了这件事。" % req.label
-			return _blocked(case_def.strip_tags(why2))
+			return _blocked(why2)
 	if need.needs_lit_to_use and not bool(have.get("lit", false)):
 		var why := need.lit_fail_message if need.lit_fail_message != "" else "还没有点亮，照不出任何东西。"
-		return _blocked("「%s」%s" % [need.label, case_def.strip_tags(why)])
+		return _blocked("「%s」%s" % [need.label, why])
 
 	if cmd.installs:
 		var ins: Dictionary = n.get("installed", {})
 		ins[need.id] = true
 		n["installed"] = ins
 
-	var out := _ok(case_def.strip_tags(cmd.success_message))
+	var out := _ok(cmd.success_message)
 	out["installed"] = cmd.installs
 	var r := _apply_payload(cmd.on_success, node_key)
 	out["spawn"] = r.get("spawn", [])
 	out["reveal"] = r.get("reveal", [])
 	out["next_scene"] = r.get("next_scene", "")
 	out["first_scene"] = r.get("first_scene", "")
-	out["captured"] = _capture_clues(cmd.success_message)
+	out["captured"] = _merge_captured(cmd.clues, r, node_key)
 
 	# 消耗：非可复用工具用完就没了（Web 版 tg-consume 开关，默认开）
 	if consume_tools and not graph.is_reusable_tool(need.id) and have_key != node_key:
@@ -164,7 +166,7 @@ func _run_use_item(node_key: String, n: Dictionary, cmd: UseItemCommandDef) -> D
 
 func _run_reveal(node_key: String, n: Dictionary, cmd: RevealCommandDef) -> Dictionary:
 	var text: String = cmd.value          # RevealCommandDef 只有 value（数据侧同款）
-	var out := _ok(case_def.strip_tags(text))
+	var out := _ok(text)
 	var spawn: Array = []
 	for it in cmd.items:
 		if it == null:
@@ -173,7 +175,7 @@ func _run_reveal(node_key: String, n: Dictionary, cmd: RevealCommandDef) -> Dict
 		graph.link(node_key, key, "entity")
 		spawn.append(key)
 	out["spawn"] = spawn
-	out["captured"] = _capture_clues(text)
+	out["captured"] = graph.capture_clue_refs(cmd.clues, node_key)
 	return out
 
 
@@ -189,8 +191,8 @@ func submit_password(node_key: String, cmd: PasswordCommandDef, input: String) -
 	out["reveal"] = r.get("reveal", [])
 	out["next_scene"] = r.get("next_scene", "")
 	out["first_scene"] = r.get("first_scene", "")
-	out["captured"] = _capture_clues(String(r.get("message", "")))
-	out["message"] = case_def.strip_tags(String(r.get("message", "")))
+	out["captured"] = r.get("captured", [])
+	out["message"] = String(r.get("message", ""))
 	return out
 
 
@@ -217,7 +219,8 @@ func _apply_payload(payload: PayloadDef, node_key: String) -> Dictionary:
 	var out := {"message": "", "spawn": [], "reveal": [], "next_scene": "", "first_scene": ""}
 	if payload == null:
 		return out
-	out["message"] = case_def.strip_tags(payload.message)
+	out["message"] = payload.message
+	out["captured"] = graph.capture_clue_refs(payload.clues, node_key)
 	for it in payload.items:
 		if it == null:
 			continue
@@ -231,13 +234,13 @@ func _apply_payload(payload: PayloadDef, node_key: String) -> Dictionary:
 		out["next_scene"] = payload.scene.id
 		if not was_explored:
 			out["first_scene"] = payload.scene.id
-	_capture_clues(payload.message)
 	return out
 
 
-## 正文里出现的 [clue:X] 直接记为已捕获，并把线索节点建出来
-func _capture_clues(text: String) -> Array:
-	return graph.capture_clues(text)
+func _merge_captured(cmd_clues: Array, payload_result: Dictionary, node_key: String) -> Array:
+	var got := graph.capture_clue_refs(cmd_clues, node_key)
+	got.append_array(payload_result.get("captured", []))
+	return got
 
 
 func _ok(message: String) -> Dictionary:

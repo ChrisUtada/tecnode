@@ -2,13 +2,25 @@
 
 [ext_resource type="Script" path="res://core/defs/SceneDef.gd" id="1_inpm2"]
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_m8usi"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_ux380"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_qsan.tres" id="3_wnlha"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="4_hvd8w"]
+
+[sub_resource type="Resource" id="Resource_0gv75"]
+script = ExtResource("4_hvd8w")
+clues = Array[ExtResource("2_ux380")]([ExtResource("3_wnlha")])
 
 [resource]
 script = ExtResource("1_inpm2")
 id = "SCENES_mdhm"
 title = "门的后面"
-content = "撞击声从厚重的铁门后传来，只有靠得如此之近才能听到。你拉开了铁门，[char:CHARS_zs]惊恐地看着你，一道[item:ITEMS_tzl]挡在你们之间。<br>在离朱穗不远的地上，一个满头白发的人蜷缩着。<br><br>问问[char:CHARS_TEC]"
-desc = "撞击声从厚重的铁门后传来，只有靠得如此之近才能听到。你拉开了铁门，朱穗惊恐地看着你，一道铁栅栏挡在你们之间。<br>在离朱穗不远的地上，一个满头白发的人蜷缩着。"
+content = "撞击声从厚重的铁门后传来，只有靠得如此之近才能听到。你拉开了铁门，朱穗惊恐地看着你，一道铁栅栏挡在你们之间。
+在离朱穗不远的地上，一个满头白发的人蜷缩着。
+
+问问TEC"
+desc = "撞击声从厚重的铁门后传来，只有靠得如此之近才能听到。你拉开了铁门，朱穗惊恐地看着你，一道铁栅栏挡在你们之间。
+在离朱穗不远的地上，一个满头白发的人蜷缩着。"
+hidden_clue = SubResource("Resource_0gv75")
 node_items = PackedStringArray("ITEMS_tzl")
 node_chars = PackedStringArray("CHARS_zs")
 node_locs = PackedStringArray()

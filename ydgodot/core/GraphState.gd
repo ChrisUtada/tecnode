@@ -39,6 +39,8 @@ var last_scene: String = ""
 ## 因果追踪（SYS_LOGS）的条目：{text, kind}，kind ∈ "" / "sys" / "warn" / "err" / "cap" / "act"。
 ## **不进快照**、不随撤销回滚 —— 对齐 Web：日志是 DOM 节点，重来 / 换案才清（17-boot.js:20）。
 var logs: Array = []
+## F6：日志历史上限。超出后从最旧开始丢，避免长局把 ScrollContainer 撑成无限 DOM。
+const LOG_MAX := 200
 ## 人物档案卡备注：id -> 文本（玩家知识，按案件存档；撤销不回滚，读档按存档恢复）。
 var notes: Dictionary = {}
 
@@ -755,13 +757,13 @@ func mark_ending(id: String) -> void:
 	endings[id] = true
 
 
-## 从正文里捕获 [clue:X]（TEC 解读 / 命令文本共用）—— 与 Web 的 gotClues 同口径
-func capture_clues(text: String, from_key: String = "") -> Array:
+## §7-2：只从显式结构化线索引用捕获，不再解析正文标签。
+func capture_clue_refs(refs: Array, from_key: String = "") -> Array:
 	var got: Array = []
-	for tag in case_def.tags_of(text):
-		if tag["kind"] != "clue":
+	for ref in refs:
+		var cid := String((ref as ClueDef).id) if ref is ClueDef else String(ref)
+		if cid == "" or captured.has(cid):
 			continue
-		var cid: String = tag["id"]
 		got.append(capture_clue(cid, from_key))
 	return got
 
@@ -783,35 +785,52 @@ func capture_clue(cid: String, from_key: String = "") -> String:
 func recompute_hidden() -> void:
 	for key in nodes.keys():
 		hidden.erase(key)
+	## F5：先把边表折叠成邻接表、把 home_scene 折叠成索引，避免「每个折叠容器 × 每个节点
+	## × 整张边表」的三重扫描。判定语义与旧版逐边扫描完全一致。
+	var adj := {}
+	for e in edges:
+		var a := String(e.get("a", ""))
+		var b := String(e.get("b", ""))
+		if not nodes.has(a) or not nodes.has(b):
+			continue
+		if not adj.has(a):
+			adj[a] = []
+		if not adj.has(b):
+			adj[b] = []
+		(adj[a] as Array).append(b)
+		(adj[b] as Array).append(a)
+	var by_scene := {}
+	for key in nodes.keys():
+		var home := String((nodes[key] as Dictionary).get("home_scene", ""))
+		if home == "":
+			continue
+		if not by_scene.has(home):
+			by_scene[home] = []
+		(by_scene[home] as Array).append(String(key))
 	var changed := true
 	while changed:
 		changed = false
 		for cid in collapsed.keys():
-			var container_key := key_of("loc", String(cid))
+			var scene_id := String(cid)
+			var container_key := key_of("loc", scene_id)
 			if not nodes.has(container_key):
-				container_key = key_of("item", String(cid))
-			for key in nodes.keys():
+				container_key = key_of("item", scene_id)
+			for key in by_scene.get(scene_id, []):
 				var n: Dictionary = nodes[key]
 				if stored.has(key) or hidden.has(key) or bool(n.get("pinned", false)):
 					continue
 				if key == container_key:
 					continue
-				if String(n.get("home_scene", "")) != String(cid):
-					continue
 				# 与「保持可见」的节点还有边 → 不藏
 				var exported := false
-				for e in edges:
-					if e["a"] != key and e["b"] != key:
-						continue
-					var other_key: String = String(e["a"]) if e["a"] != key else String(e["b"])
+				for other_key in adj.get(key, []):
 					if other_key == container_key:
 						continue
-					var other := node(other_key)
-					if other.is_empty():
+					if not nodes.has(other_key):
 						continue
 					if hidden.has(other_key) or stored.has(other_key):
 						continue
-					if String(other.get("home_scene", "")) == String(cid):
+					if String((nodes[other_key] as Dictionary).get("home_scene", "")) == scene_id:
 						continue
 					exported = true
 					break
@@ -926,6 +945,8 @@ func add_log(text: String, kind: String = "") -> void:
 	if text == "":
 		return
 	logs.append({"text": text, "kind": kind})
+	while logs.size() > LOG_MAX:
+		logs.pop_front()
 
 
 func clear_logs() -> void:

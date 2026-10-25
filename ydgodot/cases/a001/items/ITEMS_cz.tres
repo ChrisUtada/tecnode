@@ -10,3 +10,7 @@ id = "ITEMS_cz"
 label = "唱针"
 desc = "安装上唱针，唱机就能播放黑胶唱片了。"
 can_be_picked = true
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

@@ -10,3 +10,7 @@ id = "ITEMS_bah"
 label = "石蒜"
 desc = "石蒜是石蒜科石蒜属的多年生草本植物"
 can_be_picked = true
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

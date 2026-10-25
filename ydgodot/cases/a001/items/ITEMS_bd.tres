@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_lwtxe"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_hj8va"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_wcoio"]
 [ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_lhsdst.tres" id="3_wcoio"]
 [ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="4_kutnv"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_jd.tres" id="5_4uk73"]
@@ -26,3 +27,7 @@ label = "绷带"
 desc = "缠绕住尸体的绷带。如果用剪刀就可以把它剪开。"
 can_be_picked = true
 commands = Array[ExtResource("1_lwtxe")]([SubResource("Resource_fg5o8")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

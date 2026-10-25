@@ -10,3 +10,7 @@ id = "ITEMS_dlh"
 label = "大丽花"
 desc = "大丽花，菊科大丽花属植物。"
 can_be_picked = true
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

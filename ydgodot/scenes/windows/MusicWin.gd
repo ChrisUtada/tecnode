@@ -26,6 +26,7 @@ var _time_label: Label
 var _play_btn: TransportButton
 var _stop_btn: TransportButton
 var _emit_acc := 0.0
+var _prog_dragging := false
 
 
 static func title_of(id: String) -> String:
@@ -125,7 +126,8 @@ func _build_content() -> void:
 	_prog.mouse_filter = Control.MOUSE_FILTER_STOP
 	_prog.tooltip_text = "播放进度 · 点击跳转"
 	_prog.add_theme_stylebox_override("background", TecTheme.flat(TecTheme.FACE_LO, 0, TecTheme.FACE_LO, 0))
-	_prog.add_theme_stylebox_override("fill", TecTheme.flat(TecTheme.LINE, 0, TecTheme.LINE, 0))
+	_prog.add_theme_stylebox_override("fill",
+		TecTheme.flat(TecTheme.SPOT_ACCENT, 0, TecTheme.SPOT_ACCENT, 0))
 	_prog.gui_input.connect(_on_prog_input)
 	_player.add_child(_prog)
 
@@ -243,8 +245,17 @@ func seek_ratio(ratio: float) -> void:
 
 
 func _on_prog_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		seek_ratio(event.position.x / maxf(_prog.size.x, 1.0))
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			## W18：按下即 seek，之后按住拖动持续跟手，不再只认单击。
+			_prog_dragging = true
+			seek_ratio(event.position.x / maxf(_prog.size.x, 1.0))
+		else:
+			_prog_dragging = false
+		accept_event()
+	elif event is InputEventMouseMotion and _prog_dragging:
+		seek_ratio((event as InputEventMouseMotion).position.x / maxf(_prog.size.x, 1.0))
+		accept_event()
 
 
 func _refresh() -> void:

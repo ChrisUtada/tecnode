@@ -42,6 +42,13 @@ func load_case() -> bool:
 	case_def = r
 	_index()
 	validate_nodes()
+	## §7-3：标签退役后的防回灌校验。正文里只要再出现 `[xxx:` 就拒绝装载，
+	## 逼数据走结构化字段（hidden_clue / clues / node_*），而不是让解析器悄悄复活。
+	var dirty := validate_text_clean()
+	if not dirty.is_empty():
+		load_error = "正文仍含退役标签：%s" % str(dirty.slice(0, 5))
+		push_error(load_error)
+		return false
 	return true
 
 
@@ -56,6 +63,46 @@ func validate_nodes() -> Array:
 	if not unknown_nodes.is_empty():
 		push_warning("画布节点清单有 %d 个 id 解析不到：%s" % [unknown_nodes.size(), str(unknown_nodes)])
 	return unknown_nodes
+
+
+## 扫描所有数据资源里的字符串，找 `[item:` / `[clue:` 这类退役标签。
+## 跳过脚本 / 贴图 / 路径字段；用实例 id 防环（CaseDef ↔ SceneDef 互相引用）。
+func validate_text_clean() -> Array:
+	var out: Array = []
+	var seen := {}
+	var re := RegEx.new()
+	re.compile("\\[[A-Za-z_]+:")
+	_scan_text(case_def, "case", re, out, seen)
+	return out
+
+
+func _scan_text(value, path: String, re: RegEx, out: Array, seen: Dictionary) -> void:
+	if value == null:
+		return
+	if value is String:
+		if re.search(String(value)) != null:
+			out.append(path)
+		return
+	if value is Script or value is Texture2D or value is AudioStream:
+		return
+	if value is Resource:
+		var rid: int = value.get_instance_id()
+		if seen.has(rid):
+			return
+		seen[rid] = true
+		for p in value.get_property_list():
+			var pname := String(p.get("name", ""))
+			if pname in ["script", "resource_path", "resource_name", "image", "avatar"]:
+				continue
+			_scan_text(value.get(pname), path + "." + pname, re, out, seen)
+		return
+	if value is Array or value is PackedStringArray:
+		for i in value.size():
+			_scan_text(value[i], path + "[%d]" % i, re, out, seen)
+		return
+	if value is Dictionary:
+		for k in value.keys():
+			_scan_text(value[k], path + "." + String(k), re, out, seen)
 
 
 func _index() -> void:
@@ -262,7 +309,7 @@ func time_brief_of(t: String) -> Dictionary:
 	for m in mems:
 		for line in m.script_lines:
 			if line != null and line.kind == "narr" and line.text != "":
-				summary = strip_tags(line.text)
+				summary = String(line.text)
 				break
 		if summary != "":
 			break
@@ -289,50 +336,11 @@ func ending_by_id(id: String) -> EndingDef:
 func text_of(kind: String, id: String) -> String:
 	if kind == "loc" or kind == "scene" or kind == "time":
 		var s := scene_of(id)
-		return strip_tags(s.content if s != null else "")
-	var it := item_of(id)
-	return strip_tags(it.desc if it != null else "")
-
-
-## 带标签的原文（容器扫描要按 `[char:x]` 之类找它的内容物，不能用 strip_tags 的版本）
-func raw_text_of(kind: String, id: String) -> String:
-	if kind == "loc" or kind == "scene" or kind == "time":
-		var s := scene_of(id)
 		return s.content if s != null else ""
 	var it := item_of(id)
 	return it.desc if it != null else ""
 
 
-func strip_tags(raw: String) -> String:
-	var s := raw.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
-	var re := RegEx.new()
-	re.compile("\\[(item|loc|char|clue|data):([^\\]]+)\\]")
-	var out := ""
-	var last := 0
-	for m in re.search_all(s):
-		out += s.substr(last, m.get_start() - last)
-		out += label_of(_tag_kind(m.get_string(1)), m.get_string(2))
-		last = m.get_end()
-	out += s.substr(last)
-	return out
-
-
-## 提取正文标签（去重、保序）—— 揭示场景时用它决定长出哪些节点
-func tags_of(raw: String) -> Array:
-	var re := RegEx.new()
-	re.compile("\\[(item|loc|char|clue|data):([^\\]]+)\\]")
-	var seen := {}
-	var out: Array = []
-	for m in re.search_all(raw):
-		var id := m.get_string(2)
-		if not seen.has(id):
-			seen[id] = true
-			out.append({"kind": _tag_kind(m.get_string(1)), "id": id})
-	return out
-
-
-## 正文标签的前缀就是权威 kind（NPC_FB 这类 id 不带 CHARS_ 前缀，不能靠 id 猜）。
-static func _tag_kind(prefix: String) -> String:
-	if prefix == "scene":
-		return "loc"
-	return prefix
+## §7-3：正文标签已退役，raw_text_of 与 text_of 同源保留，避免旧调用方立刻断掉。
+func raw_text_of(kind: String, id: String) -> String:
+	return text_of(kind, id)

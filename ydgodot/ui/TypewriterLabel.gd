@@ -16,6 +16,9 @@ var _legacy_writes := false
 var _reserve_h := 0.0
 ## 单字耗时（毫秒）。开始界面标题这类「缓进」场合调慢，其余默认 45ms。
 var char_ms := CHAR_MS
+## G14：重点行开打前的停顿（毫秒）。只用于「真名线索」这类需要玩家意识到分量的行。
+var pause_ms := 0.0
+var _delay_left := 0.0
 
 
 func configure(p_text: String, p_size: int = 12, p_color: Color = Color.BLACK) -> void:
@@ -32,6 +35,7 @@ func configure(p_text: String, p_size: int = 12, p_color: Color = Color.BLACK) -
 	_shown = 0.0
 	_shown_n = -1
 	_visible_writes = 0
+	_delay_left = 0.0
 	set_process(false)
 	_update_reserve()
 
@@ -46,6 +50,7 @@ func start_typing(p_text: String = "") -> void:
 	_shown = 0.0
 	_shown_n = 0
 	visible_characters = 0
+	_delay_left = maxf(pause_ms, 0.0) / 1000.0
 	_typing = true
 	set_process(true)
 
@@ -53,6 +58,7 @@ func start_typing(p_text: String = "") -> void:
 func finish_typing() -> void:
 	visible_characters = -1
 	_shown_n = -1
+	_delay_left = 0.0
 	if not _typing:
 		return
 	_typing = false
@@ -119,6 +125,9 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	if not _typing:
+		return
+	if _delay_left > 0.0:
+		_delay_left = maxf(0.0, _delay_left - delta)
 		return
 	_shown += delta * (1000.0 / char_ms)
 	var n := int(_shown)

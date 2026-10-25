@@ -7,7 +7,16 @@
 script = ExtResource("1_oxlfo")
 id = "SCENES_fkjl"
 title = "访客记录"
-content = "[loc:SCENES_0602] 9：00 - 10：30 [char:CHARS_zs]的清洁时间<br>6月2日 15：07 - 18：13 [char:NPC_FB]老师来访<br>………………<br>………………<br>………………<br>6月15日 9：00 - 10：30 朱穗的清洁时间<br>6月15日 17：03 傅柏老师来访<br>………………<br>………………<br>[loc:SCENES_0704]"
+content = "6月2日 9：00 - 10：30 朱穗的清洁时间
+6月2日 15：07 - 18：13 傅柏老师来访
+………………
+………………
+………………
+6月15日 9：00 - 10：30 朱穗的清洁时间
+6月15日 17：03 傅柏老师来访
+………………
+………………
+7月4日"
 desc = "记录了每日到访花园的客人。"
 node_items = PackedStringArray()
 node_chars = PackedStringArray("CHARS_zs", "NPC_FB")

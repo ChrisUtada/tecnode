@@ -232,7 +232,7 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	chip.size = Vector2(CHIP_W, CHIP_H)
 	chip.custom_minimum_size = Vector2(CHIP_W, CHIP_H)
 	chip.mouse_filter = Control.MOUSE_FILTER_STOP
-	chip.tooltip_text = "单击 = 查看详情；点「取回」或拖出桌布 = 放回画布；拖到线索册 = 收进册子"
+	chip.tooltip_text = "单击 = 查看详情；拖出桌布 = 放回画布；拖到线索册 = 收进册子"
 	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE, 1)
 	chip.add_theme_stylebox_override("panel", sb)
 
@@ -249,7 +249,8 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(title)
 
-	## K2：底行 = 状态 + 明确的「取回」按钮。双击不再承担取回语义。
+	## K2（2026-10-25 改判）：底行只留状态。取回只走「拖出桌布」，
+	## 单击仍看详情；chip 上不再放第二个会改变状态的按钮。
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 2)
 	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -264,22 +265,6 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	foot.add_child(sub)
-
-	var take := TecTheme.button("取回")
-	take.name = "take"
-	take.tooltip_text = "把这条线索放回画布"
-	take.custom_minimum_size = Vector2(34, 16)
-	take.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
-	for state in ["normal", "hover", "pressed", "hover_pressed"]:
-		var sb2 := TecTheme.button_style(state == "hover" or state == "hover_pressed",
-			state == "pressed" or state == "hover_pressed")
-		sb2.content_margin_left = 4
-		sb2.content_margin_right = 4
-		sb2.content_margin_top = 0
-		sb2.content_margin_bottom = 0
-		take.add_theme_stylebox_override(state, sb2)
-	take.pressed.connect(func(): clue_taken.emit(key))
-	foot.add_child(take)
 
 	chip.gui_input.connect(_on_chip_input.bind(key, chip))
 	return chip

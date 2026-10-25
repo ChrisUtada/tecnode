@@ -201,7 +201,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("首行已贴出", int(state["lines"]) == 1 and chat.line_count() == 1, str(state["lines"]))
 	check("打字未完成", chat.is_typing())
 	check("打字机 45ms/字", ChatWindow.CHAR_MS == 45.0, str(ChatWindow.CHAR_MS))
-	check("对话窗无滚动条", chat.find_children("*", "ScrollContainer", true, false).is_empty())
+	check("W9 对话窗有滚动区", not chat.find_children("*", "ScrollContainer", true, false).is_empty())
 	check("对话窗预排全文行", chat._rows.size() == int(state["total"]), str(chat._rows.size()))
 	var first_text := String(scene.dbg_dialogues().by_id("DLG_0704_zs_lhs").script_lines[0].text)
 	check("首行是旁白原文", chat.current_text() == first_text, chat.current_text())
@@ -213,8 +213,8 @@ func _test_desktop(c: CaseLoader) -> void:
 	await process_frame
 	await process_frame
 	var last_root: Control = chat._rows[chat._rows.size() - 1]["root"]
-	check("对话窗包住预排全文", chat.get_global_rect().encloses(last_root.get_global_rect()),
-		"%s / %s" % [chat.get_global_rect(), last_root.get_global_rect()])
+	check("W9 长对话窗高封顶", chat.size.y <= 380.0 + SysWindow.PAD * 2.0 + 1.0,
+		"%.0f / 末行 %s" % [chat.size.y, last_root.get_global_rect()])
 	var chat_bg := chat.get_node_or_null("bg") as Control
 	check("对话窗底板随内容增高", chat_bg != null
 		and chat_bg.size.y >= chat.body.size.y + SysWindow.BAR_H + 20.0,

@@ -7,7 +7,9 @@
 script = ExtResource("1_s8v75")
 id = "SCENES_choutier"
 title = "右侧抽屉"
-content = "[item:ITEM_shuzhuo]右侧抽屉里摆放着一把锋利的[item:ITEMS_jd]和一个[item:ITEMS_jzmh]。<br><br>问问[char:CHARS_TEC]"
+content = "书桌右侧抽屉里摆放着一把锋利的剪刀和一个精致的木盒。
+
+问问TEC"
 desc = "右侧的抽屉里摆放着一把锋利的剪刀和一个精致的木盒。"
 node_items = PackedStringArray("ITEM_shuzhuo", "ITEMS_jd", "ITEMS_jzmh")
 node_chars = PackedStringArray()

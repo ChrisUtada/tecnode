@@ -7,7 +7,12 @@
 script = ExtResource("1_4mywu")
 id = "SCENES_0602"
 title = "6月2日"
-content = "6月2日，8点，身为助手的[char:CHARS_zs]来到花园。与往常一样，朱穗需要将桌面上的文件整理归位，同时整理清洁整个花园。<br>10点，完成所有工作的朱穗离开了花园。<br>10点30分左右，植物所所长[char:NPC_FB]来访，并为[char:CHARS_luhengs]和[char:CHARS_JS]拍摄了合影。<br><br>问问[char:CHARS_TEC]<br>更多[loc:SCENES_fkjl]"
+content = "6月2日，8点，身为助手的朱穗来到花园。与往常一样，朱穗需要将桌面上的文件整理归位，同时整理清洁整个花园。
+10点，完成所有工作的朱穗离开了花园。
+10点30分左右，植物所所长傅柏来访，并为陆珩松和槿杉拍摄了合影。
+
+问问TEC
+更多访客记录"
 desc = "平常的一天。"
 node_items = PackedStringArray()
 node_chars = PackedStringArray("CHARS_zs", "NPC_FB", "CHARS_luhengs", "CHARS_JS")

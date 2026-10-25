@@ -20,6 +20,13 @@ var case_id: String = ""
 var path: String = ""
 var history: Array = []
 var last_error: String = ""
+## F4：最近一次已入账 / 已写盘的快照 JSON。提交判脏不再序列化 before 与 current 两份，
+## 只序列化 current 一次并与它比较；自动写盘可直接复用这份字符串。
+var last_json := ""
+var pending_json := ""
+## F4 基准：快照 / JSON 序列化次数（测试用）。
+var dbg_snapshot_calls := 0
+var dbg_json_calls := 0
 
 
 func _init(p_graph: GraphState, p_case_id: String = "", p_path: String = "") -> void:
@@ -40,6 +47,7 @@ static func save_path_for(id: String) -> String:
 # ── 快照 ────────────────────────────────────────────────────────────────
 
 func snapshot() -> Dictionary:
+	dbg_snapshot_calls += 1
 	var nodes_out := {}
 	for key in graph.nodes.keys():
 		var n: Dictionary = graph.nodes[key]
@@ -71,6 +79,7 @@ func snapshot() -> Dictionary:
 
 
 func snapshot_json() -> String:
+	dbg_json_calls += 1
 	return JSON.stringify(snapshot())
 
 
@@ -81,6 +90,12 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 	last_error = ""
 	if s.is_empty() or not (s.get("nodes") is Dictionary):
 		last_error = "快照缺少 nodes"
+		return false
+	## S15：格式号只写不校验会导致未来旧档被按新格式静默解析。
+	## 缺省 / 老档按当前格式读；比当前新的版本明确拒绝。
+	var fmt := int(s.get("format", FORMAT))
+	if fmt > FORMAT:
+		last_error = "存档格式过新：%d（当前支持 %d）" % [fmt, FORMAT]
 		return false
 	var now_card_seen := graph.card_seen.duplicate(true) if keep_knowledge else {}
 	var now_debuted := graph.debuted.duplicate(true) if keep_knowledge else {}
@@ -208,6 +223,8 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 				graph.nodes[key]["unread"] = bool(now_unread[key])
 
 	graph.recompute_hidden()
+	## 图已被替换：下一次提交必须重新建立基准，不能拿旧 JSON 判「没变」。
+	last_json = ""
 	return true
 
 
@@ -270,8 +287,29 @@ func save_to_disk(p_path: String = "") -> bool:
 	if f == null:
 		last_error = "无法写入 %s（错误 %d）" % [target, FileAccess.get_open_error()]
 		return false
-	f.store_string(JSON.stringify(snapshot(), "\t"))
+	var snap := snapshot()
+	last_json = JSON.stringify(snap)
+	var text := JSON.stringify(snap, "\t")
+	f.store_string(text)
 	f.close()
+	pending_json = ""
+	return true
+
+
+## 自动写盘：复用 `_commit` 已经算好的 JSON，避免第三次 snapshot + stringify。
+func flush_pending(p_path: String = "") -> bool:
+	if pending_json == "":
+		return save_to_disk(p_path)
+	last_error = ""
+	var target := p_path if p_path != "" else path
+	var f := FileAccess.open(target, FileAccess.WRITE)
+	if f == null:
+		last_error = "无法写入 %s（错误 %d）" % [target, FileAccess.get_open_error()]
+		return false
+	f.store_string(pending_json)
+	f.close()
+	last_json = pending_json
+	pending_json = ""
 	return true
 
 
@@ -290,6 +328,8 @@ func load_from_disk(p_path: String = "") -> bool:
 	if not restore_json(text):
 		return false
 	history.clear()
+	last_json = ""
+	pending_json = ""
 	return true
 
 

@@ -7,7 +7,11 @@
 script = ExtResource("1_2547x")
 id = "SCENES_lhsdst"
 title = "陆珩松的尸体"
-content = "绷带之下，[loc:SCENES_body]的状况惨不忍睹。死去的[char:CHARS_luhengs]披着白大褂，暴露在外的皮肤上布满溃烂和黑褐色的斑块，在毫无血色的皮肤上显得尤为刺眼。<br>一张[item:ITEMS_zbbdz]斜插在衣服的左侧袋里，而在右侧口袋里藏着一枚[item:ITEMS_cz]。<br><br>问问[char:CHARS_TEC]<br>返回[loc:SCENES_garden]"
+content = "绷带之下，尸体的状况惨不忍睹。死去的陆珩松披着白大褂，暴露在外的皮肤上布满溃烂和黑褐色的斑块，在毫无血色的皮肤上显得尤为刺眼。
+一张皱巴巴的纸斜插在衣服的左侧袋里，而在右侧口袋里藏着一枚唱针。
+
+问问TEC
+返回植物学家的花园"
 desc = "绷带之下，陆珩松的尸体惨不忍睹。"
 node_items = PackedStringArray("ITEMS_zbbdz", "ITEMS_cz")
 node_chars = PackedStringArray("CHARS_luhengs")

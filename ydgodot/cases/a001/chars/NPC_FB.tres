@@ -10,7 +10,7 @@
 
 [sub_resource type="Resource" id="Resource_lrqc5"]
 script = ExtResource("5_fxuao")
-text = "获得线索：[clue:CLUES_fb]"
+text = "获得线索：植物研究所所长傅柏"
 clues = Array[ExtResource("3_pntgt")]([ExtResource("4_sapxa")])
 
 [sub_resource type="Resource" id="Resource_6a3oj"]

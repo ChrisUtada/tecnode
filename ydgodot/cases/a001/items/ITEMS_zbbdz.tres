@@ -10,3 +10,7 @@ id = "ITEMS_zbbdz"
 label = "皱巴巴的纸"
 desc = "纸上写着：伞形科独活属多年生草本，有明显的暗紫红色斑点和白色硬毛。叶片为巨大的深裂复叶，顶生大型白色伞形花序。"
 can_be_picked = true
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

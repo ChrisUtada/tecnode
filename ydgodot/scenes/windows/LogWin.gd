@@ -19,6 +19,7 @@ var graph: GraphState
 var _scroll: ScrollContainer
 var _list: VBoxContainer
 var _rows: Array[Control] = []
+var _empty_row: Control = null
 var _log_sig := ""
 var _typing_lab: RichTextLabel
 var _typing_total := 0
@@ -29,6 +30,8 @@ var _typing_n := -1
 var _typing_writes := 0
 ## 基准用：强制回到 F7 之前的「每帧写 + 每帧滚动」。
 var _legacy_writes := false
+## F6 基准：本次窗口生命周期内实际构建的行控件数。
+var _rows_built := 0
 
 
 ## h 是 **body 高**。Web `.log-win .log-body{max-height:340px}`，body 还要扣掉标题栏 23
@@ -55,31 +58,48 @@ func refresh_log() -> void:
 	if _list == null:
 		return
 	var entries: Array = graph.logs if graph != null else []
-	var sig := "v1:" + str(entries.size()) + ":"
+	## 不能把 size 放在签名前缀里：追加一条时新签名就不再以旧签名开头。
+	## 行数由 `_rows.size()` 自己维护，签名只记录条目序列。
+	var sig := "v1:"
 	for e in entries:
 		sig += String((e as Dictionary).get("kind", "")) + String.chr(31) \
 			+ String((e as Dictionary).get("text", "")) + String.chr(30)
 	if sig == _log_sig:
 		return
+	## F6：新日志是旧日志的前缀延伸时只追加新行；撤销 / 读档 / 历史上限挤掉队首时才全量重建。
+	var appendable := _log_sig != "" and sig.begins_with(_log_sig) \
+		and _rows.size() <= entries.size()
 	_log_sig = sig
 	_stop_typing()
-	for c in _list.get_children():
-		_list.remove_child(c)
-		c.queue_free()
-	_rows.clear()
-	if entries.is_empty():
-		var empty := TecTheme.label("（还没有记录）", TecTheme.FS_BODY, TecTheme.MUTED)
-		_list.add_child(empty)
-		return
-	for i in entries.size():
-		var e: Dictionary = entries[i]
-		var kind := String(e.get("kind", ""))
-		var text := String(e.get("text", ""))
-		var row := _make_row(text, kind)
-		_list.add_child(row)
-		if i == entries.size() - 1:
-			_start_typing(row.get_node_or_null("log_text") as RichTextLabel)
+	if not appendable:
+		for c in _list.get_children():
+			_list.remove_child(c)
+			c.queue_free()
+		_rows.clear()
+		_empty_row = null
+		if entries.is_empty():
+			_empty_row = TecTheme.label("（还没有记录）", TecTheme.FS_BODY, TecTheme.MUTED)
+			_list.add_child(_empty_row)
+			return
+		for i in entries.size():
+			var e: Dictionary = entries[i]
+			_append_row(String(e.get("kind", "")), String(e.get("text", "")))
+	else:
+		if _empty_row != null and is_instance_valid(_empty_row):
+			_list.remove_child(_empty_row)
+			_empty_row.queue_free()
+			_empty_row = null
+		for i in range(_rows.size(), entries.size()):
+			var e: Dictionary = entries[i]
+			_append_row(String(e.get("kind", "")), String(e.get("text", "")))
+	if not _rows.is_empty():
+		_start_typing(_rows[_rows.size() - 1].get_node_or_null("log_text") as RichTextLabel)
 	_scroll_to_end()
+
+
+func _append_row(kind: String, text: String) -> void:
+	var row := _make_row(text, kind)
+	_list.add_child(row)
 
 
 func _start_typing(lab: RichTextLabel) -> void:
@@ -124,6 +144,7 @@ func _process(delta: float) -> void:
 
 
 func _make_row(text: String, kind: String) -> Control:
+	_rows_built += 1
 	var row := PanelContainer.new()
 	row.name = "log_row"
 	var sb := StyleBoxFlat.new()

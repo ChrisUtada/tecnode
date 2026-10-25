@@ -107,7 +107,7 @@ func _test_desktop() -> void:
 	await process_frame
 	check("案件地图可打开", map != null and map.visible)
 	check("案件地图 2 行", map != null and map.dbg_row_count() == 2, str(map.dbg_row_count() if map != null else -1))
-	check("A001 当前状态", scene.dbg_case_map_state("A001") == "当前", scene.dbg_case_map_state("A001"))
+	check("W28 A001 当前状态", scene.dbg_case_map_state("A001") == "进行中", scene.dbg_case_map_state("A001"))
 	check("A002 锁定状态", scene.dbg_case_map_state("A002") == "锁定", scene.dbg_case_map_state("A002"))
 	check("当前案件不可重复进入", not scene.dbg_case_map_click("A001"))
 	check("锁定案件不可点击", not scene.dbg_case_map_click("A002"))
@@ -126,7 +126,7 @@ func _test_desktop() -> void:
 
 	scene.dbg_open_case_map()
 	await process_frame
-	check("收起后地图本案可进入", scene.dbg_case_map_state("A001") == "进入", scene.dbg_case_map_state("A001"))
+	check("W28 收起后地图仍显示进行中", scene.dbg_case_map_state("A001") == "进行中", scene.dbg_case_map_state("A001"))
 	check("点击本案行重新展开", scene.dbg_case_map_click("A001"))
 	await process_frame
 	info = scene.dbg_case_info()

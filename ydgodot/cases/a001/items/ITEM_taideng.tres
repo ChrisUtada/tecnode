@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="ItemDef" format=3]
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_rjyu5"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_f0mcj"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_iudqa"]
 [ext_resource type="Script" path="res://core/defs/commands/TextCommandDef.gd" id="3_f0mcj"]
 [ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="4_k1g7y"]
@@ -19,3 +20,7 @@ toggle_light = true
 lit_on_message = "被点亮了，暖黄的光晕在画布上散开"
 lit_off_message = "熄灭了"
 commands = Array[ExtResource("1_rjyu5")]([SubResource("Resource_pbmwf")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

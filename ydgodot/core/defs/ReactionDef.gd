@@ -6,6 +6,8 @@ extends Resource
 @export var clue: ClueDef = null
 @export var item: ItemDef = null
 @export_multiline var text: String = ""
+## §7-2：这条反应直接产出的线索。与 results 一样是结构化字段。
+@export var clues: Array[ClueDef] = []
 ## 命中后的产出（Web `05-combine.js:112-123`）：{"scene": sid, "items": [id…]}
 ## A-001 的 27 条反应全是纯文本；结构照 Web 的表格条目保留，等带 results 的剧本直接可用。
 @export var results: Dictionary = {}

@@ -2,9 +2,11 @@
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_mbwo5"]
 [ext_resource type="Script" path="res://core/defs/ConditionDef.gd" id="2_8ynu0"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_uqgr1"]
 [ext_resource type="Resource" path="res://cases/a001/clues/CLUES_xds.tres" id="3_uqgr1"]
 [ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zhpt.tres" id="4_qib0t"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="5_x5bvh"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_yzs.tres" id="6_qib0t"]
 [ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="6_ulajk"]
 [ext_resource type="Script" path="res://core/defs/commands/ConditionalCommandDef.gd" id="7_wteae"]
 [ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="8_14ji1"]
@@ -21,7 +23,8 @@ fail_message = "不知名的液体"
 
 [sub_resource type="Resource" id="Resource_nw55k"]
 script = ExtResource("6_ulajk")
-message = "获得线索：[clue:CLUES_yzs]"
+message = "获得线索：抑制素"
+clues = Array[ExtResource("2_uqgr1")]([ExtResource("6_qib0t")])
 
 [sub_resource type="Resource" id="Resource_8a7sn"]
 script = ExtResource("7_wteae")
@@ -36,3 +39,7 @@ label = "注射器"
 desc = "一根注射器，针筒内有半管透明的不知名液体。"
 can_be_picked = true
 commands = Array[ExtResource("1_mbwo5")]([SubResource("Resource_8a7sn")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

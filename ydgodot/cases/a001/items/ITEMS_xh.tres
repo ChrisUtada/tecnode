@@ -9,7 +9,7 @@
 
 [sub_resource type="Resource" id="Resource_tvx1c"]
 script = ExtResource("5_dlp85")
-text = "干硬的血迹有一股[clue:CLUES_CBKW]。"
+text = "干硬的血迹有一股草本的苦味。"
 clues = Array[ExtResource("3_a1kqr")]([ExtResource("4_hg0ny")])
 
 [resource]
@@ -18,3 +18,7 @@ id = "ITEMS_xh"
 label = "血痕"
 desc = "被绳索的毛刺磨烂的脖颈上，出现一道深深的血痕。"
 hidden_clue = SubResource("Resource_tvx1c")
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

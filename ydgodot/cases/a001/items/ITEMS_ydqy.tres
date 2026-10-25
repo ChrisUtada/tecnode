@@ -9,3 +9,7 @@ script = ExtResource("3_fat8d")
 id = "ITEMS_ydqy"
 label = "异动区域"
 desc = "发生因果扰动的区域，某些特殊的存在导致了整个区域的异常。调查员的目标就是揭示特殊存在的真名，以便进行捕获。"
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

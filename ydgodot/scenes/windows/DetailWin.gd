@@ -218,23 +218,23 @@ func _intro_text(n: Dictionary, kind: String) -> String:
 		var mem := _mem_narr(String(n.get("id", "")), kind)
 		if mem != "":
 			return mem + "\n（时刻：" + _case.time_label_of(_graph.time) + "）"
-		return _case.strip_tags(_case.text_of(kind, String(n.get("id", "")))) \
+		return _case.text_of(kind, String(n.get("id", ""))) \
 			if _case.text_of(kind, String(n.get("id", ""))) != "" else "（无描述）"
 	if kind == "clue":
 		var c := _case.clue_of(String(n["id"]))
-		return _non_empty(_case.strip_tags(c.desc) if c != null else "", "（无描述）")
+		return _non_empty(c.desc if c != null else "", "（无描述）")
 	if kind == "char":
 		var mem := _mem_narr(String(n.get("id", "")), kind)
 		if mem != "":
 			return mem + "\n（时刻：" + _case.time_label_of(_graph.time) + "）"
 		var ch := _case.char_of(String(n["id"]))
-		return _non_empty(_case.strip_tags(ch.desc) if ch != null else "", "（无描述）")
+		return _non_empty(ch.desc if ch != null else "", "（无描述）")
 	var it := _case.item_of(String(n["id"]))
 	if it == null:
 		return "（无描述）"
 	# 容器物品的简介就是它的正文；普通物品是 desc
 	var body := it.content if it.content != "" else it.desc
-	return _non_empty(_case.strip_tags(body), "（无描述）")
+	return _non_empty(body, "（无描述）")
 
 
 func _status_text(n: Dictionary, kind: String) -> String:
@@ -302,7 +302,7 @@ func _mem_narr(id: String, kind: String) -> String:
 		var lines: Array = []
 		for line in mem.script_lines:
 			if line != null and String(line.text) != "":
-				lines.append(_case.strip_tags(String(line.text)))
+				lines.append(String(line.text))
 		if not lines.is_empty():
 			return "\n".join(lines)
 	return ""

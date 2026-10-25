@@ -10,3 +10,7 @@ id = "ITEMS_hy"
 label = "合影"
 desc = "三张陆珩松与槿杉不同姿态的合影，其中一张在合影的右下角用小字写着：6月2日。"
 can_be_picked = true
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

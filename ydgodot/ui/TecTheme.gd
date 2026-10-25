@@ -165,7 +165,11 @@ const SPOT_ACCENT := Color("2f5d55")
 ## ── 材质色（三层体系 · 世界的样貌）──────────────────────────────────────
 ## 回答「这是什么」，不回答「该做什么」：只出现在物体及其影响范围，
 ## 不涂铬件、不做通用语义、低饱和印刷感。随内容承载逐个接入。
-const MAT_FLAME := Color("c1622f")    # 火焰/余烬（刻意避开警示朱，待燃烧交互承载）
+const MAT_FLAME := Color("c1622f")    # 火焰（刻意避开警示朱，待燃烧交互承载）
+const MAT_EMBER := Color("8a4a2a")    # 余烬 / 焦痕
+const MAT_DUST := Color("c9c4b8")     # 灰尘 / 陈旧纸面
+const MAT_ASH := Color("7a7a74")      # 灰烬
+const MAT_PLANT := Color("5a7a5c")    # 植物 / 生长
 
 ## ── 回忆态（P4 起**不再做旧纸**）──────────────────────────────────────────────
 ## 原来是四档暖米黄（`#e2deca → #ccc7ad`），代表「这张卡来自过去」。
@@ -344,7 +348,13 @@ static func window_style() -> StyleBoxFlat:
 ##   常态 1px → 悬停 **2px**（线宽）→ 按下**反白**（黑底白字）。
 ## 不引入灰阶填充：悬停变灰等于把 V3 删掉的中间灰又请回来。
 static func button_style(hover: bool = false, pressed: bool = false) -> StyleBoxFlat:
-	var sb := flat(INK if pressed else CARD, R_BTN, INK, 2 if hover else 1)
+	## C-B：悬停键线叠一层强调青；按下仍是纯黑反白（错误/选中语义不混）。
+	var border := INK
+	if hover and not pressed:
+		border = SPOT_ACCENT
+	elif hover and pressed:
+		border = INK
+	var sb := flat(INK if pressed else CARD, R_BTN, border, 2 if hover else 1)
 	sb.content_margin_left = 12
 	sb.content_margin_right = 12
 	sb.content_margin_top = 6

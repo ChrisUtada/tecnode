@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://core/defs/ReactionDef.gd" id="1_aydq0"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_hy.tres" id="2_kqcwc"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_wnppb"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_jzmh.tres" id="3_wnppb"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_turename.tres" id="4_fr7pr"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEM_sxbj.tres" id="5_24uom"]

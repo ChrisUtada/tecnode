@@ -2,28 +2,34 @@
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_txw30"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_wmhj.tres" id="2_glqgd"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_ug0ih"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_nm.tres" id="3_byu8k"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_d0j66"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_wmhj.tres" id="4_mk207"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_cz.tres" id="4_mwhdx"]
 [ext_resource type="Script" path="res://core/defs/commands/UseItemCommandDef.gd" id="5_ug0ih"]
 [ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_cjag.tres" id="6_byu8k"]
 [ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="7_mk207"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_htys.tres" id="8_stsye"]
 [ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="9_jfi71"]
+[ext_resource type="Resource" path="res://cases/a001/clues/DATA_H_music.tres" id="9_stsye"]
 
 [sub_resource type="Resource" id="Resource_dlgj8"]
 script = ExtResource("5_ug0ih")
 required_item = ExtResource("2_glqgd")
 requires = Array[ExtResource("3_d0j66")]([ExtResource("4_mwhdx")])
-success_message = "几声沙沙响和类似[clue:CLUES_nm]的声响后，[clue:CLUES_wmhj]开始播放……"
+success_message = "几声沙沙响和类似鸟鸣的声响后，陆珩松的录音开始播放……"
 label = "放入黑胶"
+clues = Array[ExtResource("2_ug0ih")]([ExtResource("3_byu8k"), ExtResource("4_mk207")])
 fail_message = "唱机上还没有装唱针，黑胶放上去也放不出声。"
 
 [sub_resource type="Resource" id="Resource_cac3u"]
 script = ExtResource("5_ug0ih")
 required_item = ExtResource("4_mwhdx")
 installs = true
-success_message = "把唱针装上唱机，唱机开始播放古典音乐，[clue:DATA_H_music]在花园中流淌。"
+success_message = "把唱针装上唱机，唱机开始播放古典音乐，G弦上的咏叹调在花园中流淌。"
 label = "装上唱针"
+clues = Array[ExtResource("2_ug0ih")]([ExtResource("9_stsye")])
 fail_message = "没有唱针，装不上。"
 
 [sub_resource type="Resource" id="Resource_oys13"]
@@ -44,3 +50,7 @@ label = "唱机"
 desc = "唱机上的唱针不知所踪，一盘黑胶被安装在唱盘上。在唱机的底座上，有一个钥匙孔，如果有合适的钥匙，应该可以打开它。"
 can_be_picked = true
 commands = Array[ExtResource("1_txw30")]([SubResource("Resource_dlgj8"), SubResource("Resource_cac3u"), SubResource("Resource_ox8f7")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

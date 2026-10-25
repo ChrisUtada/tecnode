@@ -10,3 +10,7 @@ id = "ITEMS_wmhj"
 label = "没有标签的黑胶"
 desc = "一张没有任何标签的黑胶唱片，安静地躺在唱机的暗格之中。"
 can_be_picked = true
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

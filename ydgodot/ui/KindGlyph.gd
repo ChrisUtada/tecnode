@@ -34,14 +34,14 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_CENTER, -1, px, col)
 
 
-## 圈内字号：P2 把文字档从 9px 提到 10px（字牌同时从 16 放到 18，内径 15.8）；
-## 0.64 让 18px 圈落在 10，而 16px 圈仍夹回 10，不会因为半径多 1px 跳到 11。
-## 缩略档没有标题可读，只靠形状，因此跟着圈径放大到 22px。
+## 圈内字号：U1 只允许 **12 / 24** 两档（点阵字原生格 12 的整数倍）。
+## 文字档圈径 20（内径 17.8）放 12px 仍有留缝；缩略档圈径 40+ 才跳到 24。
+## 旧版的 9/10/22px 是重采样发糊的根因，不再按内径连续取值。
 ## 抽成静态函数是为了测试能直接断言「笔画 < 内径」，不依赖渲染截图。
 static func glyph_font_px(radius: float, zoom: float) -> int:
 	var sw := maxf(1.0, 1.1 / maxf(zoom, 0.1))
 	var inner_d := maxf((radius - sw) * 2.0, 1.0)
-	return clampi(int(round(inner_d * 0.64)), 10, 22)
+	return 24 if inner_d >= 30.0 else 12
 
 
 func set_kind(k: String) -> void:

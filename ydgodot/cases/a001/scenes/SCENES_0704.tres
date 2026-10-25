@@ -2,13 +2,25 @@
 
 [ext_resource type="Script" path="res://core/defs/SceneDef.gd" id="1_a5ggm"]
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_hnfg6"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_ovar1"]
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zhpt.tres" id="3_7aorj"]
+[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="4_dgeaa"]
+
+[sub_resource type="Resource" id="Resource_ihjr5"]
+script = ExtResource("4_dgeaa")
+clues = Array[ExtResource("2_ovar1")]([ExtResource("3_7aorj")])
 
 [resource]
 script = ExtResource("1_a5ggm")
 id = "SCENES_0704"
 title = "7月4日"
-content = "花园之中，G弦的咏叹调反复播放着，[char:CHARS_zs]伏在书桌之上，看起来像是睡着了一般。<br>全身包裹着绷带的[char:CHARS_luhengs]关掉了唱机，手中握着注射器，拖着沉重的脚步，慢慢靠近书桌……<br><br>问问[char:CHARS_TEC]<br>更多[loc:SCENES_fkjl]"
+content = "花园之中，G弦的咏叹调反复播放着，朱穗伏在书桌之上，看起来像是睡着了一般。
+全身包裹着绷带的陆珩松关掉了唱机，手中握着注射器，拖着沉重的脚步，慢慢靠近书桌……
+
+问问TEC
+更多访客记录"
 desc = "一个特殊的日子。"
+hidden_clue = SubResource("Resource_ihjr5")
 node_items = PackedStringArray()
 node_chars = PackedStringArray("CHARS_zs", "CHARS_luhengs")
 node_locs = PackedStringArray("SCENES_fkjl")

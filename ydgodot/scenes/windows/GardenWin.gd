@@ -27,6 +27,11 @@ var _narr_idx := -1
 var _narr_shown := 0
 var _drag_idx := -1
 var _drag_moved := false
+var _drag_press_global := Vector2.ZERO
+## F9 基准：贴图 / 标签 / stylebox 的阶段刷新次数。
+var _stage_refreshes := 0
+## S11：案件收起后禁止再挪动植株写进度。
+var writes_enabled := true
 var _tick := 0.0
 
 
@@ -136,6 +141,7 @@ func _make_plant(idx: int, plot: Dictionary) -> Control:
 	p.add_child(img)
 
 	var st := GardenSystem.stage_of(plot)
+	p.set_meta("garden_stage", st)
 	var bloom := st >= 4
 	var chip := PanelContainer.new()
 	chip.name = "stage"
@@ -210,7 +216,16 @@ func plant_seed_at(at_global: Vector2) -> bool:
 	return true
 
 
+func set_writes_enabled(on: bool) -> void:
+	writes_enabled = on
+	if not on:
+		_drag_idx = -1
+		_drag_moved = false
+
+
 func _on_plant_input(event: InputEvent, idx: int) -> void:
+	if not writes_enabled:
+		return
 	var plots := _plot_list()
 	if idx < 0 or idx >= plots.size():
 		return
@@ -218,6 +233,7 @@ func _on_plant_input(event: InputEvent, idx: int) -> void:
 		if event.pressed:
 			_drag_idx = idx
 			_drag_moved = false
+			_drag_press_global = event.global_position
 		else:
 			if _drag_idx == idx:
 				if not _drag_moved and GardenSystem.is_bloomed(plots[idx]):
@@ -228,7 +244,8 @@ func _on_plant_input(event: InputEvent, idx: int) -> void:
 			_drag_idx = -1
 		return
 	if event is InputEventMouseMotion and _drag_idx == idx:
-		if event.relative.length() > 2.0:
+		## W19：慢拖时单帧位移很小，阈值必须看「按下以来的累计位移」。
+		if event.global_position.distance_to(_drag_press_global) > 4.0:
 			_drag_moved = true
 		if not _drag_moved:
 			return
@@ -270,19 +287,23 @@ func _refresh_growth() -> void:
 		if not is_instance_valid(plant):
 			continue
 		var st := GardenSystem.stage_of(plot)
-		var img: TextureRect = plant.get_node_or_null("img")
-		var stage_path: String = GardenSystem.STAGE_IMAGES[st]
-		if img != null and ResourceLoader.exists(stage_path):
-			img.texture = load(stage_path)
-		var chip: PanelContainer = plant.get_node_or_null("stage")
-		if chip != null:
-			chip.add_theme_stylebox_override("panel",
-				TecTheme.flat(TecTheme.LINE if st >= 4 else TecTheme.CARD, TecTheme.R_SM,
-					TecTheme.EDGE if st >= 4 else TecTheme.EDGE_SOFT, 1))
-			var lab: Label = chip.get_node_or_null("Label")
-			if lab != null:
-				lab.text = GardenSystem.STAGE_NAMES[st]
-				lab.add_theme_color_override("font_color", TecTheme.TEXT if st >= 4 else TecTheme.MUTED)
+		## F9：阶段没变就只更新进度条，不再每秒重新 load 贴图 / 重建 stylebox / 改标签。
+		if int(plant.get_meta("garden_stage", -1)) != st:
+			plant.set_meta("garden_stage", st)
+			_stage_refreshes += 1
+			var img: TextureRect = plant.get_node_or_null("img")
+			var stage_path: String = GardenSystem.STAGE_IMAGES[st]
+			if img != null and ResourceLoader.exists(stage_path):
+				img.texture = load(stage_path)
+			var chip: PanelContainer = plant.get_node_or_null("stage")
+			if chip != null:
+				chip.add_theme_stylebox_override("panel",
+					TecTheme.flat(TecTheme.LINE if st >= 4 else TecTheme.CARD, TecTheme.R_SM,
+						TecTheme.EDGE if st >= 4 else TecTheme.EDGE_SOFT, 1))
+				var lab: Label = chip.get_node_or_null("Label")
+				if lab != null:
+					lab.text = GardenSystem.STAGE_NAMES[st]
+					lab.add_theme_color_override("font_color", TecTheme.TEXT if st >= 4 else TecTheme.MUTED)
 		var bar: ProgressBar = plant.get_node_or_null("growth")
 		if bar != null:
 			bar.value = GardenSystem.progress_of(plot) * 100.0

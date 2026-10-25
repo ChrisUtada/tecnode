@@ -37,7 +37,7 @@ func toggle_light(node_key: String) -> Dictionary:
 		return {}
 	n["lit"] = not bool(n.get("lit", false))
 	var msg := it.lit_on_message if n["lit"] else it.lit_off_message
-	return {"changed": true, "lit": n["lit"], "message": case_def.strip_tags(msg)}
+	return {"changed": true, "lit": n["lit"], "message": msg}
 
 
 ## 是不是「场景类」节点（loc / time / 旧版 scene）。场景⇄场景的判定只认这个。
@@ -133,10 +133,10 @@ func lookup_reaction(kind: String, owner_id: String, tool_id: String) -> Diction
 		return {}
 	for r in ch.item_reactions:
 		if r != null and r.trigger_id == tool_id:
-			return {"text": r.text, "results": r.results, "field": "itemReactions"}
+			return {"text": r.text, "results": r.results, "clues": r.clues, "field": "itemReactions"}
 	for r in ch.clue_reactions:
 		if r != null and r.trigger_id == tool_id:
-			return {"text": r.text, "results": r.results, "field": "reactions"}
+			return {"text": r.text, "results": r.results, "clues": r.clues, "field": "reactions"}
 	return {}
 
 
@@ -165,16 +165,16 @@ func _scan_container_reaction(container_key: String, other_id: String) -> Dictio
 ##   `results.scene` 若是时刻 id → 走档案开口径（Web announceTimeCollected） here handled by DESKTOP toast.
 func _apply_reaction(hit: Dictionary, owner_key: String) -> Dictionary:
 	var raw := String(hit.get("text", ""))
-	var captured := graph.capture_clues(raw)
+	## §7-2：产出来自结构化 `clues`，正文只负责显示。
+	var captured := graph.capture_clue_refs(hit.get("clues", []), owner_key)
 	var reveal: Array = []
-	for tag in case_def.tags_of(raw):
-		if String(tag["kind"]) != "clue":
+	for ref in hit.get("clues", []):
+		var id := String((ref as ClueDef).id) if ref is ClueDef else String(ref)
+		if id == "" or not graph.has("clue", id):
 			continue
-		var id := String(tag["id"])
-		if graph.has("clue", id):
-			continue
-		graph.add_node("clue", id)
 		var ck := graph.key_of("clue", id)
+		if graph.node(ck).is_empty():
+			graph.add_node("clue", id)
 		graph.link(owner_key, ck, "entity")
 		reveal.append(ck)
 
@@ -216,7 +216,7 @@ func _apply_reaction(hit: Dictionary, owner_key: String) -> Dictionary:
 	return {
 		"ok": true,
 		"matched": true,
-		"message": case_def.strip_tags(raw),
+		"message": raw,
 		"captured": captured,
 		"reveal": reveal,
 	}
@@ -244,6 +244,6 @@ func activate(node_key: String) -> Dictionary:
 	return cmd_sys.execute(node_key, cmds[0])
 
 
-## 从一次成功的组合里抽出「新获得的线索」（P0：正文里出现的 [clue:] 直接记为已捕获）
-func capture_clues(text: String) -> Array:
-	return graph.capture_clues(text)
+## §7-2：只保留结构化捕获入口（供旧调用方平滑迁移）。
+func capture_clues(refs: Array) -> Array:
+	return graph.capture_clue_refs(refs)

@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_d18f0"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_7ka10"]
+[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_wsvhv"]
 [ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_body.tres" id="3_wsvhv"]
 [ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="4_tger0"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEM_shoudiantong.tres" id="5_w0hfk"]
@@ -26,3 +27,7 @@ label = "黑影"
 desc = "摇摇晃晃，摇摇晃晃……打开手电筒照亮它，应该能看得更清楚。"
 can_be_picked = true
 commands = Array[ExtResource("1_d18f0")]([SubResource("Resource_v7kmp")])
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()

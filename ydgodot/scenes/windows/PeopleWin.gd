@@ -107,7 +107,7 @@ func _make_row(id: String) -> Control:
 		if ch != null and ch.name != "":
 			nm = ch.name
 		if ch != null:
-			desc = case_def.strip_tags(ch.desc) if ch.desc != "" else ""
+			desc = ch.desc if ch.desc != "" else ""
 		var pr: Dictionary = graph.char_progress(id)
 		var prog := int(pr.get("prog", 0))
 		var total := int(pr.get("total", 0))

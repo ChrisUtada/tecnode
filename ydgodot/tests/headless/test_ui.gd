@@ -360,15 +360,26 @@ func _initialize() -> void:
 	await process_frame
 	check("双击才激活（灯翻了）", bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false)) != lit0)
 
-	# 2) 右键 = 钉住（唯一切入点），钉住后左上角挂「已固定」
+	# 2) K11：右键 = 上下文菜单（钉住 / 查看详情），不再直接改状态。
 	var rev := InputEventMouseButton.new()
 	rev.button_index = MOUSE_BUTTON_RIGHT
 	rev.pressed = true
+	rev.global_position = torch.get_global_rect().get_center()
 	torch._gui_input(rev)
 	await process_frame
-	check("右键钉住", bool(scene.graph.node(TORCH).get("pinned", false)))
+	check("K11 右键打开上下文菜单", scene._card_ctx != null)
+	check("K11 菜单出现前不改钉住态", not bool(scene.graph.node(TORCH).get("pinned", false)))
+	var ctx_pin := scene._card_ctx.find_child("ctx_pin", true, false) as Button
+	check("K11 菜单有钉住项", ctx_pin != null and ctx_pin.text == "钉住")
+	ctx_pin.pressed.emit()
+	await process_frame
+	check("K11 点菜单项后钉住", bool(scene.graph.node(TORCH).get("pinned", false)))
 	check("钉住挂「已固定」角标", (torch.get_node("pin") as Label).visible)
 	torch._gui_input(rev)
+	await process_frame
+	var ctx_unpin := scene._card_ctx.find_child("ctx_pin", true, false) as Button
+	check("K11 再开菜单显示取消钉住", ctx_unpin != null and ctx_unpin.text == "取消钉住")
+	ctx_unpin.pressed.emit()
 	await process_frame
 	check("再右键取消钉住", not bool(scene.graph.node(TORCH).get("pinned", false)))
 
@@ -591,12 +602,17 @@ func _initialize() -> void:
 		and KindGlyph.GLYPH_TEXT.get("clue", "") == "线"
 		and KindGlyph.GLYPH_TEXT.get("time", "") == "时",
 		str(KindGlyph.GLYPH_TEXT))
+	## U1：0.95 以下直接切纯符号档。0.9x 不再显示被重采样的标题。
 	scene._view_k = 0.9
 	scene._apply_view()
-	check("0.9x：标题 + 左侧小符号并存", lod_card != null and lod_card._title.visible
-		and lod_card._glyph.visible and lod_card._glyph.size.x <= NodeCard.GLYPH_BOX,
+	check("U1 0.9x：标题退场、只留放大符号", lod_card != null and not lod_card._title.visible
+		and lod_card._glyph.visible and lod_card._glyph.size.x > 60.0,
 		"null" if lod_card == null else "%s/%.0f" % [lod_card._title.visible,
 			lod_card._glyph.size.x])
+	scene._view_k = 0.96
+	scene._apply_view()
+	check("U1 0.96x：标题回来", lod_card != null and lod_card._title.visible,
+		"null" if lod_card == null else str(lod_card._title.visible))
 	## 0.88x 实测标题已缺笔（「注射器」被压成「注器」）⇒ 再往下只留放大的类型符号
 	scene._view_k = 0.6
 	scene._apply_view()
@@ -662,10 +678,15 @@ func _initialize() -> void:
 	var gfont := TecTheme.font()
 	var gink := gfont.get_ascent(gpx) + gfont.get_descent(gpx)
 	var ginner := NodeCard.GLYPH_BOX - 2.0 * 1.1
-	check("字牌字号提到 10px（旧版文字档 12px 顶圈）",
-		gpx >= 10 and gpx <= 10, "px %d" % gpx)
-	check("字牌笔画高度 < 圈内径（四边留缝）",
+	check("U1 文字档字号 = 12px（原生格）", gpx == 12, "px %d" % gpx)
+	check("U1 字牌笔画高度 < 圈内径（四边留缝）",
 		gink < ginner, "墨高 %.1f / 内径 %.1f" % [gink, ginner])
+	## 缩略档圈径足够大才跳到 24px，绝不再是 22/13 这类重采样档。
+	var big_px := KindGlyph.glyph_font_px(22.0, 1.0)
+	check("U1 缩略档字号 = 24px", big_px == 24, "px %d" % big_px)
+	var big_ink := gfont.get_ascent(big_px) + gfont.get_descent(big_px)
+	check("U1 缩略档笔画仍 < 圈内径", big_ink < (22.0 - 1.1) * 2.0,
+		"墨高 %.1f / 内径 %.1f" % [big_ink, (22.0 - 1.1) * 2.0])
 
 	## 7c1d) 打字机必须**全程按全文**占位：`visible_characters` 会让 Label 只在
 	## 剩余字里算最小高度，窗体会塌成一行、正文溢出框外（用户反馈）。
@@ -757,7 +778,8 @@ func _initialize() -> void:
 	# 7d) 「适应窗口」按包围盒缩放：装不下才缩，且真的写进图层变换
 	scene._view_user = false
 	scene._fit_cards()
-	check("适应窗口落在 0.45~1.3", scene._view_k >= 0.45 - 0.001 and scene._view_k <= 1.3 + 0.001,
+	check("U1 适应窗口落在 0.45~1.0（只缩不放）",
+		scene._view_k >= 0.45 - 0.001 and scene._view_k <= 1.0 + 0.001,
 		"%f" % scene._view_k)
 	check("适应窗口写进图层缩放", scene._card_layer.scale.is_equal_approx(
 		Vector2(scene._view_k, scene._view_k)), str(scene._card_layer.scale))
@@ -796,6 +818,8 @@ func _initialize() -> void:
 	_single_click(vis_card)
 	await process_frame
 	await process_frame
+	check("C-B 节点选中环 = 强调青",
+		vis_card._sel.visible and vis_card._sel.sel_color.is_equal_approx(TecTheme.SPOT_ACCENT))
 	var dw: DetailWin = scene.get_node_or_null("desk/detail_win") as DetailWin
 	check("详情窗跟随选中", dw != null and dw.visible)
 	if dw != null:
@@ -851,6 +875,8 @@ func _initialize() -> void:
 			scene._narr.queue_free()
 		scene._narr = null
 		scene._pending_detail = false
+		# 叙事卡 queue_free 在帧末生效；先让它离场，后面的画布落点才不会被残影挡住。
+		await process_frame
 
 	# 10) 反应表：把物品拖给人物要能说出话来（14 条反应表此前完全不可达）
 	var item_key: String = scene.dbg_ensure("item", "ITEMS_changji")
@@ -942,8 +968,8 @@ func _initialize() -> void:
 	await process_frame
 	check("K2 双击芯片不再取回", String(scene.graph.stored.get(clue_key, "")) == GraphState.MATRIX,
 		String(scene.graph.stored.get(clue_key, "")))
-	var take_btn := chip_panel.find_child("take", true, false) as Button
-	check("K2 芯片有明确的取回按钮", take_btn != null and take_btn.text.contains("取回"))
+	## K2（2026-10-25 改判）：chip 上不再放「取回」按钮；单击看详情，取回只走拖出桌布。
+	check("K2 芯片不再有取回按钮", chip_panel.find_child("take", true, false) == null)
 	_chip_press(chip_panel, chip_panel.get_global_rect().get_center())
 	_chip_motion(chip_panel, blank_pt)
 	_chip_release(chip_panel, blank_pt)
@@ -1147,7 +1173,8 @@ func _initialize() -> void:
 		scene_pick != "" and item_picks.size() == 2, scene_pick + " / " + str(item_picks))
 	var lut := ReactionDef.new()
 	lut.trigger_id = "ITEM_shoudiantong"
-	lut.text = "REACTION-PROBE 反应表注入：[clue:CLUES_qsan]"
+	lut.text = "REACTION-PROBE 反应表注入"
+	lut.clues = [scene.case_def.clue_of("CLUES_qsan")]
 	lut.results = {"scene": scene_pick, "items": item_picks}
 	var lg: CharDef = scene.case_def.char_of("CHARS_luhengs")
 	lg.item_reactions.insert(0, lut)
@@ -1214,7 +1241,7 @@ func _initialize() -> void:
 			Vector2(float(scene.graph.node(ik21b)["x"]), float(scene.graph.node(ik21b)["y"]))
 				.is_equal_approx(src21b + Vector2(60.0 + 26.0 * float(i21b), 60.0 + 26.0 * float(i21b))),
 			str(scene.graph.node(ik21b)))
-	check("正文 [clue:] 照旧建线索（回归）", scene.graph.has("clue", "CLUES_qsan"))
+	check("§7-2 结构化反应线索建卡（回归）", scene.graph.has("clue", "CLUES_qsan"))
 
 	# 22) z 序：新打开 / 被点击的系统窗提到浮动窗栈顶；
 	# icons 在浮动窗之下；toast(30) 在 TEC(28) 之上；镜像(40) 在 toast 之上
@@ -1235,8 +1262,12 @@ func _initialize() -> void:
 	var log_w := e_log as SysWindow
 	check("A2：当前窗（日志）为激活态", log_w.is_window_active())
 	check("A2：地图窗转为非激活", not map_w.is_window_active())
-	check("A2：激活窗保留标题横纹", (log_w._rules[0] as Control).visible)
-	check("A2：非激活窗收起标题横纹", not (map_w._rules[0] as Control).visible)
+	var log_stripes = log_w._rules[0]
+	var map_stripes = map_w._rules[0]
+	check("A2/C-B：激活窗标题横纹为强调青",
+		log_stripes.visible and log_stripes.col.is_equal_approx(TecTheme.SPOT_ACCENT))
+	check("A2/C-B：非激活窗标题横纹保留但用墨色",
+		map_stripes.visible and map_stripes.col.is_equal_approx(TecTheme.INK))
 	var map_sb := (map_w.get_node("bg") as Panel).get_theme_stylebox("panel") as StyleBoxFlat
 	var log_sb := (log_w.get_node("bg") as Panel).get_theme_stylebox("panel") as StyleBoxFlat
 	check("A2：激活窗 2px 框", log_sb.border_width_top == 2, str(log_sb.border_width_top))
@@ -1546,8 +1577,8 @@ func _initialize() -> void:
 			and p42_n.border_color.is_equal_approx(TecTheme.INK)
 			and p42_n.corner_radius_top_left == TecTheme.R_BTN,
 		str(p42_n))
-	check("悬停只把键线加到 2px（填充仍是白）",
-		p42_h.border_width_left == 2 and p42_h.border_color.is_equal_approx(TecTheme.INK)
+	check("C-B 悬停把键线加到 2px 并用强调青（填充仍是白）",
+		p42_h.border_width_left == 2 and p42_h.border_color.is_equal_approx(TecTheme.SPOT_ACCENT)
 			and p42_h.bg_color.is_equal_approx(TecTheme.CARD), str(p42_h))
 	check("按下反白（黑底 + 白字），不引入灰阶填充",
 		p42_p.bg_color.is_equal_approx(TecTheme.INK)
@@ -1986,6 +2017,13 @@ func _initialize() -> void:
 	check("W27 签发窗标题栏可拖动", cert != null and cert.dbg_drag_enabled())
 	var cert_close := cert.get_node_or_null("bar/close") as Control if cert != null else null
 	check("W27 签发期仍隐藏 ×（流程强制）", cert_close == null or not cert_close.visible)
+	if cert != null:
+		var stripes = cert.get_node_or_null("bar/title_stripes")
+		check("A9 隐藏按钮后标题条纹补到右沿",
+			stripes != null and stripes.line_right >= cert._inner_w - 2.0,
+			"null" if stripes == null else "%.1f / %.1f" % [stripes.line_right, cert._inner_w])
+		check("A10 签发窗有 3px 偏移影",
+			cert.get_node_or_null("offset_shadow") != null and cert.offset_shadow)
 	check("G5 四项字段齐全",
 		cert != null and cert.find_child("cert_name", true, false) != null
 			and cert.find_child("cert_id_value", true, false) != null
@@ -2076,6 +2114,118 @@ func _initialize() -> void:
 	await process_frame
 	check("G6 照片写进证件", scene._investigator.get("avatarId", "") == "CHARS_ANON")
 	Investigator.clear(scene._inv_path)
+
+	# ── W 组收口：图标边界 / 重叠命中 / 键盘 / 平移边界 / 镜像 LOD / G14 ──
+	# W7：窗口尺寸变化只同步拖动边界，不把玩家摆好的图标归位。
+	var w7_icon := scene._icon_by_app("tec") as DeskIcon
+	var w7_pos: Vector2 = w7_icon.position if w7_icon != null else Vector2.ZERO
+	if w7_icon != null:
+		w7_icon.position = Vector2(700.0, 500.0)
+		scene._desk.size = Vector2(960.0, 700.0)
+		scene._sync_icon_bounds()
+		check("W7 resize 后图标夹回可见区",
+			w7_icon.position.x <= 960.0 - w7_icon.size.x + 0.01
+				and w7_icon.position.y <= 700.0 - w7_icon.size.y + 0.01,
+			str(w7_icon.position))
+		scene._desk.size = Vector2(1280.0, 720.0)
+		w7_icon.position = w7_pos
+		scene._sync_icon_bounds()
+
+	# W8：悬停高亮与组合命中都取「最上层」那张卡。
+	var w8_cards: Array = []
+	for key in _cards().keys():
+		var c := _cards()[key] as NodeCard
+		if c != null and c.visible:
+			w8_cards.append(c)
+	if w8_cards.size() >= 2:
+		var w8_a: NodeCard = w8_cards[0]
+		var w8_b: NodeCard = w8_cards[1]
+		var w8_a_pos: Vector2 = w8_a.position
+		var w8_b_pos: Vector2 = w8_b.position
+		w8_b.position = w8_a.position
+		w8_b.move_to_front()
+		var w8_pt: Vector2 = w8_b.get_global_rect().get_center()
+		check("W8 重叠命中与高亮同为最上层卡",
+			w8_a._card_under(w8_pt) == w8_b.card_key
+				and scene._card_key_at(w8_pt) == w8_b.card_key,
+			"%s / %s" % [w8_a._card_under(w8_pt), scene._card_key_at(w8_pt)])
+		w8_a.position = w8_a_pos
+		w8_b.position = w8_b_pos
+
+	# W11：Esc 关最上层窗，Ctrl+Z 撤销。
+	scene._toggle_storage(GraphState.LEDGER)
+	await process_frame
+	check("W11 前置：线索册已打开", scene._ledger_win != null)
+	var w11_esc := InputEventKey.new()
+	w11_esc.keycode = KEY_ESCAPE
+	w11_esc.pressed = true
+	scene._unhandled_input(w11_esc)
+	check("W11 Esc 关闭最上层窗", scene._ledger_win == null)
+	var w11_card: NodeCard = w8_cards[0] if not w8_cards.is_empty() else null
+	if w11_card != null:
+		var w11_key: String = w11_card.card_key
+		var w11_pin_before: bool = bool(scene.graph.node(w11_key).get("pinned", false))
+		var w11_hist: int = scene.dbg_history_size()
+		scene._on_card_pin_toggled(w11_key)
+		check("W11 前置：置钉进入撤销栈", scene.dbg_history_size() > w11_hist)
+		var w11_undo := InputEventKey.new()
+		w11_undo.keycode = KEY_Z
+		w11_undo.ctrl_pressed = true
+		w11_undo.pressed = true
+		scene._unhandled_input(w11_undo)
+		check("W11 Ctrl+Z 撤销置钉",
+			bool(scene.graph.node(w11_key).get("pinned", false)) == w11_pin_before)
+
+	# W12：平移边界至少留 80px 世界可见，且按下载入拖动光标。
+	var w12_stage := scene.get_node("desk/case_win/body/stage") as Control
+	var w12_far: Vector2 = scene._clamp_view_pos(Vector2(99999.0, 99999.0))
+	var w12_near: Vector2 = scene._clamp_view_pos(Vector2(-99999.0, -99999.0))
+	check("W12 平移右上边界留出世界",
+		w12_far.x <= w12_stage.size.x - 80.0 + 0.01
+			and w12_far.y <= w12_stage.size.y - 80.0 + 0.01, str(w12_far))
+	check("W12 平移左下边界留出世界", w12_near.x >= 80.0 - 2000.0 * scene._view_k
+		and w12_near.y >= 80.0 - 1300.0 * scene._view_k, str(w12_near))
+
+	# W14：缩放档下拖卡，镜像的 scale / LOD 与原件一致。
+	# 注意 W11 的撤销会全量重建卡片，这里要重新取当前实例。
+	var w14_card: NodeCard = null
+	for key in _cards().keys():
+		var c := _cards()[key] as NodeCard
+		if c != null and c.visible:
+			w14_card = c
+			break
+	if w14_card != null:
+		var w14_old_k: float = scene._view_k
+		scene._view_k = 0.6
+		scene._apply_view()
+		scene._on_card_dragged(w14_card.card_key)
+		var w14_mirror: NodeCard = scene._card_mirror
+		check("W14 镜像跟随缩放倍率",
+			w14_mirror != null and absf(w14_mirror.scale.x - 0.6) < 0.01,
+			str(w14_mirror.scale) if w14_mirror != null else "null")
+		check("W14 镜像跟随 LOD（0.6 档只留符号）",
+			w14_mirror != null and not w14_mirror._title.visible
+				and w14_mirror._glyph.size.x > 60.0,
+			"null" if w14_mirror == null else str(w14_mirror._title.visible))
+		scene._drop_card_mirror(w14_card)
+		scene._drag_key = ""
+		scene._view_k = w14_old_k
+		scene._apply_view()
+
+	# G14：真名线索行反白 + 强调青首符号 + 打字机停顿。
+	var g14: EndingDef = scene.case_def.ending_by_id("TRUE_E")
+	if g14 != null and not g14.recipe.is_empty():
+		var g14_key: String = scene.dbg_ensure("clue", String(g14.recipe[0].id))
+		check("G14 识别真名配方线索", scene._has_true_name_clue([g14_key]))
+		scene._tec.append_true_clue("真名线索测试行")
+		var g14_line: Node = scene._tec._lines.get_child(scene._tec._lines.get_child_count() - 3)
+		check("G14 真名行反白 + 青色首符号",
+			g14_line is TypewriterLabel
+				and (g14_line as TypewriterLabel).get_theme_stylebox("normal") != null
+				and (g14_line as TypewriterLabel).find_child("true_clue_mark", true, false) != null)
+		check("G14 真名行有打字前停顿",
+			g14_line is TypewriterLabel and (g14_line as TypewriterLabel).pause_ms > 0.0)
+		scene._tec.finish_typing()
 
 	# G6：普通结局后，目标条要接着指路，而不是演完就静场。
 	var normal_end: EndingDef = scene.case_def.ending_by_id("END_NORMAL")

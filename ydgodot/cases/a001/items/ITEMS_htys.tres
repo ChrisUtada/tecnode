@@ -10,3 +10,7 @@ id = "ITEMS_htys"
 label = "黄铜钥匙"
 desc = "一把黄铜打造的钥匙。匙柄处刻着两个英文字母：JS。"
 can_be_picked = true
+node_items = PackedStringArray()
+node_chars = PackedStringArray()
+node_locs = PackedStringArray()
+node_clues = PackedStringArray()
