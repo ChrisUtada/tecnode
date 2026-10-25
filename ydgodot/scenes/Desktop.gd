@@ -527,8 +527,8 @@ func _process(_dt: float) -> void:
 	else:
 		_sdrag_ghost.position = _sdrag_ghost_position(at)
 		if _dbg_trace_key != "":
-			var ghost_delta := (_sdrag_ghost.global_position
-				- (at + Vector2(12, 10))).length()
+			var ghost_expect := at - _sdrag_ghost.size * 0.5
+			var ghost_delta := (_sdrag_ghost.global_position - ghost_expect).length()
 			if ghost_delta > 4.0:
 				_dbg_storage_flow("幽灵偏移 global=%s cursor=%s delta=%.1f" % [
 					_sdrag_ghost.global_position, at, ghost_delta])
@@ -607,8 +607,12 @@ func _make_drag_ghost(text: String) -> PanelContainer:
 ## 指针是屏幕/全局坐标，直接赋值会整整偏一个顶栏高度。
 func _sdrag_ghost_position(at_global: Vector2) -> Vector2:
 	if _desk == null or not is_instance_valid(_desk):
-		return at_global + Vector2(12, 10)
-	return _desk.get_global_transform().affine_inverse() * at_global + Vector2(12, 10)
+		return at_global
+	var p := _desk.get_global_transform().affine_inverse() * at_global
+	## 幽灵中心对准光标；创建前拿不到真实尺寸时退回一个小偏移。
+	if _sdrag_ghost != null and is_instance_valid(_sdrag_ghost):
+		return p - _sdrag_ghost.size * 0.5
+	return p + Vector2(12, 10)
 
 
 func _sdrag_cancel() -> void:
