@@ -54,8 +54,8 @@ func setup_card(p: Dictionary) -> void:
 	_content = VBoxContainer.new()
 	_content.name = "card_content"
 	_content.position = Vector2(14.0, 10.0)
-	_content.size = Vector2(W - 28.0, H - 20.0)
-	_content.add_theme_constant_override("separation", 4)
+	_content.size = Vector2(W - 28.0, H - 28.0)
+	_content.add_theme_constant_override("separation", 3)
 	_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_content)
 
@@ -119,7 +119,7 @@ func setup_card(p: Dictionary) -> void:
 
 	_note = TextEdit.new()
 	_note.name = "card_note"
-	_note.custom_minimum_size = Vector2(0, 80)
+	_note.custom_minimum_size = Vector2(0, 72)
 	_note.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_note.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	_note.placeholder_text = "写点笔记…"
@@ -159,19 +159,10 @@ func setup_card(p: Dictionary) -> void:
 	_action_btn.pressed.connect(func(): action_requested.emit(person_id))
 	_content.add_child(_action_btn)
 
-	_close_btn = TecTheme.button("×")
+	_close_btn = TecTheme.mini_button("×", "关闭档案卡")
 	_close_btn.name = "card_close"
-	_close_btn.tooltip_text = "关闭档案卡"
 	_close_btn.position = Vector2(W - 26.0, 6.0)
-	_close_btn.custom_minimum_size = Vector2(18, 18)
-	_close_btn.size = Vector2(18, 18)
 	_close_btn.z_index = 2
-	var close_sb := TecTheme.button_style()
-	close_sb.content_margin_left = 0
-	close_sb.content_margin_right = 0
-	close_sb.content_margin_top = 0
-	close_sb.content_margin_bottom = 0
-	_close_btn.add_theme_stylebox_override("normal", close_sb)
 	_close_btn.pressed.connect(close)
 	add_child(_close_btn)
 

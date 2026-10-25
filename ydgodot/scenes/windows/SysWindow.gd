@@ -267,40 +267,16 @@ class TitleStripes extends Control:
 
 
 func _mini_button(text: String) -> Button:
-	var b := Button.new()
-	b.focus_mode = Control.FOCUS_NONE
-	b.size = Vector2(CTRL, CTRL)
-	b.custom_minimum_size = b.size
-	var normal := TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.INK, 1)
-	normal.content_margin_left = 0
-	normal.content_margin_right = 0
-	normal.content_margin_top = 0
-	normal.content_margin_bottom = 0
-	b.add_theme_stylebox_override("normal", normal)
-	## 与全站按钮同一套语法（P4.2）：键线 1px → 悬停 2px → 按下反白。
-	## 原来常态用 `EDGE`（30% 黑），这两个小圆在标题栏上淡得像没画框。
-	b.add_theme_stylebox_override("hover", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.INK, 2))
-	b.add_theme_stylebox_override("pressed", TecTheme.flat(TecTheme.INK, TecTheme.R_BTN, TecTheme.INK, 1))
-	var glyph := TecTheme.label(text, TecTheme.FS_BODY, TecTheme.TEXT)
-	glyph.name = "glyph"
-	glyph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(glyph)
-	b.set_meta("glyph_normal", TecTheme.TEXT)
-	b.set_meta("glyph_hot", TecTheme.CARD)
-	## 只有**按下**才反白；悬停只加粗键线，字形不动。
-	b.button_down.connect(func(): _paint_mini_glyph(b, true))
-	b.button_up.connect(func(): _paint_mini_glyph(b, false))
-	return b
+	return TecTheme.mini_button(text)
 
 
+## MemCard 这类深色标题栏会把 glyph 颜色改成提亮版，再借这个方法回灌。
 func _paint_mini_glyph(b: Button, hot: bool) -> void:
 	var glyph := b.get_node_or_null("glyph") as Label
 	if glyph == null:
 		return
-	glyph.add_theme_color_override("font_color", b.get_meta("glyph_hot" if hot else "glyph_normal", TecTheme.TEXT))
+	glyph.add_theme_color_override("font_color",
+		b.get_meta("glyph_hot" if hot else "glyph_normal", TecTheme.TEXT))
 
 
 ## 拖动中悬停 = 落点：Web `.bag-win.over / .clue-win.over{outline:2px dashed var(--text);outline-offset:3px}`

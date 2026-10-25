@@ -470,6 +470,43 @@ static func header_button(text: String, primary: bool = false) -> Button:
 	return b
 
 
+## 窗口 / 档案卡右上角的最小按钮（× / –）：18×18、白底 1px 墨线、hover 2px、按下反白。
+## 统一在这里出，避免 PersonCard 这类非 SysWindow 自己拼出一颗圆药丸。
+static func mini_button(text: String, tip: String = "") -> Button:
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.tooltip_text = tip
+	b.size = Vector2(18, 18)
+	b.custom_minimum_size = b.size
+	var normal := flat(CARD, R_BTN, INK, 1)
+	for sb in [normal]:
+		sb.content_margin_left = 0
+		sb.content_margin_right = 0
+		sb.content_margin_top = 0
+		sb.content_margin_bottom = 0
+	b.add_theme_stylebox_override("normal", normal)
+	b.add_theme_stylebox_override("hover", flat(CARD, R_BTN, INK, 2))
+	b.add_theme_stylebox_override("pressed", flat(INK, R_BTN, INK, 1))
+	var glyph := label(text, FS_BODY, TEXT)
+	glyph.name = "glyph"
+	glyph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(glyph)
+	b.set_meta("glyph_normal", TEXT)
+	b.set_meta("glyph_hot", CARD)
+	b.button_down.connect(func():
+		var g := b.get_node_or_null("glyph") as Label
+		if g != null:
+			g.add_theme_color_override("font_color", b.get_meta("glyph_hot", CARD)))
+	b.button_up.connect(func():
+		var g := b.get_node_or_null("glyph") as Label
+		if g != null:
+			g.add_theme_color_override("font_color", b.get_meta("glyph_normal", TEXT)))
+	return b
+
+
 static func button(text: String) -> Button:
 	var b := Button.new()
 	b.text = text

@@ -557,6 +557,15 @@ func _test_desktop(c: CaseLoader) -> void:
 	var inv_card = scene.dbg_person_card()
 	var close_btn := inv_card.find_child("card_close", true, false) as Button if inv_card != null else null
 	check("档案卡有 × 关闭", close_btn != null)
+	check("档案卡关闭键与系统窗同款（18×18 + glyph）",
+		close_btn != null and close_btn.size.x <= 20.0 and close_btn.size.y <= 20.0
+			and close_btn.find_child("glyph", true, false) != null,
+		"null" if close_btn == null else str(close_btn.size))
+	var action_btn := inv_card.find_child("card_action", true, false) as Button if inv_card != null else null
+	check("档案卡底部按钮不贴下边缘",
+		inv_card != null and action_btn != null
+			and inv_card.get_global_rect().end.y - action_btn.get_global_rect().end.y >= 12.0,
+		"null" if action_btn == null else str(inv_card.get_global_rect().end.y - action_btn.get_global_rect().end.y))
 	if close_btn != null:
 		close_btn.pressed.emit()
 	await process_frame
