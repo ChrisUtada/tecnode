@@ -144,6 +144,10 @@ func _initialize() -> void:
 			pw_stripes.size.x <= pw_bar.size.x and pw_stripes.size.y <= pw_bar.size.y
 				and float(pw_stripes.get("line_right")) <= pw_bar.size.x,
 			"%s / bar %s" % [pw_stripes.size, pw_bar.size])
+		var pw_in := pop.find_child("pw_in", true, false) as LineEdit
+		check("密码输入数字为墨色",
+			pw_in != null and pw_in.get_theme_color("font_color").is_equal_approx(TecTheme.TEXT),
+			"null" if pw_in == null else pw_in.get_theme_color("font_color").to_html(false))
 	scene.dbg_password("item:ITEMS_jzmh", "1111")
 	await process_frame
 	check("密码错：弹窗还在", scene.get_node_or_null("desk/pw_pop") != null)

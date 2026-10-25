@@ -27,6 +27,12 @@ func setup_password(item_label: String, hint: String) -> void:
 	_input.custom_minimum_size = Vector2(96, 28)
 	_input.add_theme_font_override("font", TecTheme.font())
 	_input.add_theme_font_size_override("font_size", TecTheme.FS_TITLE)
+	## 密码数字必须是墨色：LineEdit 默认字色来自内置主题，在灰窗上会发白看不清。
+	_input.add_theme_color_override("font_color", TecTheme.TEXT)
+	_input.add_theme_color_override("font_uneditable_color", TecTheme.TEXT)
+	_input.add_theme_color_override("font_placeholder_color", TecTheme.MUTED)
+	_input.add_theme_color_override("caret_color", TecTheme.INK)
+	_input.add_theme_color_override("selection_color", Color(TecTheme.INK, 0.16))
 	_input.add_theme_stylebox_override("normal", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.EDGE_SOFT, 1))
 	_input.add_theme_stylebox_override("focus", TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.LINE, 1))
 	_input.text_submitted.connect(func(_t: String): _submit())
