@@ -3800,6 +3800,9 @@ func _spawn_card(key: String) -> NodeCard:
 		if not _shot_mode() and not _tutorial_active:
 			card.pivot_offset = card.size * 0.5
 			card.play_pop()
+			## pop 期间连线不能停在旧端点；接下来半秒逐帧重画。
+			_follow_frames = maxi(_follow_frames, 30)
+			_edges_dirty = true
 	## 新卡一上画布就重画连线；否则同帧刚建立的边要等下一次布局/交互才出现。
 	_repaint_edges()
 	return card
@@ -3970,8 +3973,10 @@ func _edge_card_shown(card: NodeCard, key: String) -> bool:
 		return false
 	if String(key) == _drag_key:
 		return true
-	return card.visible and card.modulate.a > 0.0 \
-		and graph != null and graph.visible_node(graph.node(String(key)))
+	## 入场 pop 的前 0.2s alpha 从 0 开始；不能把它误判成矩阵遮挡而跳过连线，
+	## 否则新节点出现的第一时间线是断的。
+	var shown := card.visible and graph != null and graph.visible_node(graph.node(String(key)))
+	return shown and (card.modulate.a > 0.0 or card.is_popping())
 
 
 func _repaint_edges() -> void:
@@ -6111,6 +6116,39 @@ func _place_new_cards(keys: Array) -> void:
 			card.position = p
 			card.set_lod(_view_k)
 	_repaint_edges()
+	## 只平移、不缩放：把新节点纳入当前视口，文字仍是 1x/0.95x 档。
+	_pan_to_include(fresh.keys())
+
+
+## 最小平移让这批卡片完整进入 stage（四周留 40px）。不动倍率，所以不会把标题缩成符号。
+func _pan_to_include(keys: Array) -> void:
+	if keys.is_empty() or _stage == null or not is_instance_valid(_stage):
+		return
+	var box := Rect2()
+	var has := false
+	for raw in keys:
+		var c: NodeCard = _cards.get(String(raw), null)
+		if c == null or not is_instance_valid(c) or not c.visible:
+			continue
+		var s := Rect2(_view_pos + c.position * _view_k, c.size * _view_k)
+		box = s if not has else box.merge(s)
+		has = true
+	if not has:
+		return
+	var stage := _stage.size
+	var margin := 40.0
+	var p := _view_pos
+	if box.end.x > stage.x - margin:
+		p.x -= box.end.x - (stage.x - margin)
+	if box.position.x < margin:
+		p.x += margin - box.position.x
+	if box.end.y > stage.y - margin:
+		p.y -= box.end.y - (stage.y - margin)
+	if box.position.y < margin:
+		p.y += margin - box.position.y
+	if p != _view_pos:
+		_view_pos = _clamp_view_pos(p)
+		_apply_view()
 
 
 ## 教学桌面不做力导向：三张卡是 TEC 亲手摆的教学道具，位置必须稳定可预期，

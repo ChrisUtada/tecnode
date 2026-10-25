@@ -156,6 +156,7 @@ var _last_click_ms := -100000
 var _spring: Tween = null
 ## 入场动画补间（play_pop 建的；拖动 / 聚焦改外观时不与它打架）
 var _pop: Tween = null
+var _popping := false
 
 
 class DashBorder extends Control:
@@ -815,6 +816,10 @@ func is_dragging() -> bool:
 	return _dragging
 
 
+func is_popping() -> bool:
+	return _popping
+
+
 func set_hover_state(on: bool) -> void:
 	if _hover == on:
 		return
@@ -839,6 +844,7 @@ func set_ghost(on: bool) -> void:
 	if on and _pop != null and _pop.is_valid():
 		_pop.kill()
 		_pop = null
+		_popping = false
 		scale = Vector2.ONE
 	_ghost = on
 	_apply_alpha()
@@ -858,6 +864,10 @@ func play_pop() -> void:
 	scale = Vector2.ONE * 0.4
 	modulate.a = 0.0
 	_pop = create_tween()
+	_popping = true
+	_pop.finished.connect(func():
+		_popping = false
+		_pop = null)
 	_pop.tween_property(self, "scale", Vector2.ONE * 1.12, 0.270) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_pop.tween_property(self, "scale", Vector2.ONE, 0.180) \

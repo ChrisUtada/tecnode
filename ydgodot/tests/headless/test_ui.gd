@@ -2132,7 +2132,8 @@ func _initialize() -> void:
 	# 展开容器：旧卡不整体漂移、镜头不自动缩小，新卡保持完整标题。
 	var stable_sid := ""
 	for s in scene.case_def.scenes.values():
-		if not scene.graph.explored.has(s.id) and scene.case_def.nodes_of_scene(s).size() > 0:
+		if not scene.graph.explored.has(s.id) and not scene.case_def.is_time_id(s.id) \
+				and scene.case_def.nodes_of_scene(s).size() > 0:
 			stable_sid = s.id
 			break
 	if stable_sid != "":
@@ -2171,6 +2172,18 @@ func _initialize() -> void:
 					new_titles += 1
 		check("展开容器：新卡先显示完整文字", new_cards > 0 and new_titles == new_cards,
 			"%d / %d" % [new_titles, new_cards])
+		check("展开容器：连线立即出现", scene._edge_layer.segment_count() > 0,
+			str(scene._edge_layer.segment_count()))
+		var stage_r: Rect2 = scene._stage.get_global_rect()
+		var all_visible := true
+		for key in _cards().keys():
+			if stable_before.has(String(key)):
+				continue
+			var c := _cards()[key] as NodeCard
+			if c != null and c.visible and not stage_r.encloses(c.get_global_rect()):
+				all_visible = false
+				break
+		check("展开容器：镜头平移跟随新节点", all_visible)
 		if scene._narr != null and is_instance_valid(scene._narr):
 			scene._narr.queue_free()
 			scene._narr = null
