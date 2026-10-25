@@ -859,7 +859,7 @@ func _initialize() -> void:
 		await process_frame
 		check("W6 再点卡片可重新打开详情", dw.visible)
 
-		# U2：叙事打字中详情挂起，播完 / 点击补全后整段出现。
+		# U2 收敛：叙事卡在屏上时详情完全让位；关闭叙事卡后才切到详情。
 		scene._show_narr("SCENES_garden")
 		await process_frame
 		var u2_narr: NarrCard = scene._narr
@@ -880,9 +880,25 @@ func _initialize() -> void:
 		await process_frame
 		await process_frame
 		check("W17 单击叙事卡补全", u2_narr == null or not u2_narr.is_typing())
-		check("U2 叙事播完补显示详情", dw.visible)
+		check("U2 叙事播完但未关闭：详情仍不出现", not dw.visible)
+		if u2_narr != null and is_instance_valid(u2_narr):
+			u2_narr._on_close_pressed()
+		await process_frame
+		await process_frame
+		check("U2 关闭叙事卡后补显示详情", dw.visible)
 		check("U2 补显示不二次打字", u2_para != null and not u2_para.is_typing(),
 			"null" if u2_para == null else str(u2_para.is_typing()))
+
+		# 玩家明确点另一张卡：收掉叙事卡再切详情，不能并排。
+		scene._show_narr("SCENES_garden")
+		await process_frame
+		check("U2 再次开叙事：详情重新让位", not dw.visible and scene._narr != null)
+		scene._on_card_selected(vis_card.card_key)
+		await process_frame
+		await process_frame
+		check("U2 点节点 = 收叙事、切详情",
+			scene._narr == null and dw.visible,
+			"narr=%s detail=%s" % [str(scene._narr), str(dw.visible)])
 		if scene._narr != null and is_instance_valid(scene._narr):
 			scene._narr.queue_free()
 		scene._narr = null

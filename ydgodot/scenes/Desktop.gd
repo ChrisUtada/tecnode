@@ -178,7 +178,7 @@ var _archive_win: ArchiveWin = null
 var _mem_card: MemCard = null
 var _chat_win: ChatWindow = null
 var _detail_win: DetailWin = null
-## U2：叙事打字期间挂起的详情；播完 / 点击补全 / 关闭叙事后再补显示。
+## U2：叙事卡存在期间挂起的详情；关闭叙事或明确点节点切换后才显示。
 var _pending_detail := false
 var _detail_full_once := false
 var dialogues: DialogueSystem = null
@@ -4206,16 +4206,16 @@ func _ensure_detail() -> DetailWin:
 
 
 func _refresh_detail(force := false) -> void:
-	## U2：叙事还在打字时，详情先挂起。玩家主动选别的节点（force）则先补全叙事；
-	## `_commit` 等后台刷新走非 force，只记 pending，等打字结束再补。
-	if _narr != null and is_instance_valid(_narr) and _narr.is_typing():
-		if force:
-			_narr.finish_typing()
-		else:
+	## U2 收敛：叙事卡在屏上时，详情完全让位，不并排抢阅读焦点。
+	## · 后台刷新（force=false）：只记 pending，等叙事卡关闭后再补；
+	## · 玩家明确点节点（force=true）：收掉叙事卡，再切到详情，做成「切换」而不是叠窗。
+	if _narr != null and is_instance_valid(_narr):
+		if not force:
 			_pending_detail = _selected != "" and graph != null and graph.nodes.has(_selected)
-			if _pending_detail and _detail_win != null and is_instance_valid(_detail_win):
+			if _detail_win != null and is_instance_valid(_detail_win):
 				_detail_win.hide()
 			return
+		_dismiss_narr()
 	if _detail_win == null or not is_instance_valid(_detail_win):
 		if _selected == "" or graph == null or not graph.nodes.has(_selected):
 			return
@@ -4230,6 +4230,15 @@ func _refresh_detail(force := false) -> void:
 		_detail_win.show_node(_selected, true)
 	else:
 		_detail_win.show_node(_selected)
+
+
+## 收起叙事卡但不触发「关闭后补详情」：用于玩家点节点、主动切到详情。
+func _dismiss_narr() -> void:
+	if _narr != null and is_instance_valid(_narr):
+		_narr.hide()
+		_narr.queue_free()
+	_narr = null
+	_pending_detail = false
 
 
 ## 「重看对话」：把这个人已经说过的台词整段重放进对话窗（Web `renarrTalk`）
@@ -5860,12 +5869,9 @@ func _show_narr(sid: String) -> void:
 
 
 func _on_narr_typing_finished() -> void:
-	if not _pending_detail:
-		return
-	_pending_detail = false
-	## U2：补显示时简介整段出现，不再二次打字。
-	_detail_full_once = true
-	_refresh_detail()
+	## 叙事卡还在屏上，详情继续让位。等玩家关掉叙事卡 / 明确点节点后再显示。
+	_pending_detail = _pending_detail or (_selected != "" and graph != null
+		and graph.nodes.has(_selected))
 
 
 func _on_narr_closed() -> void:
