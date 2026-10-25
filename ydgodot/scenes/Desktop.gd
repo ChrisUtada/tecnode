@@ -460,6 +460,10 @@ func _notification(what: int) -> void:
 ## 为什么不用 Control 的 drag&drop：那套只搬数据、画不了跟手的幽灵；
 ## 而画布拖动本来就是我们自己算的指针手势，两边口径要一致。
 func _process(_dt: float) -> void:
+	if _panning and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_panning = false
+		if _stage != null:
+			_stage.mouse_default_cursor_shape = Control.CURSOR_ARROW
 	if _autosave_pending and Time.get_ticks_msec() >= _autosave_due_msec:
 		_autosave()
 	## F1：分帧力导向。每帧只推进 8 轮，卡片随收敛缓慢落位，主线程不再整帧卡死。
@@ -475,8 +479,9 @@ func _process(_dt: float) -> void:
 		_dbg_trace_frames -= 1
 		var tc := _cards.get(_dbg_trace_key, null) as NodeCard
 		if tc != null:
-			var tsig := "pos=%s global=%s home=%s view=%s k=%.3f job=%s tween=%s scale=%s popping=%s stored=%s" % [
-				tc.position, tc.global_position, tc._home, _view_pos, _view_k, str(_layout_job != null),
+			var tsig := "pos=%s global=%s home=%s view=%s k=%.3f panning=%s stage=%s job=%s tween=%s scale=%s popping=%s stored=%s" % [
+				tc.position, tc.global_position, tc._home, _view_pos, _view_k, str(_panning),
+				str(_stage.size) if _stage != null else "-", str(_layout_job != null),
 				str(_move_twens.has(_dbg_trace_key)), str(tc.scale), str(tc.is_popping()),
 				str(graph != null and graph.stored.has(_dbg_trace_key))]
 			if tsig != _dbg_trace_last:
@@ -550,6 +555,11 @@ func _storage_win_of(key: String) -> Control:
 
 ## 收纳窗里按住一行（StorageWin.row_pressed）→ 开启拖拽会话
 func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void:
+	## 行拖拽开始前先结束任何残留的画布平移：否则拖行时镜头还在跟鼠标走，
+	## 看起来就是「幽灵在光标处、节点在别处」。
+	_panning = false
+	if _stage != null:
+		_stage.mouse_default_cursor_shape = Control.CURSOR_ARROW
 	_sdrag_key = key
 	_sdrag_from = from_kind
 	_sdrag_origin = at_global
@@ -3725,9 +3735,17 @@ func _on_stage_input(event: InputEvent) -> void:
 				_stage.mouse_default_cursor_shape = Control.CURSOR_ARROW
 		return
 	if event is InputEventMouseMotion and _panning:
+		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			## 松手事件被窗口吃掉时 _panning 会卡住，之后移动鼠标会像「镜头自己在飘」。
+			_panning = false
+			if _stage != null:
+				_stage.mouse_default_cursor_shape = Control.CURSOR_ARROW
+			return
 		_view_pos = _clamp_view_pos(_pan_origin
 			+ ((event as InputEventMouseMotion).position - _pan_from))
 		_view_user = true
+		if _dbg_trace_key != "":
+			_dbg_storage_flow("镜头平移 鼠标=%s view=%s" % [(event as InputEventMouseMotion).position, _view_pos])
 		_apply_view()
 
 
