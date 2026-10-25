@@ -489,25 +489,38 @@ func _process(_dt: float) -> void:
 		if at.distance_to(_sdrag_origin) < 5.0:
 			if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 				var clicked := _sdrag_key
+				_dbg_storage_flow("位移不足 5px → 单击取回 key=%s dist=%.2f" % [
+					clicked, at.distance_to(_sdrag_origin)])
 				_sdrag_cancel()
 				# 没移动就松手 = 单击这一行 = 取回（Web 的行单击口径）
 				_take_from_store(clicked, "")
 			return
 		_sdrag_started = true
+		_dbg_storage_flow("拖拽开始 key=%s origin=%s at=%s" % [_sdrag_key, _sdrag_origin, at])
 		_sdrag_ghost = _make_drag_ghost(_sdrag_label)
 	else:
 		_sdrag_ghost.position = _sdrag_ghost_position(at)
 	_update_drop_over(at)
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_dbg_storage_flow("松手 key=%s at=%s started=%s" % [_sdrag_key, at, _sdrag_started])
 		_finish_sdrag(at)
 
 
 func _take_from_store(key: String, _unused: String) -> void:
 	if key == "":
 		return
+	_dbg_storage_flow("点击 / 按钮取回 key=%s" % key)
 	var win := _storage_win_of(key)
 	if win != null:
 		(win as StorageWin)._take(key)
+
+
+## 临时诊断：收纳拖拽链路。会同时写进游戏日志和 Godot 输出面板。
+func _dbg_storage_flow(text: String) -> void:
+	var line := "DBG 收纳：" + text
+	print(line)
+	if graph != null:
+		_log(line, "sys")
 
 
 func _storage_win_of(key: String) -> Control:
@@ -525,6 +538,8 @@ func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void
 	_sdrag_origin = at_global
 	_sdrag_started = false
 	_sdrag_label = String(graph.node(key).get("label", key))
+	_dbg_storage_flow("行按下 key=%s from=%s at=%s card=%s" % [key, from_kind, at_global,
+		str((_cards.get(key, null) as NodeCard).position) if _cards.has(key) else "无卡"])
 
 
 func _make_drag_ghost(text: String) -> PanelContainer:
@@ -568,30 +583,47 @@ func _sdrag_cancel() -> void:
 ## 松手结算：另一个收纳窗 → 推演桌布 / 推演器图标 → 画布（落在松手那一点）→ 都不中：回去
 func _finish_sdrag(at: Vector2) -> void:
 	var key := _sdrag_key
+	var card0 := _cards.get(key, null) as NodeCard
+	_dbg_storage_flow("松手结算 key=%s at=%s stored=%s card=%s scale=%s popping=%s" % [
+		key, at, str(graph != null and graph.stored.has(key)) if graph != null else "no-graph",
+		str(card0.position) if card0 != null else "无卡",
+		str(card0.scale) if card0 != null else "-",
+		str(card0.is_popping()) if card0 != null else "-"])
 	_sdrag_cancel()
 	if key == "" or graph == null or not graph.stored.has(key):
+		_dbg_storage_flow("放弃：key 为空 / 已不在袋中")
 		return
 	var n := graph.node(key)
 	var before := _save.snapshot()
 	var target := _drop_target_at(at)
 	var tid := String(target.get("id", "")) if not target.is_empty() else ""
 	if tid != "":
+		_dbg_storage_flow("落点交给目标 %s" % tid)
 		_dispatch_drop(key, tid, at, "store")
+		_dbg_storage_flow("目标处理完成 stored=%s node=(%.1f,%.1f)" % [
+			str(graph.stored.has(key)), float(graph.node(key).get("x", -1.0)),
+			float(graph.node(key).get("y", -1.0))])
 		return
 	var blocked := _drop_blocker_at(at)
 	if blocked != "":
+		_dbg_storage_flow("被落点拦截：%s" % blocked)
 		_reject_drop(blocked)
 		return
 	## 落在任何窗体 / 人物档案卡上（含 TEC / 对话 / 推演标题栏）都留在原处，不穿透。
 	if _floating_window_at(at) != null or _person_card_blocks(at):
+		_dbg_storage_flow("落在窗体 / 人物卡上，留在袋中")
 		return
 	if not _stage.get_global_rect().has_point(at):
 		# 落在画布之外：东西留在原处，并给一句反馈（W23）。
+		_dbg_storage_flow("落在画布外，留在袋中")
 		_show_toast("这里放不下，已留在原处。", true)
 		return
 	var world := (at - _stage.get_global_position() - _view_pos) / maxf(_view_k, 0.01)
 	world.x = maxf(0.0, world.x)
 	world.y = maxf(0.0, world.y)
+	_dbg_storage_flow("画布落点 world=%s view=%s k=%.3f node_before=(%.1f,%.1f) card_before=%s" % [
+		world, _view_pos, _view_k, float(n.get("x", -1.0)), float(n.get("y", -1.0)),
+		str(card0.position) if card0 != null else "无卡"])
 	graph.take_back(key, world.x, world.y)
 	_apply_hidden()
 	_refresh_storage_wins()
@@ -599,6 +631,13 @@ func _finish_sdrag(at: Vector2) -> void:
 	if card != null:
 		card.position = world
 		card.set_home(world)
+		_dbg_storage_flow("放置完成 card=%s global=%s graph=(%.1f,%.1f) scale=%s popping=%s move_tween=%s" % [
+			card.position, card.global_position, float(graph.node(key).get("x", -1.0)),
+			float(graph.node(key).get("y", -1.0)), str(card.scale), str(card.is_popping()),
+			str(_move_twens.has(key))])
+	else:
+		_dbg_storage_flow("放置完成但找不到卡片：graph=(%.1f,%.1f)" % [
+			float(graph.node(key).get("x", -1.0)), float(graph.node(key).get("y", -1.0))])
 	_selected = key
 	graph.selected = key
 	_apply_focus()
@@ -4800,11 +4839,16 @@ func _toggle_storage(kind: String) -> void:
 
 ## 收纳窗取出前先拍快照（StorageWin 自己改图，Desktop 只能从信号里抢在它前面）
 func _on_storage_will_take(_key: String) -> void:
+	_dbg_storage_flow("取回写入前 key=%s node=(%.1f,%.1f)" % [
+		_key, float(graph.node(_key).get("x", -1.0)), float(graph.node(_key).get("y", -1.0))])
 	_storage_before = _save.snapshot()
 
 
 ## 从收纳窗取回：节点回到画布，并刷新两个清单窗
 func _on_storage_took(key: String) -> void:
+	_dbg_storage_flow("取回完成 key=%s node=(%.1f,%.1f) card=%s" % [
+		key, float(graph.node(key).get("x", -1.0)), float(graph.node(key).get("y", -1.0)),
+		str((_cards.get(key, null) as NodeCard).position) if _cards.has(key) else "无卡"])
 	if _cards.has(key):
 		(_cards[key] as NodeCard).visible = graph.visible_node(graph.node(key))
 	_relayout()
