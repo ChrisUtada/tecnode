@@ -477,21 +477,6 @@ func _process(_dt: float) -> void:
 			_layout_job = null
 			if _opt_reveal and not _view_user:
 				_fit_cards()
-	if _dbg_trace_frames > 0:
-		_dbg_trace_frames -= 1
-		var tc := _cards.get(_dbg_trace_key, null) as NodeCard
-		if tc != null:
-			var tsig := "pos=%s global=%s home=%s view=%s k=%.3f panning=%s stage=%s job=%s tween=%s scale=%s popping=%s stored=%s" % [
-				tc.position, tc.global_position, tc._home, _view_pos, _view_k, str(_panning),
-				str(_stage.size) if _stage != null else "-", str(_layout_job != null),
-				str(_move_twens.has(_dbg_trace_key)), str(tc.scale), str(tc.is_popping()),
-				str(graph != null and graph.stored.has(_dbg_trace_key))]
-			if tsig != _dbg_trace_last:
-				_dbg_storage_flow("跟踪 key=%s %s" % [_dbg_trace_key, tsig])
-				_dbg_trace_last = tsig
-		if _dbg_trace_frames == 0:
-			_dbg_trace_key = ""
-			_dbg_trace_last = ""
 	var edges_due := _edges_dirty
 	if _follow_frames > 0:
 		_follow_frames -= 1
@@ -506,15 +491,14 @@ func _process(_dt: float) -> void:
 	if _sdrag_key == "":
 		return
 	if _card_mirror != null and is_instance_valid(_card_mirror):
-		_dbg_storage_flow("行拖拽期间发现残留卡片镜像，强制移除")
 		_drop_card_mirror(null)
-	var at := _cursor_viewport_pos()
+	## 光标位置一律取视口坐标——事件本来就工作在这个坐标系里，混用 OS 屏幕坐标
+	## 会在窗口不在 (0,0) 时让幽灵标签偏出一个窗口位置（实测窗口在 (500,300) 时偏 (500,300)）。
+	var at := get_viewport().get_mouse_position()
 	if not _sdrag_started:
 		if at.distance_to(_sdrag_origin) < 5.0:
 			if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 				var clicked := _sdrag_key
-				_dbg_storage_flow("位移不足 5px → 单击取回 key=%s dist=%.2f" % [
-					clicked, at.distance_to(_sdrag_origin)])
 				_sdrag_cancel()
 				# 没移动就松手 = 单击这一行 = 取回（Web 的行单击口径）
 				_take_from_store(clicked, "")
@@ -523,71 +507,20 @@ func _process(_dt: float) -> void:
 		_sdrag_ghost = _make_drag_ghost(_sdrag_label)
 		if _sdrag_ghost != null:
 			_sdrag_ghost.position = _sdrag_ghost_position(at)
-		_dbg_storage_flow("拖拽开始 key=%s origin=%s at=%s ghost=%s size=%s" % [
-			_sdrag_key, _sdrag_origin, at,
-			str(_sdrag_ghost.global_position) if _sdrag_ghost != null else "无幽灵",
-			str(_sdrag_ghost.size) if _sdrag_ghost != null else "-"])
-		if _sdrag_ghost != null:
-			var gc := _sdrag_ghost.global_position + _sdrag_ghost.size * 0.5
-			_dbg_storage_flow("拖拽对齐 cursor=%s ghost_topleft=%s ghost_center=%s delta_top=%.1f" % [
-				at, _sdrag_ghost.global_position, gc,
-				(_sdrag_ghost.global_position - at).length()])
-		_dbg_storage_flow("鼠标坐标对照 os=%s win=%s viewport=%s desk=%s scale=%s window=%s" % [
-			DisplayServer.mouse_get_position(), get_window().position,
-			get_viewport().get_mouse_position(), _desk.get_global_mouse_position(),
-			str(DisplayServer.screen_get_scale()), str(get_window().size)])
-		var vp := get_viewport()
-		var st := Transform2D()
-		if vp != null and vp.has_method("get_screen_transform"):
-			st = vp.get_screen_transform()
-		var mapped := st.affine_inverse() * Vector2(DisplayServer.mouse_get_position())
-		_dbg_storage_flow("屏幕变换 st=%s os=%s mapped=%s viewport_mouse=%s" % [
-			st, DisplayServer.mouse_get_position(), mapped, vp.get_mouse_position() if vp != null else "no-vp"])
-		_dbg_storage_flow("光标映射 normal=%s corrected=%s" % [
-			_desk.get_global_mouse_position(), at])
 	else:
 		if _sdrag_ghost != null and is_instance_valid(_sdrag_ghost):
 			_sdrag_ghost.position = _sdrag_ghost_position(at)
-			var gd := (_sdrag_ghost.global_position - at).length()
-			if _dbg_trace_key != "" and gd > 4.0:
-				_dbg_storage_flow("幽灵偏移 global=%s cursor=%s delta=%.1f" % [
-					_sdrag_ghost.global_position, at, gd])
 	_update_drop_over(at)
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		_dbg_storage_flow("松手 cursor=%s key=%s started=%s" % [at, _sdrag_key, _sdrag_started])
 		_finish_sdrag(at)
 
 
 func _take_from_store(key: String, _unused: String) -> void:
 	if key == "":
 		return
-	_dbg_storage_flow("点击 / 按钮取回 key=%s" % key)
 	var win := _storage_win_of(key)
 	if win != null:
 		(win as StorageWin)._take(key)
-
-
-## 临时诊断：收纳拖拽链路。会同时写进游戏日志和 Godot 输出面板。
-func _dbg_storage_flow(text: String) -> void:
-	var line := "DBG 收纳：" + text
-	print(line)
-	if graph != null:
-		_log(line, "sys")
-
-
-## 光标在视口内的位置；优先用 OS 光标 + 视口→屏幕变换校准。
-## 独立窗口通常两者一致；嵌入运行 / 窗口缩放时可能不一致，后者会导致
-## 「Godot 鼠标坐标等于幽灵坐标，但屏幕上幽灵离真实光标很远」。
-func _cursor_viewport_pos() -> Vector2:
-	var normal := _desk.get_global_mouse_position() if _desk != null else get_viewport().get_mouse_position()
-	if DisplayServer.get_name() == "headless":
-		return normal
-	var vp := get_viewport()
-	if vp == null or not vp.has_method("get_screen_transform"):
-		return normal
-	var st: Transform2D = vp.get_screen_transform()
-	var mapped := st.affine_inverse() * Vector2(DisplayServer.mouse_get_position())
-	return mapped if mapped.distance_to(normal) > 2.0 else normal
 
 
 func _storage_win_of(key: String) -> Control:
@@ -611,15 +544,13 @@ func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void
 		_drop_card_mirror(null)
 	_drop_sdrag_card_mirror()
 	_sdrag_key = key
-	at_global = _cursor_viewport_pos()
+	## 起点以实时视口光标为准（行事件坐标在按下帧可能与拖动起始帧不同）
+	at_global = get_viewport().get_mouse_position()
 	_sdrag_from = from_kind
 	_sdrag_origin = at_global
 	_sdrag_started = false
 	_sdrag_label = String(graph.node(key).get("label", key))
 	var rc := _cards.get(key, null) as NodeCard
-	_dbg_storage_flow("行按下 key=%s from=%s at=%s card=%s visible=%s mirror=%s" % [key, from_kind,
-		at_global, str(rc.position) if rc != null else "无卡", str(rc.visible) if rc != null else "-",
-		str(_card_mirror.global_position) if _card_mirror != null and is_instance_valid(_card_mirror) else "无镜像"])
 	## 行在袋里时，真实卡片必须不可见；若历史补间/刷新把它留在了旧位置，这里强制收掉，
 	## 避免拖拽时看到「幽灵在光标处、节点却在旧坐标」。
 	if rc != null:
@@ -693,39 +624,25 @@ func _drop_sdrag_card_mirror() -> void:
 func _finish_sdrag(at: Vector2) -> void:
 	var key := _sdrag_key
 	var card0 := _cards.get(key, null) as NodeCard
-	var ghost0 := _sdrag_ghost
-	_dbg_storage_flow("松手结算 cursor=%s key=%s stored=%s card=%s visible=%s ghost=%s" % [
-		at, key, str(graph != null and graph.stored.has(key)) if graph != null else "no-graph",
-		str(card0.position) if card0 != null else "无卡",
-		str(card0.visible) if card0 != null else "-",
-		str((ghost0 as Control).global_position) if ghost0 != null and is_instance_valid(ghost0) else "无幽灵"])
 	_sdrag_cancel()
 	if key == "" or graph == null or not graph.stored.has(key):
-		_dbg_storage_flow("放弃：key 为空 / 已不在袋中")
 		return
 	var n := graph.node(key)
 	var before := _save.snapshot()
 	var target := _drop_target_at(at)
 	var tid := String(target.get("id", "")) if not target.is_empty() else ""
 	if tid != "":
-		_dbg_storage_flow("落点交给目标 %s" % tid)
 		_dispatch_drop(key, tid, at, "store")
-		_dbg_storage_flow("目标处理完成 stored=%s node=(%.1f,%.1f)" % [
-			str(graph.stored.has(key)), float(graph.node(key).get("x", -1.0)),
-			float(graph.node(key).get("y", -1.0))])
 		return
 	var blocked := _drop_blocker_at(at)
 	if blocked != "":
-		_dbg_storage_flow("被落点拦截：%s" % blocked)
 		_reject_drop(blocked)
 		return
 	## 落在任何窗体 / 人物档案卡上（含 TEC / 对话 / 推演标题栏）都留在原处，不穿透。
 	if _floating_window_at(at) != null or _person_card_blocks(at):
-		_dbg_storage_flow("落在窗体 / 人物卡上，留在袋中")
 		return
 	if not _stage.get_global_rect().has_point(at):
 		# 落在画布之外：东西留在原处，并给一句反馈（W23）。
-		_dbg_storage_flow("落在画布外，留在袋中")
 		_show_toast("这里放不下，已留在原处。", true)
 		return
 	var world := (at - _stage.get_global_position() - _view_pos) / maxf(_view_k, 0.01)
@@ -736,9 +653,6 @@ func _finish_sdrag(at: Vector2) -> void:
 	if card0 != null:
 		place.x = clampf(place.x, 0.0, maxf(0.0, WORLD_W - card0.size.x))
 		place.y = clampf(place.y, 0.0, maxf(0.0, WORLD_H - card0.size.y))
-	_dbg_storage_flow("画布落点 world=%s place=%s view=%s k=%.3f node_before=(%.1f,%.1f) card_before=%s" % [
-		world, place, _view_pos, _view_k, float(n.get("x", -1.0)), float(n.get("y", -1.0)),
-		str(card0.position) if card0 != null else "无卡"])
 	graph.take_back(key, place.x, place.y)
 	_apply_hidden()
 	_refresh_storage_wins()
@@ -746,23 +660,12 @@ func _finish_sdrag(at: Vector2) -> void:
 	if card != null:
 		card.position = place
 		card.set_home(place)
-		_dbg_storage_flow("放置完成 card=%s global=%s graph=(%.1f,%.1f) scale=%s popping=%s move_tween=%s layout_job=%s" % [
-			card.position, card.global_position, float(graph.node(key).get("x", -1.0)),
-			float(graph.node(key).get("y", -1.0)), str(card.scale), str(card.is_popping()),
-			str(_move_twens.has(key)), str(_layout_job != null)])
-	else:
-		_dbg_storage_flow("放置完成但找不到卡片：graph=(%.1f,%.1f)" % [
-			float(graph.node(key).get("x", -1.0)), float(graph.node(key).get("y", -1.0))])
 	_selected = key
 	graph.selected = key
 	_apply_focus()
 	_refresh_detail()
 	_repaint_edges()
 	_commit(before)
-	_dbg_trace_key = key
-	_dbg_trace_frames = 120
-	_dbg_trace_last = ""
-	_dbg_storage_flow("跟踪开始 key=%s（120 帧）" % key)
 
 
 
@@ -3699,9 +3602,6 @@ func _rebuild_from_graph(fit_camera := false) -> void:
 		if card != null and is_instance_valid(card):
 			card.node_data = n
 			card.visible = graph.visible_node(n)
-			if String(key) == _dbg_trace_key:
-				_dbg_storage_flow("重建写位 key=%s before=%s -> %s" % [
-					key, card.position, Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))])
 			card.position = Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
 			card.set_home_silent(card.position)
 			card.set_lod(_view_k)
@@ -3816,8 +3716,6 @@ func _on_stage_input(event: InputEvent) -> void:
 		_view_pos = _clamp_view_pos(_pan_origin
 			+ ((event as InputEventMouseMotion).position - _pan_from))
 		_view_user = true
-		if _dbg_trace_key != "":
-			_dbg_storage_flow("镜头平移 鼠标=%s view=%s" % [(event as InputEventMouseMotion).position, _view_pos])
 		_apply_view()
 
 
@@ -3972,9 +3870,6 @@ func _spawn_card(key: String) -> NodeCard:
 	card.spring_finished.connect(_on_card_spring_finished)
 	_card_layer.add_child(card)
 	_cards[key] = card
-	card.debug_event = func(text: String) -> void:
-		if _dbg_trace_key == card.card_key:
-			_dbg_storage_flow("卡片 " + text)
 	_fresh_spawns.append(key)
 	## 新卡上画布时立刻对齐当前倍率，否则缩小状态下新出现的卡会带着「完整两行」出现
 	card.set_lod(_view_k)
@@ -4024,8 +3919,6 @@ func _seed_one(key: String) -> void:
 
 
 func _on_card_selected(key: String) -> void:
-	if _dbg_trace_key != "":
-		_dbg_storage_flow("上下文：选中 %s（诊断 %s）" % [key, _dbg_trace_key])
 	_selected = key
 	graph.selected = key
 	if graph.has_unread(key):
@@ -4783,8 +4676,6 @@ func _on_card_activated(key: String) -> void:
 	var n := graph.node(key)
 	if n.is_empty():
 		return
-	if _dbg_trace_key != "":
-		_dbg_storage_flow("上下文：激活 %s（诊断 %s）" % [key, _dbg_trace_key])
 	if _tutorial_active and _tutorial_on_activate(key):
 		return
 	var id := String(n["id"])
@@ -4976,16 +4867,11 @@ func _toggle_storage(kind: String) -> void:
 
 ## 收纳窗取出前先拍快照（StorageWin 自己改图，Desktop 只能从信号里抢在它前面）
 func _on_storage_will_take(_key: String) -> void:
-	_dbg_storage_flow("取回写入前 key=%s node=(%.1f,%.1f)" % [
-		_key, float(graph.node(_key).get("x", -1.0)), float(graph.node(_key).get("y", -1.0))])
 	_storage_before = _save.snapshot()
 
 
 ## 从收纳窗取回：节点回到画布，并刷新两个清单窗
 func _on_storage_took(key: String) -> void:
-	_dbg_storage_flow("取回完成 key=%s node=(%.1f,%.1f) card=%s" % [
-		key, float(graph.node(key).get("x", -1.0)), float(graph.node(key).get("y", -1.0)),
-		str((_cards.get(key, null) as NodeCard).position) if _cards.has(key) else "无卡"])
 	if _cards.has(key):
 		(_cards[key] as NodeCard).visible = graph.visible_node(graph.node(key))
 	_relayout()
@@ -6581,9 +6467,6 @@ func _layout_signature() -> String:
 ## `force` = 用户显式要求「现在就按当前结构重排」（页眉开关）；测试伪造数据位时也用它。
 func _relayout(animated := false, force := false) -> void:
 	var sig := _layout_signature()
-	if _dbg_trace_key != "":
-		_dbg_storage_flow("重排调用 animated=%s force=%s sig_changed=%s trace=%s" % [
-			str(animated), str(force), str(sig != _layout_sig), _dbg_trace_key])
 	var new_keys := _fresh_spawns.duplicate()
 	_fresh_spawns.clear()
 	if force or sig != _layout_sig:
@@ -6693,9 +6576,6 @@ func _place_new_cards(keys: Array) -> void:
 			if clash:
 				continue
 			_kill_move(String(key))
-			if String(key) == _dbg_trace_key:
-				_dbg_storage_flow("重排落位 key=%s card_before=%s -> %s" % [
-					key, card.position, p])
 			n["x"] = p.x
 			n["y"] = p.y
 			card.set_home_silent(p)
@@ -6816,9 +6696,6 @@ func _apply_layout_job(animated: bool, progressive: bool) -> void:
 			continue
 		var before_pos: Vector2 = card.position
 		card.set_home_silent(p)
-		if String(key) == _dbg_trace_key and before_pos.distance_to(p) > 0.5:
-			_dbg_storage_flow("布局任务写位 key=%s before=%s -> %s progressive=%s animated=%s" % [
-				key, before_pos, p, str(progressive), str(animated)])
 		var fp: bool = bool(_layout_job.first_place.get(String(key), false))
 		if progressive or fp or not animated or _shot_mode() or before_pos.distance_to(p) < 2.0:
 			card.position = p
@@ -6828,15 +6705,9 @@ func _apply_layout_job(animated: bool, progressive: bool) -> void:
 
 var _move_twens: Dictionary = {}      # key -> 卡片落位补间（下一次重排前先杀）
 var _follow_frames := 0               # >0 时每帧重画连线（过渡期间连线跟着节点走）
-## 临时诊断：拖出收纳后跟踪该卡片 2 秒，记录坐标 / 镜头 / 布局任务变化。
-var _dbg_trace_key := ""
-var _dbg_trace_frames := 0
-var _dbg_trace_last := ""
 
 
 func _start_move_tween(key: String, card: NodeCard, p: Vector2) -> void:
-	if key == _dbg_trace_key:
-		_dbg_storage_flow("启动位移补间 key=%s from=%s -> %s" % [key, card.position, p])
 	_kill_move(key)
 	var tw := card.create_tween()
 	tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)

@@ -1,10 +1,11 @@
-[gd_resource type="Resource" script_class="MemoryDef" format=3]
+[gd_resource type="Resource" script_class="MemoryDef" format=3 uid="uid://bou0y648h4j8x"]
 
-[ext_resource type="Script" path="res://core/defs/MemoryDef.gd" id="1_uu671"]
-[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="2_5gunv"]
-[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_luhengs.tres" id="3_6lp7r"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0704.tres" id="4_xq1yb"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="5_3toi0"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="1_5gunv"]
+[ext_resource type="Script" uid="uid://bbrq88ixy6w57" path="res://core/defs/MemoryDef.gd" id="1_uu671"]
+[ext_resource type="Script" uid="uid://dn86qlm67oq1c" path="res://core/defs/DialogueLineDef.gd" id="2_5gunv"]
+[ext_resource type="Resource" uid="uid://clqpdkyqimoca" path="res://cases/a001/chars/CHARS_luhengs.tres" id="3_6lp7r"]
+[ext_resource type="Resource" uid="uid://dimlo8yu2en8i" path="res://cases/a001/scenes/SCENES_0704.tres" id="4_xq1yb"]
+[ext_resource type="Resource" uid="uid://ko5cevng8seb" path="res://cases/a001/scenes/SCENES_garden.tres" id="5_3toi0"]
 
 [sub_resource type="Resource" id="Resource_ejvaa"]
 script = ExtResource("2_5gunv")

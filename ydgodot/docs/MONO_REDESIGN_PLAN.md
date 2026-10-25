@@ -498,7 +498,7 @@ V4.1 验收后用户的第二批评判，两条：
 | P7.2 | 确认 `test_ui.gd:693` 的 `0.32` alpha 断言仍成立（本计划不动它） | ✅ |
 | P7.3 | 全量回归：15 个脚本 **1278 项**，期望 **0 失败**（先 `--import`） | ✅ 2026-10-23 · 1278 / 0 |
 | P7.4 | 逐阶段截图留档到 `docs/screens/`（改前 / P3 样张 / 改后） | 🟡 `docs/p2_*.png` 已刷新；未建 `docs/screens/` 目录 |
-| P7.5 | 同步 `README.md`、`docs/INTERACTION_GAP_REPORT.md`、`GODOT_PORT_PLAN.md`（三份都是 CRLF） | ⬜ |
+| P7.5 | 同步 `README.md` 与历史文档 | ➖ 已废弃（GAP 报告等历史文档已于 2026-10-25 清理） |
 | P7.6 | `paper.gdshader` / `surface.gdshader` 的引用清零（文件留作参考） | ⬜ `NodeCard` 仍引用 `surface.gdshader` |
 
 ---

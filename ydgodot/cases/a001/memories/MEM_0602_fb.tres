@@ -1,11 +1,12 @@
-[gd_resource type="Resource" script_class="MemoryDef" format=3]
+[gd_resource type="Resource" script_class="MemoryDef" format=3 uid="uid://glitr1t7mmp8"]
 
-[ext_resource type="Script" path="res://core/defs/MemoryDef.gd" id="1_t15ej"]
-[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="2_72qgq"]
-[ext_resource type="Resource" path="res://cases/a001/chars/NPC_FB.tres" id="3_ibfwm"]
-[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_JS.tres" id="4_su2qa"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="5_wocd5"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="6_qodc2"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="1_72qgq"]
+[ext_resource type="Script" uid="uid://bbrq88ixy6w57" path="res://core/defs/MemoryDef.gd" id="1_t15ej"]
+[ext_resource type="Script" uid="uid://dn86qlm67oq1c" path="res://core/defs/DialogueLineDef.gd" id="2_72qgq"]
+[ext_resource type="Resource" uid="uid://b6n03mh02lhqd" path="res://cases/a001/chars/NPC_FB.tres" id="3_ibfwm"]
+[ext_resource type="Resource" uid="uid://eywyw0ioblq2" path="res://cases/a001/chars/CHARS_JS.tres" id="4_su2qa"]
+[ext_resource type="Resource" uid="uid://bq2bg0dg2s18d" path="res://cases/a001/scenes/SCENES_0602.tres" id="5_wocd5"]
+[ext_resource type="Resource" uid="uid://ko5cevng8seb" path="res://cases/a001/scenes/SCENES_garden.tres" id="6_qodc2"]
 
 [sub_resource type="Resource" id="Resource_umqkn"]
 script = ExtResource("2_72qgq")

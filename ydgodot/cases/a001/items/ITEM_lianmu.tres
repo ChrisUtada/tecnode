@@ -39,7 +39,6 @@ script = ExtResource("4_sd5m1")
 id = "ITEM_lianmu"
 label = "黑色帘幕"
 desc = "遮住整个花园的帘幕，透不进一丝阳光。"
-baggable = false
 commands = Array[ExtResource("1_3mu1c")]([SubResource("Resource_q3d3o")])
 hidden_clue = SubResource("Resource_7xidx")
 node_items = PackedStringArray()

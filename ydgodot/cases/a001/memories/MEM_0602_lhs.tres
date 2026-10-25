@@ -1,15 +1,15 @@
-[gd_resource type="Resource" script_class="MemoryDef" format=3]
+[gd_resource type="Resource" script_class="MemoryDef" format=3 uid="uid://bk65rksktdrg8"]
 
-[ext_resource type="Script" path="res://core/defs/MemoryDef.gd" id="1_5edpk"]
-[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="2_frifx"]
-[ext_resource type="Resource" path="res://cases/a001/chars/NPC_FB.tres" id="3_fmyj2"]
-[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_luhengs.tres" id="4_wyx08"]
-[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_JS.tres" id="5_jvuy4"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="6_f6oeq"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="7_u7jh7"]
-
-[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
+[ext_resource type="Script" uid="uid://bbrq88ixy6w57" path="res://core/defs/MemoryDef.gd" id="1_5edpk"]
+[ext_resource type="Script" uid="uid://dn86qlm67oq1c" path="res://core/defs/DialogueLineDef.gd" id="2_frifx"]
+[ext_resource type="Resource" uid="uid://b6n03mh02lhqd" path="res://cases/a001/chars/NPC_FB.tres" id="3_fmyj2"]
+[ext_resource type="Resource" uid="uid://clqpdkyqimoca" path="res://cases/a001/chars/CHARS_luhengs.tres" id="4_wyx08"]
+[ext_resource type="Resource" uid="uid://eywyw0ioblq2" path="res://cases/a001/chars/CHARS_JS.tres" id="5_jvuy4"]
+[ext_resource type="Resource" uid="uid://bq2bg0dg2s18d" path="res://cases/a001/scenes/SCENES_0602.tres" id="6_f6oeq"]
+[ext_resource type="Resource" uid="uid://ko5cevng8seb" path="res://cases/a001/scenes/SCENES_garden.tres" id="7_u7jh7"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
 [ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_lhs_mem.tres" id="ev_mem"]
+
 [sub_resource type="Resource" id="Resource_024ke"]
 script = ExtResource("2_frifx")
 text = "花园里，槿杉把最后一盆标本摆回架上。傅柏举着相机，迟迟没有按下快门。"
