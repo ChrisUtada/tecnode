@@ -510,8 +510,11 @@ func _process(_dt: float) -> void:
 				_take_from_store(clicked, "")
 			return
 		_sdrag_started = true
-		_dbg_storage_flow("拖拽开始 key=%s origin=%s at=%s" % [_sdrag_key, _sdrag_origin, at])
+		_dbg_storage_flow("拖拽开始 key=%s origin=%s at=%s ghost=%s" % [_sdrag_key, _sdrag_origin, at,
+			str((_sdrag_ghost as Control).global_position) if _sdrag_ghost != null else "无幽灵"])
 		_sdrag_ghost = _make_drag_ghost(_sdrag_label)
+		_dbg_storage_flow("拖拽幽灵生成 global=%s size=%s cursor=%s" % [
+			str((_sdrag_ghost as Control).global_position), str((_sdrag_ghost as Control).size), at])
 	else:
 		_sdrag_ghost.position = _sdrag_ghost_position(at)
 	_update_drop_over(at)
@@ -552,8 +555,13 @@ func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void
 	_sdrag_origin = at_global
 	_sdrag_started = false
 	_sdrag_label = String(graph.node(key).get("label", key))
-	_dbg_storage_flow("行按下 key=%s from=%s at=%s card=%s" % [key, from_kind, at_global,
-		str((_cards.get(key, null) as NodeCard).position) if _cards.has(key) else "无卡"])
+	var rc := _cards.get(key, null) as NodeCard
+	_dbg_storage_flow("行按下 key=%s from=%s at=%s card=%s visible=%s" % [key, from_kind,
+		at_global, str(rc.position) if rc != null else "无卡", str(rc.visible) if rc != null else "-"])
+	## 行在袋里时，真实卡片必须不可见；若历史补间/刷新把它留在了旧位置，这里强制收掉，
+	## 避免拖拽时看到「幽灵在光标处、节点却在旧坐标」。
+	if rc != null:
+		rc.visible = false
 
 
 func _make_drag_ghost(text: String) -> PanelContainer:
@@ -598,11 +606,12 @@ func _sdrag_cancel() -> void:
 func _finish_sdrag(at: Vector2) -> void:
 	var key := _sdrag_key
 	var card0 := _cards.get(key, null) as NodeCard
-	_dbg_storage_flow("松手结算 key=%s at=%s stored=%s card=%s scale=%s popping=%s" % [
+	var ghost0 := _sdrag_ghost
+	_dbg_storage_flow("松手结算 key=%s at=%s stored=%s card=%s visible=%s ghost=%s" % [
 		key, at, str(graph != null and graph.stored.has(key)) if graph != null else "no-graph",
 		str(card0.position) if card0 != null else "无卡",
-		str(card0.scale) if card0 != null else "-",
-		str(card0.is_popping()) if card0 != null else "-"])
+		str(card0.visible) if card0 != null else "-",
+		str((ghost0 as Control).global_position) if ghost0 != null and is_instance_valid(ghost0) else "无幽灵"])
 	_sdrag_cancel()
 	if key == "" or graph == null or not graph.stored.has(key):
 		_dbg_storage_flow("放弃：key 为空 / 已不在袋中")
