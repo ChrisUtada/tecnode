@@ -37,6 +37,7 @@ const CertWinScript := preload("res://scenes/windows/CertWin.gd")
 const PhotoWinScript := preload("res://scenes/windows/PhotoWin.gd")
 const ConfirmWinScript := preload("res://ui/ConfirmWin.gd")
 const DropOutlineScript := preload("res://ui/DropOutline.gd")
+const PersonCardScript := preload("res://scenes/windows/PersonCard.gd")
 const TUT_OFFICE_KEY := "loc:" + TUT_OFFICE_ID
 const TUT_CERT_ITEM_KEY := "item:" + TUT_CERT_ITEM_ID
 const TUT_CERT_CLUE_KEY := "clue:" + TUT_CERT_CLUE_ID
@@ -223,6 +224,7 @@ var _garden_win: GardenWin = null
 var _garden_drop_before: Dictionary = {}
 ## 批 1（差距报告 I1 / I2 / I3）：日志窗 + 人物名册 + 四个计数角标
 var _people_win: PeopleWin = null
+var _people_card = null
 var _log_win: LogWin = null
 var _log_unread := 0
 var _infer_btn: Button = null
@@ -308,6 +310,7 @@ func _layout_root() -> void:
 	_place_music_windows()
 	_place_case_dock()
 	_place_floating_windows()
+	_place_person_card()
 	_relayout_edge_windows(vw)
 	_clamp_windows_to_desk()
 
@@ -544,8 +547,8 @@ func _finish_sdrag(at: Vector2) -> void:
 	if blocked != "":
 		_reject_drop(blocked)
 		return
-	## 落在任何窗体上（含 TEC / 对话 / 推演标题栏）都交给当前窗，不再掉回下面画布。
-	if _floating_window_at(at) != null:
+	## 落在任何窗体 / 人物档案卡上（含 TEC / 对话 / 推演标题栏）都留在原处，不穿透。
+	if _floating_window_at(at) != null or _person_card_blocks(at):
 		return
 	if not _stage.get_global_rect().has_point(at):
 		# 落在画布之外：什么都不做，东西留在原处（不吞节点）
@@ -1191,6 +1194,7 @@ const ZR_NARR := 16       # .narr-card / .bubble：回放叙事小卡
 const ZR_LOG := 21        # .log-win
 const ZR_DETAIL := 22     # .detail-win
 const ZR_DOCK := 23       # #music-dock / #case-dock / #tec-chip
+const ZR_PERSON := 27     # 人物档案卡：高于普通系统窗，低于 TEC / toast
 const ZR_ICONS := 24      # #icons：窗开着会被任何系统窗盖住（11-dialog.js:501 注释）
 const ZR_WIN := 25        # .bag/.clue/.cert/.map/.music/.goto/.infer/.garden/.people-win
 const ZR_CHAT := 26       # .chat-win / .avatar-win
@@ -2264,6 +2268,7 @@ func _close_case_transients() -> void:
 	_narr = null
 	_close_mem_card()
 	_close_chat()
+	_close_person_card()
 	if _archive_win != null and is_instance_valid(_archive_win):
 		_archive_win.queue_free()
 	_archive_win = null
@@ -2350,6 +2355,7 @@ func _new_runtime() -> void:
 	if _garden_win != null and is_instance_valid(_garden_win):
 		_garden_win.queue_free()
 	_garden_win = null
+	_close_person_card()
 	if _people_win != null and is_instance_valid(_people_win):
 		_people_win.queue_free()
 	_people_win = null
@@ -2960,6 +2966,8 @@ func _clear_case_save() -> void:
 
 
 func _refresh_chip() -> void:
+	if _people_win != null and is_instance_valid(_people_win):
+		_people_win.set_investigator(_investigator)
 	if _inv_chip == null:
 		return
 	if _investigator.is_empty():
@@ -3863,6 +3871,9 @@ func _drop_hover_allowed(target_id: String) -> bool:
 
 ## 拖动中用：命中的窗口 / 图标 / 卡片统一画一层虚线框
 func _update_drop_over(at_global: Vector2) -> void:
+	if _person_card_blocks(at_global):
+		_clear_drop_over()
+		return
 	var hit_id := ""
 	var hit_rect := Rect2()
 	var hit_inset := 0.0
@@ -3916,8 +3927,8 @@ func _handle_card_drop(key: String, at_global: Vector2) -> bool:
 	if blocked != "":
 		_reject_drop(blocked)
 		return true
-	## 任何浮动窗都拦截卡片，哪怕它不是落点：松手弹回，不再穿透去和窗体下面的卡组合。
-	if _floating_window_at(at_global) != null:
+	## 任何浮动窗 / 人物档案卡都拦截卡片，哪怕它不是落点：松手弹回，不穿透到下面。
+	if _floating_window_at(at_global) != null or _person_card_blocks(at_global):
 		return true
 	return false
 
@@ -4108,8 +4119,8 @@ func _floating_window_at(at_global: Vector2) -> SysWindow:
 
 
 func _card_key_at(at_global: Vector2) -> String:
-	## 指针落在任何浮动窗上时，窗下的卡片不可被选中 / 当作组合目标。
-	if _floating_window_at(at_global) != null:
+	## 指针落在任何浮动窗 / 人物档案卡上时，下面的卡片不可被选中 / 当作组合目标。
+	if _floating_window_at(at_global) != null or _person_card_blocks(at_global):
 		return ""
 	for i in range(_card_layer.get_child_count() - 1, -1, -1):
 		var card := _card_layer.get_child(i) as NodeCard
@@ -4339,16 +4350,19 @@ func _toggle_people() -> void:
 	if not _require_case():
 		return
 	if _people_win != null and is_instance_valid(_people_win):
+		_close_person_card()
 		_people_win.queue_free()
 		_people_win = null
 		return
 	_people_win = PeopleWin.new()
 	_people_win.name = "people_win"
-	_people_win.setup_people(graph, case_def)
+	_people_win.setup_people(graph, case_def, 324.0, 399.0, _investigator)
 	# 定位按 Web 的 right / top 算，并且跟着**实际尺寸**走（size 含 PAD 的投影余量）
 	_people_win.position = Vector2(_vw() - 328.0 - _people_win.size.x + SysWindow.PAD, 60.0)
 	_people_win.row_clicked.connect(_on_people_row)
-	_people_win.closed.connect(func(): _people_win = null)
+	_people_win.closed.connect(func():
+		_people_win = null
+		_close_person_card())
 	_desk.add_child(_people_win)
 	_place_z(_people_win, ZR_WIN)
 
@@ -4358,18 +4372,186 @@ func _refresh_people_win() -> void:
 		_people_win.refresh_people()
 
 
-## 点行（Web `refreshPeopleWin` 的 click）：常驻成员 = 打开各自的窗；
-## 遇到的人 = 叫到画布中央、选中，接着说下一句。
+## 名册点行 = 打开人物档案卡（PEOPLE_CARD_PLAN）。跳转/叫人降级为卡内「前往此人」。
 func _on_people_row(id: String) -> void:
 	if not _require_case():
 		return
-	if id == "CHARS_TEC":
+	_open_person_card(id)
+
+
+# ── 人物档案卡（PEOPLE_CARD_PLAN）────────────────────────────────────────
+
+func _person_card_blocks(at_global: Vector2) -> bool:
+	return _people_card != null and is_instance_valid(_people_card) \
+		and _people_card.visible and _people_card.get_global_rect().has_point(at_global)
+
+
+func _close_person_card() -> void:
+	if _people_card != null and is_instance_valid(_people_card):
+		_people_card.commit_note()
+		_people_card.queue_free()
+	_people_card = null
+
+
+func _open_person_card(id: String) -> void:
+	if graph == null or case_def == null:
+		return
+	var payload := _person_payload(id)
+	if payload.is_empty():
+		return
+	_close_person_card()
+	_people_card = PersonCardScript.new()
+	_people_card.setup_card(payload)
+	_people_card.closed.connect(_close_person_card)
+	_people_card.action_requested.connect(_on_person_action)
+	_people_card.note_changed.connect(_on_person_note_changed)
+	_people_card.note_committed.connect(_on_person_note_committed)
+	_desk.add_child(_people_card)
+	_place_z(_people_card, ZR_PERSON)
+	_place_person_card()
+
+
+func _place_person_card() -> void:
+	if _people_card == null or not is_instance_valid(_people_card) or _desk == null:
+		return
+	var desk_w := _desk.size.x
+	var desk_h := _desk.size.y
+	var pos := Vector2(maxf(12.0, desk_w - _people_card.size.x - 24.0), 60.0)
+	if _people_win != null and is_instance_valid(_people_win):
+		pos = Vector2(_people_win.position.x - _people_card.size.x - 12.0,
+			maxf(12.0, _people_win.position.y))
+	pos.x = clampf(pos.x, 12.0, maxf(12.0, desk_w - _people_card.size.x - 12.0))
+	pos.y = clampf(pos.y, 12.0, maxf(12.0, desk_h - _people_card.size.y - 12.0))
+	_people_card.position = pos
+
+
+func _on_person_action(id: String) -> void:
+	_close_person_card()
+	if id == GraphState.INVESTIGATOR_ID:
+		_open_cert_review()
+	elif id == "CHARS_TEC":
 		_open_tec()
-		return
-	if id == "CHARS_EXEC":
+	elif id == "CHARS_EXEC":
 		_open_matrix()
+	else:
+		_goto_char(id)
+
+
+func _on_person_note_changed(id: String, text: String) -> void:
+	if graph == null or id == "":
 		return
-	_goto_char(id)
+	if text.strip_edges() == "":
+		graph.notes.erase(id)
+	else:
+		graph.notes[id] = text
+	_queue_autosave()
+
+
+func _on_person_note_committed(id: String, text: String) -> void:
+	_on_person_note_changed(id, text)
+	_autosave()
+
+
+func _person_payload(id: String) -> Dictionary:
+	if id == GraphState.INVESTIGATOR_ID:
+		if _investigator.is_empty():
+			return {}
+		var iname := String(_investigator.get("name", "调查员"))
+		var avatar_id := String(_investigator.get("avatarId", ""))
+		return {
+			"id": id,
+			"name": iname,
+			"role": "调查员",
+			"state": "在册",
+			"photo": String(PeopleWin.AVATAR.get(avatar_id, "")),
+			"initial": iname.substr(0, 1) if iname != "" else "?",
+			"meta_lines": [
+				"编号 · " + String(_investigator.get("id", "")),
+				"入职 · " + String(_investigator.get("date", "")),
+				"首次记录 · TEC办公室",
+			],
+			"note": String(graph.notes.get(id, "")),
+			"action": "查看证件",
+		}
+
+	var ch := case_def.char_of(id)
+	var name_text := id
+	var role := ""
+	var state := "存活"
+	var relation := ""
+	var photo := ""
+	var first_scene := ""
+	if ch != null:
+		name_text = ch.name if ch.name != "" else id
+		role = ch.role if ch.role != "" else _first_sentence(ch.desc)
+		state = ch.fate if ch.fate != "" else "存活"
+		relation = ch.relation
+		photo = _person_photo(id, ch)
+		var n := graph.node(graph.key_of("char", id))
+		if not n.is_empty():
+			first_scene = String(n.get("home_scene", ""))
+		if first_scene == "" and ch.debut != null:
+			first_scene = ch.debut.id
+	elif id == "CHARS_EXEC":
+		name_text = "执行者"
+		role = "推演执行者"
+		state = "待命"
+		relation = "长按执行者推演"
+		photo = "res://assets/raw/executor-avatar.png"
+	if id == "CHARS_TEC":
+		role = "AI 助手" if role == "" else role
+		state = "在线" if state == "" else state
+		photo = "res://assets/raw/tec-avatar.png"
+	var first := ""
+	if id == "CHARS_TEC":
+		first = "T.E.C-OS"
+	elif id == "CHARS_EXEC":
+		first = "推演桌布"
+	if first_scene != "" and case_def.scene_of(first_scene) != null:
+		first = case_def.scene_title(first_scene)
+	var meta: Array = []
+	if first != "":
+		meta.append("首次记录 · " + first)
+	if relation != "":
+		meta.append("关联 · " + relation)
+	return {
+		"id": id,
+		"name": name_text,
+		"role": role,
+		"state": state,
+		"photo": photo,
+		"initial": name_text.substr(0, 1) if name_text != "" else "?",
+		"meta_lines": meta,
+		"note": String(graph.notes.get(id, "")),
+		"action": "打开对话窗" if id == "CHARS_TEC" else ("打开推演器" if id == "CHARS_EXEC" else "前往此人"),
+	}
+
+
+func _person_photo(id: String, ch: CharDef) -> String:
+	if id == "CHARS_TEC":
+		return "res://assets/raw/tec-avatar.png"
+	if id == "CHARS_EXEC":
+		return "res://assets/raw/executor-avatar.png"
+	if ch == null or String(ch.avatar).strip_edges() == "":
+		return ""
+	var raw := String(ch.avatar)
+	if raw.begins_with("res://") and ResourceLoader.exists(raw):
+		return raw
+	var base := raw.get_file()
+	for root in ["res://assets/raw/", "res://assets/images/", "res://images/"]:
+		if ResourceLoader.exists(root + base):
+			return root + base
+	return ""
+
+
+func _first_sentence(text: String) -> String:
+	var clean := case_def.strip_tags(text).strip_edges() if case_def != null else text.strip_edges()
+	if clean == "":
+		return ""
+	var idx := clean.find("。")
+	if idx > 0:
+		return clean.substr(0, idx)
+	return clean
 
 
 ## 把人物叫到画面中央（Web `gotoChar`）：没节点就补一个、在袋里就取回，然后居中 + 选中。
@@ -4400,6 +4582,11 @@ func _goto_char(id: String) -> bool:
 	if card != null:
 		_center_on(card)
 	_on_card_selected(key)
+	## S12：对话窗开着时不再误报「暂无对话文本」——把现有对话提层，等玩家看完。
+	if _chat_win != null and is_instance_valid(_chat_win):
+		_raise_to_front(_chat_win)
+		_commit(before)
+		return true
 	if _say_next_line(id):
 		return true
 	_show_toast("「%s」\n（暂无对话文本）" % label, true)
@@ -4657,8 +4844,8 @@ func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
 	if blocked != "":
 		_reject_drop(blocked)
 		return
-	## 桌布线索引拖到别的窗体（包括被推演窗盖住的 TEC）时留在桌布上，不要穿透掉落。
-	if _floating_window_at(at_global) != null:
+	## 桌布线索引拖到别的窗体 / 人物档案卡时留在桌布上，不要穿透掉落。
+	if _floating_window_at(at_global) != null or _person_card_blocks(at_global):
 		return
 	## K4：拖到画布之外（顶栏 / 桌面空白）不写回负坐标，留在桌布原处。
 	if not _stage.get_global_rect().has_point(at_global):
@@ -6331,6 +6518,7 @@ func dbg_people_win() -> PeopleWin:
 
 
 func dbg_close_people() -> void:
+	_close_person_card()
 	if _people_win != null and is_instance_valid(_people_win):
 		_people_win.queue_free()
 	_people_win = null
@@ -6338,6 +6526,36 @@ func dbg_close_people() -> void:
 
 func dbg_people_row(id: String) -> void:
 	_on_people_row(id)
+
+
+func dbg_person_card() -> Control:
+	return _people_card if _people_card != null and is_instance_valid(_people_card) else null
+
+
+func dbg_person_payload(id: String) -> Dictionary:
+	return _person_payload(id)
+
+
+func dbg_person_id() -> String:
+	return String(_people_card.person_id) if _people_card != null and is_instance_valid(_people_card) else ""
+
+
+func dbg_person_action(id: String = "") -> void:
+	var target := id
+	if target == "" and _people_card != null and is_instance_valid(_people_card):
+		target = _people_card.person_id
+	if target != "":
+		_on_person_action(target)
+
+
+func dbg_person_note(id: String, text: String) -> void:
+	_on_person_note_committed(id, text)
+	if _people_card != null and is_instance_valid(_people_card) and _people_card.person_id == id:
+		_people_card.set_note_text(text)
+
+
+func dbg_close_person_card() -> void:
+	_close_person_card()
 
 
 func dbg_open_log() -> LogWin:

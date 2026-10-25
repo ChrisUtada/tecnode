@@ -64,6 +64,7 @@ func _populate(g: GraphState) -> void:
 	g.debuted["CHARS_TEC"] = true
 	g.time = "MEM_x"
 	g.garden = {"seed": true, "plots": [{"at": 123, "hit": true}]}
+	g.notes["CHARS_zs"] = "旧笔记：朱穗在隐瞒什么。"
 
 
 # ── 1. 快照 → 恢复：字段一字不差 ───────────────────────────────────────
@@ -95,6 +96,7 @@ func _test_snapshot_roundtrip() -> void:
 		and bool(snap["debuted"]["CHARS_TEC"]))
 	check("快照：time / garden", String(snap["time"]) == "MEM_x"
 		and bool(snap["garden"]["seed"]) and int(snap["garden"]["plots"][0]["at"]) == 123)
+	check("快照：人物备注", String((snap["notes"] as Dictionary).get("CHARS_zs", "")) == "旧笔记：朱穗在隐瞒什么。")
 
 	var json_before := JSON.stringify(snap)
 	var g2 := GraphState.new(c)
@@ -119,6 +121,7 @@ func _test_snapshot_roundtrip() -> void:
 		and bool(g2.debuted.get("CHARS_TEC", false)))
 	check("恢复：time / garden", g2.time == "MEM_x" and bool(g2.garden.get("seed", false))
 		and int((g2.garden["plots"] as Array)[0]["at"]) == 123)
+	check("恢复：人物备注", String(g2.notes.get("CHARS_zs", "")) == "旧笔记：朱穗在隐瞒什么。")
 	check("恢复：快照 JSON 可重复", JSON.stringify(ss2.snapshot()) == json_before)
 
 
@@ -170,6 +173,7 @@ func _test_undo_knowledge() -> void:
 	g.node(key)["unread"] = true
 	g.card_seen["SCENES_0602"] = true
 	g.debuted["NPC_FB"] = true
+	g.notes["CHARS_luhengs"] = "旧备注"
 	var ss := SaveSystem.new(g, "a001")
 	var before := ss.snapshot()
 
@@ -179,6 +183,7 @@ func _test_undo_knowledge() -> void:
 	g.card_seen["SCENES_0704"] = true
 	g.debuted["NPC_FB"] = false
 	g.debuted["CHARS_zs"] = true
+	g.notes["CHARS_luhengs"] = "新备注：玩家刚写的"
 	g.add_node("item", "ITEMS_bd")
 	ss.push_history_snapshot(before)
 	check("S8 撤销成功", ss.undo())
@@ -193,6 +198,9 @@ func _test_undo_knowledge() -> void:
 			and bool(g.debuted.get("CHARS_zs", false)),
 		str(g.debuted))
 	check("S8 图结构仍按快照回滚", not g.has("item", "ITEMS_bd"))
+	check("S8 撤销不回滚人物备注",
+		String(g.notes.get("CHARS_luhengs", "")) == "新备注：玩家刚写的",
+		String(g.notes.get("CHARS_luhengs", "")))
 
 	# 普通读档（非撤销）不能把当前知识并进旧档。
 	var g2 := GraphState.new(c)
@@ -204,6 +212,9 @@ func _test_undo_knowledge() -> void:
 		not g2.card_seen.has("SCENES_extra") and not g2.debuted.has("CHARS_extra"),
 		str(g2.card_seen) + " / " + str(g2.debuted))
 	check("S8 读档恢复存档里的 unread", bool(g2.node(key).get("unread", false)))
+	check("S8 读档按存档恢复备注",
+		String(g2.notes.get("CHARS_luhengs", "")) == "旧备注",
+		String(g2.notes.get("CHARS_luhengs", "")))
 
 
 # ── 4. JSON / 磁盘存档往返 ──────────────────────────────────────────────
@@ -228,6 +239,9 @@ func _test_json_and_disk() -> void:
 	g.capture_clue("CLUES_mc")
 	check("存档：读盘成功", ss.load_from_disk(p))
 	check("存档：读回旧状态", not g.captured.has("CLUES_mc"))
+	check("存档：读盘恢复人物备注",
+		String(g.notes.get("CHARS_zs", "")) == "旧笔记：朱穗在隐瞒什么。",
+		String(g.notes.get("CHARS_zs", "")))
 	check("存档：读档清空撤销栈", not ss.can_undo())
 	check("存档：坏文件读失败", not ss.load_from_disk("user://test_p15_missing.save"))
 	ss.clear_save(p)

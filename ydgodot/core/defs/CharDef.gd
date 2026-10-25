@@ -6,6 +6,11 @@ extends Resource
 @export var name: String = ""
 @export_multiline var desc: String = ""
 @export var avatar: String = ""
+## 人物档案卡（PEOPLE_CARD_PLAN）：身份 / 状态 / 案件关联。
+## `fate` 留空时档案卡按「存活」显示；死者由案件数据显式写死因（如「死亡 · 吊颈」）。
+@export var role: String = ""
+@export var fate: String = ""
+@export var relation: String = ""
 @export var debut: SceneDef = null
 @export var talk_queue: Array[String] = []
 @export var scene_talks: Array[SceneTalkDef] = []

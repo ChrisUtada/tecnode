@@ -374,21 +374,40 @@ func _test_desktop(c: CaseLoader) -> void:
 		return
 	check("名册窗标题", pw.title == "人物", pw.title)
 	await process_frame
+	# 调查员入册（首位）；其余仍按 met_char_ids 顺序。
+	scene._investigator = {
+		"name": "执行者", "id": "TEC-TEST-0001", "date": "2026-10-25", "avatarId": "CHARS_EXEC",
+	}
+	pw.set_investigator(scene._investigator)
+	await process_frame
 	var rows: Array = pw.row_ids()
-	check("名册 = met_char_ids", rows == scene.graph.met_char_ids(), str(rows))
+	check("调查员在名册首位", rows.size() > 0 and rows[0] == GraphState.INVESTIGATOR_ID, str(rows))
+	check("调查员之后的顺序 = met_char_ids", rows.slice(1) == scene.graph.met_char_ids(), str(rows))
+	check("调查员行状态", pw.row_state(GraphState.INVESTIGATOR_ID) == "调查员",
+		pw.row_state(GraphState.INVESTIGATOR_ID))
 	check("常驻两人在册", rows.has("CHARS_TEC") and rows.has("CHARS_EXEC"), str(rows))
 	check("到过 7/4 ⇒ 陆珩松在册", rows.has("CHARS_luhengs"), str(rows))
 	check("K10 常驻行状态词统一", pw.row_state("CHARS_TEC") == "助手窗"
 		and pw.row_state("CHARS_EXEC") == "推演器",
 		pw.row_state("CHARS_TEC") + " / " + pw.row_state("CHARS_EXEC"))
-	# K3：再次打开名册仍是同一扇窗；点常驻行只提层，不把窗关掉。
+	# K3：再次打开名册仍是同一扇窗；点击行只开档案卡，不关名册。
 	scene._open_icon_app("people")
 	check("K3 再次打开名册不关窗", scene._people_win != null and scene._people_win.visible)
 	scene._on_people_row("CHARS_TEC")
-	scene._on_people_row("CHARS_TEC")
-	check("K3 名册点 TEC 两次仍保持打开",
-		scene._tec.visible and scene._people_win != null and scene._people_win.visible)
+	await process_frame
+	check("K3 名册点 TEC 行打开档案卡",
+		scene.dbg_person_card() != null and scene.dbg_person_id() == "CHARS_TEC")
+	check("K3 档案卡不关名册", scene._people_win != null and scene._people_win.visible)
+	check("档案卡不解锁 TEC 窗", scene._tec == null or not scene._tec.visible)
+	check("档案卡状态：TEC 在线", String(scene.dbg_person_payload("CHARS_TEC").get("state", "")) == "在线",
+		String(scene.dbg_person_payload("CHARS_TEC").get("state", "")))
+	check("档案卡动作：TEC 打开对话窗",
+		String(scene.dbg_person_payload("CHARS_TEC").get("action", "")) == "打开对话窗")
+	scene.dbg_person_action("CHARS_TEC")
+	await process_frame
+	check("卡内动作才打开 TEC 窗", scene.dbg_tec_win() != null and scene.dbg_tec_win().visible)
 	scene.dbg_tec_close()
+
 	check("状态词不带计数", not pw.row_state("CHARS_luhengs").contains("/"),
 		pw.row_state("CHARS_luhengs"))
 	var av := pw.find_child("av", true, false) as PanelContainer
@@ -415,32 +434,137 @@ func _test_desktop(c: CaseLoader) -> void:
 		tec_sb != null and tec_sb.expand_margin_left == -8.0
 			and tec_sb.expand_margin_right == -8.0, str(tec_sb))
 
-	# 点常驻行 = 打开各自的窗
-	scene.dbg_people_row("CHARS_TEC")
-	await process_frame
-	check("点 TEC 行开 TEC 窗", scene.dbg_tec_win() != null and scene.dbg_tec_win().visible)
-	scene.dbg_tec_close()
-
-	# 点普通行 = 叫到画布 + 说下一句
-	var prog0 := int(scene.graph.talk_prog.get(scene.graph.key_of("char", "CHARS_luhengs"), 0))
+	# 点普通行 = 只开档案卡；跳转/叫人降级为卡内「前往此人」。
+	var key_lhs: String = scene.graph.key_of("char", "CHARS_luhengs")
+	var prog0 := int(scene.graph.talk_prog.get(key_lhs, 0))
 	scene.dbg_people_row("CHARS_luhengs")
 	await process_frame
-	var key_lhs: String = scene.graph.key_of("char", "CHARS_luhengs")
-	check("点人一行：上画布", scene.graph.nodes.has(key_lhs))
-	check("点人一行：已选中", String(scene.dbg_state()["selected"]) == key_lhs,
+	check("普通行打开档案卡", scene.dbg_person_id() == "CHARS_luhengs", scene.dbg_person_id())
+	check("点行不再叫人上画布", not scene.graph.nodes.has(key_lhs))
+	check("点行不再推进对话", int(scene.graph.talk_prog.get(key_lhs, 0)) == prog0)
+	check("点行不开对话窗", scene.dbg_chat() == null)
+	var lhs_payload: Dictionary = scene.dbg_person_payload("CHARS_luhengs")
+	check("死者卡状态显示死因", String(lhs_payload.get("state", "")) == "死亡 · 吊颈",
+		String(lhs_payload.get("state", "")))
+	check("死者卡关联", " ".join(lhs_payload.get("meta_lines", [])).contains("本案死者"),
+		str(lhs_payload.get("meta_lines", [])))
+	var card = scene.dbg_person_card()
+	check("档案卡 260×360 量级", card != null and card.size.x >= 260.0 and card.size.y >= 360.0,
+		str(card.size) if card != null else "null")
+	check("档案卡不出桌面",
+		card != null and scene._desk.get_global_rect().encloses(card.get_global_rect()),
+		str(card.get_global_rect()) if card != null else "null")
+	var desk_old: Vector2 = scene._desk.size
+	scene._desk.size = Vector2(960.0, 508.0)
+	scene._place_person_card()
+	check("960 宽下档案卡仍不出桌面",
+		card != null and scene._desk.get_global_rect().encloses(card.get_global_rect()),
+		str(card.get_global_rect()) if card != null else "null")
+	scene._desk.size = desk_old
+	scene._place_person_card()
+
+	# 备注：写入即进 graph.notes / 快照；撤销一个无关操作不回滚。
+	var note_edit := card.find_child("card_note", true, false) as TextEdit if card != null else null
+	check("档案卡有可编辑备注区", note_edit != null and note_edit.placeholder_text != "",
+		"null" if note_edit == null else note_edit.placeholder_text)
+	if note_edit != null:
+		note_edit.text = "手写备注"
+		note_edit.text_changed.emit()
+		check("备注编辑即时写入 graph.notes",
+			String(scene.graph.notes.get("CHARS_luhengs", "")) == "手写备注",
+			String(scene.graph.notes.get("CHARS_luhengs", "")))
+		note_edit.focus_exited.emit()
+	scene.dbg_ensure("item", "ITEM_shoudiantong")
+	await process_frame
+	scene.dbg_activate("item:ITEM_shoudiantong")
+	await process_frame
+	scene.dbg_person_note("CHARS_luhengs", "他在撒谎，6月2日不在场。")
+	check("备注写入按人物 id 存档", String(scene.graph.notes.get("CHARS_luhengs", "")) == "他在撒谎，6月2日不在场。",
+		String(scene.graph.notes.get("CHARS_luhengs", "")))
+	check("备注进入快照", String((scene._save.snapshot().get("notes", {}) as Dictionary).get("CHARS_luhengs", "")) == "他在撒谎，6月2日不在场。",
+		str(scene._save.snapshot().get("notes", {})))
+	check("备注写入卡片", card != null and String(card.call("note_text")) == "他在撒谎，6月2日不在场。",
+		String(card.call("note_text")) if card != null else "null")
+	check("无关操作撤销", scene.dbg_undo())
+	await process_frame
+	check("撤销不回滚备注",
+		String(scene.graph.notes.get("CHARS_luhengs", "")) == "他在撒谎，6月2日不在场。",
+		String(scene.graph.notes.get("CHARS_luhengs", "")))
+
+	# 卡内「前往此人」= 一步恢复旧行为。
+	scene.dbg_person_action()
+	await process_frame
+	check("前往此人：上画布", scene.graph.nodes.has(key_lhs))
+	check("前往此人：已选中", String(scene.dbg_state()["selected"]) == key_lhs,
 		String(scene.dbg_state()["selected"]))
-	check("点人一行：说下一句", int(scene.graph.talk_prog.get(key_lhs, 0)) == prog0 + 1,
+	check("前往此人：说下一句", int(scene.graph.talk_prog.get(key_lhs, 0)) == prog0 + 1,
 		str(scene.graph.talk_prog.get(key_lhs, 0)))
-	check("点人一行：开对话窗", scene.dbg_chat() != null)
+	check("前往此人：开对话窗", scene.dbg_chat() != null)
 	if scene.dbg_chat() != null:
 		check("对话窗是这句台词", scene.dbg_chat_title().begins_with("独白 · ")
 			or scene.dbg_chat_title().begins_with("对话 · "), scene.dbg_chat_title())
+		# S12：对话窗开着时再从档案卡点「前往此人」，提层现有对话，不误报「暂无对话文本」。
+		scene.dbg_people_row("CHARS_luhengs")
+		await process_frame
+		var toast12: String = scene.dbg_toast_text()
+		scene.dbg_person_action()
+		await process_frame
+		check("S12 对话窗开着时前往不再误报",
+			scene.dbg_chat() != null and not scene.dbg_toast_text().contains("暂无对话文本"),
+			scene.dbg_toast_text() + " / before=" + toast12)
 		scene.dbg_chat_close()
 	await process_frame
 	pw.refresh_people()
 	await process_frame
 	check("聊过一句 ⇒ 状态变「可继续」", pw.row_state("CHARS_luhengs") == "可继续",
 		pw.row_state("CHARS_luhengs"))
+
+	# 活人状态 + 同时只开一张卡 + 调查员卡字段。
+	scene.graph.add_node("char", "CHARS_zs")
+	scene.graph.debuted["CHARS_zs"] = true
+	pw.refresh_people()
+	await process_frame
+	scene.dbg_people_row("CHARS_zs")
+	await process_frame
+	check("活人卡状态显示存活",
+		String(scene.dbg_person_payload("CHARS_zs").get("state", "")) == "存活",
+		String(scene.dbg_person_payload("CHARS_zs").get("state", "")))
+	check("同时只开一张档案卡", scene.dbg_person_id() == "CHARS_zs", scene.dbg_person_id())
+	var card_count := 0
+	for ch in scene._desk.get_children():
+		if String(ch.name).begins_with("person_card_"):
+			card_count += 1
+	check("桌面只有一张档案卡", card_count == 1, str(card_count))
+
+	scene.dbg_people_row(GraphState.INVESTIGATOR_ID)
+	await process_frame
+	var inv_payload: Dictionary = scene.dbg_person_payload(GraphState.INVESTIGATOR_ID)
+	check("调查员卡姓名取证件", String(inv_payload.get("name", "")) == "执行者",
+		String(inv_payload.get("name", "")))
+	check("调查员卡编号取证件",
+		" ".join(inv_payload.get("meta_lines", [])).contains("TEC-TEST-0001"),
+		str(inv_payload.get("meta_lines", [])))
+	check("调查员卡动作查看证件", String(inv_payload.get("action", "")) == "查看证件")
+	scene.dbg_person_note(GraphState.INVESTIGATOR_ID, "我的调查笔记")
+	check("调查员备注独立存档",
+		String(scene.graph.notes.get(GraphState.INVESTIGATOR_ID, "")) == "我的调查笔记")
+	var inv_card = scene.dbg_person_card()
+	var close_btn := inv_card.find_child("card_close", true, false) as Button if inv_card != null else null
+	check("档案卡有 × 关闭", close_btn != null)
+	if close_btn != null:
+		close_btn.pressed.emit()
+	await process_frame
+	check("档案卡 × 可关闭", scene.dbg_person_card() == null)
+
+	# 调查员卡动作 = 查看证件。
+	scene.dbg_people_row(GraphState.INVESTIGATOR_ID)
+	await process_frame
+	scene.dbg_person_action()
+	await process_frame
+	check("调查员卡动作打开证件复核", scene.dbg_cert_open())
+	if scene._cert_win != null and is_instance_valid(scene._cert_win):
+		scene._cert_win.queue_free()
+	await process_frame
 
 	scene.dbg_close_people()
 	await process_frame

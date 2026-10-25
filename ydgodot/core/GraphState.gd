@@ -39,10 +39,14 @@ var last_scene: String = ""
 ## 因果追踪（SYS_LOGS）的条目：{text, kind}，kind ∈ "" / "sys" / "warn" / "err" / "cap" / "act"。
 ## **不进快照**、不随撤销回滚 —— 对齐 Web：日志是 DOM 节点，重来 / 换案才清（17-boot.js:20）。
 var logs: Array = []
+## 人物档案卡备注：id -> 文本（玩家知识，按案件存档；撤销不回滚，读档按存档恢复）。
+var notes: Dictionary = {}
 
 ## 名册常驻成员（Web `ROSTER_PINNED`）：一进游戏就在册，不靠「已结识」判定；
-## 两者都没有画布节点，点一行 = 打开各自的窗。
+## 两者都没有画布节点，点一行 = 打开人物档案卡。
 const ROSTER_PINNED := ["CHARS_TEC", "CHARS_EXEC"]
+## 调查员（玩家自己）不是 CharDef，名册与档案卡共用这个 id 作 notes key。
+const INVESTIGATOR_ID := "INVESTIGATOR"
 const ROSTER_PINNED_TAG := {"CHARS_TEC": "助手窗", "CHARS_EXEC": "推演器"}
 const ROSTER_PINNED_NAME := {"CHARS_EXEC": "执行者"}
 const ROSTER_PINNED_DESC := {"CHARS_EXEC": "推演桌布中央的执行者，长按 2.5 秒执行推演。"}

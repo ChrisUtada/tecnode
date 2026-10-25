@@ -4,7 +4,8 @@ extends RefCounted
 ##
 ## 快照只装「玩家玩出来的运行时态」：节点（含位置 / 点亮 / 钉住 / 零件 / 收纳去向）、
 ## 边、已探索 / 已捕获 / 已试、TEC 进度、折叠、五感阵列、已达成结局、时刻与花园。
-## 玩家知识（Web 的 seenTexts / unread）与可重算的 hidden 不存。
+## 人物档案备注属于「玩家知识」，但需要跨读档保留，故单独存 notes；撤销时不回滚。
+## 可重算的 hidden 不存。
 ##
 ## 存档路径固定为 `user://tec_case_<id>.save`；撤销栈最多 60 步。
 
@@ -65,6 +66,7 @@ func snapshot() -> Dictionary:
 		"matrix": _matrix_copy(),
 		"endings": graph.endings.keys(),
 		"garden": graph.garden.duplicate(true),
+		"notes": graph.notes.duplicate(true),
 	}
 
 
@@ -177,6 +179,14 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 	elif _as_array(s.get("endings", [])).has("TRUE_E"):
 		# P2.5 老档迁移：走完真名但存档还没有 garden 字段 → 补一枚种子
 		graph.garden = {"seed": true, "plots": []}
+
+	## 人物档案卡备注：读档按存档恢复；撤销（keep_knowledge）保持当前值不覆盖。
+	if not keep_knowledge:
+		graph.notes.clear()
+		var notes_in = s.get("notes", {})
+		if notes_in is Dictionary:
+			for key in (notes_in as Dictionary).keys():
+				graph.notes[String(key)] = String((notes_in as Dictionary)[key])
 
 	var matrix_in = s.get("matrix", {})
 	if matrix_in is Dictionary:

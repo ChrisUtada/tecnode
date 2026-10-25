@@ -2,9 +2,8 @@ class_name PeopleWin
 extends SysWindow
 ## 人物名册（对齐 Web `people-win` / `ROSTER // 人物`）
 ##
-## 两种行，长得一样、动作不同（Web `12-panels.js:401-506`）：
-##   · **常驻成员**（TEC / 执行者）—— 一进游戏就在册，没有画布节点，点一行 = 打开各自的窗；
-##   · **遇到的人** —— 已结识的剧情角色，点一行 = 叫到画布中央并选中，接着说下一句。
+## 点行统一 = 打开人物档案卡（PEOPLE_CARD_PLAN），不再直接跳转 / 叫人；
+## 跳转降级为卡内「前往此人」。调查员（玩家自己）常驻首位，其后 TEC / 执行者 / 已结识角色。
 ## 左侧 48×48 小头像：有素材用像素图（TEC / 执行者复用各自窗里那张），
 ## 没有的用「首字方块」占位（2026-10-14 用户决定；24×24 在真机上认不出是谁）。
 ## 状态列只给状态词、**不给 x/y 计数**（用户要求）。
@@ -20,6 +19,7 @@ const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var graph: GraphState
 var case_def: CaseLoader
+var _investigator: Dictionary = {}
 var _list: VBoxContainer
 var _scroll: ScrollContainer
 var _list_sig := ""
@@ -27,9 +27,11 @@ var _list_sig := ""
 
 ## h 是 **body 高**（SysWindow 会再加 PAD*2）。Web `.people-win .syswin-body{max-height:356px}`，
 ## 而 body 还要扣掉标题栏 23 与上下 20 —— 所以传 399 才能得到 356 的列表区。
-func setup_people(p_graph: GraphState, p_case: CaseLoader, w: float = 324.0, h: float = 399.0) -> void:
+func setup_people(p_graph: GraphState, p_case: CaseLoader, w: float = 324.0,
+		h: float = 399.0, p_investigator: Dictionary = {}) -> void:
 	graph = p_graph
 	case_def = p_case
+	_investigator = p_investigator.duplicate(true)
 	setup("人物", w, h)
 	_scroll = ScrollContainer.new()
 	_scroll.name = "people_scroll"
@@ -46,13 +48,23 @@ func setup_people(p_graph: GraphState, p_case: CaseLoader, w: float = 324.0, h: 
 	refresh_people()
 
 
+func set_investigator(p_investigator: Dictionary) -> void:
+	_investigator = p_investigator.duplicate(true)
+	refresh_people()
+
+
 func refresh_people() -> void:
 	if _list == null:
 		return
-	var ids: Array = graph.met_char_ids() if graph != null else []
-	var sig := "v1:"
+	var ids: Array = []
+	if not _investigator.is_empty():
+		ids.append(GraphState.INVESTIGATOR_ID)
+	if graph != null:
+		ids.append_array(graph.met_char_ids())
+	var sig := "v2:" + String(_investigator.get("name", "")) + ":" \
+		+ String(_investigator.get("id", "")) + String.chr(30)
 	for id in ids:
-		var pr: Dictionary = graph.char_progress(String(id))
+		var pr: Dictionary = graph.char_progress(String(id)) if graph != null else {}
 		sig += String(id) + String.chr(31) + str(int(pr.get("prog", 0))) + "/" \
 			+ str(int(pr.get("total", 0))) + String.chr(30)
 	if sig == _list_sig:
@@ -74,23 +86,28 @@ func refresh_people() -> void:
 
 func _make_row(id: String) -> Control:
 	var pinned := GraphState.ROSTER_PINNED.has(id)
+	var investigator := id == GraphState.INVESTIGATOR_ID
 	var ch := case_def.char_of(id) if case_def != null else null
 	var nm := id
-	if pinned and GraphState.ROSTER_PINNED_NAME.has(id):
-		nm = String(GraphState.ROSTER_PINNED_NAME[id])
-	elif ch != null and ch.name != "":
-		nm = ch.name
 	var desc := ""
-	if pinned and GraphState.ROSTER_PINNED_DESC.has(id):
-		desc = String(GraphState.ROSTER_PINNED_DESC[id])
-	elif ch != null:
-		desc = case_def.strip_tags(ch.desc) if ch.desc != "" else ""
-
 	var state := ""
 	var done := false
-	if pinned:
+	if investigator:
+		nm = String(_investigator.get("name", "调查员"))
+		desc = "T.E.C-OS 调查员"
+		state = "调查员"
+		done = true
+	elif pinned:
+		if GraphState.ROSTER_PINNED_NAME.has(id):
+			nm = String(GraphState.ROSTER_PINNED_NAME[id])
+		if GraphState.ROSTER_PINNED_DESC.has(id):
+			desc = String(GraphState.ROSTER_PINNED_DESC[id])
 		state = String(GraphState.ROSTER_PINNED_TAG.get(id, ""))
 	else:
+		if ch != null and ch.name != "":
+			nm = ch.name
+		if ch != null:
+			desc = case_def.strip_tags(ch.desc) if ch.desc != "" else ""
 		var pr: Dictionary = graph.char_progress(id)
 		var prog := int(pr.get("prog", 0))
 		var total := int(pr.get("total", 0))
@@ -169,9 +186,27 @@ func _row_style(hover: bool) -> StyleBoxFlat:
 func _make_avatar(id: String, name_text: String) -> Control:
 	var frame := AvatarFrameScript.new()
 	frame.name = "av"
-	frame.setup(String(AVATAR.get(id, "")), 48.0,
+	frame.setup(_avatar_path(id), 48.0,
 		name_text.substr(0, 1) if name_text != "" else "?")
 	return frame
+
+
+func _avatar_path(id: String) -> String:
+	if id == GraphState.INVESTIGATOR_ID:
+		return String(AVATAR.get(String(_investigator.get("avatarId", "")), ""))
+	if AVATAR.has(id):
+		return String(AVATAR[id])
+	var ch := case_def.char_of(id) if case_def != null else null
+	if ch == null or String(ch.avatar).strip_edges() == "":
+		return ""
+	var raw := String(ch.avatar)
+	if raw.begins_with("res://") and ResourceLoader.exists(raw):
+		return raw
+	var base := raw.get_file()
+	for root in ["res://assets/raw/", "res://assets/images/", "res://images/"]:
+		if ResourceLoader.exists(root + base):
+			return root + base
+	return ""
 
 
 func _on_row_input(ev: InputEvent, id: String) -> void:
