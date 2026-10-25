@@ -534,6 +534,13 @@ func _process(_dt: float) -> void:
 			DisplayServer.mouse_get_position(), get_window().position,
 			get_viewport().get_mouse_position(), _desk.get_global_mouse_position(),
 			str(DisplayServer.screen_get_scale()), str(get_window().size)])
+		var vp := get_viewport()
+		var st := Transform2D()
+		if vp != null and vp.has_method("get_screen_transform"):
+			st = vp.get_screen_transform()
+		var mapped := st.affine_inverse() * Vector2(DisplayServer.mouse_get_position())
+		_dbg_storage_flow("屏幕变换 st=%s os=%s mapped=%s viewport_mouse=%s" % [
+			st, DisplayServer.mouse_get_position(), mapped, vp.get_mouse_position() if vp != null else "no-vp"])
 	else:
 		if _sdrag_ghost != null and is_instance_valid(_sdrag_ghost):
 			_sdrag_ghost.position = _sdrag_ghost_position(at)
