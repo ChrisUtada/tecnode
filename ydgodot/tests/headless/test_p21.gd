@@ -151,6 +151,17 @@ func _test_desktop() -> void:
 	scene._place_case_dock()
 	check("dock 模式无图标角标", not bool(info["badge_visible"]))
 	check("dock 卡片有内容", scene._dock_title.text != "" and scene._dock_sub.text != "")
+	var dock_glyph := scene._dock_card.find_child("case_glyph", true, false) as Label
+	var dock_glyph_box := scene._dock_card.find_child("case_glyph_box", true, false) as Control
+	check("dock 标记为「案」字 + 外框",
+		dock_glyph != null and dock_glyph.text == "案" and dock_glyph_box != null
+			and dock_glyph.get_theme_color("font_color").is_equal_approx(TecTheme.TEXT),
+		"null" if dock_glyph == null else dock_glyph.text)
+	check("dock 标记不贴边",
+		dock_glyph_box != null
+			and dock_glyph_box.get_global_rect().position.x
+				- scene._dock_card.get_global_rect().position.x >= 8.0,
+		"null" if dock_glyph_box == null else str(dock_glyph_box.get_global_rect()) + " / dock " + str(scene._dock_card.get_global_rect()))
 	# U7：案件卡片可拖，重排不吸回；未拖动松手才展开。
 	var dock_home: Vector2 = scene._dock_card.position
 	var dock_at: Vector2 = scene._dock_card.get_global_rect().get_center()

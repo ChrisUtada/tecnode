@@ -2197,6 +2197,12 @@ func _build_case_park() -> void:
 	_dock_card.tooltip_text = "案件已收起 · 拖动可挪位置 · 单击展开"
 	_normal_style = TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 1)
 	_hover_style = TecTheme.flat(TecTheme.CARD, TecTheme.R_WIN, TecTheme.INK, 2)
+	## PanelContainer 会把子节点排进 style 的内容区；边框内留 10/8px，图标才不会贴边。
+	for sb in [_normal_style, _hover_style]:
+		sb.content_margin_left = 10
+		sb.content_margin_right = 10
+		sb.content_margin_top = 8
+		sb.content_margin_bottom = 8
 	_dock_card.add_theme_stylebox_override("panel", _normal_style)
 	_dock_card.mouse_entered.connect(func():
 		_dock_card.add_theme_stylebox_override("panel", _hover_style))
@@ -2209,26 +2215,33 @@ func _build_case_park() -> void:
 
 	var row := HBoxContainer.new()
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	row.offset_left = 8
-	row.offset_top = 8
-	row.offset_right = -9
-	row.offset_bottom = -8
+	## 内边距由 PanelContainer 的 StyleBox content_margin 负责；这里填满内容区即可。
+	row.offset_left = 0
+	row.offset_top = 0
+	row.offset_right = 0
+	row.offset_bottom = 0
 	row.add_theme_constant_override("separation", 9)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_dock_card.add_child(row)
 
+	## 案卷标记和节点类型符号同语法：一个汉字 + 一圈外框，不再用「▣」这个看不出含义的小方块。
 	var glyph_box := PanelContainer.new()
+	glyph_box.name = "case_glyph_box"
 	glyph_box.custom_minimum_size = Vector2(32, 32)
 	glyph_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	glyph_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph_box.add_theme_stylebox_override("panel",
 		TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.INK, 1))
 	row.add_child(glyph_box)
-	var glyph := TecTheme.label("▣", TecTheme.FS_TITLE, TecTheme.MUTED)
+	var glyph_center := CenterContainer.new()
+	glyph_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glyph_box.add_child(glyph_center)
+	var glyph := TecTheme.label("案", TecTheme.FS_BODY, TecTheme.TEXT)
+	glyph.name = "case_glyph"
 	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	glyph_box.add_child(glyph)
+	glyph_center.add_child(glyph)
 
 	var meta := VBoxContainer.new()
 	meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
