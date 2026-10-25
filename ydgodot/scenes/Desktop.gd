@@ -515,13 +515,23 @@ func _process(_dt: float) -> void:
 				_take_from_store(clicked, "")
 			return
 		_sdrag_started = true
+		_sdrag_ghost = _make_drag_ghost(_sdrag_label)
+		## 创建当帧就贴到当前光标：否则第一次移动距离大时，幽灵会先在起点出现一帧，
+		## 看起来就是「光标在这、节点在别处」。
+		if _sdrag_ghost != null:
+			_sdrag_ghost.position = _sdrag_ghost_position(at)
 		_dbg_storage_flow("拖拽开始 key=%s origin=%s at=%s ghost=%s" % [_sdrag_key, _sdrag_origin, at,
 			str((_sdrag_ghost as Control).global_position) if _sdrag_ghost != null else "无幽灵"])
-		_sdrag_ghost = _make_drag_ghost(_sdrag_label)
 		_dbg_storage_flow("拖拽幽灵生成 global=%s size=%s cursor=%s" % [
 			str((_sdrag_ghost as Control).global_position), str((_sdrag_ghost as Control).size), at])
 	else:
 		_sdrag_ghost.position = _sdrag_ghost_position(at)
+		if _dbg_trace_key != "":
+			var ghost_delta := (_sdrag_ghost.global_position
+				- (at + Vector2(12, 10))).length()
+			if ghost_delta > 4.0:
+				_dbg_storage_flow("幽灵偏移 global=%s cursor=%s delta=%.1f" % [
+					_sdrag_ghost.global_position, at, ghost_delta])
 	_update_drop_over(at)
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_dbg_storage_flow("松手 key=%s at=%s started=%s" % [_sdrag_key, at, _sdrag_started])
