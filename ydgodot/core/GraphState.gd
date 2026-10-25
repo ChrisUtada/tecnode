@@ -43,6 +43,11 @@ var logs: Array = []
 const LOG_MAX := 200
 ## 人物档案卡备注：id -> 文本（玩家知识，按案件存档；撤销不回滚，读档按存档恢复）。
 var notes: Dictionary = {}
+## 证据主张（待核对）：person_id -> field_id -> {value, evidence_id}。进快照，撤销会回滚。
+var claims: Dictionary = {}
+## 已核准字段：person_id -> field_id -> {value, evidence_id}。
+## 玩家知识：撤销不回滚，读档按存档恢复。
+var confirmed_fields: Dictionary = {}
 
 ## 名册常驻成员（Web `ROSTER_PINNED`）：一进游戏就在册，不靠「已结识」判定；
 ## 两者都没有画布节点，点一行 = 打开人物档案卡。
@@ -130,6 +135,11 @@ func add_node(kind: String, id: String) -> Dictionary:
 		"fresh": false,       # 本次新出现（档案 / 卡片的「新」角标）
 		"unread": false,      # 玩家还没点过它
 	}
+	if kind == "evidence":
+		var ev := case_def.evidence_of(id) if case_def != null else null
+		n["tier"] = ev.tier if ev != null else "wu"
+		## 证据是玩家已经拿到的知识，不随时刻 / 折叠容器消失。
+		n["always_visible"] = true
 	nodes[key] = n
 	return n
 
@@ -601,9 +611,14 @@ func can_bag(key: String) -> bool:
 	var n := node(key)
 	if n.is_empty() or stored.has(key):
 		return false
-	## 旧版证物袋也收线索（再由 restash 搬去线索册）；非物品保持这条兼容路径。
-	if String(n.get("kind", "")) != "item":
+	var kind := String(n.get("kind", ""))
+	if kind == "evidence":
 		return true
+	## 旧版证物袋也收线索，再由 restash 搬去线索册；保留这条兼容路径。
+	if kind == "clue":
+		return true
+	if kind != "item":
+		return false
 	var it := case_def.item_of(String(n.get("id", "")))
 	return it != null and it.baggable
 
@@ -790,6 +805,97 @@ func capture_clue(cid: String, from_key: String = "") -> String:
 	return String(n["key"])
 
 
+## 证据落地（TEC / 对话 / 回忆 / 配方共用）：已存在则返回同一个 key，不重复掉落。
+func capture_evidence(eid: String, from_key: String = "", x: float = -1.0, y: float = -1.0) -> String:
+	var existing := key_of("evidence", eid)
+	if nodes.has(existing):
+		return existing
+	var n := add_node("evidence", eid)
+	if from_key != "":
+		link(from_key, String(n["key"]), "entity")
+		var src := node(from_key)
+		if String(n.get("home_scene", "")) == "":
+			n["home_scene"] = String(src.get("home_scene", ""))
+	if x >= 0.0 and y >= 0.0:
+		n["x"] = x
+		n["y"] = y
+	mark_fresh(String(n["key"]))
+	return String(n["key"])
+
+
+# ── 档案字段：主张 / 核准 ───────────────────────────────────────────────
+
+func claim_of(person_id: String, field_id: String) -> Dictionary:
+	var row = claims.get(person_id, null)
+	if row is Dictionary:
+		return (row as Dictionary).get(field_id, {})
+	return {}
+
+
+func set_claim(person_id: String, field_id: String, value: String = "", evidence_id: String = "") -> void:
+	if not claims.has(person_id):
+		claims[person_id] = {}
+	var row: Dictionary = claims[person_id]
+	var old: Dictionary = row.get(field_id, {})
+	row[field_id] = {
+		"value": value if value != "" else String(old.get("value", "")),
+		"evidence_id": evidence_id if evidence_id != "" else String(old.get("evidence_id", "")),
+	}
+
+
+func clear_claim(person_id: String, field_id: String) -> void:
+	if not claims.has(person_id):
+		return
+	(claims[person_id] as Dictionary).erase(field_id)
+	if (claims[person_id] as Dictionary).is_empty():
+		claims.erase(person_id)
+
+
+func pending_claims(person_id: String) -> Dictionary:
+	var out := {}
+	var row = claims.get(person_id, null)
+	if row is Dictionary:
+		for fid in (row as Dictionary).keys():
+			var claim = (row as Dictionary)[fid]
+			if claim is Dictionary and String((claim as Dictionary).get("evidence_id", "")) != "":
+				out[String(fid)] = (claim as Dictionary).duplicate(true)
+	return out
+
+
+func pending_claim_count(person_id: String) -> int:
+	return pending_claims(person_id).size()
+
+
+func confirmed_field_of(person_id: String, field_id: String) -> Dictionary:
+	var row = confirmed_fields.get(person_id, null)
+	if row is Dictionary:
+		return (row as Dictionary).get(field_id, {})
+	return {}
+
+
+func is_field_confirmed(person_id: String, field_id: String) -> bool:
+	return not confirmed_field_of(person_id, field_id).is_empty()
+
+
+func confirm_field(person_id: String, field_id: String, value: String, evidence_id: String) -> void:
+	if not confirmed_fields.has(person_id):
+		confirmed_fields[person_id] = {}
+	(confirmed_fields[person_id] as Dictionary)[field_id] = {
+		"value": value, "evidence_id": evidence_id,
+	}
+	clear_claim(person_id, field_id)
+
+
+func all_fields_confirmed(person_id: String) -> bool:
+	var ch := case_def.char_of(person_id) if case_def != null else null
+	if ch == null or ch.evidence_fields.is_empty():
+		return false
+	for f in ch.evidence_fields:
+		if f == null or not is_field_confirmed(person_id, f.id):
+			return false
+	return true
+
+
 ## 折叠后的隐藏重算（对齐 Web 的 recomputeHidden）：
 ##   折叠的容器住着的节点默认藏起来，但
 ##   · 钉住的（pinned）不藏；
@@ -831,6 +937,8 @@ func recompute_hidden() -> void:
 			for key in by_scene.get(scene_id, []):
 				var n: Dictionary = nodes[key]
 				if stored.has(key) or hidden.has(key) or bool(n.get("pinned", false)):
+					continue
+				if bool(n.get("always_visible", false)):
 					continue
 				if key == container_key:
 					continue

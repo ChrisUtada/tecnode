@@ -73,7 +73,7 @@ func refresh_store() -> void:
 		_rows.remove_child(c)
 		c.queue_free()
 	if list.is_empty():
-		var hint := "证物袋是空的。把物品拖到左侧「证物袋」图标或窗口上收纳；点一行可取回。"
+		var hint := "证物袋是空的。把物品或证据拖到左侧「证物袋」图标或窗口上收纳；点一行可取回。"
 		if store_kind == GraphState.LEDGER:
 			hint = "线索册是空的。把线索拖到左侧「线索册」图标或窗口上收纳；点一行可取回。"
 		var empty := TecTheme.label(hint, TecTheme.FS_BODY, TecTheme.MUTED)
@@ -133,7 +133,7 @@ func _make_row(key: String) -> Control:
 	if store_kind == GraphState.BAG:
 		var from_id := String(n.get("bag_from", ""))
 		if from_id != "":
-			var from_text := "来自 " + case_def.label_of("item", from_id)
+			var from_text := "来自 " + case_def.label_of(CaseLoader.kind_of_ref(from_id), from_id)
 			var src := TecTheme.label(from_text, TecTheme.FS_BODY, TecTheme.MUTED)
 			src.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			src.clip_text = true

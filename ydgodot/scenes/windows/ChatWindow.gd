@@ -3,6 +3,9 @@ extends SysWindow
 ## 多人对话窗（对齐 Web `.chat-win` / `11-dialog.js`）：
 ## 390 宽、右上角、逐行打字；有台词的人不在场时停下等，拖人物进来续播。
 
+## 首次完整播放结束（最后一行自然打完 / 独白整段贴出）；补全跳过或中途关闭不发射。
+signal playback_completed(id: String)
+
 const CHAR_MS := 45.0
 const BODY_PAD_X := 12.0
 const BODY_PAD_Y := 4.0
@@ -23,6 +26,9 @@ var _cur_text := ""
 var _lines_shown := 0
 ## 独白 / 反应独白：一次把全部行贴出，不要求玩家逐句点击。
 var _reveal_all := false
+## 本次播放是否被「点击补全」跳过了任意一行。跳过过 = 不算首次完整播放。
+var _skipped_any := false
+var _completed_emitted := false
 
 
 ## `p_reveal_all`：独白整段直接可见；标题可用 `p_title` 覆盖，
@@ -146,6 +152,8 @@ func _advance() -> int:
 		set_hint("把「" + case_def.label_of("char", String(res["who"])) + "」拖进对话框")
 		return 0
 	set_hint("")
+	if _rows.is_empty():
+		_emit_completion()
 	return 0
 
 
@@ -185,7 +193,11 @@ func _build_rows() -> void:
 		root.add_child(built[0] as Control)
 		root.modulate.a = 0.0
 		_line_box.add_child(root)
-		_rows.append({"root": root, "label": built[1] as TypewriterLabel, "text": text})
+		var row_no := _rows.size()
+		var lab := built[1] as TypewriterLabel
+		if lab != null:
+			lab.typing_finished.connect(_on_row_typed.bind(row_no))
+		_rows.append({"root": root, "label": lab, "text": text})
 		first = false
 
 
@@ -217,6 +229,23 @@ func _reveal_all_rows() -> void:
 		var last := _rows[_rows.size() - 1] as Dictionary
 		_cur = last["label"] as TypewriterLabel
 		_cur_text = String(last["text"])
+	## 独白整段贴出 = 完整播放；反应独白没有 drops，不影响。
+	_emit_completion()
+
+
+func _on_row_typed(row_no: int) -> void:
+	if _completed_emitted or _skipped_any:
+		return
+	if row_no == _rows.size() - 1:
+		_emit_completion()
+
+
+func _emit_completion() -> void:
+	if _completed_emitted or _skipped_any:
+		return
+	_completed_emitted = true
+	var entry_id := String(session.entry.id) if session != null and session.entry != null else ""
+	playback_completed.emit(entry_id)
 
 
 func _say_row(who_id: String, who_name: String, text: String) -> Array:
@@ -267,6 +296,8 @@ func _wrap_line(row: Control) -> Control:
 
 
 func finish_line() -> void:
+	## 玩家点一下补全 = 跳过打字；这一轮不再算「首次完整播放」。
+	_skipped_any = true
 	if _cur != null:
 		_cur.finish_typing()
 
@@ -339,6 +370,14 @@ func line_count() -> int:
 
 func is_monologue() -> bool:
 	return _reveal_all
+
+
+## 测试 / 截图：把本轮所有行调成快速打字，便于无头验证「自然打完」。
+func dbg_set_char_ms(ms: float) -> void:
+	for raw in _rows:
+		var lab := (raw as Dictionary).get("label", null) as TypewriterLabel
+		if lab != null:
+			lab.char_ms = maxf(ms, 0.01)
 
 
 func is_typing() -> bool:

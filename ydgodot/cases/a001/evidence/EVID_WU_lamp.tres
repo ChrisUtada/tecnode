@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_oxhnv"]
+
+[resource]
+script = ExtResource("1_oxhnv")
+id = "EVID_WU_lamp"
+label = "台灯"
+desc = "老式台灯，铜链被反复拉动，灯罩下有一圈焦痕。"
+source_text = "从书桌台灯中提取。"

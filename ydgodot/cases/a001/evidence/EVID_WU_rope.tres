@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_cu7is"]
+
+[resource]
+script = ExtResource("1_cu7is")
+id = "EVID_WU_rope"
+label = "粗糙的绳索"
+desc = "渗着黑红血迹的粗绳，毛刺上还挂着皮屑。"
+source_text = "从尸体旁的粗糙绳索中提取。"

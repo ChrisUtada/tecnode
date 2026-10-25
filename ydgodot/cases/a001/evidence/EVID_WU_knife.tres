@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_umk2b"]
+
+[resource]
+script = ExtResource("1_umk2b")
+id = "EVID_WU_knife"
+label = "染血的美工刀"
+desc = "刀刃与下腹伤口吻合，是一把被藏起来的凶器。"
+source_text = "从染血的美工刀中提取。"

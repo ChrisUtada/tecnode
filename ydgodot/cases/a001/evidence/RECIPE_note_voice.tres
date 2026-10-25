@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EvidenceRecipeDef" format=3]
+
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_note.tres" id="1_5qdp2"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_lhs_word.tres" id="2_3cleo"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_note_voice.tres" id="3_28jtp"]
+[ext_resource type="Script" path="res://core/defs/EvidenceRecipeDef.gd" id="4_5dvva"]
+
+[resource]
+script = ExtResource("4_5dvva")
+id = "RECIPE_note_voice"
+a = ExtResource("1_5qdp2")
+b = ExtResource("2_3cleo")
+evidence = ExtResource("3_28jtp")
+text = "笔记与证词能互相印证，但这还不能说明死因。"

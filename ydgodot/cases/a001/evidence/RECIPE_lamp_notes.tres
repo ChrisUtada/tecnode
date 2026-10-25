@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EvidenceRecipeDef" format=3]
+
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_note.tres" id="1_k4tmm"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_lamp.tres" id="2_l6a4y"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_lamp_notes.tres" id="3_3aur3"]
+[ext_resource type="Script" path="res://core/defs/EvidenceRecipeDef.gd" id="4_ao5e2"]
+
+[resource]
+script = ExtResource("4_ao5e2")
+id = "RECIPE_lamp_notes"
+a = ExtResource("1_k4tmm")
+b = ExtResource("2_l6a4y")
+evidence = ExtResource("3_3aur3")
+text = "笔记的压痕与台灯的位置对上了。"

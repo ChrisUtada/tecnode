@@ -7,6 +7,8 @@
 [ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="5_5wcn4"]
 [ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="6_upcah"]
 
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_rope.tres" id="ev_rope"]
 [sub_resource type="Resource" id="Resource_4on64"]
 script = ExtResource("5_5wcn4")
 text = "毛刺硬得如同针一般，轻易就扎破了手指。鲜血很快就被吸收了。"
@@ -23,3 +25,4 @@ node_items = PackedStringArray()
 node_chars = PackedStringArray()
 node_locs = PackedStringArray()
 node_clues = PackedStringArray()
+hidden_evidence = Array[ExtResource("evd_script")]([ExtResource("ev_rope")])

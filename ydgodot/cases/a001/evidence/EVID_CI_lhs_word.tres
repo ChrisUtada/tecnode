@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_4lpe8"]
+
+[resource]
+script = ExtResource("1_4lpe8")
+tier = "ci"
+id = "EVID_CI_lhs_word"
+label = "陆珩松的独白"
+desc = "他坚持没有人会死去，语气却像在告别。"
+source_text = "完整听完陆珩松的独白。"

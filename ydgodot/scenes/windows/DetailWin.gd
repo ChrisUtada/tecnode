@@ -223,6 +223,14 @@ func _intro_text(n: Dictionary, kind: String) -> String:
 	if kind == "clue":
 		var c := _case.clue_of(String(n["id"]))
 		return _non_empty(c.desc if c != null else "", "（无描述）")
+	if kind == "evidence":
+		var ev := _case.evidence_of(String(n["id"]))
+		if ev == null:
+			return "（无描述）"
+		var body := _non_empty(ev.desc, "（无描述）")
+		if ev.source_text.strip_edges() != "":
+			body += "\n来源：" + ev.source_text
+		return body
 	if kind == "char":
 		var mem := _mem_narr(String(n.get("id", "")), kind)
 		if mem != "":
@@ -255,6 +263,10 @@ func _status_text(n: Dictionary, kind: String) -> String:
 		var ch := _case.char_of(String(n["id"]))
 		var total := ch.talk_queue.size() if ch != null else 0
 		return "已聊完" if int(_graph.talk_prog.get(_key, 0)) >= total else "可对话"
+	if kind == "evidence":
+		var ev := _case.evidence_of(String(n["id"]))
+		var tier := String(ev.tier) if ev != null else "wu"
+		return {"wu": "物证原料", "ci": "言词证据", "zheng": "结论 · 可填入档案"}.get(tier, tier)
 	if kind != "item":
 		return ""
 	var it := _case.item_of(String(n["id"]))

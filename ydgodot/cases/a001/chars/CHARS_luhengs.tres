@@ -20,6 +20,8 @@
 [ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0704.tres" id="18_ymv3a"]
 [ext_resource type="Script" path="res://core/defs/CharDef.gd" id="19_1el3v"]
 
+[ext_resource type="Script" path="res://core/defs/EvidenceFieldDef.gd" id="efd_script"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/FIELD_lhs_cause.tres" id="ef_cause"]
 [sub_resource type="Resource" id="Resource_x3m33"]
 script = ExtResource("1_qq2g3")
 trigger_id = "CLUES_wmhj"
@@ -116,3 +118,4 @@ clue_reactions = Array[ExtResource("1_qq2g3")]([SubResource("Resource_x3m33"), S
 item_reactions = Array[ExtResource("1_qq2g3")]([SubResource("Resource_ib6wx"), SubResource("Resource_dspnl"), SubResource("Resource_58qmv"), SubResource("Resource_x2dx4")])
 hidden_clue = SubResource("Resource_xexkm")
 metadata/changed = true
+evidence_fields = Array[ExtResource("efd_script")]([ExtResource("ef_cause")])

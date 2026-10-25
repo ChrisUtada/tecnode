@@ -17,3 +17,5 @@ extends Resource
 @export var clue_reactions: Array[ReactionDef] = []
 @export var item_reactions: Array[ReactionDef] = []
 @export var hidden_clue: HiddenClueDef = null
+## 档案卡关键字段（死因 / 真名级字段等）。空 = 这个人物不参与证据字段玩法。
+@export var evidence_fields: Array[EvidenceFieldDef] = []

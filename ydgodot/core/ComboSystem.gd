@@ -76,6 +76,12 @@ func use_item(tool_key: String, target_key: String) -> Dictionary:
 		return {"ok": false, "no_tried": true,
 			"message": "这两个场景之间没有直接通路"}
 
+	# ⓪.5 证据配方：两侧都是证据卡时才查表；物/词/证只是字段，不在这里限制。
+	if String(tool["kind"]) == "evidence" and String(target["kind"]) == "evidence":
+		var recipe := case_def.evidence_recipe_for(tool_id, target_id)
+		if recipe != null:
+			return _apply_evidence_recipe(recipe, target_key)
+
 	# ① 目标自己有反应表（人物对「你手上的东西」说一句话）
 	var hit := lookup_reaction(String(target["kind"]), target_id, tool_id)
 	var owner_key := target_key
@@ -154,6 +160,34 @@ func _scan_container_reaction(container_key: String, other_id: String) -> Dictio
 			h["via"] = container_key
 			return h
 	return {}
+
+
+## 证据配方命中：只产出「证」级卡，落在目标节点右下 `(60, 60)`；不消耗原料。
+## 反复组合同一对已产出过的证据不重复建卡，避免画布堆叠同名结论。
+func _apply_evidence_recipe(recipe: EvidenceRecipeDef, target_key: String) -> Dictionary:
+	var ev := recipe.evidence
+	if ev == null or case_def.evidence_of(ev.id) == null:
+		return {"ok": false, "matched": true, "no_tried": true,
+			"message": "这条配方没有可用的证据产物"}
+	if graph.has("evidence", ev.id):
+		return {"ok": false, "matched": true, "no_tried": true,
+			"message": "「%s」已经在画布上了" % ev.label}
+	var tn := graph.node(target_key)
+	var sx := float(tn.get("x", -1.0))
+	var sy := float(tn.get("y", -1.0))
+	if sx < 0.0:
+		sx = 900.0
+	if sy < 0.0:
+		sy = 600.0
+	var key := graph.capture_evidence(ev.id, target_key, sx + 60.0, sy + 60.0)
+	return {
+		"ok": true,
+		"matched": true,
+		"evidence_recipe": true,
+		"message": recipe.text if recipe.text.strip_edges() != "" else "证据链成立。",
+		"reveal": [key],
+		"produced_evidence": ev.id,
+	}
 
 
 ## 命中后的统一落地：正文 → 提示语；正文里的 [clue:x] → 建线索节点并连给反应表主人；

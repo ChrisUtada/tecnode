@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_st8pe"]
+
+[resource]
+script = ExtResource("1_st8pe")
+tier = "zheng"
+id = "EVID_Z_lamp_notes"
+label = "台灯下的字迹"
+desc = "笔记的压痕与台灯位置对得上，说明有人在灯下反复改写。"
+source_text = "由「手写笔记」与「台灯」合成。"

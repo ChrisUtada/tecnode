@@ -75,6 +75,8 @@ func snapshot() -> Dictionary:
 		"endings": graph.endings.keys(),
 		"garden": graph.garden.duplicate(true),
 		"notes": graph.notes.duplicate(true),
+		"claims": graph.claims.duplicate(true),
+		"confirmedFields": graph.confirmed_fields.duplicate(true),
 	}
 
 
@@ -100,6 +102,7 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 	var now_card_seen := graph.card_seen.duplicate(true) if keep_knowledge else {}
 	var now_debuted := graph.debuted.duplicate(true) if keep_knowledge else {}
 	var now_unread := {}
+	var now_confirmed := graph.confirmed_fields.duplicate(true) if keep_knowledge else {}
 	if keep_knowledge:
 		for raw_key in graph.nodes.keys():
 			var k := String(raw_key)
@@ -113,6 +116,8 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 	graph.stored.clear()
 	graph.endings.clear()
 	graph.tried.clear()
+	graph.claims.clear()
+	graph.confirmed_fields.clear()
 	graph.talk_prog.clear()
 	graph.card_seen.clear()
 	graph.debuted.clear()
@@ -210,6 +215,14 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 			graph.matrix[sense] = _as_array(list).duplicate()
 	for id in _as_array(s.get("endings", [])):
 		graph.endings[String(id)] = true
+	for pid in (s.get("claims", {}) as Dictionary).keys():
+		var row = (s.get("claims", {}) as Dictionary)[pid]
+		if row is Dictionary:
+			graph.claims[String(pid)] = (row as Dictionary).duplicate(true)
+	for pid2 in (s.get("confirmedFields", {}) as Dictionary).keys():
+		var row2 = (s.get("confirmedFields", {}) as Dictionary)[pid2]
+		if row2 is Dictionary:
+			graph.confirmed_fields[String(pid2)] = (row2 as Dictionary).duplicate(true)
 
 	## S8：撤销时用**当前值**合并知识，而不是让快照覆盖；
 	## 当前值里显式 false 的条目也照样覆盖（与 Web 的 Object.assign 同口径）。
@@ -221,6 +234,12 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 		for key in now_unread.keys():
 			if graph.nodes.has(key):
 				graph.nodes[key]["unread"] = bool(now_unread[key])
+		## 已盖章字段是玩家知识：撤销能把主张与节点倒回去，但不能把章倒掉。
+		graph.confirmed_fields = now_confirmed
+	## 已盖章字段不应该再留一条待核对主张（旧档 / 撤销交叉时可能出现）。
+	for pid in graph.confirmed_fields.keys():
+		for fid in (graph.confirmed_fields[pid] as Dictionary).keys():
+			graph.clear_claim(String(pid), String(fid))
 
 	graph.recompute_hidden()
 	## 图已被替换：下一次提交必须重新建立基准，不能拿旧 JSON 判「没变」。

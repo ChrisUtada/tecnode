@@ -8,6 +8,8 @@
 [ext_resource type="Script" path="res://core/defs/DialogueDef.gd" id="6_2dsyb"]
 [ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="7_golp7"]
 
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_zs_word.tres" id="ev_zs"]
 [sub_resource type="Resource" id="Resource_fs36s"]
 script = ExtResource("7_golp7")
 text = "花园里只剩G弦的咏叹调。朱穗伏在书桌上，呼吸浅得像是随时会断。"
@@ -79,3 +81,4 @@ participants = Array[ExtResource("3_r66df")]([ExtResource("4_iw4nm"), ExtResourc
 context_when = ExtResource("1_u3w02")
 context_where = ExtResource("2_jd7nq")
 script_lines = Array[ExtResource("7_golp7")]([SubResource("Resource_fs36s"), SubResource("Resource_6kuh1"), SubResource("Resource_6lmrm"), SubResource("Resource_3lm42"), SubResource("Resource_e384v"), SubResource("Resource_wrbkv"), SubResource("Resource_6f1nv"), SubResource("Resource_gvad5"), SubResource("Resource_xyek5"), SubResource("Resource_7nbem"), SubResource("Resource_w72tr"), SubResource("Resource_dh56e")])
+drops_evidence = Array[ExtResource("evd_script")]([ExtResource("ev_zs")])

@@ -40,18 +40,23 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	check("实体数量一致（场景/物品/人物/线索/回忆/对话/结局）",
+	check("实体数量一致（场景/物品/人物/线索/证据/配方/回忆/对话/结局）",
 		c.scenes.size() == jd["scenes"].size() and c.items.size() == jd["items"].size()
 		and c.chars.size() == jd["chars"].size() and c.clues.size() == jd["clues"].size()
+		and c.evidences.size() == jd["evidences"].size()
+		and c.evidence_recipes.size() == jd["evidenceRecipes"].size()
 		and c.memories.size() == jd["memories"].size() and c.dialogues.size() == jd["dialogues"].size()
 		and c.endings.size() == jd["endings"].size(),
-		"%d/%d/%d/%d/%d/%d/%d" % [c.scenes.size(), c.items.size(), c.chars.size(), c.clues.size(),
+		"%d/%d/%d/%d/%d/%d/%d/%d/%d" % [c.scenes.size(), c.items.size(), c.chars.size(),
+			c.clues.size(), c.evidences.size(), c.evidence_recipes.size(),
 			c.memories.size(), c.dialogues.size(), c.endings.size()])
 
 	var scenes := _by_id(c.scenes)
 	var items := _by_id(c.items)
 	var chars := _by_id(c.chars)
 	var clues := _by_id(c.clues)
+	var evs := _by_id(c.evidences)
+	var recs := _by_id(c.evidence_recipes)
 	var mems := _by_id(c.memories)
 	var dlgs := _by_id(c.dialogues)
 	var ends := _by_id(c.endings)
@@ -100,6 +105,23 @@ func _initialize() -> void:
 	check("线索 %d 个逐字段一致（含五感枚举）" % jd["clues"].size(), bad == 0, "%d 个不一致" % bad)
 
 	bad = 0
+	for id in jd["evidences"]:
+		var r: EvidenceDef = evs.get(id)
+		if r == null or not _eq(_norm_evidence(r), _norm_evidence_json(jd["evidences"][id])):
+			bad += 1
+			print("     ✗ evidence ", id)
+	check("证据 %d 个逐字段一致（含 tier / sourceText）" % jd["evidences"].size(), bad == 0, "%d 个不一致" % bad)
+
+	bad = 0
+	for r in jd["evidenceRecipes"]:
+		var rec: EvidenceRecipeDef = recs.get(String(r["id"]))
+		if rec == null or not _eq(_norm_recipe(rec), _norm_recipe_json(r)):
+			bad += 1
+			print("     ✗ recipe ", r["id"])
+	check("证据配方 %d 条逐字段一致（无序对 / 产物 / 文案）" % jd["evidenceRecipes"].size(),
+		bad == 0, "%d 个不一致" % bad)
+
+	bad = 0
 	for m in jd["memories"]:
 		var r: MemoryDef = mems.get(String(m["id"]))
 		if r == null or not _eq(_norm_memory(r), _norm_memory_json(m)):
@@ -136,6 +158,8 @@ func _initialize() -> void:
 			loader.nodes_of_item(it)
 		bad_nodes = loader.unknown_nodes
 	check("画布节点清单无悬空 id", ok_load and bad_nodes.is_empty(), str(bad_nodes))
+	check("证据链可达性检查通过", ok_load and loader.evidence_issues.is_empty(),
+		str(loader.evidence_issues))
 	if ok_load:
 		var garden_nodes: Array = loader.nodes_of_scene(scenes.get("SCENES_garden"))
 		check("花园清单 6 件（正文已无标签，清单照样成立）", garden_nodes.size() == 6, str(garden_nodes.size()))
@@ -207,13 +231,58 @@ func _clue_ids(h) -> Array:
 	return out
 
 
+func _evidence_ids(list) -> Array:
+	var out := []
+	for r in list:
+		if r != null:
+			out.append(String(r.id))
+	return out
+
+
+func _norm_evidence(r: EvidenceDef) -> Dictionary:
+	return {"label": r.label, "tier": r.tier, "desc": r.desc, "sourceText": r.source_text}
+
+
+func _norm_evidence_json(d: Dictionary) -> Dictionary:
+	return {"label": String(d.get("label", "")), "tier": String(d.get("tier", "wu")),
+		"desc": String(d.get("desc", "")), "sourceText": String(d.get("sourceText", ""))}
+
+
+func _norm_recipe(r: EvidenceRecipeDef) -> Dictionary:
+	return {"id": r.id, "a": String(r.a.id) if r.a != null else "",
+		"b": String(r.b.id) if r.b != null else "",
+		"evidence": String(r.evidence.id) if r.evidence != null else "",
+		"text": r.text}
+
+
+func _norm_recipe_json(d: Dictionary) -> Dictionary:
+	return {"id": String(d.get("id", "")), "a": String(d.get("a", "")),
+		"b": String(d.get("b", "")), "evidence": String(d.get("evidence", "")),
+		"text": String(d.get("text", ""))}
+
+
+func _norm_field(f: EvidenceFieldDef) -> Dictionary:
+	return {"id": f.id, "label": f.label, "prompt": f.prompt,
+		"options": Array(f.options), "correct": f.correct,
+		"support": _evidence_ids(f.support),
+		"dropClue": String(f.drop_clue.id) if f.drop_clue != null else ""}
+
+
+func _norm_field_json(f: Dictionary) -> Dictionary:
+	return {"id": String(f.get("id", "")), "label": String(f.get("label", "")),
+		"prompt": String(f.get("prompt", "")), "options": f.get("options", []),
+		"correct": String(f.get("correct", "")), "support": f.get("support", []),
+		"dropClue": String(f.get("dropClue", ""))}
+
+
 ## 正文 / 描述**不再与 JSON 档案比对**：`.tres` 已经是唯一真相源，正文改成什么样
 ## 都在 Godot 检查器里直接编辑（JSON 只留作历史档案）。其余字段照旧逐字段对账。
 ## 节点的归属也不再由正文标签决定 —— 那件事由下面的「节点清单可解析」守着。
 func _norm_scene(r: SceneDef) -> Dictionary:
 	return {"title": r.title, "canBePicked": r.can_be_picked,
 		"hiddenText": (r.hidden_clue.text if r.hidden_clue != null else null),
-		"hiddenIds": _clue_ids(r.hidden_clue)}
+		"hiddenIds": _clue_ids(r.hidden_clue),
+		"hiddenEvidence": _evidence_ids(r.hidden_evidence)}
 
 
 func _norm_scene_json(d: Dictionary) -> Dictionary:
@@ -221,7 +290,8 @@ func _norm_scene_json(d: Dictionary) -> Dictionary:
 	return {"title": String(d.get("title", "")),
 		"canBePicked": bool(d.get("canBePicked", false)),
 		"hiddenText": (String(h.get("text", "")) if h != null else null),
-		"hiddenIds": (h.get("ids", []) if h != null else [])}
+		"hiddenIds": (h.get("ids", []) if h != null else []),
+		"hiddenEvidence": d.get("hiddenEvidence", [])}
 
 
 func _norm_item(r: ItemDef) -> Dictionary:
@@ -237,7 +307,8 @@ func _norm_item(r: ItemDef) -> Dictionary:
 		"litOn": r.lit_on_message, "litOff": r.lit_off_message, "litFail": r.lit_fail_message,
 		"commands": cmds, "excerpts": exs,
 		"hiddenText": (r.hidden_clue.text if r.hidden_clue != null else null),
-		"hiddenIds": _clue_ids(r.hidden_clue)}
+		"hiddenIds": _clue_ids(r.hidden_clue),
+		"hiddenEvidence": _evidence_ids(r.hidden_evidence)}
 
 
 func _norm_item_json(d: Dictionary) -> Dictionary:
@@ -255,7 +326,8 @@ func _norm_item_json(d: Dictionary) -> Dictionary:
 		"litFail": String(d.get("litFailMessage", "")),
 		"commands": cmds, "excerpts": exs,
 		"hiddenText": (String(h.get("text", "")) if h != null else null),
-		"hiddenIds": (h.get("ids", []) if h != null else [])}
+		"hiddenIds": (h.get("ids", []) if h != null else []),
+		"hiddenEvidence": d.get("hiddenEvidence", [])}
 
 
 func _norm_cmd(cmd: CommandDef) -> Dictionary:
@@ -362,10 +434,15 @@ func _norm_char(r: CharDef) -> Dictionary:
 	var item_re := {}
 	for rec in r.item_reactions:
 		item_re[rec.trigger_id] = rec.text
+	var fields := []
+	for f in r.evidence_fields:
+		if f != null:
+			fields.append(_norm_field(f))
 	return {"name": r.name, "desc": r.desc, "avatar": r.avatar,
 		"debut": (r.debut.id if r.debut != null else ""),
 		"talkQueue": r.talk_queue, "sceneTalks": talks,
-		"reactions": clue_re, "itemReactions": item_re}
+		"reactions": clue_re, "itemReactions": item_re,
+		"evidenceFields": fields}
 
 
 func _d(v) -> Dictionary:
@@ -388,9 +465,13 @@ func _norm_char_json(d: Dictionary) -> Dictionary:
 	var queue := []
 	for l in d.get("talkQueue", []):
 		queue.append(String(l.get("text", "")))
+	var fields := []
+	for f in d.get("evidenceFields", []):
+		fields.append(_norm_field_json(f))
 	return {"name": String(d.get("name", "")), "desc": String(d.get("desc", "")),
 		"avatar": String(d.get("avatar", "")), "debut": String(d.get("debut", "")),
-		"talkQueue": queue, "sceneTalks": talks, "reactions": clue_re, "itemReactions": item_re}
+		"talkQueue": queue, "sceneTalks": talks, "reactions": clue_re,
+		"itemReactions": item_re, "evidenceFields": fields}
 
 
 func _norm_memory(r: MemoryDef) -> Dictionary:
@@ -398,7 +479,8 @@ func _norm_memory(r: MemoryDef) -> Dictionary:
 	for l in r.script_lines:
 		lines.append({"t": l.kind, "who": (l.who.id if l.who != null else ""), "text": l.text})
 	return {"id": r.id, "when": (r.when.id if r.when != null else ""), "where": (r.where.id if r.where != null else ""),
-		"who": (r.who.id if r.who != null else ""), "title": r.title, "script": lines}
+		"who": (r.who.id if r.who != null else ""), "title": r.title, "script": lines,
+		"dropsEvidence": _evidence_ids(r.drops_evidence)}
 
 
 func _norm_memory_json(d: Dictionary) -> Dictionary:
@@ -406,7 +488,8 @@ func _norm_memory_json(d: Dictionary) -> Dictionary:
 	for l in d.get("script", []):
 		lines.append({"t": String(l.get("t", "")), "who": String(l.get("who", "")), "text": String(l.get("text", ""))})
 	return {"id": String(d.get("id", "")), "when": String(d.get("when", "")), "where": String(d.get("where", "")),
-		"who": String(d.get("who", "")), "title": String(d.get("title", "")), "script": lines}
+		"who": String(d.get("who", "")), "title": String(d.get("title", "")), "script": lines,
+		"dropsEvidence": d.get("dropsEvidence", [])}
 
 
 func _norm_dialogue(r: DialogueDef) -> Dictionary:
@@ -415,7 +498,8 @@ func _norm_dialogue(r: DialogueDef) -> Dictionary:
 		lines.append({"t": l.kind, "who": (l.who.id if l.who != null else ""), "text": l.text})
 	return {"id": r.id, "participants": _ids(r.participants),
 		"when": (r.context_when.id if r.context_when != null else ""),
-		"where": (r.context_where.id if r.context_where != null else ""), "script": lines}
+		"where": (r.context_where.id if r.context_where != null else ""), "script": lines,
+		"dropsEvidence": _evidence_ids(r.drops_evidence)}
 
 
 func _norm_dialogue_json(d: Dictionary) -> Dictionary:
@@ -423,7 +507,8 @@ func _norm_dialogue_json(d: Dictionary) -> Dictionary:
 	for l in d.get("script", []):
 		lines.append({"t": String(l.get("t", "")), "who": String(l.get("who", "")), "text": String(l.get("text", ""))})
 	return {"id": String(d.get("id", "")), "participants": d.get("participants", []),
-		"when": String(d.get("when", "")), "where": String(d.get("where", "")), "script": lines}
+		"when": String(d.get("when", "")), "where": String(d.get("where", "")), "script": lines,
+		"dropsEvidence": d.get("dropsEvidence", [])}
 
 
 func _norm_ending(r: EndingDef) -> Dictionary:

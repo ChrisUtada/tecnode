@@ -13,6 +13,8 @@
 [ext_resource type="Script" path="res://core/defs/commands/RevealCommandDef.gd" id="10_ep07k"]
 [ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="11_g3e1c"]
 
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_note.tres" id="ev_note"]
 [sub_resource type="Resource" id="Resource_5y5ds"]
 script = ExtResource("10_ep07k")
 value = "借着光翻开手写植物笔记：大丽花、洋金花、大豕草、石蒜……全是与植物有关的记录。在笔记的最下面，还压着一张A4大小的纸。"
@@ -31,3 +33,4 @@ node_items = PackedStringArray()
 node_chars = PackedStringArray()
 node_locs = PackedStringArray()
 node_clues = PackedStringArray()
+hidden_evidence = Array[ExtResource("evd_script")]([ExtResource("ev_note")])

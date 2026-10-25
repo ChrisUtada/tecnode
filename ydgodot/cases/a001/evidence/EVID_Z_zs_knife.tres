@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_gftpg"]
+
+[resource]
+script = ExtResource("1_gftpg")
+tier = "zheng"
+id = "EVID_Z_zs_knife"
+label = "朱穗的刀伤"
+desc = "朱穗的证词与凶器吻合，她确实刺伤了陆珩松。"
+source_text = "由「朱穗的证词」与「染血的美工刀」合成。"

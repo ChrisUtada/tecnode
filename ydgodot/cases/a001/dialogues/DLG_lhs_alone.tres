@@ -5,6 +5,8 @@
 [ext_resource type="Script" path="res://core/defs/DialogueDef.gd" id="3_n8vnq"]
 [ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="4_lf4dw"]
 
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_lhs_word.tres" id="ev_word"]
 [sub_resource type="Resource" id="Resource_3c823"]
 script = ExtResource("4_lf4dw")
 text = "陆珩松把录音针挪近了一点，像是怕惊动谁。"
@@ -32,3 +34,4 @@ script = ExtResource("3_n8vnq")
 id = "DLG_lhs_alone"
 participants = Array[ExtResource("1_x134g")]([ExtResource("2_3klr4")])
 script_lines = Array[ExtResource("4_lf4dw")]([SubResource("Resource_3c823"), SubResource("Resource_mig5t"), SubResource("Resource_v5xwq"), SubResource("Resource_fxea7")])
+drops_evidence = Array[ExtResource("evd_script")]([ExtResource("ev_word")])

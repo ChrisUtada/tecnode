@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_slkgo"]
+
+[resource]
+script = ExtResource("1_slkgo")
+tier = "zheng"
+id = "EVID_Z_strangled"
+label = "被掩盖的缢死"
+desc = "时间可以被改写，但绳索留下的痕迹不会说谎：真正的死因是缢死。"
+source_text = "由「伪造的时间」与「粗糙的绳索」合成。"

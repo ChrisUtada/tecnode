@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EvidenceFieldDef" format=3]
+
+[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_mc.tres" id="1_8dgv3"]
+[ext_resource type="Script" path="res://core/defs/EvidenceFieldDef.gd" id="2_vowc5"]
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="3_1s1ve"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_strangled.tres" id="4_do1x3"]
+
+[resource]
+script = ExtResource("2_vowc5")
+id = "FIELD_lhs_cause"
+label = "死因"
+prompt = "他到底是怎么死的？"
+options = PackedStringArray("窒息", "中毒", "坠落", "刺伤", "缢死")
+correct = "缢死"
+support = Array[ExtResource("3_1s1ve")]([ExtResource("4_do1x3")])
+drop_clue = ExtResource("1_8dgv3")

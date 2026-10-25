@@ -23,6 +23,8 @@ extends Resource
 @export var commands: Array[CommandDef] = []
 @export var excerpts: Array[ExcerptDef] = []
 @export var hidden_clue: HiddenClueDef = null
+## TEC 分析该物品时一并掉落的「物」级证据（与 hidden_clue 并列）。
+@export var hidden_evidence: Array[EvidenceDef] = []
 
 ## ── 画布节点 ─────────────────────────────────────────────────────────────
 ## 容器物品（书桌 / 抽屉 / 垃圾桶）展开时倒出来的东西。与场景同一套语义：

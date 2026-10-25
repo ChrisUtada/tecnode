@@ -3416,6 +3416,7 @@ func _commit(before: Dictionary) -> void:
 	_refresh_detail()
 	_refresh_crumbs()
 	_refresh_people_win()
+	_refresh_person_card_fields()
 	_refresh_log_win()
 
 
@@ -3502,6 +3503,7 @@ func _rebuild_from_graph(fit_camera := false) -> void:
 		_edge_layer.clear_ghost()
 	GardenSystem.normalize(graph, case_def)
 	_refresh_people_win()
+	_refresh_person_card_fields()
 	_refresh_log_win()
 	## S4：撤销 / 读档只重建画布，不碰音乐播放器。正在播的歌属于「玩家现场」，
 	## 不该因为撤销一个无关操作（点亮手电、收纳一件物品）被掐断。
@@ -4154,6 +4156,13 @@ func _drop_targets() -> Array:
 		## 不再让卡片从窗体缝隙漏到下面的画布节点。
 		out.append({"id": "mx-board", "rect": _matrix_win.get_global_rect(), "inset": 10.0,
 			"depth": _target_depth(_matrix_win)})
+	if _people_card != null and is_instance_valid(_people_card) and _people_card.visible:
+		for ft in _people_card.evidence_drop_targets():
+			out.append({
+				"id": "person-field:%s:%s" % [String(_people_card.person_id), String(ft["id"])],
+				"rect": ft["rect"], "inset": 0.0,
+				"depth": _target_depth(_people_card),
+			})
 	## 落点优先级跟随真实层序：后提上来的窗（含推演窗）先命中。
 	## 固定顺序会让下面的 TEC 抢走上面推演窗的拖放，看起来就是「功能穿透」。
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -4258,11 +4267,13 @@ func _drop_hover_allowed(target_id: String) -> bool:
 	if n.is_empty():
 		return true
 	var kind := String(n["kind"])
+	if target_id.begins_with("person-field:"):
+		return kind == "evidence"
 	match target_id:
 		"tec-dock", "tec-avatar", "tec-chip", "chat-win":
 			return false
 		"bag-win", "bag-dock":
-			return kind == "item"
+			return kind == "item" or kind == "evidence"
 		"clue-win", "clue-icon", "infer-icon", "mx-board":
 			return kind == "clue"
 	return true
@@ -4380,6 +4391,12 @@ func _dispatch_drop(key: String, target_id: String, _at_global: Vector2, source:
 		return true
 	var kind := String(n["kind"])
 	var label := String(n.get("label", key))
+	if target_id.begins_with("person-field:"):
+		var parts := target_id.split(":")
+		if parts.size() >= 3:
+			_assign_evidence_to_field(String(parts[1]), String(parts[2]), key, source)
+		return true
+	var tier := String(n.get("tier", ""))
 	match target_id:
 		"bag-win", "bag-dock":
 			if source == "canvas":
@@ -4387,23 +4404,31 @@ func _dispatch_drop(key: String, target_id: String, _at_global: Vector2, source:
 			else:
 				_restash_to(key, GraphState.BAG, label)
 		"clue-win", "clue-icon":
-			if source == "canvas":
+			if kind == "evidence":
+				_reject_drop("「%s」是证据，不归线索册——它属于证物袋。" % label)
+			elif source == "canvas":
 				_store_into(GraphState.LEDGER, key)
 			else:
 				_restash_to(key, GraphState.LEDGER, label)
 		"tec-dock", "tec-avatar", "tec-chip":
-			if source == "canvas":
+			if kind == "evidence":
+				_reject_drop(_evidence_tec_message(tier))
+			elif source == "canvas":
 				_start_tec_analysis(key)
 			else:
 				_reject_drop("先从%s把「%s」取回画布，再拖给 TEC 分析。" % [_source_name(source), label])
 		"infer-icon", "mx-board":
-			if kind != "clue":
+			if kind == "evidence":
+				_reject_drop("推演桌布只接五感线索；证据属于证物袋。")
+			elif kind != "clue":
 				if not _tutorial_correct("推演桌布只收线索。"):
 					_reject_drop("只有线索能放到推演桌布。")
 			elif source != "matrix":
 				_assign_to_matrix(key)
 		"chat-win":
-			if source == "canvas":
+			if kind == "evidence":
+				_reject_drop("证据不是人物，不能加入这段对话。")
+			elif source == "canvas":
 				_chat_drop(key)
 			else:
 				_reject_drop("对话窗只接画布上的节点；先从%s取回。" % _source_name(source))
@@ -4425,8 +4450,8 @@ func _restash_to(key: String, to: String, label: String) -> void:
 	if from == to:
 		return
 	var kind := String(graph.node(key).get("kind", ""))
-	if to == GraphState.BAG and kind != "item":
-		_reject_drop("只有物品能进证物袋。")
+	if to == GraphState.BAG and kind != "item" and kind != "evidence":
+		_reject_drop("只有物品和证据能进证物袋。")
 		return
 	if to == GraphState.LEDGER and kind != "clue":
 		_reject_drop("只有线索能进线索册。")
@@ -4452,9 +4477,9 @@ func _store_into(where: String, key: String) -> void:
 		if not _tutorial_correct(already):
 			_reject_drop(already)
 		return
-	if where == GraphState.BAG and String(n["kind"]) != "item":
-		if not _tutorial_correct("只有物品能进证物袋。"):
-			_reject_drop("只有物品能进证物袋。")
+	if where == GraphState.BAG and String(n["kind"]) != "item" and String(n["kind"]) != "evidence":
+		if not _tutorial_correct("只有物品和证据能进证物袋。"):
+			_reject_drop("只有物品和证据能进证物袋。")
 		return
 	if where == GraphState.BAG and not graph.can_bag(key):
 		var bag_msg := "「%s」不能放进证物袋。" % String(n.get("label", key))
@@ -4826,6 +4851,8 @@ func _open_person_card(id: String) -> void:
 	_people_card.action_requested.connect(_on_person_action)
 	_people_card.note_changed.connect(_on_person_note_changed)
 	_people_card.note_committed.connect(_on_person_note_committed)
+	_people_card.field_word_selected.connect(_on_person_field_word)
+	_people_card.field_check_requested.connect(_check_person_claims)
 	_desk.add_child(_people_card)
 	_place_z(_people_card, ZR_PERSON)
 	_place_person_card()
@@ -4944,6 +4971,7 @@ func _person_payload(id: String) -> Dictionary:
 		"meta_lines": meta,
 		"note": String(graph.notes.get(id, "")),
 		"action": "打开对话窗" if id == "CHARS_TEC" else ("打开推演器" if id == "CHARS_EXEC" else "前往此人"),
+		"evidence_fields": _person_field_payload(id),
 	}
 
 
@@ -4953,6 +4981,207 @@ func _person_photo(id: String, ch: CharDef) -> String:
 		if path != "":
 			return path
 	return CaseLoader.avatar_path_of_def(ch)
+
+
+## 档案卡关键字段的显示载荷。`correct` 不下发给 UI，避免在卡面 / 调试出口里直接看到答案。
+func _person_field_payload(person_id: String) -> Array:
+	var out: Array = []
+	var ch := case_def.char_of(person_id) if case_def != null else null
+	if ch == null:
+		return out
+	for f in ch.evidence_fields:
+		if f == null:
+			continue
+		var claim := graph.claim_of(person_id, f.id)
+		var confirmed := graph.confirmed_field_of(person_id, f.id)
+		var state := "empty"
+		if not confirmed.is_empty():
+			state = "stamped"
+		elif String(claim.get("evidence_id", "")) != "":
+			state = "pending"
+		elif String(claim.get("value", "")) != "":
+			state = "draft"
+		var ev_id := String(confirmed.get("evidence_id", claim.get("evidence_id", "")))
+		out.append({
+			"id": f.id,
+			"label": f.label,
+			"prompt": f.prompt,
+			"options": f.options,
+			"value": String(confirmed.get("value", claim.get("value", ""))),
+			"state": state,
+			"evidence_id": ev_id,
+			"evidence_label": case_def.label_of("evidence", ev_id) if ev_id != "" else "",
+		})
+	return out
+
+
+func _find_evidence_field(person_id: String, field_id: String) -> EvidenceFieldDef:
+	var ch := case_def.char_of(person_id) if case_def != null else null
+	if ch == null:
+		return null
+	for f in ch.evidence_fields:
+		if f != null and f.id == field_id:
+			return f
+	return null
+
+
+func _evidence_tec_message(tier: String) -> String:
+	match tier:
+		"wu":
+			return "「物」是我分析出来的原料，不用再分析——拿去和证词拼成「证」吧。"
+		"ci":
+			return "话是你说给我听的，不用分析——它得先和物证拼成「证」。"
+		"zheng":
+			return "结论已经是结论了，不用再分析——把它拖到档案字段上。"
+	return "证据不需要再分析。"
+
+
+func _refresh_person_card_fields() -> void:
+	if _people_card == null or not is_instance_valid(_people_card):
+		return
+	if not _people_card.visible:
+		return
+	_people_card.refresh_evidence(_person_field_payload(String(_people_card.person_id)))
+
+
+## 把「证」级证据附到某个人物的关键字段上，进入待核对。
+func _assign_evidence_to_field(person_id: String, field_id: String, key: String,
+		_source: String = "canvas") -> bool:
+	if graph == null or case_def == null:
+		return false
+	var n := graph.node(key)
+	var field := _find_evidence_field(person_id, field_id)
+	if n.is_empty() or field == null:
+		return false
+	var label := String(n.get("label", key))
+	if graph.is_field_confirmed(person_id, field_id):
+		_reject_drop("「%s」已经核准，不能再附证据。" % field.label)
+		return false
+	if String(n.get("kind", "")) != "evidence":
+		_reject_drop("只有「证」级结论能填进档案字段。")
+		return false
+	var tier := String(n.get("tier", ""))
+	if tier != "zheng":
+		var raw := "物" if tier == "wu" else "词"
+		_reject_drop("「%s」是「%s」级原料——把它和%s拼出「证」再说。" % [
+			label, raw, "证词" if tier == "wu" else "物证"])
+		return false
+	var before := _save.snapshot()
+	graph.set_claim(person_id, field_id, "", String(n.get("id", "")))
+	_refresh_person_card_fields()
+	_log("将证据「%s」附到「%s」的「%s」字段，待核对" % [
+		label, case_def.char_of(person_id).name if case_def.char_of(person_id) != null else person_id,
+		field.label], "act")
+	_tec_teach_claim()
+	if graph.pending_claim_count(person_id) >= 3:
+		_check_person_claims(person_id, before)
+	else:
+		_commit(before)
+	return true
+
+
+func _on_person_field_word(person_id: String, field_id: String, value: String) -> void:
+	if graph == null or case_def == null:
+		return
+	var field := _find_evidence_field(person_id, field_id)
+	if field == null or graph.is_field_confirmed(person_id, field_id):
+		return
+	if not field.options.has(value):
+		return
+	var before := _save.snapshot()
+	graph.set_claim(person_id, field_id, value)
+	_refresh_person_card_fields()
+	_tec_teach_claim()
+	_commit(before)
+
+
+func _tec_teach_claim() -> void:
+	if graph == null or _tec == null:
+		return
+	if int(graph.tec_prog.get("_claim_intro", 0)) > 0:
+		return
+	graph.tec_prog["_claim_intro"] = 1
+	## 不抢开 TEC：玩家正在档案卡上选词 / 附证据，TEC 窗压过卡片会打断操作。
+	## 台词先存进 TEC，另用一条轻提示把节拍说出来。
+	_tec.append_line("主张先放着，攒几条我一起核对。")
+	_show_toast("TEC：主张先放着，攒几条我一起核对。")
+
+
+## TEC 批量核对：逐条判词条 + 证据，正确的盖章，错误的退回；全部字段核准后掉落人物线索。
+func _check_person_claims(person_id: String, before := {}) -> bool:
+	if graph == null or case_def == null:
+		return false
+	var ch := case_def.char_of(person_id)
+	var pending := graph.pending_claims(person_id)
+	if ch == null or pending.is_empty():
+		_show_toast("还没有待核对的主张。", true)
+		return false
+	var snap: Dictionary = before if not before.is_empty() else _save.snapshot()
+	_open_tec()
+	_tec.finish_typing()
+	_tec.append_line("核对「%s」的 %d 条主张。" % [ch.name, pending.size()])
+	var passed := 0
+	var rejected := 0
+	for raw_fid in pending.keys():
+		var fid := String(raw_fid)
+		var field := _find_evidence_field(person_id, fid)
+		var claim: Dictionary = pending[raw_fid]
+		if field == null:
+			graph.clear_claim(person_id, fid)
+			continue
+		var value := String(claim.get("value", ""))
+		var ev_id := String(claim.get("evidence_id", ""))
+		var supported := false
+		for ev in field.support:
+			if ev != null and ev.id == ev_id:
+				supported = true
+				break
+		if value == field.correct and supported:
+			graph.confirm_field(person_id, fid, value, ev_id)
+			passed += 1
+			_tec.append_line("「%s」核准：%s。" % [field.label, value])
+			_log("主张核准：%s · %s = %s" % [ch.name, field.label, value], "act")
+		else:
+			graph.clear_claim(person_id, fid)
+			rejected += 1
+			_tec.append_line("「%s」这条主张还站不住。词条或证据有一处不对，再看一遍。" % field.label)
+			_log("主张退回：%s · %s" % [ch.name, field.label], "warn")
+	_tec.append_line("本轮核对 %d 条：核准 %d，退回 %d。" % [pending.size(), passed, rejected])
+	if graph.all_fields_confirmed(person_id):
+		_drop_person_completion_clues(person_id)
+	_refresh_person_card_fields()
+	_commit(snap)
+	return true
+
+
+## 关键字段全部盖章后，把该人物档案里的线索落到画布（落地即已捕获）。
+func _drop_person_completion_clues(person_id: String) -> void:
+	var ch := case_def.char_of(person_id)
+	if ch == null:
+		return
+	var person_key := graph.key_of("char", person_id)
+	var names: Array = []
+	for f in ch.evidence_fields:
+		if f == null or f.drop_clue == null:
+			continue
+		if graph.captured.has(f.drop_clue.id):
+			continue
+		var key := graph.capture_clue(f.drop_clue.id, person_key)
+		graph.mark_fresh(key)
+		_refresh_or_spawn_card(key)
+		names.append(f.drop_clue.label)
+		var line := "档案核准：从「%s」的档案里掉落人物线索「%s」。（落地即已捕获）" % [
+			ch.name, f.drop_clue.label]
+		if _has_true_name_clue([key]):
+			_tec.append_true_clue(line)
+		else:
+			_tec.append_line(line)
+		_log("人物线索「%s」落地（已捕获）" % f.drop_clue.label, "cap")
+	if not names.is_empty():
+		_relayout()
+		_show_toast("获得人物线索：" + "、".join(names))
+	else:
+		_tec.append_line("「%s」的档案已经全部核准。" % ch.name)
 
 
 func _first_sentence(text: String) -> String:
@@ -5530,6 +5759,11 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 		for k in res.get("consumed", []):
 			_despawn_card(String(k))
 		_relayout()
+		if bool(res.get("evidence_recipe", false)):
+			var produced := String(res.get("produced_evidence", ""))
+			_tec_teach_evidence()
+			_tec_teach_recipe()
+			_show_toast("获得证据：" + case_def.label_of("evidence", produced))
 		## 反应表命中：除案卷与节点产出外，再用独白把台词面对面说出来。
 		## TEC 的反应归 TEC 窗（分析链路），不要重复弹独白。
 		var reaction_owner := String(res.get("reaction_owner", ""))
@@ -5812,8 +6046,9 @@ func _open_memory_play(mem: MemoryDef, where_key: String) -> void:
 	_mem_card.case_def = case_def
 	var title := mem.title if mem.title != "" else mem.id
 	_log("想起了一段回忆：%s" % title, "sys")
-	_mem_card.setup_play("记忆 · " + title, _memory_play_lines(mem), 420, 300)
 	_mem_card.closed.connect(_on_mem_closed)
+	_mem_card.playback_completed.connect(_on_memory_playback_completed)
+	_mem_card.setup_play("记忆 · " + title, _memory_play_lines(mem), 420, 300, "char", mem.id)
 	_desk.add_child(_mem_card)
 	_anchor_card_to(_mem_card, where_key)
 	_place_z(_mem_card, ZR_NARR)
@@ -5919,8 +6154,10 @@ func _open_chat(entry: DialogueDef, ids: Array, reveal_all := false,
 	_close_chat()
 	_chat_win = ChatWindow.new()
 	_chat_win.name = "chat_win"
-	_chat_win.setup_chat(entry, ids, case_def, reveal_all, title_override)
+	## 先接线再 setup：独白是「整段一次贴出」，playback_completed 会在 setup 内同步发射。
 	_chat_win.closed.connect(_on_chat_closed)
+	_chat_win.playback_completed.connect(_on_dialogue_playback_completed)
+	_chat_win.setup_chat(entry, ids, case_def, reveal_all, title_override)
 	_desk.add_child(_chat_win)
 	_place_z(_chat_win, ZR_CHAT)
 	_place_floating_windows()
@@ -5958,6 +6195,94 @@ func _open_reaction_monologue(char_id: String, text: String, trigger_label: Stri
 	entry.script_lines.append(line)
 	var tail := "对「%s」的反应" % trigger_label if trigger_label != "" else "反应"
 	return _open_chat(entry, [char_id], true, "独白 · %s · %s" % [ch.name, tail])
+
+
+# ── 证据：落地 / 同源去重 / 首次教学 ─────────────────────────────────────
+
+## 把一条证据落到画布。已存在（含在证物袋里）就复用，不再刷「新」。
+func _grant_evidence(ev: EvidenceDef, from_key: String = "", x: float = -1.0,
+		y: float = -1.0) -> String:
+	if ev == null or case_def == null or graph == null:
+		return ""
+	var existed := graph.has("evidence", ev.id)
+	var key := graph.capture_evidence(ev.id, from_key, x, y)
+	if key == "":
+		return ""
+	if not existed:
+		var n := graph.node(key)
+		_refresh_or_spawn_card(key)
+		_relayout()
+		_log("获得证据「%s」" % String(n.get("label", ev.label)), "cap")
+		_show_toast("获得证据：" + String(n.get("label", ev.label)))
+		_tec_teach_evidence()
+	return key
+
+
+## 一次掉一组证据，返回实际新增的 key 列表（已存在的跳过）。
+func _grant_evidences(evs: Array, from_key: String = "") -> Array:
+	var out: Array = []
+	for raw in evs:
+		var ev := raw as EvidenceDef
+		if ev == null:
+			continue
+		if graph != null and graph.has("evidence", ev.id):
+			continue
+		var key := _grant_evidence(ev, from_key)
+		if key != "":
+			out.append(key)
+	return out
+
+
+func _on_dialogue_playback_completed(id: String) -> void:
+	if id == "" or dialogues == null or graph == null:
+		return
+	var d := dialogues.by_id(id)
+	if d == null or d.drops_evidence.is_empty():
+		return
+	var before := _save.snapshot()
+	if not _grant_evidences(d.drops_evidence).is_empty():
+		_commit(before)
+
+
+func _on_memory_playback_completed(id: String) -> void:
+	if id == "" or case_def == null or graph == null:
+		return
+	for m in case_def.memories:
+		if m == null or m.id != id or m.drops_evidence.is_empty():
+			continue
+		var from_key := graph.key_of("char", m.who.id) if m.who != null else ""
+		if from_key != "" and not graph.nodes.has(from_key):
+			from_key = graph.scene_key(m.where.id) if m.where != null else ""
+		var before := _save.snapshot()
+		if not _grant_evidences(m.drops_evidence, from_key).is_empty():
+			_commit(before)
+		return
+
+
+func _tec_teach_evidence() -> void:
+	if graph == null or _tec == null:
+		return
+	if int(graph.tec_prog.get("_evi_intro", 0)) > 0:
+		return
+	graph.tec_prog["_evi_intro"] = 1
+	_tec.append_line("这是证据——它该进证物袋，或者拿去填档案。")
+	if _people_card != null and is_instance_valid(_people_card) and _people_card.visible:
+		_show_toast("TEC：这是证据——它该进证物袋，或者拿去填档案。")
+	else:
+		_open_tec()
+
+
+func _tec_teach_recipe() -> void:
+	if graph == null or _tec == null:
+		return
+	if int(graph.tec_prog.get("_recipe_intro", 0)) > 0:
+		return
+	graph.tec_prog["_recipe_intro"] = 1
+	_tec.append_line("物和词只是原料——两两拼成「证」，才能填进档案。")
+	if _people_card != null and is_instance_valid(_people_card) and _people_card.visible:
+		_show_toast("TEC：物和词只是原料——拼成「证」才能填进档案。")
+	else:
+		_open_tec()
 
 
 func _try_dialogue_combo(tool_key: String, target_key: String) -> bool:
@@ -6456,6 +6781,9 @@ func _start_tec_analysis(key: String) -> bool:
 	var n := graph.node(key)
 	if n.is_empty():
 		return false
+	if String(n.get("kind", "")) == "evidence":
+		_reject_drop(_evidence_tec_message(String(n.get("tier", ""))))
+		return false
 	if _tec.is_analyzing():
 		if _tutorial_active:
 			_tutorial_say("让我先看完这个。")
@@ -6509,6 +6837,41 @@ func _has_true_name_clue(keys: Array) -> bool:
 		if recipe.has(String(n.get("id", ""))):
 			return true
 	return false
+
+
+func _hidden_evidence_of(kind: String, id: String) -> Array:
+	match kind:
+		"loc", "scene", "time":
+			var s := case_def.scene_of(id)
+			return s.hidden_evidence if s != null else []
+		"item":
+			var it := case_def.item_of(id)
+			return it.hidden_evidence if it != null else []
+	return []
+
+
+## TEC 分析完成：把 hidden_evidence 落到画布。返回新增 key / 名字。
+## 位置沿「目标右下 60 + i*26」；不重复掉落已有的证据。
+func _capture_node_hidden_evidence(kind: String, id: String, host_key: String) -> Dictionary:
+	var evs := _hidden_evidence_of(kind, id)
+	if evs.is_empty():
+		return {"keys": [], "names": []}
+	var host := graph.node(host_key)
+	var hx := float(host.get("x", -1.0))
+	var hy := float(host.get("y", -1.0))
+	var got: Array = []
+	var names: Array = []
+	for i in evs.size():
+		var ev := evs[i] as EvidenceDef
+		if ev == null or graph.has("evidence", ev.id):
+			continue
+		var x := hx + 60.0 + float(i) * 26.0 if hx >= 0.0 else -1.0
+		var y := hy + 60.0 + float(i) * 26.0 if hy >= 0.0 else -1.0
+		var key := _grant_evidence(ev, host_key, x, y)
+		if key != "":
+			got.append(key)
+			names.append(ev.label)
+	return {"keys": got, "names": names}
 
 
 func _hidden_clue_of(kind: String, id: String) -> HiddenClueDef:
@@ -6622,7 +6985,8 @@ func _on_first_expand(kind: String, id: String, was_explored: bool) -> void:
 			_tec_hint("「%s」的档案可以解读——把场景节点拖给我分析。" % title, false, true)
 		else:
 			_tec_hint("先看看「%s」里有什么；可疑的东西可以拖给我。" % title)
-	elif _tec_reaction_text(kind, id) != "" or _hidden_clue_of(kind, id) != null:
+	elif _tec_reaction_text(kind, id) != "" or _hidden_clue_of(kind, id) != null \
+			or not _hidden_evidence_of(kind, id).is_empty():
 		_tec_hint("「%s」可以拖给我看看。" % title)
 
 
@@ -6681,6 +7045,15 @@ func _tec_next_hint() -> String:
 				break
 		if locked and _tec_reaction_text("item", String(n["id"])) != "":
 			hints.append("明示：带密码锁的「%s」可以拖给我，我能读出数字提示。" % String(n.get("label", "")))
+			break
+	for ch in case_def.chars.values():
+		var missing := ""
+		for f in ch.evidence_fields:
+			if f != null and not graph.is_field_confirmed(ch.id, f.id):
+				missing = f.label
+				break
+		if missing != "":
+			hints.append("提示：「%s」档案里的「%s」还缺结论证据。" % [ch.name, missing])
 			break
 	var tier := int(graph.tec_prog.get("_hint", 0))
 	graph.tec_prog["_hint"] = tier + 1
@@ -6752,6 +7125,11 @@ func _on_tec_analysis_done(target: String) -> void:
 			_log("TEC 解读了「%s」的档案（%d/%d）" % [label, prog + 1, talks.size()], "sys")
 		elif not talks.is_empty():
 			_tec.append_line("「%s」的档案已经全部解读完毕。" % label)
+		var scene_ev := _capture_node_hidden_evidence(kind, id, key)
+		if not (scene_ev["keys"] as Array).is_empty():
+			_tec.append_line("分析完成：「%s」中提取到证据 —— %s。（已落到画布上）" \
+				% [label, "、".join(scene_ev["names"])])
+			_log("TEC 从「%s」提取证据：%s" % [label, "、".join(scene_ev["names"])], "cap")
 	else:
 		_tec_reaction(key)
 		var ent_hidden := _capture_node_hidden_clues(kind, id, key)
@@ -6766,6 +7144,11 @@ func _on_tec_analysis_done(target: String) -> void:
 				_tec.append_line(String(ent_hidden["text"]))
 			_log("TEC 捕获「%s」的隐藏线索：%s" % [label, "、".join(ent_hidden["names"])], "cap")
 			_show_toast("捕获线索：" + "、".join(ent_hidden["names"]))
+		var ent_ev := _capture_node_hidden_evidence(kind, id, key)
+		if not (ent_ev["keys"] as Array).is_empty():
+			_tec.append_line("分析完成：「%s」中提取到证据 —— %s。（已落到画布上）" \
+				% [label, "、".join(ent_ev["names"])])
+			_log("TEC 从「%s」提取证据：%s" % [label, "、".join(ent_ev["names"])], "cap")
 	if _tec_min:
 		_tec_dot = true
 		_sync_tec_chip()
@@ -7144,6 +7527,26 @@ func dbg_person_note(id: String, text: String) -> void:
 	_on_person_note_committed(id, text)
 	if _people_card != null and is_instance_valid(_people_card) and _people_card.person_id == id:
 		_people_card.set_note_text(text)
+
+
+func dbg_person_fields(person_id: String) -> Array:
+	return _person_field_payload(person_id)
+
+
+func dbg_person_field_word(person_id: String, field_id: String, value: String) -> void:
+	_on_person_field_word(person_id, field_id, value)
+
+
+func dbg_person_field_drop(person_id: String, field_id: String, key: String) -> bool:
+	return _assign_evidence_to_field(person_id, field_id, key, "canvas")
+
+
+func dbg_person_check(person_id: String) -> bool:
+	return _check_person_claims(person_id)
+
+
+func dbg_person_field_state(field_id: String) -> String:
+	return _people_card.field_state(field_id) if _people_card != null and is_instance_valid(_people_card) else ""
 
 
 func dbg_close_person_card() -> void:

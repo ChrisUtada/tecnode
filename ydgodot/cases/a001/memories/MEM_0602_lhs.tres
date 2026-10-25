@@ -8,6 +8,8 @@
 [ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="6_f6oeq"]
 [ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_garden.tres" id="7_u7jh7"]
 
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_lhs_mem.tres" id="ev_mem"]
 [sub_resource type="Resource" id="Resource_024ke"]
 script = ExtResource("2_frifx")
 text = "花园里，槿杉把最后一盆标本摆回架上。傅柏举着相机，迟迟没有按下快门。"
@@ -48,3 +50,4 @@ where = ExtResource("7_u7jh7")
 who = ExtResource("4_wyx08")
 title = "6月2日 · 陆珩松"
 script_lines = Array[ExtResource("2_frifx")]([SubResource("Resource_024ke"), SubResource("Resource_krh0w"), SubResource("Resource_jaml6"), SubResource("Resource_cstj5"), SubResource("Resource_c83er"), SubResource("Resource_xkece")])
+drops_evidence = Array[ExtResource("evd_script")]([ExtResource("ev_mem")])

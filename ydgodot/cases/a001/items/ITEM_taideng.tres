@@ -6,6 +6,8 @@
 [ext_resource type="Script" path="res://core/defs/commands/TextCommandDef.gd" id="3_f0mcj"]
 [ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="4_k1g7y"]
 
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_lamp.tres" id="ev_lamp"]
 [sub_resource type="Resource" id="Resource_pbmwf"]
 script = ExtResource("3_f0mcj")
 value = "昏黄的灯光照亮了书桌，桌上的手写笔记都和各色植物有关。"
@@ -24,3 +26,4 @@ node_items = PackedStringArray()
 node_chars = PackedStringArray()
 node_locs = PackedStringArray()
 node_clues = PackedStringArray()
+hidden_evidence = Array[ExtResource("evd_script")]([ExtResource("ev_lamp")])

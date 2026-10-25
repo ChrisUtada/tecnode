@@ -57,7 +57,8 @@ const DBL_MS := 500
 
 ## 类型名。**卡面上不显示它** —— 类型改由左侧的类型色符号承担（见 `ui/KindGlyph.gd`），
 ## 这个名字只给详情窗 `_kind_name()` 用。
-const KIND_NAME := {"loc": "场景", "item": "物品", "char": "人物", "clue": "线索", "time": "时刻"}
+const KIND_NAME := {"loc": "场景", "item": "物品", "char": "人物", "clue": "线索",
+	"time": "时刻", "evidence": "证据"}
 const DARK_HI := TecTheme.FACE_DARK_HI
 const DARK_LO := TecTheme.FACE_DARK_LO
 ## 点亮态的光晕直径。Web 的 `#glow` 是 560×560 挂在节点上，这里按卡片尺寸取一个
@@ -304,6 +305,8 @@ func _build(w: float, h: float) -> void:
 	_glyph.name = "glyph"
 	_glyph.kind = kind
 	_glyph.col = TecTheme.kind_color(kind)
+	if kind == "evidence":
+		_glyph.set_evidence_tier(String(node_data.get("tier", "wu")))
 	_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_glyph)
 
@@ -496,6 +499,15 @@ func _layout_title() -> void:
 ## 符号会直接消失，必须换提亮版（`kind_color(kind, true)`）。
 func _sync_glyph_color(on_dark: bool) -> void:
 	if _glyph == null:
+		return
+	if kind == "evidence":
+		## 墨色反白字牌：普通态=墨底纸字，反白态=纸底墨字（不能真的消失）。
+		var fill := TecTheme.CARD if on_dark else TecTheme.INK
+		var ink := TecTheme.INK if on_dark else TecTheme.CARD
+		if _glyph.col != fill or _glyph.text_col != ink:
+			_glyph.col = fill
+			_glyph.text_col = ink
+			_glyph.queue_redraw()
 		return
 	var c := TecTheme.kind_color(kind, on_dark)
 	if _glyph.col != c:

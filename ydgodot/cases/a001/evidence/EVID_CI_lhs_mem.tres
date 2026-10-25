@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_tama2"]
+
+[resource]
+script = ExtResource("1_tama2")
+tier = "ci"
+id = "EVID_CI_lhs_mem"
+label = "陆珩松的回忆"
+desc = "6月2日的合影与快门声，藏着他没有说完的承诺。"
+source_text = "完整看完6月2日陆珩松的回忆。"

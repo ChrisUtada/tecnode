@@ -94,6 +94,27 @@
 [ext_resource type="Resource" path="res://cases/a001/scenes/SCENE_START.tres" id="93_tsyvq"]
 [ext_resource type="Script" path="res://core/defs/CaseDef.gd" id="94_h0b74"]
 
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="95_evdef"]
+[ext_resource type="Script" path="res://core/defs/EvidenceRecipeDef.gd" id="96_evrec"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_note.tres" id="ev_00"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_lamp.tres" id="ev_01"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_rope.tres" id="ev_02"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_knife.tres" id="ev_03"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_lhs_word.tres" id="ev_04"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_lhs_mem.tres" id="ev_05"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_zs_word.tres" id="ev_06"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_lamp_notes.tres" id="ev_07"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_note_voice.tres" id="ev_08"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_forged_time.tres" id="ev_09"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_strangled.tres" id="ev_10"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_zs_knife.tres" id="ev_11"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/RECIPE_lamp_notes.tres" id="rc_00"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/RECIPE_forged_time.tres" id="rc_01"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/RECIPE_strangled.tres" id="rc_02"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/RECIPE_note_voice.tres" id="rc_03"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/RECIPE_zs_knife.tres" id="rc_04"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/RECIPE_mem_voice.tres" id="rc_05"]
+
 [resource]
 script = ExtResource("94_h0b74")
 id = "a001"
@@ -109,3 +130,5 @@ clues = Array[ExtResource("7_2afdi")]([ExtResource("8_k3cue"), ExtResource("9_hm
 memories = Array[ExtResource("75_olqex")]([ExtResource("76_wrjqr"), ExtResource("77_2en5a"), ExtResource("78_e0twb"), ExtResource("79_qoetk"), ExtResource("80_r31be"), ExtResource("81_3bxi2")])
 dialogues = Array[ExtResource("28_7rqui")]([ExtResource("29_s5fkv"), ExtResource("30_u8qm7"), ExtResource("31_cyusc")])
 endings = Array[ExtResource("32_1ee0q")]([ExtResource("33_mo3tq"), ExtResource("34_1seuf"), ExtResource("35_nno8f"), ExtResource("36_ibohf"), ExtResource("37_fevno")])
+evidences = Array[ExtResource("95_evdef")]([ExtResource("ev_00"), ExtResource("ev_01"), ExtResource("ev_02"), ExtResource("ev_03"), ExtResource("ev_04"), ExtResource("ev_05"), ExtResource("ev_06"), ExtResource("ev_07"), ExtResource("ev_08"), ExtResource("ev_09"), ExtResource("ev_10"), ExtResource("ev_11")])
+evidence_recipes = Array[ExtResource("96_evrec")]([ExtResource("rc_00"), ExtResource("rc_01"), ExtResource("rc_02"), ExtResource("rc_03"), ExtResource("rc_04"), ExtResource("rc_05")])

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_y0t2n"]
+
+[resource]
+script = ExtResource("1_y0t2n")
+tier = "ci"
+id = "EVID_CI_zs_word"
+label = "朱穗的证词"
+desc = "她承认自己把刀插进了陆老师的腹部。"
+source_text = "完整听完朱穗与陆珩松的对话。"

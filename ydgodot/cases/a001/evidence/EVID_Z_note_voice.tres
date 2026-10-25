@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_r8sfy"]
+
+[resource]
+script = ExtResource("1_r8sfy")
+tier = "zheng"
+id = "EVID_Z_note_voice"
+label = "笔记与证词对应"
+desc = "陆珩松的说法与笔记里的修改痕迹互相印证。"
+source_text = "由「手写笔记」与「陆珩松的独白」合成。"

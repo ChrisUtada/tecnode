@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_boqen"]
+
+[resource]
+script = ExtResource("1_boqen")
+tier = "zheng"
+id = "EVID_Z_forged_time"
+label = "伪造的时间"
+desc = "有人改写了笔记和证词里的时间，让死亡时刻看起来更早。"
+source_text = "由「台灯下的字迹」与「陆珩松的独白」合成。"

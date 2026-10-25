@@ -4,6 +4,8 @@ extends SysWindow
 ## 暗纸 + 双线黑框的「另一种纸」，正文逐行打字，单击推进，按住整卡可拖动。
 ## 卡片只负责放映；正文行由 Desktop 按当前时刻 / 地点拼好。
 
+signal playback_completed(id: String)
+
 const CHAR_MS := 45.0
 const MARGIN := 14.0
 const TALK_COLOR := TecTheme.INK_MUTED
@@ -21,6 +23,10 @@ var _idx := 0
 var _cur: TypewriterLabel = null
 var _cur_text := ""
 var _play_mode := false
+## 回忆卡的来源 id（MemoryDef.id）；时刻卡为空，不参与证据掉落。
+var memory_id := ""
+var _skipped_any := false
+var _completed_emitted := false
 ## 标题条上那颗类型符号的类型（时刻 = 时，人物对话 = 人）。颜色走深色面提亮版。
 var _kind := "time"
 var _glyph: KindGlyph
@@ -44,7 +50,8 @@ func setup_memory(p_title: String, p_lines: Array, w: float = 330.0, h: float = 
 
 
 func setup_play(p_title: String, p_lines: Array, w: float = 420.0, h: float = 300.0,
-		kind: String = "char") -> void:
+		kind: String = "char", p_memory_id: String = "") -> void:
+	memory_id = p_memory_id
 	var specs: Array = []
 	for raw in p_lines:
 		if raw is Dictionary:
@@ -80,6 +87,7 @@ func _setup_lines(p_title: String, p_lines: Array, w: float, h: float, play_mode
 	gui_input.connect(_on_card_input)
 	_build_rows()
 	_play_next()
+	_emit_completion_if_empty()
 	call_deferred("_fit_height")
 
 
@@ -170,6 +178,9 @@ func _build_rows() -> void:
 		var label := built[1] as TypewriterLabel
 		row.modulate.a = 0.0
 		_line_box.add_child(row)
+		var row_no := _rows.size()
+		if label != null:
+			label.typing_finished.connect(_on_row_typed.bind(row_no))
 		_rows.append({"root": row, "label": label, "text": text})
 
 
@@ -233,7 +244,23 @@ func _say_avatar(who: String, name: String) -> Control:
 	return frame
 
 
+func _on_row_typed(row_no: int) -> void:
+	if _completed_emitted or _skipped_any:
+		return
+	if row_no == _rows.size() - 1:
+		_completed_emitted = true
+		playback_completed.emit(memory_id)
+
+
+func _emit_completion_if_empty() -> void:
+	if _rows.is_empty() and not _completed_emitted and not _skipped_any:
+		_completed_emitted = true
+		playback_completed.emit(memory_id)
+
+
 func _finish_line() -> void:
+	## 点击补全 = 跳过打字；本次不算首次完整播放。
+	_skipped_any = true
 	if _cur != null:
 		_cur.finish_typing()
 
@@ -350,6 +377,13 @@ func index() -> int:
 
 func is_typing() -> bool:
 	return _cur != null and _cur.is_typing()
+
+
+func dbg_set_char_ms(ms: float) -> void:
+	for raw in _rows:
+		var lab := (raw as Dictionary).get("label", null) as TypewriterLabel
+		if lab != null:
+			lab.char_ms = maxf(ms, 0.01)
 
 
 func finish_line() -> void:

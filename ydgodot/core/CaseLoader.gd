@@ -23,9 +23,12 @@ var scenes: Dictionary = {}      # id -> SceneDef
 var items: Dictionary = {}       # id -> ItemDef
 var chars: Dictionary = {}       # id -> CharDef
 var clues: Dictionary = {}       # id -> ClueDef
+var evidences: Dictionary = {}   # id -> EvidenceDef
+var evidence_recipes: Array[EvidenceRecipeDef] = []
 var memories: Array[MemoryDef] = []
 var dialogues: Array[DialogueDef] = []
 var endings: Array[EndingDef] = []
+var evidence_issues: Array = []
 var load_error: String = ""
 
 
@@ -47,6 +50,10 @@ func load_case() -> bool:
 	case_def = r
 	_index()
 	validate_nodes()
+	evidence_issues = validate_evidence()
+	if not evidence_issues.is_empty():
+		push_warning("证据链有 %d 处不可达 / 配置问题：%s" % [
+			evidence_issues.size(), str(evidence_issues.slice(0, 5))])
 	## §7-3：标签退役后的防回灌校验。正文里只要再出现 `[xxx:` 就拒绝装载，
 	## 逼数据走结构化字段（hidden_clue / clues / node_*），而不是让解析器悄悄复活。
 	var dirty := validate_text_clean()
@@ -68,6 +75,75 @@ func validate_nodes() -> Array:
 	if not unknown_nodes.is_empty():
 		push_warning("画布节点清单有 %d 个 id 解析不到：%s" % [unknown_nodes.size(), str(unknown_nodes)])
 	return unknown_nodes
+
+
+## 证据链可达性：每个原料证据必须有来源（TEC / 对话 / 回忆 / 配方），
+## 每条配方的两端与产物都必须可达，每个关键字段至少有一条可拿到证据的支撑。
+## 返回问题列表；空 = 通过。运行时只警告，迁移测试会判死。
+func validate_evidence() -> Array:
+	var out: Array = []
+	var valid_tiers := ["wu", "ci", "zheng"]
+	var available := {}
+	for ev in case_def.evidences:
+		if ev == null or ev.id == "":
+			out.append("证据定义缺 id")
+			continue
+		if not valid_tiers.has(String(ev.tier)):
+			out.append("%s 的 tier 非法：%s" % [ev.id, ev.tier])
+		if ev.label.strip_edges() == "":
+			out.append("%s 缺 label" % ev.id)
+	for it in case_def.items:
+		for ev in it.hidden_evidence:
+			if ev != null:
+				available[ev.id] = true
+	for s in case_def.scenes:
+		for ev in s.hidden_evidence:
+			if ev != null:
+				available[ev.id] = true
+	for d in case_def.dialogues:
+		for ev in d.drops_evidence:
+			if ev != null:
+				available[ev.id] = true
+	for m in case_def.memories:
+		for ev in m.drops_evidence:
+			if ev != null:
+				available[ev.id] = true
+	# 配方产出可以继续作为下一层原料：迭代到稳定。
+	var changed := true
+	while changed:
+		changed = false
+		for r in case_def.evidence_recipes:
+			if r == null or r.a == null or r.b == null or r.evidence == null:
+				continue
+			if available.has(r.a.id) and available.has(r.b.id) and not available.has(r.evidence.id):
+				available[r.evidence.id] = true
+				changed = true
+	for r in case_def.evidence_recipes:
+		if r == null or r.a == null or r.b == null or r.evidence == null:
+			out.append("配方缺 a / b / evidence")
+			continue
+		if r.a.id == r.b.id:
+			out.append("配方 %s 的两端是同一张证据" % r.id)
+		if String(r.evidence.tier) != "zheng":
+			out.append("配方 %s 的产物不是「证」：%s" % [r.id, r.evidence.tier])
+		for ev in [r.a, r.b, r.evidence]:
+			if not available.has(ev.id):
+				out.append("配方 %s 的「%s」没有可达来源" % [r.id, ev.id])
+	for ch in case_def.chars:
+		for f in ch.evidence_fields:
+			if f == null:
+				out.append("%s 有空的证据字段" % ch.id)
+				continue
+			if f.options.is_empty() or not f.options.has(f.correct):
+				out.append("%s / %s 的词库不含正确答案" % [ch.id, f.id])
+			if f.support.is_empty():
+				out.append("%s / %s 没有支撑证据" % [ch.id, f.id])
+			for ev in f.support:
+				if ev == null or not available.has(ev.id):
+					out.append("%s / %s 的支撑证据不可达" % [ch.id, f.id])
+			if f.drop_clue == null:
+				out.append("%s / %s 没有完成掉落线索" % [ch.id, f.id])
+	return out
 
 
 ## 扫描所有数据资源里的字符串，找 `[item:` / `[clue:` 这类退役标签。
@@ -111,7 +187,7 @@ func _scan_text(value, path: String, re: RegEx, out: Array, seen: Dictionary) ->
 
 
 func _index() -> void:
-	scenes.clear(); items.clear(); chars.clear(); clues.clear()
+	scenes.clear(); items.clear(); chars.clear(); clues.clear(); evidences.clear()
 	for s in case_def.scenes:
 		scenes[s.id] = s
 	for it in case_def.items:
@@ -120,6 +196,9 @@ func _index() -> void:
 		chars[c.id] = c
 	for cl in case_def.clues:
 		clues[cl.id] = cl
+	for ev in case_def.evidences:
+		evidences[ev.id] = ev
+	evidence_recipes = case_def.evidence_recipes
 	memories = case_def.memories
 	dialogues = case_def.dialogues
 	endings = case_def.endings
@@ -145,6 +224,8 @@ static func kind_of_ref(ref_id: String) -> String:
 		return "char"
 	if p.begins_with("CLUES_") or p.begins_with("CLUE_") or p.begins_with("DATA_"):
 		return "clue"
+	if p.begins_with("EVID_") or p.begins_with("EVIDENCE_"):
+		return "evidence"
 	return "data"
 
 
@@ -188,6 +269,25 @@ func clue_of(id: String) -> ClueDef:
 	return clues.get(id, null)
 
 
+func evidence_of(id: String) -> EvidenceDef:
+	return evidences.get(id, null)
+
+
+## 无序对配方：`a × b` 与 `b × a` 都能命中。
+func evidence_recipe_for(a_id: String, b_id: String) -> EvidenceRecipeDef:
+	for r in evidence_recipes:
+		if r == null or r.a == null or r.b == null:
+			continue
+		if (r.a.id == a_id and r.b.id == b_id) or (r.a.id == b_id and r.b.id == a_id):
+			return r
+	return null
+
+
+func evidence_tier_of(id: String) -> String:
+	var ev := evidence_of(id)
+	return ev.tier if ev != null else ""
+
+
 ## 按 kind 取实体（画布 kind = loc/item/char/clue）
 func def_of(kind: String, id: String) -> Resource:
 	match kind:
@@ -199,6 +299,8 @@ func def_of(kind: String, id: String) -> Resource:
 			return char_of(id)
 		"clue", "data":
 			return clue_of(id)
+		"evidence":
+			return evidence_of(id)
 	return null
 
 
@@ -216,6 +318,9 @@ func label_of(kind: String, id: String) -> String:
 		"clue", "data":
 			var cl := clue_of(id)
 			return cl.label if cl != null else id
+		"evidence":
+			var ev := evidence_of(id)
+			return ev.label if ev != null else id
 	return id
 
 

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EvidenceRecipeDef" format=3]
+
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_lamp_notes.tres" id="1_xi7qp"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_lhs_word.tres" id="2_b417k"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_forged_time.tres" id="3_sguon"]
+[ext_resource type="Script" path="res://core/defs/EvidenceRecipeDef.gd" id="4_ooe3x"]
+
+[resource]
+script = ExtResource("4_ooe3x")
+id = "RECIPE_forged_time"
+a = ExtResource("1_xi7qp")
+b = ExtResource("2_b417k")
+evidence = ExtResource("3_sguon")
+text = "台灯下的字迹与他的独白互相矛盾——时间被人改过。"

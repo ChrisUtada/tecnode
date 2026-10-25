@@ -216,7 +216,10 @@
       "nodeItems": [],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": []
+      "nodeClues": [],
+      "hiddenEvidence": [
+        "EVID_WU_lamp"
+      ]
     },
     "ITEM_chouti": {
       "baggable": false,
@@ -547,7 +550,10 @@
       "nodeItems": [],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": []
+      "nodeClues": [],
+      "hiddenEvidence": [
+        "EVID_WU_rope"
+      ]
     },
     "ITEMS_jzmh": {
       "label": "精致的木盒",
@@ -676,7 +682,10 @@
       "nodeItems": [],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": []
+      "nodeClues": [],
+      "hiddenEvidence": [
+        "EVID_WU_knife"
+      ]
     },
     "ITEMS_yjh": {
       "label": "洋金花",
@@ -811,7 +820,10 @@
       "nodeItems": [],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": []
+      "nodeClues": [],
+      "hiddenEvidence": [
+        "EVID_WU_note"
+      ]
     },
     "ITEM_shuzhuo": {
       "baggable": false,
@@ -884,10 +896,7 @@
           "CLUES_JS"
         ]
       },
-      "avatar": "res://assets/raw/jin.png",
-      "role": "植物学家",
-      "fate": "存活",
-      "relation": "抑制素研究的参与者"
+      "avatar": "res://assets/raw/jin.png"
     },
     "CHARS_luhengs": {
       "role": "植物学家",
@@ -1001,9 +1010,25 @@
         ]
       },
       "avatar": "res://assets/raw/lu.png",
-      "role": "植物学家",
-      "fate": "死亡 · 吊颈",
-      "relation": "本案死者"
+      "evidenceFields": [
+        {
+          "id": "FIELD_lhs_cause",
+          "label": "死因",
+          "prompt": "他到底是怎么死的？",
+          "options": [
+            "窒息",
+            "中毒",
+            "坠落",
+            "刺伤",
+            "缢死"
+          ],
+          "correct": "缢死",
+          "support": [
+            "EVID_Z_strangled"
+          ],
+          "dropClue": "CLUES_mc"
+        }
+      ]
     },
     "NPC_FB": {
       "role": "植物研究所所长",
@@ -1038,10 +1063,7 @@
           }
         ]
       },
-      "avatar": "res://assets/raw/fu.png",
-      "role": "植物研究所所长",
-      "fate": "存活",
-      "relation": "研究项目的知情者"
+      "avatar": "res://assets/raw/fu.png"
     },
     "CHARS_zs": {
       "role": "助手",
@@ -1125,10 +1147,7 @@
           }
         ]
       },
-      "avatar": "res://assets/raw/zhu.png",
-      "role": "助手",
-      "fate": "存活",
-      "relation": "陆珩松与槿杉的助手"
+      "avatar": "res://assets/raw/zhu.png"
     },
     "CHARS_TEC": {
       "role": "AI 助手",
@@ -1243,10 +1262,7 @@
           "text": "我记得有一张纸，上面好像写了某种植物，找到那个植物，把它拖给对应的人或物试试。"
         }
       },
-      "avatar": "images/avatar_CHARS_TEC.png",
-      "role": "AI 助手",
-      "fate": "在线",
-      "relation": "你的助手"
+      "avatar": "images/avatar_CHARS_TEC.png"
     }
   },
   "clues": {
@@ -1387,6 +1403,9 @@
           "t": "narr",
           "text": "快门落下的那一瞬，槿杉露出了笑容。那是陆珩松后来反复想起的画面。"
         }
+      ],
+      "dropsEvidence": [
+        "EVID_CI_lhs_mem"
       ]
     },
     {
@@ -1646,6 +1665,9 @@
           "t": "narr",
           "text": "她推开花园的门，逃进夜里。身后的唱机还在转。"
         }
+      ],
+      "dropsEvidence": [
+        "EVID_CI_zs_word"
       ]
     },
     {
@@ -1673,6 +1695,9 @@
           "who": "CHARS_luhengs",
           "text": "花魄若能留下一线生机，就值得我把这条路走完。"
         }
+      ],
+      "dropsEvidence": [
+        "EVID_CI_lhs_word"
       ]
     }
   ],
@@ -1751,6 +1776,124 @@
         "CLUES_fb"
       ],
       "message": "傅柏的自述：我只是无意之间提到，一种类似黑魔法的方式或许能够治愈槿杉的奇怪疾病，没想到两人都表现出极其浓厚的兴趣。于是我不得不将这种古老而邪恶的方式告诉了陆和槿，两人很快将其付诸实践。概括而言，就是献祭和捕获，献祭某些珍贵的东西，以捕获某些等价的事物，但别忘记了，世界上并无绝对的公平可言，古老的方式，总是伴随着未知的风险。代价往往大于所得。而人类一旦发现所得的事物正是自己梦寐以求的，很容易便会陷入偏执，完全忽视代价，等在前方的或许只有悲剧。真有趣。"
+    }
+  ],
+  "evidences": {
+    "EVID_WU_note": {
+      "label": "手写笔记",
+      "tier": "wu",
+      "desc": "写满植物名与习性的手写笔记，纸页边缘有反复翻动的痕迹。",
+      "sourceText": "从书桌的手写笔记中提取。"
+    },
+    "EVID_WU_lamp": {
+      "label": "台灯",
+      "tier": "wu",
+      "desc": "老式台灯，铜链被反复拉动，灯罩下有一圈焦痕。",
+      "sourceText": "从书桌台灯中提取。"
+    },
+    "EVID_WU_rope": {
+      "label": "粗糙的绳索",
+      "tier": "wu",
+      "desc": "渗着黑红血迹的粗绳，毛刺上还挂着皮屑。",
+      "sourceText": "从尸体旁的粗糙绳索中提取。"
+    },
+    "EVID_WU_knife": {
+      "label": "染血的美工刀",
+      "tier": "wu",
+      "desc": "刀刃与下腹伤口吻合，是一把被藏起来的凶器。",
+      "sourceText": "从染血的美工刀中提取。"
+    },
+    "EVID_CI_lhs_word": {
+      "label": "陆珩松的独白",
+      "tier": "ci",
+      "desc": "他坚持没有人会死去，语气却像在告别。",
+      "sourceText": "完整听完陆珩松的独白。"
+    },
+    "EVID_CI_lhs_mem": {
+      "label": "陆珩松的回忆",
+      "tier": "ci",
+      "desc": "6月2日的合影与快门声，藏着他没有说完的承诺。",
+      "sourceText": "完整看完6月2日陆珩松的回忆。"
+    },
+    "EVID_CI_zs_word": {
+      "label": "朱穗的证词",
+      "tier": "ci",
+      "desc": "她承认自己把刀插进了陆老师的腹部。",
+      "sourceText": "完整听完朱穗与陆珩松的对话。"
+    },
+    "EVID_Z_lamp_notes": {
+      "label": "台灯下的字迹",
+      "tier": "zheng",
+      "desc": "笔记的压痕与台灯位置对得上，说明有人在灯下反复改写。",
+      "sourceText": "由「手写笔记」与「台灯」合成。"
+    },
+    "EVID_Z_note_voice": {
+      "label": "笔记与证词对应",
+      "tier": "zheng",
+      "desc": "陆珩松的说法与笔记里的修改痕迹互相印证。",
+      "sourceText": "由「手写笔记」与「陆珩松的独白」合成。"
+    },
+    "EVID_Z_forged_time": {
+      "label": "伪造的时间",
+      "tier": "zheng",
+      "desc": "有人改写了笔记和证词里的时间，让死亡时刻看起来更早。",
+      "sourceText": "由「台灯下的字迹」与「陆珩松的独白」合成。"
+    },
+    "EVID_Z_strangled": {
+      "label": "被掩盖的缢死",
+      "tier": "zheng",
+      "desc": "时间可以被改写，但绳索留下的痕迹不会说谎：真正的死因是缢死。",
+      "sourceText": "由「伪造的时间」与「粗糙的绳索」合成。"
+    },
+    "EVID_Z_zs_knife": {
+      "label": "朱穗的刀伤",
+      "tier": "zheng",
+      "desc": "朱穗的证词与凶器吻合，她确实刺伤了陆珩松。",
+      "sourceText": "由「朱穗的证词」与「染血的美工刀」合成。"
+    }
+  },
+  "evidenceRecipes": [
+    {
+      "id": "RECIPE_lamp_notes",
+      "a": "EVID_WU_note",
+      "b": "EVID_WU_lamp",
+      "evidence": "EVID_Z_lamp_notes",
+      "text": "笔记的压痕与台灯的位置对上了。"
+    },
+    {
+      "id": "RECIPE_forged_time",
+      "a": "EVID_Z_lamp_notes",
+      "b": "EVID_CI_lhs_word",
+      "evidence": "EVID_Z_forged_time",
+      "text": "台灯下的字迹与他的独白互相矛盾——时间被人改过。"
+    },
+    {
+      "id": "RECIPE_strangled",
+      "a": "EVID_Z_forged_time",
+      "b": "EVID_WU_rope",
+      "evidence": "EVID_Z_strangled",
+      "text": "时间被伪造，但绳索上的血痕不会说谎。"
+    },
+    {
+      "id": "RECIPE_note_voice",
+      "a": "EVID_WU_note",
+      "b": "EVID_CI_lhs_word",
+      "evidence": "EVID_Z_note_voice",
+      "text": "笔记与证词能互相印证，但这还不能说明死因。"
+    },
+    {
+      "id": "RECIPE_zs_knife",
+      "a": "EVID_CI_zs_word",
+      "b": "EVID_WU_knife",
+      "evidence": "EVID_Z_zs_knife",
+      "text": "朱穗的证词与凶器完全吻合。"
+    },
+    {
+      "id": "RECIPE_mem_voice",
+      "a": "EVID_WU_note",
+      "b": "EVID_CI_lhs_mem",
+      "evidence": "EVID_Z_note_voice",
+      "text": "笔记与回忆里的细节互相印证。"
     }
   ]
 }

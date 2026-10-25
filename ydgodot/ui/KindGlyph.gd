@@ -14,14 +14,21 @@ var kind := "item"
 var col := TecTheme.INK
 var zoom := 1.0
 var radius := 8.0
+## 证据族用「墨色反白字牌」：实心圆 + 纸白单字。`glyph_override` 承载 tier 的 物/词/证。
+var filled := false
+var text_col := TecTheme.CARD
+var glyph_override := ""
 
 
 func _draw() -> void:
 	var c := size * 0.5
 	var r := radius
 	var sw := maxf(1.0, 1.1 / maxf(zoom, 0.1))
-	draw_arc(c, maxf(r - sw * 0.5, 0.5), 0.0, TAU, 40, col, sw, true)
-	var glyph := String(GLYPH_TEXT.get(kind, "?"))
+	if filled:
+		draw_circle(c, maxf(r - sw * 0.5, 0.5), col, true, -1.0, true)
+	else:
+		draw_arc(c, maxf(r - sw * 0.5, 0.5), 0.0, TAU, 40, col, sw, true)
+	var glyph := glyph_override if glyph_override != "" else String(GLYPH_TEXT.get(kind, "?"))
 	var font := TecTheme.font()
 	## 字要明显小于圈：占圈内径的 ~2/3，四边留出呼吸缝，笔画才不会顶到弧线上。
 	## （旧版文字档直接画 12px、缩略档画 24px，圈内径只有 13/30，一放大就糊成一团�?
@@ -31,7 +38,7 @@ func _draw() -> void:
 	var desc := font.get_descent(px)
 	var baseline := c.y + (asc - desc) * 0.5
 	draw_string(font, Vector2(c.x - w * 0.5, baseline), glyph,
-		HORIZONTAL_ALIGNMENT_CENTER, -1, px, col)
+		HORIZONTAL_ALIGNMENT_CENTER, -1, px, text_col if filled else col)
 
 
 ## 圈内字号：U1 只允许 **12 / 24** 两档（点阵字原生格 12 的整数倍）。
@@ -46,6 +53,12 @@ static func glyph_font_px(radius: float, zoom: float) -> int:
 
 func set_kind(k: String) -> void:
 	kind = k
+	queue_redraw()
+
+
+func set_evidence_tier(tier: String) -> void:
+	glyph_override = {"wu": "物", "ci": "词", "zheng": "证"}.get(tier, "?")
+	filled = true
 	queue_redraw()
 
 
