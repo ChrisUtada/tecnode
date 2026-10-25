@@ -1184,6 +1184,38 @@ func _initialize() -> void:
 	(scene._log_win as Control)._on_bar_input(ev23)
 	await process_frame
 	check("标题栏按下仍提到栈顶", scene._log_win.get_index() > scene._map_win.get_index())
+	var mot23 := InputEventMouseMotion.new()
+	mot23.global_position = Vector2(9999.0, 9999.0)
+	(scene._log_win as Control)._on_bar_input(mot23)
+	var lr23: Rect2 = scene._log_win.get_global_rect()
+	var desk23: Rect2 = scene._desk.get_global_rect()
+	check("W4 窗口拖动被钳在桌面内",
+		lr23.position.y >= desk23.position.y
+			and lr23.position.x + lr23.size.x >= desk23.position.x + 40.0
+			and lr23.position.x <= desk23.end.x - 40.0
+			and lr23.position.y <= desk23.end.y - 40.0,
+		str(lr23))
+	var up23 := InputEventMouseButton.new()
+	up23.button_index = MOUSE_BUTTON_LEFT
+	up23.pressed = false
+	up23.global_position = mot23.global_position
+	(scene._log_win as Control)._on_bar_input(up23)
+	scene._tec.position = Vector2(9999.0, 9999.0)
+	scene._open_tec()
+	var tr23: Rect2 = scene._tec.get_global_rect()
+	check("W4 TEC 重开时被钳回桌面",
+		tr23.position.x <= desk23.end.x - 40.0 and tr23.position.y <= desk23.end.y - 40.0,
+		str(tr23))
+	var desk23_old: Vector2 = scene._desk.size
+	scene._desk.size = Vector2(960.0, 508.0)
+	scene._tec.position = Vector2(9999.0, 9999.0)
+	scene._tec.clamp_into_parent()
+	check("W4 960 下 TEC 仍留在桌面内",
+		scene._tec.position.x <= 920.0 and scene._tec.position.y <= 468.0,
+		str(scene._tec.position))
+	scene._desk.size = desk23_old
+	scene._tec.clamp_into_parent()
+	scene._hide_tec()
 	scene._toggle_log()
 	await process_frame
 
@@ -1621,6 +1653,12 @@ func _initialize() -> void:
 		not scene.graph.captured.has("CLUES_INVESTIGATOR")
 			and not scene.graph.nodes.has("clue:CLUES_INVESTIGATOR"))
 	check("G2 办公室→证件一条线", scene._edge_layer.segment_count() == 1)
+	tut_office_card.modulate.a = 0.0
+	scene._repaint_edges()
+	check("U5 透明卡不再画连线", scene._edge_layer.segment_count() == 0)
+	tut_office_card.modulate.a = 1.0
+	scene._repaint_edges()
+	check("U5 恢复可见后连线回来", scene._edge_layer.segment_count() == 1)
 	check("G2 TEC 提示把证件拖过去", _last_line(scene._tec).contains("调查员证"))
 	scene._on_card_selected(tut_cert_key)
 	check("G2 选中节点显示详情窗",

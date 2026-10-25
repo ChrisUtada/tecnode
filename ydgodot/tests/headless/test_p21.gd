@@ -133,6 +133,17 @@ func _test_desktop() -> void:
 	await process_frame
 	info = scene.dbg_case_info()
 	check("dock 可见", bool(info["dock"]) and bool(info["dock_visible"]))
+	check("U6 dock 卡片完整落在桌面内",
+		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
+		str(scene._dock_card.get_global_rect()))
+	var desk_old: Vector2 = scene._desk.size
+	scene._desk.size = Vector2(960.0, 508.0)
+	scene._place_case_dock()
+	check("U6 960×560 下 dock 仍在桌面内",
+		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
+		str(scene._dock_card.get_global_rect()))
+	scene._desk.size = desk_old
+	scene._place_case_dock()
 	check("dock 模式无图标角标", not bool(info["badge_visible"]))
 	check("dock 卡片有内容", scene._dock_title.text != "" and scene._dock_sub.text != "")
 	scene.dbg_reopen_case()

@@ -308,10 +308,15 @@ func _test_desktop(c: CaseLoader) -> void:
 	# 组合成功：一条 act，且不弹提示条（Web 刻意：结果靠画面自证）
 	scene.dbg_ensure("item", "ITEMS_cz")
 	await process_frame
+	var cz_key := "item:ITEMS_cz"
+	scene.graph.tried[cz_key + ">loc:SCENES_garden"] = true
 	n0 = scene.graph.log_count()
 	var toast_before: String = scene.dbg_toast_text()
 	scene.dbg_combo_ui("ITEMS_cz", "ITEMS_changji")
 	await process_frame
+	check("U5 组合消耗后卡片已移除", not scene._cards.has(cz_key))
+	check("U5 组合消耗后 tried 已清",
+		not scene.graph.tried.has(cz_key + ">loc:SCENES_garden"))
 	check("组合成功记一条", scene.graph.log_count() == n0 + 1, str(scene.graph.log_count() - n0))
 	var last_kind := String(scene.dbg_log_kinds()[-1])
 	check("组合成功是 act", last_kind == "act", last_kind)

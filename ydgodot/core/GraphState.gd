@@ -158,6 +158,11 @@ func delete_node(key: String) -> bool:
 		if e["a"] != key and e["b"] != key:
 			kept.append(e)
 	edges = kept
+	## 删掉节点后，「试过」虚线键也要一起清；否则节点日后再出现会带着旧虚线还魂。
+	for raw in tried.keys():
+		var pair := String(raw).split(">", false, 1)
+		if pair.size() == 2 and (pair[0] == key or pair[1] == key):
+			tried.erase(raw)
 	return true
 
 

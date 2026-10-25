@@ -188,7 +188,12 @@ func _test_delete_node() -> void:
 	var g8 := GraphState.new(c)
 	g8.add_node("item", "ITEM_shoudiantong")
 	g8.link("item:ITEM_shoudiantong", "loc:SCENES_garden", "entity")
+	g8.tried["item:ITEM_shoudiantong>loc:SCENES_garden"] = true
+	g8.tried["loc:SCENES_garden>char:NPC_FB"] = true
 	check("删节点成功", g8.delete_node("item:ITEM_shoudiantong"))
 	check("删掉后节点没了", not g8.has("item", "ITEM_shoudiantong"))
 	check("连着的边也一起没了", not g8.has_edge("item:ITEM_shoudiantong", "loc:SCENES_garden"))
+	check("U5 删节点清掉相关 tried",
+		not g8.tried.has("item:ITEM_shoudiantong>loc:SCENES_garden"))
+	check("U5 不误删无关 tried", g8.tried.has("loc:SCENES_garden>char:NPC_FB"))
 	check("删不存在的节点返回 false", not g8.delete_node("item:ITEM_shoudiantong"))

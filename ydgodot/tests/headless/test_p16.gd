@@ -184,6 +184,10 @@ func _test_desktop() -> void:
 	scene.dbg_open_cert()
 	await process_frame
 	check("可回看调查员证", scene.dbg_cert_open())
+	scene._view_user = true
+	scene._view_k = 1.8
+	scene._view_pos = Vector2(-4000.0, -4000.0)
+	scene._apply_view()
 	scene._reset_case()
 	await process_frame
 	check("重置先弹确认", scene._confirm_win != null and scene._confirm_win.visible)
@@ -192,6 +196,14 @@ func _test_desktop() -> void:
 	await process_frame
 	check("取消后确认窗关闭", scene._confirm_win == null)
 	scene._reset_case(true)
+	await process_frame
+	await process_frame
+	check("S1 重置后镜头回到自动档", not scene._view_user)
+	var start_slice_key := "loc:SCENES_garden"
+	check("S1 重置后起始节点在可视区",
+		scene._cards.has(start_slice_key)
+			and scene._stage.get_global_rect().intersects(
+				(scene._cards[start_slice_key] as NodeCard).get_global_rect()))
 	check("重来不清调查员", String(scene.dbg_investigator().get("name", "")) == "执行者")
 	scene.dbg_clear_investigator()
 	check("清证后内存为空", scene.dbg_investigator().is_empty())

@@ -300,8 +300,10 @@ func _layout_root() -> void:
 		_reset_icon_positions()
 	_place_toast_anchor()
 	_place_music_windows()
+	_place_case_dock()
 	_place_floating_windows()
 	_relayout_edge_windows(vw)
+	_clamp_windows_to_desk()
 
 
 ## 窄窗口先收左半边：工具组固定 596px（670..1266），窗口宽到 1150 以下时
@@ -1167,6 +1169,8 @@ func _place_z(ctrl: Control, rank: int) -> void:
 			at = i - 1 if i > self_idx else i
 			break
 	_desk.move_child(ctrl, at)
+	if ctrl is SysWindow and ctrl != _case_win and ctrl.visible:
+		(ctrl as SysWindow).clamp_into_parent()
 	## 新打开的系统窗就是当前窗：放到浮动窗栈顶，但仍压在 toast / 拖拽描边 / 拖拽镜像之下。
 	if ctrl is SysWindow and ctrl != _case_win and rank < ZR_DROP \
 		and (ctrl as SysWindow).participates_in_activation() and ctrl.visible:
@@ -1680,6 +1684,26 @@ func _ensure_music_dock() -> MusicDock:
 
 ## 播放器与 dock 的默认落点按 1280×720 量的 906/414、1026/532；
 ## 缩到 960×560 时只把越界的那一轴拉回右下安全区，不改变 1280 的既有构图。
+## 案件收进右下角时的卡片：跟随桌面现算，别再用 1280×720 下的固定 678。
+func _clamp_windows_to_desk() -> void:
+	if _desk == null or not is_instance_valid(_desk):
+		return
+	for c in _desk.get_children():
+		var w := c as SysWindow
+		if w != null and is_instance_valid(w) and w.visible:
+			w.clamp_into_parent()
+
+
+func _place_case_dock() -> void:
+	if _dock_card == null or not is_instance_valid(_dock_card):
+		return
+	var desk_w := _desk.size.x if _desk != null and is_instance_valid(_desk) else _vw()
+	var desk_h := _desk.size.y if _desk != null and is_instance_valid(_desk) else _vh() - HEADER_H
+	_dock_card.position = Vector2(
+		maxf(14.0, desk_w - 16.0 - _dock_card.size.x),
+		maxf(14.0, desk_h - 16.0 - _dock_card.size.y))
+
+
 func _place_music_windows() -> void:
 	var desk_h := _desk.size.y if _desk != null and is_instance_valid(_desk) else _vh() - HEADER_H
 	if _music_win != null and is_instance_valid(_music_win):
@@ -2112,6 +2136,7 @@ func _reopen_case() -> void:
 	_case_held = false
 	_case_docked = false
 	_case_win.visible = true
+	_case_win.clamp_into_parent()
 	_place_z(_case_win, ZR_CASE)
 	if _tec != null and _tec.visible:
 		_place_z(_tec, ZR_TEC)
@@ -2144,6 +2169,7 @@ func _update_case_park_ui() -> void:
 		_dock_sub.text = "进度已保存 · 点此展开"
 		_dock_card.visible = _case_docked
 		if _case_docked:
+			_place_case_dock()
 			_place_z(_dock_card, ZR_DOCK)
 	if _map_badge != null:
 		_map_badge.visible = _case_held
@@ -2285,6 +2311,8 @@ func _sync_case_progress_from_graph() -> void:
 
 
 func _start_slice() -> void:
+	## 重置 / 换案后镜头必须回到自动档，否则玩家之前拖过的镜头会对着空画布。
+	_reset_camera()
 	_new_runtime()
 
 	# 开局状态**照 Web `17-boot.js:42` 一模一样的口径**：画布上只放一张「未探索」的起始场景节点，
@@ -3051,6 +3079,7 @@ func _commit(before: Dictionary) -> void:
 	if JSON.stringify(before) == JSON.stringify(_save.snapshot()):
 		return
 	_save.push_history_snapshot(before)
+	_sync_canvas()
 	_queue_autosave()
 	_refresh_app_icons()
 	_refresh_detail()
@@ -3224,6 +3253,13 @@ func _abort_card_drag() -> void:
 			_edge_layer.clear_ghost()
 
 
+func _reset_camera() -> void:
+	_view_k = 1.0
+	_view_pos = Vector2.ZERO
+	_view_user = false
+	_apply_view()
+
+
 func _apply_view() -> void:
 	if _card_layer == null:
 		return
@@ -3266,6 +3302,43 @@ func _clear_selection() -> void:
 
 
 # ── 卡片 ────────────────────────────────────────────────────────────────
+
+## 组合 / 命令消耗掉的数据节点也要收尸：卡片、选中、拖动、连线痕迹全部一起清。
+func _despawn_card(key: String) -> void:
+	if key == "":
+		return
+	_kill_move(key)
+	if _drag_key == key:
+		_drop_card_mirror(null)
+		_drag_key = ""
+	if _matrix_faded.has(key):
+		_matrix_faded.erase(key)
+	var card: NodeCard = _cards.get(key, null)
+	if card != null and is_instance_valid(card):
+		card.queue_free()
+	_cards.erase(key)
+	if _selected == key:
+		_selected = ""
+		if graph != null:
+			graph.selected = ""
+		_apply_focus()
+		_refresh_detail()
+
+
+## 任何改图路径的兜底：数据层已不存在的卡片必须从 _cards 清掉，避免僵尸卡继续画线 / 参与布局。
+func _sync_canvas() -> void:
+	if graph == null or _cards.is_empty():
+		return
+	var removed := false
+	for key in _cards.keys():
+		var card: NodeCard = _cards.get(key, null)
+		if card == null or not is_instance_valid(card) or not graph.nodes.has(String(key)):
+			_despawn_card(String(key))
+			removed = true
+	if removed:
+		_apply_hidden()
+		_repaint_edges()
+
 
 func _spawn_card(key: String) -> NodeCard:
 	if _cards.has(key):
@@ -3453,6 +3526,16 @@ func _on_card_drag_finished(key: String, pos: Vector2, handled: bool) -> void:
 
 ## 重画连线（Web `paintEdges()`）：端点取 `visual_center()`，四种边各自配色 / 线宽 / 虚线。
 ## 聚焦选中开着时，与选中节点无关的边降到 12% 不透明（Web 的 `opacity .12`）。
+## 连线端点是否真的可见：卡被矩阵窗用 modulate.a=0 暂时遮掉时，不能继续画线。
+func _edge_card_shown(card: NodeCard, key: String) -> bool:
+	if card == null or not is_instance_valid(card):
+		return false
+	if String(key) == _drag_key:
+		return true
+	return card.visible and card.modulate.a > 0.0 \
+		and graph != null and graph.visible_node(graph.node(String(key)))
+
+
 func _repaint_edges() -> void:
 	_edges_dirty = false
 	if _edge_layer == null or graph == null:
@@ -3467,8 +3550,7 @@ func _repaint_edges() -> void:
 		if ca == null or cb == null:
 			continue
 		# 拖动中本卡被镜像隐藏（Web 也 `visibility:hidden` 原件）—— 边照常画
-		if not (ca.visible or String(a) == _drag_key) or \
-				not (cb.visible or String(b) == _drag_key):
+		if not _edge_card_shown(ca, a) or not _edge_card_shown(cb, b):
 			continue
 		segs.append({
 			"a": ca.visual_center(), "b": cb.visual_center(),
@@ -3484,8 +3566,7 @@ func _repaint_edges() -> void:
 		var cb: NodeCard = _cards.get(pair[1], null)
 		if ca == null or cb == null:
 			continue
-		if not (ca.visible or String(pair[0]) == _drag_key) or \
-				not (cb.visible or String(pair[1]) == _drag_key):
+		if not _edge_card_shown(ca, pair[0]) or not _edge_card_shown(cb, pair[1]):
 			continue
 		segs.append({
 			"a": ca.visual_center(), "b": cb.visual_center(), "kind": "tried",
@@ -3943,6 +4024,8 @@ func _apply_outcome(res: Dictionary, node_key: String) -> void:
 		_spawn_card(String(k))
 	for k in res.get("captured", []):
 		_refresh_or_spawn_card(String(k))
+	for k in res.get("consumed", []):
+		_despawn_card(String(k))
 	if bool(res.get("lit_changed", false)):
 		if _cards.has(node_key):
 			_cards[node_key].refresh()
@@ -4569,6 +4652,8 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 			_spawn_card(String(k))
 		for k in res.get("captured", []):
 			_refresh_or_spawn_card(String(k))
+		for k in res.get("consumed", []):
+			_despawn_card(String(k))
 		_relayout()
 		_commit(before)
 	else:

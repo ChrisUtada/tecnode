@@ -477,7 +477,23 @@ func _on_bar_input(event: InputEvent) -> void:
 		else:
 			_dragging = false
 	elif event is InputEventMouseMotion and _dragging:
-		position = _grab + (event.global_position - _press)
+		position = _clamp_window_pos(_grab + (event.global_position - _press))
+
+
+## 标题栏至少留 40px 在桌面内，避免窗口被拖到裁切区外永久拿不回。
+func clamp_into_parent() -> void:
+	position = _clamp_window_pos(position)
+
+
+func _clamp_window_pos(p: Vector2) -> Vector2:
+	var parent := get_parent() as Control
+	if parent == null:
+		return p
+	var keep := 40.0
+	var min_x := keep - size.x
+	var max_x := maxf(min_x, parent.size.x - keep)
+	var max_y := maxf(0.0, parent.size.y - keep)
+	return Vector2(clampf(p.x, min_x, max_x), clampf(p.y, 0.0, max_y))
 
 
 ## 提层回调（Desktop._place_z 接进来）：置 true 后标题栏按下不再 move_to_front

@@ -401,13 +401,32 @@ func _test_desktop(c: CaseLoader) -> void:
 	var probe: NodeCard = null
 	for key in scene._cards.keys():
 		var c2 := scene._cards[key] as NodeCard
-		if c2 != null and c2.visible:
+		if c2 == null or not c2.visible:
+			continue
+		if probe == null:
+			probe = c2
+		if not scene.graph.neighbors(String(key)).is_empty():
 			probe = c2
 			break
 	if probe != null:
 		var saved_global := probe.global_position
+		var probe_has_edges: bool = not scene.graph.neighbors(probe.card_key).is_empty()
+		if not probe_has_edges:
+			for key in scene._cards.keys():
+				var other := scene._cards[key] as NodeCard
+				if other != null and other.visible and other.card_key != probe.card_key:
+					scene.graph.link(probe.card_key, other.card_key, "entity")
+					probe_has_edges = true
+					break
+		scene._repaint_edges()
+		var segs_before: int = scene._edge_layer.segment_count()
 		probe.global_position = matrix.global_position + Vector2(20, 20)
 		scene._sync_matrix_occlusion()
+		scene._repaint_edges()
+		if probe_has_edges and segs_before > 0:
+			check("A7 淡出卡不再画连线",
+				scene._edge_layer.segment_count() < segs_before,
+				str(segs_before) + " -> " + str(scene._edge_layer.segment_count()))
 		check("A7 矩阵覆盖的卡淡出", probe.modulate.a == 0.0, str(probe.modulate.a))
 		matrix._on_close_pressed()
 		await process_frame
