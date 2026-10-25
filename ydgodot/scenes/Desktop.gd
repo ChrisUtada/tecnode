@@ -5530,6 +5530,16 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 		for k in res.get("consumed", []):
 			_despawn_card(String(k))
 		_relayout()
+		## 反应表命中：除案卷与节点产出外，再用独白把台词面对面说出来。
+		## TEC 的反应归 TEC 窗（分析链路），不要重复弹独白。
+		var reaction_owner := String(res.get("reaction_owner", ""))
+		if reaction_owner != "" and reaction_owner != "CHARS_TEC":
+			var trigger_id := String(res.get("reaction_trigger", ""))
+			var trigger_label := target_label
+			if trigger_id != "":
+				trigger_label = case_def.label_of(CaseLoader.kind_of_ref(trigger_id), trigger_id)
+			_open_reaction_monologue(reaction_owner, String(res.get("message", "")),
+				trigger_label)
 		_commit(before)
 	else:
 		var msg := String(res.get("message", ""))
@@ -5902,13 +5912,14 @@ func _on_chat_closed() -> void:
 
 
 ## 对话窗固定贴右上（Web `.chat-win`：right 18 / top 72；desk 已让出 header，再减 PAD 14）。
-func _open_chat(entry: DialogueDef, ids: Array) -> bool:
+func _open_chat(entry: DialogueDef, ids: Array, reveal_all := false,
+		title_override := "") -> bool:
 	if entry == null or case_def == null:
 		return false
 	_close_chat()
 	_chat_win = ChatWindow.new()
 	_chat_win.name = "chat_win"
-	_chat_win.setup_chat(entry, ids, case_def)
+	_chat_win.setup_chat(entry, ids, case_def, reveal_all, title_override)
 	_chat_win.closed.connect(_on_chat_closed)
 	_desk.add_child(_chat_win)
 	_place_z(_chat_win, ZR_CHAT)
@@ -5916,13 +5927,37 @@ func _open_chat(entry: DialogueDef, ids: Array) -> bool:
 	return true
 
 
+## 独白 = 整段台词一次贴出；不像多人对话那样等玩家逐句点。
 func _open_monologue(char_id: String) -> bool:
 	if dialogues == null:
 		return false
 	var entry := dialogues.monologue_of(char_id)
 	if entry == null:
 		return false
-	return _open_chat(entry, [char_id])
+	return _open_chat(entry, [char_id], true)
+
+
+## 人物对物品 / 线索的反应：仍进独白窗，但标题带上反应对象；
+## 单句反应一次贴完，不再只写进案卷让玩家错过。
+func _open_reaction_monologue(char_id: String, text: String, trigger_label: String) -> bool:
+	if char_id == "" or text.strip_edges() == "" or case_def == null:
+		return false
+	## 正在播多人对话时不抢窗；反应仍保留在案卷与画布产出里。
+	if _chat_win != null and is_instance_valid(_chat_win) and not _chat_win.is_monologue():
+		return false
+	var ch := case_def.char_of(char_id)
+	if ch == null:
+		return false
+	var entry := DialogueDef.new()
+	var parts: Array[CharDef] = [ch]
+	entry.participants = parts
+	var line := DialogueLineDef.new()
+	line.kind = "say"
+	line.who = ch
+	line.text = text
+	entry.script_lines.append(line)
+	var tail := "对「%s」的反应" % trigger_label if trigger_label != "" else "反应"
+	return _open_chat(entry, [char_id], true, "独白 · %s · %s" % [ch.name, tail])
 
 
 func _try_dialogue_combo(tool_key: String, target_key: String) -> bool:

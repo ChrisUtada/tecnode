@@ -133,10 +133,12 @@ func lookup_reaction(kind: String, owner_id: String, tool_id: String) -> Diction
 		return {}
 	for r in ch.item_reactions:
 		if r != null and r.trigger_id == tool_id:
-			return {"text": r.text, "results": r.results, "clues": r.clues, "field": "itemReactions"}
+			return {"text": r.text, "results": r.results, "clues": r.clues, "field": "itemReactions",
+				"reaction_owner": owner_id, "reaction_trigger": tool_id}
 	for r in ch.clue_reactions:
 		if r != null and r.trigger_id == tool_id:
-			return {"text": r.text, "results": r.results, "clues": r.clues, "field": "reactions"}
+			return {"text": r.text, "results": r.results, "clues": r.clues, "field": "reactions",
+				"reaction_owner": owner_id, "reaction_trigger": tool_id}
 	return {}
 
 
@@ -219,6 +221,8 @@ func _apply_reaction(hit: Dictionary, owner_key: String) -> Dictionary:
 		"message": raw,
 		"captured": captured,
 		"reveal": reveal,
+		"reaction_owner": String(hit.get("reaction_owner", "")),
+		"reaction_trigger": String(hit.get("reaction_trigger", "")),
 	}
 
 

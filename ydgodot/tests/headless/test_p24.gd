@@ -270,14 +270,70 @@ func _test_desktop(c: CaseLoader) -> void:
 	chat = scene.dbg_chat()
 	check("独白窗打开", chat != null)
 	if chat != null:
+		await process_frame
 		state = scene.dbg_chat_state()
 		check("独白标题", scene.dbg_chat_title() == "独白 · 陆珩松", scene.dbg_chat_title())
 		check("独白 id", String(state["id"]) == "DLG_lhs_alone", str(state["id"]))
 		check("独白一人", String(state["id"]) == "DLG_lhs_alone"
 			and (state["participants"] as Array).size() == 1)
 		check("独白 4 句", int(state["total"]) == 4, str(state["total"]))
-		check("独白首行旁白", chat.current_text() == String(
-			scene.dbg_dialogues().by_id("DLG_lhs_alone").script_lines[0].text))
+		var all_rows_shown := true
+		for row in chat._rows:
+			if (row["root"] as Control).modulate.a < 0.99:
+				all_rows_shown = false
+		check("独白一次完整显示全部台词",
+			all_rows_shown and chat.line_count() == chat._rows.size()
+				and not chat.is_typing() and int(state["idx"]) == 4 and bool(state["done"]),
+			"rows=%d shown=%d idx=%d done=%s" % [
+				chat._rows.size(), chat.line_count(), int(state["idx"]), str(state["done"])])
+		var last_line := String(
+			scene.dbg_dialogues().by_id("DLG_lhs_alone").script_lines[3].text)
+		check("独白当前文本 = 末行", chat.current_text() == last_line, chat.current_text())
+		var last_row := chat._rows[chat._rows.size() - 1]["root"] as Control
+		check("独白末行不越出正文区",
+			chat.body.get_global_rect().encloses(last_row.get_global_rect()),
+			"%s / %s" % [chat.body.get_global_rect(), last_row.get_global_rect()])
+		scene.dbg_chat_close()
+
+	# 人物对物品的反应：同一独白窗，标题带对象，一次贴完整句。
+	scene.dbg_ensure("item", "ITEMS_hy")
+	await process_frame
+	var logs_before_reaction: int = int(scene.graph.logs.size())
+	scene.dbg_combo_ui("ITEMS_hy", "CHARS_luhengs")
+	await process_frame
+	var reaction_chat: ChatWindow = scene.dbg_chat()
+	check("反应独白打开", reaction_chat != null)
+	if reaction_chat != null:
+		var reaction_text := ""
+		for r in c.char_of("CHARS_luhengs").item_reactions:
+			if r.trigger_id == "ITEMS_hy":
+				reaction_text = r.text
+		var hy_label := c.label_of("item", "ITEMS_hy")
+		check("反应独白标题带对象",
+			scene.dbg_chat_title() == "独白 · 陆珩松 · 对「%s」的反应" % hy_label,
+			scene.dbg_chat_title())
+		check("反应独白一次贴完整句",
+			reaction_chat.line_count() == 1 and not reaction_chat.is_typing()
+				and reaction_chat.current_text() == reaction_text,
+			reaction_chat.current_text())
+		check("反应仍进案卷", scene.graph.logs.size() > logs_before_reaction)
+		scene.dbg_chat_close()
+
+	# 线索反应走同一条独白通道。
+	scene.dbg_ensure("clue", "CLUES_qsan")
+	await process_frame
+	scene.dbg_combo_ui("CLUES_qsan", "CHARS_zs")
+	await process_frame
+	var clue_chat: ChatWindow = scene.dbg_chat()
+	check("线索反应独白打开", clue_chat != null)
+	if clue_chat != null:
+		var qsan_label := c.label_of("clue", "CLUES_qsan")
+		check("线索反应标题带对象",
+			scene.dbg_chat_title() == "独白 · 朱穗 · 对「%s」的反应" % qsan_label,
+			scene.dbg_chat_title())
+		check("线索反应一次贴完整句",
+			clue_chat.line_count() == 1 and not clue_chat.is_typing(),
+			"%d / %s" % [clue_chat.line_count(), str(clue_chat.is_typing())])
 		scene.dbg_chat_close()
 
 	check("测试钩子开三人剧本", scene.dbg_open_dialogue("DLG_garden_review", ["CHARS_zs", "NPC_FB"]))

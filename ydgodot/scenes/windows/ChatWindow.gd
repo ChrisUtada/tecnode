@@ -4,6 +4,8 @@ extends SysWindow
 ## 390 宽、右上角、逐行打字；有台词的人不在场时停下等，拖人物进来续播。
 
 const CHAR_MS := 45.0
+const BODY_PAD_X := 12.0
+const BODY_PAD_Y := 4.0
 const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var session: DialogueSession
@@ -19,12 +21,19 @@ var _hint: Label
 var _cur: TypewriterLabel = null
 var _cur_text := ""
 var _lines_shown := 0
+## 独白 / 反应独白：一次把全部行贴出，不要求玩家逐句点击。
+var _reveal_all := false
 
 
-func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader) -> void:
+## `p_reveal_all`：独白整段直接可见；标题可用 `p_title` 覆盖，
+## 反应独白据此带上「对『某物』的反应」，而普通对话仍走逐行推进。
+func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader,
+		p_reveal_all := false, p_title := "") -> void:
 	case_def = p_case
 	session = DialogueSession.new(p_entry, initial_ids)
-	setup(_chat_title(p_entry, initial_ids), 390, 200)
+	_reveal_all = p_reveal_all
+	var head := p_title if p_title != "" else _chat_title(p_entry, initial_ids)
+	setup(head, 390, 200)
 	content.add_theme_constant_override("separation", 0)
 
 	## W9：对话越长越不能把窗撑出桌布。正文放进滚动区，窗高封顶；
@@ -49,10 +58,10 @@ func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader) ->
 	var pad := MarginContainer.new()
 	pad.name = "chat_pad"
 	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	pad.add_theme_constant_override("margin_left", 12)
-	pad.add_theme_constant_override("margin_right", 12)
-	pad.add_theme_constant_override("margin_top", 4)
-	pad.add_theme_constant_override("margin_bottom", 4)
+	pad.add_theme_constant_override("margin_left", int(BODY_PAD_X))
+	pad.add_theme_constant_override("margin_right", int(BODY_PAD_X))
+	pad.add_theme_constant_override("margin_top", int(BODY_PAD_Y))
+	pad.add_theme_constant_override("margin_bottom", int(BODY_PAD_Y))
 	pad.mouse_filter = Control.MOUSE_FILTER_PASS
 	_scroll.add_child(pad)
 
@@ -92,7 +101,10 @@ func setup_chat(p_entry: DialogueDef, initial_ids: Array, p_case: CaseLoader) ->
 	body.gui_input.connect(_on_click)
 	content.gui_input.connect(_on_click)
 	_build_rows()
-	_advance()
+	if _reveal_all:
+		_reveal_all_rows()
+	else:
+		_advance()
 	call_deferred("_fit_height")
 
 
@@ -188,6 +200,25 @@ func _append_line(_line: DialogueLineDef) -> void:
 	_scroll_to_end()
 
 
+## 独白不是“点一下出一句”的对话：构建完就把所有行完整贴出。
+## 同时把 session 推到 done，避免之后点击再走 step 把已显示的行重复追加。
+func _reveal_all_rows() -> void:
+	if session != null:
+		session.index = session.total()
+		session.waiting_for = ""
+		session.done = true
+	for raw in _rows:
+		var row := raw as Dictionary
+		(row["root"] as Control).modulate.a = 1.0
+		var label := row["label"] as TypewriterLabel
+		label.finish_typing()
+	_lines_shown = _rows.size()
+	if not _rows.is_empty():
+		var last := _rows[_rows.size() - 1] as Dictionary
+		_cur = last["label"] as TypewriterLabel
+		_cur_text = String(last["text"])
+
+
 func _say_row(who_id: String, who_name: String, text: String) -> Array:
 	var row := HBoxContainer.new()
 	row.name = "chat_say"
@@ -261,7 +292,10 @@ func _fit_height() -> void:
 	var hint_h := 0.0
 	if _hint_box != null and _hint_box.visible:
 		hint_h = _hint_box.get_combined_minimum_size().y + 1.0
-	var target := clampf(SysWindow.BAR_H + 20.0 + lines_h + hint_h, 200.0, 380.0)
+	## 正文区还有 `chat_pad` 的上下 4px；只按 line_box 算会把最后一行切掉。
+	var lo := 120.0 if _reveal_all else 200.0
+	var target := clampf(SysWindow.BAR_H + 20.0 + lines_h + BODY_PAD_Y * 2.0 + hint_h,
+		lo, 380.0)
 	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:
 		set_inner_height(target)
 
@@ -301,6 +335,10 @@ func drop_character(id: String) -> bool:
 
 func line_count() -> int:
 	return _lines_shown
+
+
+func is_monologue() -> bool:
+	return _reveal_all
 
 
 func is_typing() -> bool:
