@@ -1,10 +1,10 @@
-[gd_resource type="Resource" script_class="ItemDef" format=3]
+[gd_resource type="Resource" script_class="ItemDef" format=3 uid="uid://curpa8pcgtk2d"]
 
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_wgvnf"]
-[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_wn1vp"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="3_m7jsk"]
-[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="4_vnsey"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="5_cjx5b"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_wgvnf"]
+[ext_resource type="Script" uid="uid://b02w85llmhtcr" path="res://core/defs/ExcerptDef.gd" id="2_wn1vp"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="3_m7jsk"]
+[ext_resource type="Script" uid="uid://cti0guintk12h" path="res://core/defs/HiddenClueDef.gd" id="4_vnsey"]
+[ext_resource type="Script" uid="uid://bfyp6gjma7kwr" path="res://core/defs/ItemDef.gd" id="5_cjx5b"]
 
 [sub_resource type="Resource" id="Resource_1yjr7"]
 script = ExtResource("4_vnsey")
@@ -12,7 +12,6 @@ text = "书桌、台灯、笔记……所有的一切都覆盖着一层薄薄的
 
 [resource]
 script = ExtResource("5_cjx5b")
-baggable = false
 id = "ITEM_shuzhuo"
 label = "书桌"
 desc = "木制的书桌上堆放着大量手写笔记，在靠近桌子的边缘，有一盏老式台灯，从灯罩中伸出一条黄铜的链子，拉动它似乎可以点亮台灯。书桌的两个抽屉闭合着，没有上锁。桌脚处摆着一个堆满灰烬的垃圾桶。
@@ -21,6 +20,7 @@ content = "木制的书桌上堆放着大量手写笔记，在靠近桌子的边
 书桌的两个抽屉闭合着，没有上锁。桌脚处摆着一个堆满灰烬的垃圾桶。
 
 返回 植物学家的花园"
+baggable = false
 hidden_clue = SubResource("Resource_1yjr7")
 node_items = PackedStringArray("ITEM_sxbj", "ITEM_taideng", "ITEM_chouti", "ITEMS_ljt")
 node_chars = PackedStringArray()

@@ -1,10 +1,10 @@
-[gd_resource type="Resource" script_class="SceneDef" format=3]
+[gd_resource type="Resource" script_class="SceneDef" format=3 uid="uid://dimlo8yu2en8i"]
 
-[ext_resource type="Script" path="res://core/defs/SceneDef.gd" id="1_a5ggm"]
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_hnfg6"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_ovar1"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zhpt.tres" id="3_7aorj"]
-[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="4_dgeaa"]
+[ext_resource type="Script" uid="uid://d0h5mowj0fpy1" path="res://core/defs/SceneDef.gd" id="1_a5ggm"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_hnfg6"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_ovar1"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_zhpt.tres" id="3_7aorj"]
+[ext_resource type="Script" uid="uid://cti0guintk12h" path="res://core/defs/HiddenClueDef.gd" id="4_dgeaa"]
 
 [sub_resource type="Resource" id="Resource_ihjr5"]
 script = ExtResource("4_dgeaa")

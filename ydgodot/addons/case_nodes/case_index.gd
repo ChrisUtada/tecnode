@@ -9,7 +9,7 @@ extends RefCounted
 ## ⚠ 扫描方式：**读 `.tres` 文本**，不 `ResourceLoader.load`。实测 load 87 个案件资源要
 ## 约 1.3 秒（每个都会连带加载 CommandDef / ExcerptDef 依赖），而读文本只要几十毫秒 ——
 ## 这个差距在编辑器里就是「点开窗口卡一下」和「立刻出来」的区别。
-## 目录名 → 类型是写死的（`items/chars/scenes/clues`），所以也不必 load 才知道类型。
+## 目录名 → 类型是写死的（`items/chars/scenes/evidence`），所以也不必 load 才知道类型。
 
 const ROOT := "res://cases"
 
@@ -18,7 +18,7 @@ const DIR_KIND := {
 	"items": "item",
 	"chars": "char",
 	"scenes": "loc",
-	"clues": "clue",
+	"evidence": "evidence",
 }
 
 ## 全编辑器共用一个索引：只在**第一次打开编辑窗口**时扫一遍案件目录，
@@ -66,7 +66,7 @@ func ensure() -> void:
 
 func rescan() -> void:
 	_scanned = true
-	_by_kind = {"item": {}, "char": {}, "loc": {}, "clue": {}}
+	_by_kind = {"item": {}, "char": {}, "loc": {}, "evidence": {}}
 	for case_dir in _subdirs(ROOT):
 		for dir_name in DIR_KIND:
 			var d: String = case_dir.path_join(String(dir_name))
@@ -88,8 +88,8 @@ static func kind_of(r: Resource) -> String:
 		return "item"
 	if r is CharDef:
 		return "char"
-	if r is ClueDef:
-		return "clue"
+	if r is EvidenceDef:
+		return "evidence"
 	return ""
 
 

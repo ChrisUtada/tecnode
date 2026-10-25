@@ -251,9 +251,9 @@ func _test_desktop(c: CaseLoader) -> void:
 	var clue_key: String = scene.dbg_ensure("clue", "CLUES_CBKW")
 	scene.dbg_select(clue_key)
 	await process_frame
-	check("收进线索册", scene.dbg_store(GraphState.LEDGER))
+	check("收进证据册", scene.dbg_store(GraphState.LEDGER))
 	await process_frame
-	check("线索册角标 1 条", scene.dbg_badge_text("clue") == "1 条", scene.dbg_badge_text("clue"))
+	check("证据册角标 1 条", scene.dbg_badge_text("clue") == "1 条", scene.dbg_badge_text("clue"))
 
 	# 4) 日志窗：关着时累未读，开窗清零
 	var before_n: int = scene.graph.log_count()
@@ -328,7 +328,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	await process_frame
 	scene.dbg_store(GraphState.LEDGER)
 	await process_frame
-	check("收入线索册不记日志", scene.graph.log_count() == n0, str(scene.graph.log_count() - n0))
+	check("收入证据册不记日志", scene.graph.log_count() == n0, str(scene.graph.log_count() - n0))
 
 	# 组合成功：一条 act，且不弹提示条（Web 刻意：结果靠画面自证）
 	scene.dbg_ensure("item", "ITEMS_cz")

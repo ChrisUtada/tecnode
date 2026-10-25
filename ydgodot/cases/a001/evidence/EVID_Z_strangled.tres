@@ -4,7 +4,8 @@
 
 [resource]
 script = ExtResource("1_slkgo")
-tier = "zheng"
+sense = "touch"
+origin = "synth"
 id = "EVID_Z_strangled"
 label = "被掩盖的缢死"
 desc = "时间可以被改写，但绳索留下的痕迹不会说谎：真正的死因是缢死。"

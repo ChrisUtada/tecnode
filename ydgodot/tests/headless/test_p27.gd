@@ -40,11 +40,11 @@ func _initialize() -> void:
 	var toast: Control = scene.get_node_or_null("desk/toast")
 	check("前提：toast 节点在", toast != null)
 
-	# ── N5 + V3：双击线索 = 捕获，卡面翻成深色反白 ──────────────────
-	var ck: String = scene.dbg_ensure("clue", "CLUES_nm")
+	# ── N5 + V3：双击证 = 确认，卡面翻成深色反白 ──────────────────
+	var ck: String = scene.dbg_ensure("evidence", "CLUES_nm")
 	await process_frame
 	var clue: NodeCard = _cards().get(ck)
-	check("前提：线索卡在画布上", clue != null, ck)
+	check("前提：证卡在画布上", clue != null, ck)
 	if clue == null:
 		print("=== %d 项，失败 %d ===" % [total, fails])
 		quit(1)
@@ -59,7 +59,7 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 	clue = _cards().get(ck)
-	check("双击线索：进 graph.captured",
+	check("双击证：进 graph.captured",
 		(scene.dbg_state()["captured"] as Array).has("CLUES_nm"),
 		str(scene.dbg_state()["captured"]))
 	check("V3：卡面翻成 got", clue.look_state() == "got", clue.look_state())
@@ -69,7 +69,7 @@ func _initialize() -> void:
 	check("V3：反白上缘 = 纯黑", col_hi.is_equal_approx(TecTheme.INK), str(col_hi))
 	check("V3：反白下缘 = 纯黑（上下同色，无渐变）", col_lo.is_equal_approx(TecTheme.INK), str(col_lo))
 	check("V3：深底上不留虚线框（反白自带边界）", not clue._border.visible)
-	check("N5：案卷记一条捕获", _log_has("已捕获线索"))
+	check("N5：案卷记一条确认", _log_has("已确认证据"))
 	check("N5：捕获不弹提示条（Web 刻意）", toast != null and not toast.visible)
 
 	_double_click(clue)
@@ -77,13 +77,13 @@ func _initialize() -> void:
 	check("重复双击：不重复记 captured",
 		(scene.dbg_state()["captured"] as Array).count("CLUES_nm") == 1,
 		str(scene.dbg_state()["captured"]))
-	check("重复双击：案卷留一条「已经捕获过了」", _log_has("已经捕获过了"))
+	check("重复双击：案卷留一条「已经确认过了」", _log_has("已经确认过了"))
 	check("重复双击：仍不弹提示条", toast != null and not toast.visible)
 
 	# ── V1：选中环（单击 = 选中，换选 = 旧的收环）───────────────────
 	_single_click(clue)
 	await process_frame
-	check("V1：单击线索出现选中环", clue.is_selected() and clue._sel.visible)
+	check("V1：单击证出现选中环", clue.is_selected() and clue._sel.visible)
 	var other: NodeCard = _first_card_except(ck)
 	check("前提：画布上还有别的卡可换选", other != null)
 	if other != null:

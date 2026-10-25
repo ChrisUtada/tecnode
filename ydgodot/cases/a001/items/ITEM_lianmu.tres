@@ -1,15 +1,16 @@
-[gd_resource type="Resource" script_class="ItemDef" format=3]
+[gd_resource type="Resource" script_class="ItemDef" format=3 uid="uid://y3buiyfphlls"]
 
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_3mu1c"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_sd5m1"]
-[ext_resource type="Script" path="res://core/defs/ConditionDef.gd" id="2_tfumb"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_qsan.tres" id="3_ukpxy"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="4_sd5m1"]
-[ext_resource type="Resource" path="res://cases/a001/clues/DATA_V_huij.tres" id="5_7xidx"]
-[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="5_s7uud"]
-[ext_resource type="Script" path="res://core/defs/commands/ConditionalCommandDef.gd" id="6_7xidx"]
-[ext_resource type="Resource" path="res://cases/a001/clues/DATA_T_sun.tres" id="6_gln2g"]
-[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="7_gln2g"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_3mu1c"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_sd5m1"]
+[ext_resource type="Script" uid="uid://cpr8ejgybxq4o" path="res://core/defs/ConditionDef.gd" id="2_tfumb"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_qsan.tres" id="3_ukpxy"]
+[ext_resource type="Script" uid="uid://bfyp6gjma7kwr" path="res://core/defs/ItemDef.gd" id="4_sd5m1"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/DATA_V_huij.tres" id="5_7xidx"]
+[ext_resource type="Script" uid="uid://ddv5xqm2n7vet" path="res://core/defs/PayloadDef.gd" id="5_s7uud"]
+[ext_resource type="Script" uid="uid://dtqa0xqm8cmyc" path="res://core/defs/commands/ConditionalCommandDef.gd" id="6_7xidx"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/DATA_T_sun.tres" id="6_gln2g"]
+[ext_resource type="Script" uid="uid://b02w85llmhtcr" path="res://core/defs/ExcerptDef.gd" id="7_gln2g"]
+[ext_resource type="Script" uid="uid://cti0guintk12h" path="res://core/defs/HiddenClueDef.gd" id="11_s7uud"]
 
 [sub_resource type="Resource" id="Resource_g0yh5"]
 script = ExtResource("2_tfumb")
@@ -28,13 +29,19 @@ success_message = "阳光直射进入花园。"
 on_success = SubResource("Resource_8g2b1")
 label = "拉开帘幕"
 
+[sub_resource type="Resource" id="Resource_7xidx"]
+script = ExtResource("11_s7uud")
+text = "帘幕缝隙里透进一线阳光。"
+clues = Array[ExtResource("2_sd5m1")]([ExtResource("6_gln2g")])
+
 [resource]
 script = ExtResource("4_sd5m1")
-baggable = false
 id = "ITEM_lianmu"
 label = "黑色帘幕"
 desc = "遮住整个花园的帘幕，透不进一丝阳光。"
+baggable = false
 commands = Array[ExtResource("1_3mu1c")]([SubResource("Resource_q3d3o")])
+hidden_clue = SubResource("Resource_7xidx")
 node_items = PackedStringArray()
 node_chars = PackedStringArray()
 node_locs = PackedStringArray()

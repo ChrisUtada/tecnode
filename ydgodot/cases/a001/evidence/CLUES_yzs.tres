@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_ov8ru"]
+
+[resource]
+script = ExtResource("1_ov8ru")
+sense = "taste"
+id = "CLUES_yzs"
+label = "抑制素"
+desc = "从陆珩松体内提取出的特殊物质。"
+source_text = "TEC 分析所得。"

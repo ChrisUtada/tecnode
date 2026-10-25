@@ -1,13 +1,13 @@
-[gd_resource type="Resource" script_class="ItemDef" format=3]
+[gd_resource type="Resource" script_class="ItemDef" format=3 uid="uid://cmlvf43ql05ua"]
 
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_jk3ud"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_liuy5"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_qmfls"]
-[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_htys.tres" id="3_liuy5"]
-[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_rxbs.tres" id="4_75yg0"]
-[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="5_b0gwq"]
-[ext_resource type="Script" path="res://core/defs/commands/PasswordCommandDef.gd" id="6_7lfhx"]
-[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="7_jus2a"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_jk3ud"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_liuy5"]
+[ext_resource type="Script" uid="uid://bfyp6gjma7kwr" path="res://core/defs/ItemDef.gd" id="2_qmfls"]
+[ext_resource type="Resource" uid="uid://sqnr66ff64sv" path="res://cases/a001/items/ITEMS_htys.tres" id="3_liuy5"]
+[ext_resource type="Resource" uid="uid://bosoh67v013o3" path="res://cases/a001/items/ITEMS_rxbs.tres" id="4_75yg0"]
+[ext_resource type="Script" uid="uid://ddv5xqm2n7vet" path="res://core/defs/PayloadDef.gd" id="5_b0gwq"]
+[ext_resource type="Script" uid="uid://twv7ufllwrh6" path="res://core/defs/commands/PasswordCommandDef.gd" id="6_7lfhx"]
+[ext_resource type="Script" uid="uid://b02w85llmhtcr" path="res://core/defs/ExcerptDef.gd" id="7_jus2a"]
 
 [sub_resource type="Resource" id="Resource_x7e00"]
 script = ExtResource("5_b0gwq")

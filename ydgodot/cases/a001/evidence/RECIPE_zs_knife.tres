@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="EvidenceRecipeDef" format=3]
 
 [ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_zs_word.tres" id="1_6irlh"]
-[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_knife.tres" id="2_w26mm"]
+[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_rxbs.tres" id="2_w26mm"]
 [ext_resource type="Resource" path="res://cases/a001/evidence/EVID_Z_zs_knife.tres" id="3_no88w"]
 [ext_resource type="Script" path="res://core/defs/EvidenceRecipeDef.gd" id="4_j88km"]
 

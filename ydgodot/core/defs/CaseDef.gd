@@ -11,7 +11,8 @@ extends Resource
 @export var scenes: Array[SceneDef] = []
 @export var items: Array[ItemDef] = []
 @export var chars: Array[CharDef] = []
-@export var clues: Array[ClueDef] = []
+## 旧线索数组只作迁移兼容；新数据一律进 `evidences`。
+@export var clues: Array[EvidenceDef] = []
 @export var evidences: Array[EvidenceDef] = []
 @export var evidence_recipes: Array[EvidenceRecipeDef] = []
 @export var memories: Array[MemoryDef] = []

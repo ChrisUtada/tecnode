@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_o6m0m"]
+
+[resource]
+script = ExtResource("1_o6m0m")
+sense = "touch"
+id = "CLUES_zhpt"
+label = "最后的一块拼图"
+desc = "距离成功只有一步之遥。"
+source_text = "TEC 分析所得。"

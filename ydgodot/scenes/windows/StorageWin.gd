@@ -73,9 +73,9 @@ func refresh_store() -> void:
 		_rows.remove_child(c)
 		c.queue_free()
 	if list.is_empty():
-		var hint := "证物袋是空的。把物品或证据拖到左侧「证物袋」图标或窗口上收纳；点一行可取回。"
+		var hint := "证物袋是空的。把物品或词拖到左侧「证物袋」图标或窗口上收纳；点一行可取回。"
 		if store_kind == GraphState.LEDGER:
-			hint = "线索册是空的。把线索拖到左侧「线索册」图标或窗口上收纳；点一行可取回。"
+			hint = "证据册是空的。把证拖到左侧「证据册」图标或窗口上收纳；点一行可取回。"
 		var empty := TecTheme.label(hint, TecTheme.FS_BODY, TecTheme.MUTED)
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empty.custom_minimum_size = Vector2(180.0, 0)
@@ -151,7 +151,7 @@ func _make_row(key: String) -> Control:
 
 	if store_kind == GraphState.LEDGER:
 		var to_mx := TecTheme.button("去推演")
-		to_mx.tooltip_text = "把这条线索放到推演桌布"
+		to_mx.tooltip_text = "把这条证放到推演桌布"
 		to_mx.custom_minimum_size = Vector2(54, 22)
 		to_mx.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		to_mx.add_theme_font_size_override("font_size", TecTheme.FS_BODY)

@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="SceneDef" format=3]
+[gd_resource type="Resource" script_class="SceneDef" format=3 uid="uid://bqbukqaih7dwv"]
 
-[ext_resource type="Script" path="res://core/defs/SceneDef.gd" id="1_2547x"]
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_d8gtu"]
+[ext_resource type="Script" uid="uid://d0h5mowj0fpy1" path="res://core/defs/SceneDef.gd" id="1_2547x"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_d8gtu"]
 
 [resource]
 script = ExtResource("1_2547x")

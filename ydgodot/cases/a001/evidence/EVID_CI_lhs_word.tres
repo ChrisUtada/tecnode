@@ -1,10 +1,11 @@
-[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+[gd_resource type="Resource" script_class="EvidenceDef" format=3 uid="uid://dnvuspf2qkw8y"]
 
-[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_4lpe8"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="1_4lpe8"]
 
 [resource]
 script = ExtResource("1_4lpe8")
 tier = "ci"
+origin = "synth"
 id = "EVID_CI_lhs_word"
 label = "陆珩松的独白"
 desc = "他坚持没有人会死去，语气却像在告别。"

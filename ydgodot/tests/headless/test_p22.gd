@@ -192,7 +192,7 @@ func _test_desktop() -> void:
 	var before_lines: int = scene.dbg_tec_win().line_count()
 	check("分析中拒绝第二个任务", not scene.dbg_tec_analyze_key("loc:SCENES_garden"))
 	scene.dbg_ensure("clue", "CLUES_nm")
-	check("线索节点拒绝分析", not scene.dbg_tec_analyze_key("clue:CLUES_nm"))
+	check("证节点拒绝分析", not scene.dbg_tec_analyze_key("evidence:CLUES_nm"))
 	scene.dbg_tec_win()._process(0.3)
 	check("分析进度推进", scene.dbg_tec_win().progress() > 0.0, str(scene.dbg_tec_win().progress()))
 
@@ -210,7 +210,7 @@ func _test_desktop() -> void:
 		and tec_win.get_global_rect().encloses(tec_win._hint.get_global_rect()),
 		"null" if tec_win == null else "%s / %s" % [
 			tec_win.get_global_rect(), tec_win._hint.get_global_rect()])
-	check("捕获尸体隐藏线索", (scene.graph.captured as Dictionary).has("CLUES_V_luheng"))
+	check("捕获尸体隐藏证据", (scene.graph.captured as Dictionary).has("CLUES_V_luheng"))
 	check("尸体档案进度 1", int(scene.graph.tec_prog.get("SCENES_body", 0)) == 1)
 	check("卡片点未读圆点", bool(info["dot"]) and chip.dbg_state()["dot"])
 	check("卡片完成文案", chip.status_text().contains("分析完成"), chip.status_text())
@@ -221,9 +221,9 @@ func _test_desktop() -> void:
 		if String(line).contains("植物学家") or String(line).contains("陆珩松"):
 			seen_hidden = true
 	check("分析结果写入对话历史", seen_hidden, str(scene.dbg_tec_win().dbg_lines()))
-	check("隐藏线索已上画布", (scene.dbg_state()["nodes"] as Array).has("clue:CLUES_V_luheng"))
+	check("隐藏证据已上画布", (scene.dbg_state()["nodes"] as Array).has("evidence:CLUES_V_luheng"))
 	var capture_keys: Array = scene.dbg_state()["captured"]
-	check("隐藏线索只捕获一次", capture_keys.count("CLUES_V_luheng") == 1)
+	check("隐藏证据只捕获一次", capture_keys.count("CLUES_V_luheng") == 1)
 
 	scene.dbg_tec_open()
 	info = scene.dbg_tec_info()
@@ -254,7 +254,7 @@ func _test_desktop() -> void:
 	for line in scene.dbg_tec_win().dbg_lines():
 		if String(line).contains("档案已经全部解读完毕"):
 			all_read = true
-		if String(line).contains("没有可以捕获的线索"):
+		if String(line).contains("没有新的证"):
 			no_clue = true
 	check("全部读完提示", all_read)
 	check("无可捕获提示", no_clue)
@@ -289,7 +289,7 @@ func _test_desktop() -> void:
 	await process_frame
 	var fallback_line := false
 	for line in scene.dbg_tec_win().dbg_lines():
-		if String(line).contains("没有更多线索"):
+		if String(line).contains("没有更多证据"):
 			fallback_line = true
 	check("无反应兜底", fallback_line)
 	check("兜底写入 tried", (scene.graph.tried as Dictionary).has("item:ITEMS_bd>tec-dock"))

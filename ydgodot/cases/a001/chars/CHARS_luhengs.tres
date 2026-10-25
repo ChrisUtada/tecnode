@@ -1,27 +1,27 @@
-[gd_resource type="Resource" script_class="CharDef" format=3]
+[gd_resource type="Resource" script_class="CharDef" format=3 uid="uid://clqpdkyqimoca"]
 
-[ext_resource type="Script" path="res://core/defs/ReactionDef.gd" id="1_qq2g3"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_wmhj.tres" id="2_cq83v"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_nm.tres" id="3_a8l8u"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_yzs.tres" id="4_dnp2i"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_xds.tres" id="5_mqpma"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_mc.tres" id="6_1vni2"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_CBKW.tres" id="7_8r3wl"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_lhsdst.tres" id="8_wpj6j"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="9_g456c"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_V_luheng.tres" id="10_vy76l"]
-[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="11_8i13g"]
-[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_changji.tres" id="12_k2gqk"]
-[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_jzmh.tres" id="13_v15wi"]
-[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_hy.tres" id="14_vfbl1"]
-[ext_resource type="Resource" path="res://cases/a001/items/ITEMS_a4paper.tres" id="15_sq1bl"]
-[ext_resource type="Script" path="res://core/defs/SceneTalkDef.gd" id="16_rauka"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="17_323su"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0704.tres" id="18_ymv3a"]
-[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="19_1el3v"]
-
-[ext_resource type="Script" path="res://core/defs/EvidenceFieldDef.gd" id="efd_script"]
+[ext_resource type="Script" uid="uid://c7gtygfp6r5fl" path="res://core/defs/ReactionDef.gd" id="1_qq2g3"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_wmhj.tres" id="2_cq83v"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_nm.tres" id="3_a8l8u"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_yzs.tres" id="4_dnp2i"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_xds.tres" id="5_mqpma"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_mc.tres" id="6_1vni2"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_CBKW.tres" id="7_8r3wl"]
+[ext_resource type="Resource" uid="uid://bqbukqaih7dwv" path="res://cases/a001/scenes/SCENES_lhsdst.tres" id="8_wpj6j"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="9_g456c"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_V_luheng.tres" id="10_vy76l"]
+[ext_resource type="Script" uid="uid://cti0guintk12h" path="res://core/defs/HiddenClueDef.gd" id="11_8i13g"]
+[ext_resource type="Resource" uid="uid://otlycwb8c1in" path="res://cases/a001/items/ITEMS_changji.tres" id="12_k2gqk"]
+[ext_resource type="Resource" uid="uid://cmlvf43ql05ua" path="res://cases/a001/items/ITEMS_jzmh.tres" id="13_v15wi"]
+[ext_resource type="Resource" uid="uid://crnlgxj1r3vmn" path="res://cases/a001/items/ITEMS_hy.tres" id="14_vfbl1"]
+[ext_resource type="Resource" uid="uid://crk31gjiwviwt" path="res://cases/a001/items/ITEMS_a4paper.tres" id="15_sq1bl"]
+[ext_resource type="Script" uid="uid://bmcrp4piui0ds" path="res://core/defs/SceneTalkDef.gd" id="16_rauka"]
+[ext_resource type="Resource" uid="uid://bq2bg0dg2s18d" path="res://cases/a001/scenes/SCENES_0602.tres" id="17_323su"]
+[ext_resource type="Resource" uid="uid://dimlo8yu2en8i" path="res://cases/a001/scenes/SCENES_0704.tres" id="18_ymv3a"]
+[ext_resource type="Script" uid="uid://dxeogelwlsx1c" path="res://core/defs/CharDef.gd" id="19_1el3v"]
+[ext_resource type="Script" uid="uid://db18133kvvrw1" path="res://core/defs/EvidenceFieldDef.gd" id="efd_script"]
 [ext_resource type="Resource" path="res://cases/a001/evidence/FIELD_lhs_cause.tres" id="ef_cause"]
+
 [sub_resource type="Resource" id="Resource_x3m33"]
 script = ExtResource("1_qq2g3")
 trigger_id = "CLUES_wmhj"
@@ -117,5 +117,5 @@ scene_talks = Array[ExtResource("16_rauka")]([SubResource("Resource_q0b34"), Sub
 clue_reactions = Array[ExtResource("1_qq2g3")]([SubResource("Resource_x3m33"), SubResource("Resource_i0jii"), SubResource("Resource_rb0ru"), SubResource("Resource_7jimo"), SubResource("Resource_isqvn"), SubResource("Resource_6yaf8")])
 item_reactions = Array[ExtResource("1_qq2g3")]([SubResource("Resource_ib6wx"), SubResource("Resource_dspnl"), SubResource("Resource_58qmv"), SubResource("Resource_x2dx4")])
 hidden_clue = SubResource("Resource_xexkm")
-metadata/changed = true
 evidence_fields = Array[ExtResource("efd_script")]([ExtResource("ef_cause")])
+metadata/changed = true

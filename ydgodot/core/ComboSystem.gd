@@ -76,11 +76,11 @@ func use_item(tool_key: String, target_key: String) -> Dictionary:
 		return {"ok": false, "no_tried": true,
 			"message": "这两个场景之间没有直接通路"}
 
-	# ⓪.5 证据配方：两侧都是证据卡时才查表；物/词/证只是字段，不在这里限制。
-	if String(tool["kind"]) == "evidence" and String(target["kind"]) == "evidence":
-		var recipe := case_def.evidence_recipe_for(tool_id, target_id)
-		if recipe != null:
-			return _apply_evidence_recipe(recipe, target_key)
+	# ⓪.5 配方：物 = 物品本体，词 / 证 = 证据卡。物品×物品、物×词、证×物都由配方表定义。
+	var recipe := case_def.evidence_recipe_for(String(tool["kind"]), tool_id,
+		String(target["kind"]), target_id)
+	if recipe != null:
+		return _apply_evidence_recipe(recipe, target_key)
 
 	# ① 目标自己有反应表（人物对「你手上的东西」说一句话）
 	var hit := lookup_reaction(String(target["kind"]), target_id, tool_id)
@@ -179,7 +179,10 @@ func _apply_evidence_recipe(recipe: EvidenceRecipeDef, target_key: String) -> Di
 		sx = 900.0
 	if sy < 0.0:
 		sy = 600.0
-	var key := graph.capture_evidence(ev.id, target_key, sx + 60.0, sy + 60.0)
+	var key := graph.capture_evidence(ev.id, target_key, sx + 60.0, sy + 60.0, "synth")
+	var evn := graph.node(key)
+	evn["origin"] = "synth"
+	evn["sense"] = recipe.sense
 	return {
 		"ok": true,
 		"matched": true,
@@ -187,6 +190,7 @@ func _apply_evidence_recipe(recipe: EvidenceRecipeDef, target_key: String) -> Di
 		"message": recipe.text if recipe.text.strip_edges() != "" else "证据链成立。",
 		"reveal": [key],
 		"produced_evidence": ev.id,
+		"sense": recipe.sense,
 	}
 
 
@@ -201,18 +205,9 @@ func _apply_evidence_recipe(recipe: EvidenceRecipeDef, target_key: String) -> Di
 ##   `results.scene` 若是时刻 id → 走档案开口径（Web announceTimeCollected） here handled by DESKTOP toast.
 func _apply_reaction(hit: Dictionary, owner_key: String) -> Dictionary:
 	var raw := String(hit.get("text", ""))
-	## §7-2：产出来自结构化 `clues`，正文只负责显示。
-	var captured := graph.capture_clue_refs(hit.get("clues", []), owner_key)
-	var reveal: Array = []
-	for ref in hit.get("clues", []):
-		var id := String((ref as ClueDef).id) if ref is ClueDef else String(ref)
-		if id == "" or not graph.has("clue", id):
-			continue
-		var ck := graph.key_of("clue", id)
-		if graph.node(ck).is_empty():
-			graph.add_node("clue", id)
-		graph.link(owner_key, ck, "entity")
-		reveal.append(ck)
+	## 产出来自结构化 `clues`（字段名沿用，内容已是证），正文只负责显示。
+	var captured := graph.capture_evidence_refs(hit.get("clues", []), owner_key, "synth")
+	var reveal: Array = captured.duplicate()
 
 	# results.scene：新场景 + `cond` 边（Web：ensureSceneNode + markFresh + isNew 才连边）
 	var results: Dictionary = hit.get("results", {})

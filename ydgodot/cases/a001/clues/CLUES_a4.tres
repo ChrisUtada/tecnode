@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="ClueDef" format=3]
-
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="1_57v81"]
-
-[resource]
-script = ExtResource("1_57v81")
-id = "CLUES_a4"
-label = "A4大小的纸"
-desc = "一张写着献祭与捕获的纸。"

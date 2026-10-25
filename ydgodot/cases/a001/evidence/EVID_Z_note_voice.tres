@@ -4,7 +4,8 @@
 
 [resource]
 script = ExtResource("1_r8sfy")
-tier = "zheng"
+sense = "hearing"
+origin = "synth"
 id = "EVID_Z_note_voice"
 label = "笔记与证词对应"
 desc = "陆珩松的说法与笔记里的修改痕迹互相印证。"

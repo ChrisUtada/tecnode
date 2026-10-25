@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="EndingDef" format=3]
+[gd_resource type="Resource" script_class="EndingDef" format=3 uid="uid://cw7rkxh8sp5kq"]
 
-[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="1_end"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_clue"]
-[ext_resource type="Resource" path="res://cases/tutorial/clues/CLUES_INVESTIGATOR_CERT.tres" id="3_cert"]
+[ext_resource type="Script" uid="uid://cda863exsx2j" path="res://core/defs/EndingDef.gd" id="1_end"]
+[ext_resource type="Script" uid="uid://c4yfit112qpl2" path="res://core/defs/EndingLineDef.gd" id="1_otv7x"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_clue"]
+[ext_resource type="Resource" path="res://cases/tutorial/evidence/CLUES_INVESTIGATOR_CERT.tres" id="3_cert"]
 
 [resource]
 script = ExtResource("1_end")

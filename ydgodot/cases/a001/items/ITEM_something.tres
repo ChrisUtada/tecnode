@@ -1,13 +1,13 @@
-[gd_resource type="Resource" script_class="ItemDef" format=3]
+[gd_resource type="Resource" script_class="ItemDef" format=3 uid="uid://dkxs71mgk5mgt"]
 
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_d18f0"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="2_7ka10"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_wsvhv"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_body.tres" id="3_wsvhv"]
-[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="4_tger0"]
-[ext_resource type="Resource" path="res://cases/a001/items/ITEM_shoudiantong.tres" id="5_w0hfk"]
-[ext_resource type="Script" path="res://core/defs/commands/UseItemCommandDef.gd" id="6_5hixq"]
-[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="7_up08b"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_d18f0"]
+[ext_resource type="Script" uid="uid://bfyp6gjma7kwr" path="res://core/defs/ItemDef.gd" id="2_7ka10"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_wsvhv"]
+[ext_resource type="Resource" uid="uid://choqbh6t88oog" path="res://cases/a001/scenes/SCENES_body.tres" id="3_wsvhv"]
+[ext_resource type="Script" uid="uid://ddv5xqm2n7vet" path="res://core/defs/PayloadDef.gd" id="4_tger0"]
+[ext_resource type="Resource" uid="uid://cdmo7osahg4ou" path="res://cases/a001/items/ITEM_shoudiantong.tres" id="5_w0hfk"]
+[ext_resource type="Script" uid="uid://cahtap1xp8427" path="res://core/defs/commands/UseItemCommandDef.gd" id="6_5hixq"]
+[ext_resource type="Script" uid="uid://b02w85llmhtcr" path="res://core/defs/ExcerptDef.gd" id="7_up08b"]
 
 [sub_resource type="Resource" id="Resource_oaa08"]
 script = ExtResource("4_tger0")

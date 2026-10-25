@@ -4,7 +4,7 @@ extends Resource
 ## 六型：text / choice / conditional / useItem / password / reveal（见 09-commands.js）。
 
 @export var label: String = ""
-## §7-2：该命令成功时直接产出的线索（显式结构化字段，不再从正文标签解析）。
-@export var clues: Array[ClueDef] = []
+## 该命令成功时直接产出的证（类型已收敛为 EvidenceDef）。
+@export var clues: Array[EvidenceDef] = []
 @export var requires_lit: Array[ItemDef] = []      # 光照门：这些灯至少亮一盏
 @export_multiline var fail_message: String = ""

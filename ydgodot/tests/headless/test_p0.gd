@@ -19,9 +19,9 @@ func _initialize() -> void:
 	print("=== P0 垂直切片回归 ===")
 	var c := CaseLoader.new()
 	check("装载 data/case-a001.json", c.load_case(), c.load_error)
-	check("案件有 11 个场景 / 35 件物品 / 20 条线索",
-		c.scenes.size() == 11 and c.items.size() == 35 and c.clues.size() == 20,
-		"%d/%d/%d" % [c.scenes.size(), c.items.size(), c.clues.size()])
+	check("案件有 11 个场景 / 35 件物品 / 28 条证据",
+		c.scenes.size() == 11 and c.items.size() == 35 and c.evidences.size() == 28,
+		"%d/%d/%d" % [c.scenes.size(), c.items.size(), c.evidences.size()])
 	var dirty := c.validate_text_clean()
 	check("§7-3 正文无退役标签（装载校验可用）", dirty.is_empty(), str(dirty.slice(0, 5)))
 	check("§7-3 退役标签会拒绝装载", c.validate_text_clean().is_empty())

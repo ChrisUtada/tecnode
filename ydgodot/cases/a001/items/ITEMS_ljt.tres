@@ -1,17 +1,26 @@
-[gd_resource type="Resource" script_class="ItemDef" format=3]
+[gd_resource type="Resource" script_class="ItemDef" format=3 uid="uid://efx6lpmmhe6r"]
 
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_rcfxj"]
-[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_cmi6u"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_mddqt"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_rcfxj"]
+[ext_resource type="Script" uid="uid://b02w85llmhtcr" path="res://core/defs/ExcerptDef.gd" id="2_cmi6u"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="3_bibfn"]
+[ext_resource type="Script" uid="uid://bfyp6gjma7kwr" path="res://core/defs/ItemDef.gd" id="3_mddqt"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/DATA_V_huij.tres" id="4_tcw2t"]
+[ext_resource type="Script" uid="uid://cti0guintk12h" path="res://core/defs/HiddenClueDef.gd" id="5_ht05n"]
+
+[sub_resource type="Resource" id="Resource_bqgo2"]
+script = ExtResource("5_ht05n")
+text = "垃圾桶底部积着细白的灰烬。"
+clues = Array[ExtResource("3_bibfn")]([ExtResource("4_tcw2t")])
 
 [resource]
 script = ExtResource("3_mddqt")
-baggable = false
 id = "ITEMS_ljt"
 label = "垃圾桶"
 desc = "书桌边的垃圾桶中堆积着不知从何而来的灰烬。"
 content = "书桌边的垃圾桶中堆积着不知从何而来的灰烬，像是焚烧什么留下的。数量多得让人不解。
 在灰烬之中，有一片未被焚烧干净的纸片。"
+baggable = false
+hidden_clue = SubResource("Resource_bqgo2")
 node_items = PackedStringArray("ITEM_shuzhuo", "ITEMS_wbfs")
 node_chars = PackedStringArray()
 node_locs = PackedStringArray()

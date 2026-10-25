@@ -40,7 +40,7 @@ const DropOutlineScript := preload("res://ui/DropOutline.gd")
 const PersonCardScript := preload("res://scenes/windows/PersonCard.gd")
 const TUT_OFFICE_KEY := "loc:" + TUT_OFFICE_ID
 const TUT_CERT_ITEM_KEY := "item:" + TUT_CERT_ITEM_ID
-const TUT_CERT_CLUE_KEY := "clue:" + TUT_CERT_CLUE_ID
+const TUT_CERT_CLUE_KEY := "evidence:" + TUT_CERT_CLUE_ID
 const TUT_CARD_X := 40.0
 const TUT_CARD_STEP_X := 60.0
 const TUT_CARD_STEP_Y := 80.0
@@ -1047,7 +1047,7 @@ func _refresh_crumbs() -> void:
 	if case_def != null:
 		scene_n = case_def.scenes.size()
 		ending_n = case_def.endings.size()
-	_crumb.text = "节点 %d/%d · 已探索场景 %d/%d · 已试组合 %d · 捕获线索 %d · 结局 %d/%d" % [
+	_crumb.text = "节点 %d/%d · 已探索场景 %d/%d · 已试组合 %d · 证据 %d · 结局 %d/%d" % [
 		vis, total, graph.explored.size(), scene_n, graph.tried.size(),
 		graph.captured.size(), graph.endings.size(), ending_n]
 	_crumb.tooltip_text = _crumb.text
@@ -1094,8 +1094,8 @@ func _goal_text() -> String:
 	if graph.explored.is_empty():
 		return "当前目标：双击「%s」展开现场" % case_def.scene_title(SLICE_SCENE)
 	if graph.matrix_count() <= 0:
-		return "当前目标：把线索放到推演桌布，长按执行者"
-	return "当前目标：核对推演桌布的线索，长按执行者"
+		return "当前目标：把证放到推演桌布，长按执行者"
+	return "当前目标：核对推演桌布的证，长按执行者"
 
 
 ## 「适应窗口」：按内容包围盒重新缩放居中。**不跑布局** —— 那会把玩家摆的位置全收回去。
@@ -1212,11 +1212,11 @@ const ICON_TOP := 16.0
 const ICON_PITCH := 76.0
 const ICON_MIN_PITCH := 68.0
 const ICON_COMPACT_PITCH := 64.0
-## 常驻 8 项：顺序即 Web `ICON_LAYOUT` 的顺序（人物排在线索册之后、日志排在 TEC 之后）
+## 常驻 8 项：顺序固定；证据册在人物之前、日志在 TEC 之后。
 const ICON_DEFS := [
 	["推演器", "infer", "star"],
 	["档案", "goto", "archive"],
-	["线索册", "clue", "notebook"],
+	["证据册", "clue", "notebook"],
 	["人物", "people", "users"],
 	["证物袋", "bag", "briefcase"],
 	["TEC", "tec", "tec"],
@@ -2828,7 +2828,7 @@ func _tutorial_spawn_node(kind: String, id: String, layer: int) -> String:
 
 
 func _tutorial_spawn_clue(id: String, from_key: String, layer: int) -> String:
-	var key := graph.capture_clue(id, from_key)
+	var key := graph.capture_evidence(id, from_key, -1.0, -1.0, "deduce")
 	var n := graph.node(key)
 	var pos := _tutorial_card_pos(layer)
 	n["x"] = pos.x
@@ -2873,7 +2873,7 @@ func _tutorial_talk_line() -> String:
 		TutorialStep.DRAG_CERT:
 			return "把「调查员证」拖给我，我核对一下。"
 		TutorialStep.STORE_SUPPLIES:
-			return "桌面可以整理：物品放证物袋，线索放线索册。不想收也行，直接双击推演器。"
+			return "桌面可以整理：物与词放证物袋，证放证据册。不想收也行，直接双击推演器。"
 		TutorialStep.INFER:
 			return "双击「推演器」开桌布，把「调查员证」拖上去，再长按执行者。挡住我的话拖开或点「–」收起。"
 		TutorialStep.CERT_FORM:
@@ -2897,7 +2897,7 @@ func _tutorial_tec_guard(key: String) -> bool:
 		TutorialStep.STORE_SUPPLIES:
 			_tutorial_say("桌面可以整理，但不是必须。收拾好就双击推演器；不想收也可以直接去。")
 		TutorialStep.INFER:
-			_tutorial_say("线索不要交给我——双击「推演器」打开桌布，把「调查员证」拖上去。")
+			_tutorial_say("证不要交给我——双击「推演器」打开桌布，把「调查员证」拖上去。")
 		TutorialStep.CERT_FORM:
 			_tutorial_say("先把调查员证填完。")
 		TutorialStep.CHOOSE_CASE:
@@ -2923,7 +2923,7 @@ func _tutorial_on_activate(key: String) -> bool:
 	return false
 
 
-## TEC 分析只产生节点相关提示 / 线索；TEC办公室分析不会产出调查员证。
+## TEC 分析只产生节点相关提示 / 证；TEC办公室分析不会产出调查员证。
 func _tutorial_on_tec_done(key: String) -> bool:
 	if _tutorial_step == TutorialStep.DOUBLE_CLICK_OFFICE and key == TUT_OFFICE_KEY:
 		_tutorial_say("TEC办公室：档案柜里有你的调查员证。双击办公室把它调出来，而不是拖给我。")
@@ -2933,7 +2933,7 @@ func _tutorial_on_tec_done(key: String) -> bool:
 		_tutorial_step = TutorialStep.STORE_SUPPLIES
 		_tutorial_unlock_apps()
 		_tutorial_set_hint()
-		_tutorial_say("核对完成。桌面可以整理：物品放证物袋，线索放线索册，但不整理也能继续。")
+		_tutorial_say("核对完成。桌面可以整理：物与词放证物袋，证放证据册，但不整理也能继续。")
 		return true
 	return false
 
@@ -2957,7 +2957,7 @@ func _tutorial_on_matrix_changed() -> void:
 		return
 	var got := 1 if graph.matrix_has(TUT_CERT_CLUE_ID) else 0
 	if got >= 1:
-		_matrix_win.set_hint("TEC：线索齐了。长按执行者，开始推演。")
+		_matrix_win.set_hint("TEC：证齐了。长按执行者，开始推演。")
 	else:
 		_matrix_win.set_hint("TEC：还需要「调查员证」——把它放到推演桌布，然后长按执行者。")
 
@@ -4267,15 +4267,17 @@ func _drop_hover_allowed(target_id: String) -> bool:
 	if n.is_empty():
 		return true
 	var kind := String(n["kind"])
+	var zheng := _is_zheng_node(n)
+	var word := _is_word_node(n)
 	if target_id.begins_with("person-field:"):
-		return kind == "evidence"
+		return zheng
 	match target_id:
 		"tec-dock", "tec-avatar", "tec-chip", "chat-win":
 			return false
 		"bag-win", "bag-dock":
-			return kind == "item" or kind == "evidence"
+			return kind == "item" or word
 		"clue-win", "clue-icon", "infer-icon", "mx-board":
-			return kind == "clue"
+			return zheng
 	return true
 
 
@@ -4370,6 +4372,14 @@ func _reject_drop(text: String) -> void:
 	_show_toast(text, true)
 
 
+func _is_word_node(n: Dictionary) -> bool:
+	return String(n.get("kind", "")) == "evidence" and String(n.get("tier", "")) == "ci"
+
+
+func _is_zheng_node(n: Dictionary) -> bool:
+	return String(n.get("kind", "")) == "evidence" and String(n.get("tier", "")) == "zheng"
+
+
 func _source_name(source: String) -> String:
 	match source:
 		"store":
@@ -4404,9 +4414,7 @@ func _dispatch_drop(key: String, target_id: String, _at_global: Vector2, source:
 			else:
 				_restash_to(key, GraphState.BAG, label)
 		"clue-win", "clue-icon":
-			if kind == "evidence":
-				_reject_drop("「%s」是证据，不归线索册——它属于证物袋。" % label)
-			elif source == "canvas":
+			if source == "canvas":
 				_store_into(GraphState.LEDGER, key)
 			else:
 				_restash_to(key, GraphState.LEDGER, label)
@@ -4418,11 +4426,11 @@ func _dispatch_drop(key: String, target_id: String, _at_global: Vector2, source:
 			else:
 				_reject_drop("先从%s把「%s」取回画布，再拖给 TEC 分析。" % [_source_name(source), label])
 		"infer-icon", "mx-board":
-			if kind == "evidence":
-				_reject_drop("推演桌布只接五感线索；证据属于证物袋。")
-			elif kind != "clue":
-				if not _tutorial_correct("推演桌布只收线索。"):
-					_reject_drop("只有线索能放到推演桌布。")
+			if not _is_zheng_node(n):
+				if kind == "evidence":
+					_reject_drop("推演桌布只接带五感的「证」；词是证言，先和物合成。")
+				elif not _tutorial_correct("推演桌布只收证。"):
+					_reject_drop("只有「证」能放到推演桌布。")
 			elif source != "matrix":
 				_assign_to_matrix(key)
 		"chat-win":
@@ -4449,12 +4457,14 @@ func _restash_to(key: String, to: String, label: String) -> void:
 	var from := String(graph.stored.get(key, ""))
 	if from == to:
 		return
-	var kind := String(graph.node(key).get("kind", ""))
-	if to == GraphState.BAG and kind != "item" and kind != "evidence":
-		_reject_drop("只有物品和证据能进证物袋。")
+	var nd := graph.node(key)
+	var kind := String(nd.get("kind", ""))
+	var tier := String(nd.get("tier", ""))
+	if to == GraphState.BAG and not (kind == "item" or (kind == "evidence" and tier == "ci")):
+		_reject_drop("证物袋收物与词；证是知识，进证据册。")
 		return
-	if to == GraphState.LEDGER and kind != "clue":
-		_reject_drop("只有线索能进线索册。")
+	if to == GraphState.LEDGER and not (kind == "evidence" and tier == "zheng"):
+		_reject_drop("证据册只收证；词进证物袋，物是原料。")
 		return
 	var before := _save.snapshot()
 	if not graph.restash(key, from, to):
@@ -4462,7 +4472,7 @@ func _restash_to(key: String, to: String, label: String) -> void:
 	_apply_hidden()
 	_refresh_matrix_views()
 	_show_toast("「%s」搬到%s" % [label,
-		"证物袋" if to == GraphState.BAG else "线索册"])
+		"证物袋" if to == GraphState.BAG else "证据册"])
 	_commit(before)
 
 
@@ -4471,27 +4481,34 @@ func _store_into(where: String, key: String) -> void:
 	var n := graph.node(key)
 	if n.is_empty():
 		return
-	var target_name := "证物袋" if where == GraphState.BAG else "线索册"
+	var target_name := "证物袋" if where == GraphState.BAG else "证据册"
 	if graph.stored.has(key):
 		var already := "「%s」已经在%s里了。" % [String(n.get("label", key)), target_name]
 		if not _tutorial_correct(already):
 			_reject_drop(already)
 		return
-	if where == GraphState.BAG and String(n["kind"]) != "item" and String(n["kind"]) != "evidence":
-		if not _tutorial_correct("只有物品和证据能进证物袋。"):
-			_reject_drop("只有物品和证据能进证物袋。")
-		return
-	if where == GraphState.BAG and not graph.can_bag(key):
-		var bag_msg := "「%s」不能放进证物袋。" % String(n.get("label", key))
-		if graph.is_container_node(key):
-			bag_msg = "「%s」是现场的一部分，收不走；它装着的东西可以单独收。" \
-				% String(n.get("label", key))
-		if not _tutorial_correct(bag_msg):
-			_reject_drop(bag_msg)
-		return
-	if where == GraphState.LEDGER and String(n["kind"]) != "clue":
-		if not _tutorial_correct("只有线索能进线索册。"):
-			_reject_drop("只有线索能进线索册。")
+	var kind := String(n.get("kind", ""))
+	var tier := String(n.get("tier", ""))
+	if where == GraphState.BAG:
+		if kind != "item" and not (kind == "evidence" and tier == "ci"):
+			var bag_msg := "证物袋收物与词；「%s」是证，请进证据册。" % String(n.get("label", key)) \
+				if kind == "evidence" else "证物袋收物与词；「%s」不能放进证物袋。" % String(n.get("label", key))
+			if not _tutorial_correct(bag_msg):
+				_reject_drop(bag_msg)
+			return
+		if not graph.can_bag(key):
+			var bag_msg2 := "「%s」不能放进证物袋。" % String(n.get("label", key))
+			if graph.is_container_node(key):
+				bag_msg2 = "「%s」是现场的一部分，收不走；它装着的东西可以单独收。" \
+					% String(n.get("label", key))
+			if not _tutorial_correct(bag_msg2):
+				_reject_drop(bag_msg2)
+			return
+	if where == GraphState.LEDGER and not (kind == "evidence" and tier == "zheng"):
+		var book_msg := "证据册只收证；词是证言，进证物袋。" if kind == "evidence" \
+			else "证据册只收证；物是原料。"
+		if not _tutorial_correct(book_msg):
+			_reject_drop(book_msg)
 		return
 	var before := _save.snapshot()
 	var ok := graph.bag_store(key) if where == GraphState.BAG else graph.ledger_store(key)
@@ -4584,10 +4601,11 @@ func _on_card_activated(key: String) -> void:
 	if _tutorial_active and _tutorial_on_activate(key):
 		return
 	var id := String(n["id"])
-	# 线索：双击 = 捕获（Web `runPrimary` 的第一支）。**不跑命令、不弹提示条**，
-	# 结果只进案卷 —— 卡面自己会翻成深色反白（`.got`），画面已经说清楚了。
-	if String(n["kind"]) == "clue":
+	# 证是知识代币：双击 = 确认（已由 TEC / 合成产出的证通常已 captured，重复双击只提示）。
+	if String(n["kind"]) == "evidence" and String(n.get("tier", "")) == "zheng":
 		_capture_clue_node(key)
+		return
+	if String(n["kind"]) == "evidence":
 		return
 	if n["kind"] == "loc":
 		# Web dblclick：场景若带命令（SCENES[id].commands），双击先跑 commands[0]，
@@ -4630,12 +4648,12 @@ func _capture_clue_node(key: String) -> void:
 	var id := String(n["id"])
 	var lab := String(n.get("label", id))
 	if graph.captured.has(id):
-		_log("线索「%s」已经捕获过了" % lab, "warn")
+		_log("证据「%s」已经确认过了" % lab, "warn")
 		return
 	var before := _save.snapshot()
-	graph.capture_clue(id)          # 同时把节点字典的 captured 置位（卡片读的是同一份引用）
+	graph.capture_evidence(id, key, -1.0, -1.0, "tec")
 	_refresh_or_spawn_card(key)
-	_log("已捕获线索「%s」" % lab, "cap")
+	_log("已确认证据「%s」" % lab, "cap")
 	_on_card_selected(key)
 	_commit(before)
 
@@ -4757,7 +4775,7 @@ func _toggle_storage(kind: String) -> void:
 		return
 	_ledger_win = StorageWin.new()
 	_ledger_win.name = "clue_win"
-	_ledger_win.setup_store("线索册", GraphState.LEDGER, graph, case_def)
+	_ledger_win.setup_store("证据册", GraphState.LEDGER, graph, case_def)
 	_ledger_win.writes_enabled = _case_open
 	_ledger_win.position = Vector2(410, 300)
 	_ledger_win.will_take.connect(_on_storage_will_take)
@@ -5034,12 +5052,10 @@ func _find_evidence_field(person_id: String, field_id: String) -> EvidenceFieldD
 
 func _evidence_tec_message(tier: String) -> String:
 	match tier:
-		"wu":
-			return "「物」是我分析出来的原料，不用再分析——拿去和证词拼成「证」吧。"
 		"ci":
-			return "话是你说给我听的，不用分析——它得先和物证拼成「证」。"
+			return "词是证言，不用分析——它得先和物拼成「证」。"
 		"zheng":
-			return "结论已经是结论了，不用再分析——把它拖到档案字段上。"
+			return "证已经是结论了，不用再分析——把它拖到证据册或档案字段上。"
 	return "证据不需要再分析。"
 
 
@@ -5064,14 +5080,16 @@ func _assign_evidence_to_field(person_id: String, field_id: String, key: String,
 	if graph.is_field_confirmed(person_id, field_id):
 		_reject_drop("「%s」已经核准，不能再附证据。" % field.label)
 		return false
-	if String(n.get("kind", "")) != "evidence":
-		_reject_drop("只有「证」级结论能填进档案字段。")
+	var kind := String(n.get("kind", ""))
+	if kind == "item":
+		_reject_drop("「%s」是物，只是原料——先和词合成「证」。" % label)
+		return false
+	if kind != "evidence":
+		_reject_drop("只有「证」能填进档案字段。")
 		return false
 	var tier := String(n.get("tier", ""))
 	if tier != "zheng":
-		var raw := "物" if tier == "wu" else "词"
-		_reject_drop("「%s」是「%s」级原料——把它和%s拼出「证」再说。" % [
-			label, raw, "证词" if tier == "wu" else "物证"])
+		_reject_drop("「%s」是词，只是证言——先和物合成「证」。" % label)
 		return false
 	var before := _save.snapshot()
 	graph.set_claim(person_id, field_id, "", String(n.get("id", "")))
@@ -5161,7 +5179,7 @@ func _check_person_claims(person_id: String, before := {}) -> bool:
 	return true
 
 
-## 关键字段全部盖章后，把该人物档案里的线索落到画布（落地即已捕获）。
+## 关键字段全部盖章后，把该人物档案里的演绎证据落到画布（origin=deduce，落地即已捕获）。
 func _drop_person_completion_clues(person_id: String) -> void:
 	var ch := case_def.char_of(person_id)
 	if ch == null:
@@ -5173,20 +5191,20 @@ func _drop_person_completion_clues(person_id: String) -> void:
 			continue
 		if graph.captured.has(f.drop_clue.id):
 			continue
-		var key := graph.capture_clue(f.drop_clue.id, person_key)
+		var key := graph.capture_evidence(f.drop_clue.id, person_key, -1.0, -1.0, "deduce")
 		graph.mark_fresh(key)
 		_refresh_or_spawn_card(key)
 		names.append(f.drop_clue.label)
-		var line := "档案核准：从「%s」的档案里掉落人物线索「%s」。（落地即已捕获）" % [
+		var line := "档案核准：从「%s」的档案里得出人物证据「%s」。（落地即已捕获）" % [
 			ch.name, f.drop_clue.label]
 		if _has_true_name_clue([key]):
 			_tec.append_true_clue(line)
 		else:
 			_tec.append_line(line)
-		_log("人物线索「%s」落地（已捕获）" % f.drop_clue.label, "cap")
+		_log("人物证据「%s」落地（已捕获）" % f.drop_clue.label, "cap")
 	if not names.is_empty():
 		_relayout()
-		_show_toast("获得人物线索：" + "、".join(names))
+		_show_toast("获得人物证据：" + "、".join(names))
 	else:
 		_tec.append_line("「%s」的档案已经全部核准。" % ch.name)
 
@@ -5416,26 +5434,28 @@ func _on_matrix_closed() -> void:
 	_place_floating_windows()
 
 
-## 画布 / 册子 → 桌布。感官自动取线索自身的 sense（与 Web 的 assignClue 一致）。
+## 画布 / 证据册 → 桌布。感官自动取证自身的 sense。
 func _assign_to_matrix(key: String) -> bool:
 	var n := graph.node(key)
 	if n.is_empty():
 		return false
-	if String(n["kind"]) != "clue":
+	if not _is_zheng_node(n):
+		var why := "推演桌布只收带五感的证；词先和物合成。" if String(n.get("kind", "")) == "evidence" \
+			else "推演桌布只收证；物是原料。"
 		if _tutorial_active and _tutorial_step == TutorialStep.INFER:
-			_tutorial_say("推演桌布只收线索。")
+			_tutorial_say(why)
 		else:
-			_reject_drop("只有线索能放到推演桌布。")
+			_reject_drop(why)
 		return false
-	var cl := case_def.clue_of(String(n["id"]))
-	if cl == null:
+	var ev := case_def.evidence_of(String(n["id"]))
+	if ev == null:
 		return false
-	## 收纳是可选的：直接拖线索上桌布也视为进入推演，不把玩家卡在证物袋/线索册。
+	## 收纳是可选的：直接拖证上桌布也视为进入推演。
 	if _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES:
 		_tutorial_begin_infer()
 	var before := _save.snapshot()
 	if not graph.matrix_assign(key):
-		_reject_drop("「%s」的感官类型是%s，无法放到推演桌布。" % [n.get("label", ""), GraphState.SENSE_NAMES.get(cl.sense, cl.sense)])
+		_reject_drop("「%s」的感官类型是%s，无法放到推演桌布。" % [n.get("label", ""), GraphState.SENSE_NAMES.get(ev.sense, ev.sense)])
 		return false
 	_apply_hidden()
 	_refresh_or_spawn_card(key)
@@ -5475,8 +5495,8 @@ func _on_matrix_took(key: String, at_global: Vector2 = Vector2(-1.0, -1.0)) -> v
 	_commit(before)
 
 
-## 桌布上的线索拖到线索册（窗**或册图标**，Web `overLedgerDrop` 的两条）= 改归册子；
-## 拖出桌布落到别处 = **带坐标**取回画布（反向 8 条路径的最后一条）
+## 桌布上的证拖到证据册（窗**或册图标**）= 改归册子；
+## 拖出桌布落到别处 = **带坐标**取回画布。
 func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
 	var target := _drop_target_at(at_global)
 	var tid := String(target.get("id", "")) if not target.is_empty() else ""
@@ -5498,8 +5518,7 @@ func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
 
 
 func _on_ledger_to_matrix(key: String) -> void:
-	## C6：线索册行内按钮必须和拖到推演器图标走同一条教学守卫，
-	## 不能绕开「收纳可选 → 推演」的步骤切换。
+	## C6：证据册行内按钮必须和拖到推演器图标走同一条教学守卫。
 	if _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES:
 		_tutorial_begin_infer()
 	var before := _save.snapshot()
@@ -5509,8 +5528,8 @@ func _on_ledger_to_matrix(key: String) -> void:
 		_tutorial_on_matrix_changed()
 		_commit(before)
 	else:
-		if not _tutorial_correct("这条线索没有可用的感官槽位。"):
-			_reject_drop("这条线索没有可用的感官槽位。")
+		if not _tutorial_correct("这条证没有可用的感官槽位。"):
+			_reject_drop("这条证没有可用的感官槽位。")
 
 
 func _refresh_matrix_views() -> void:
@@ -5525,7 +5544,7 @@ func _refresh_matrix_views() -> void:
 		_ledger_win.refresh_store()
 
 
-## 长按蓄力完成 → 配方判定（Web 的 executeInference）：恰好命中才算，多余线索也失败
+## 长按蓄力完成 → 配方判定：恰好命中才算，多余的证也失败
 func _run_inference() -> void:
 	var hit := graph.match_ending()
 	if _tutorial_active:
@@ -5533,7 +5552,7 @@ func _run_inference() -> void:
 			if hit == null or hit.id != TUT_ENDING_ID:
 				if _matrix_win != null and is_instance_valid(_matrix_win):
 					_matrix_win.show_heartbroken()
-					_matrix_win.set_hint("TEC：配方不对——只需要「调查员证」一条线索。")
+					_matrix_win.set_hint("TEC：配方不对——只需要「调查员证」一条证。")
 				return
 			_tutorial_on_inference_success(hit)
 			return
@@ -5543,10 +5562,10 @@ func _run_inference() -> void:
 			_matrix_win.set_hint("TEC：取证流程已经走完了。")
 		return
 	if hit == null:
-		## 失败要指向下一步：空桌布 vs 有线索但配方/数量不对。
-		var why := "推演桌布上还没有线索。先把线索放到推演桌布。"
+		## 失败要指向下一步：空桌布 vs 有证但配方/数量不对。
+		var why := "推演桌布上还没有证。先把证放到推演桌布。"
 		if graph.matrix_count() > 0:
-			why = "当前线索组合没有对应结局。检查配方与线索数量，取回多余线索再试。"
+			why = "当前证据组合没有对应结局。检查配方与证的数量，取回多余的证再试。"
 		if _matrix_win != null and is_instance_valid(_matrix_win):
 			_matrix_win.show_heartbroken()
 			_matrix_win.set_hint("TEC：" + why)
@@ -6799,9 +6818,6 @@ func _start_tec_analysis(key: String) -> bool:
 		return false
 	if _tutorial_active and not _tutorial_tec_guard(key):
 		return false
-	if String(n["kind"]) == "clue":
-		_show_toast("线索节点不需要再让 TEC 分析", true)
-		return false
 	if not _tec.visible and not _tec_min:
 		_open_tec()
 	return _tec.analyze(key, String(n.get("label", key)))
@@ -6846,41 +6862,6 @@ func _has_true_name_clue(keys: Array) -> bool:
 	return false
 
 
-func _hidden_evidence_of(kind: String, id: String) -> Array:
-	match kind:
-		"loc", "scene", "time":
-			var s := case_def.scene_of(id)
-			return s.hidden_evidence if s != null else []
-		"item":
-			var it := case_def.item_of(id)
-			return it.hidden_evidence if it != null else []
-	return []
-
-
-## TEC 分析完成：把 hidden_evidence 落到画布。返回新增 key / 名字。
-## 位置沿「目标右下 60 + i*26」；不重复掉落已有的证据。
-func _capture_node_hidden_evidence(kind: String, id: String, host_key: String) -> Dictionary:
-	var evs := _hidden_evidence_of(kind, id)
-	if evs.is_empty():
-		return {"keys": [], "names": []}
-	var host := graph.node(host_key)
-	var hx := float(host.get("x", -1.0))
-	var hy := float(host.get("y", -1.0))
-	var got: Array = []
-	var names: Array = []
-	for i in evs.size():
-		var ev := evs[i] as EvidenceDef
-		if ev == null or graph.has("evidence", ev.id):
-			continue
-		var x := hx + 60.0 + float(i) * 26.0 if hx >= 0.0 else -1.0
-		var y := hy + 60.0 + float(i) * 26.0 if hy >= 0.0 else -1.0
-		var key := _grant_evidence(ev, host_key, x, y)
-		if key != "":
-			got.append(key)
-			names.append(ev.label)
-	return {"keys": got, "names": names}
-
-
 func _hidden_clue_of(kind: String, id: String) -> HiddenClueDef:
 	match kind:
 		"loc", "time":
@@ -6906,20 +6887,20 @@ func _capture_node_hidden_clues(kind: String, id: String, host_key: String) -> D
 		if clue == null or graph.captured.has(clue.id) or seen.has(clue.id):
 			continue
 		seen[clue.id] = true
-		got.append(graph.capture_clue(clue.id, host_key))
+		got.append(graph.capture_evidence(clue.id, host_key, -1.0, -1.0, "tec"))
 		names.append(clue.label)
 	_refresh_clue_keys(got)
 	return {"keys": got, "names": names, "text": hc.text}
 
 
-## TEC 解读完成后捕获 hiddenClue（场景 / 物品同一套字段；当前先接场景分析链路）
+## TEC 解读完成后落 hidden_clue（字段名沿用，内容为证）。
 func _capture_hidden_clue(scene_id: String) -> void:
 	var kind := graph.normalize_kind("loc", scene_id)
 	var host := graph.key_of(kind, scene_id)
 	var res := _capture_node_hidden_clues(kind, scene_id, host)
 	if res["keys"].is_empty():
 		return
-	_show_toast("捕获线索：" + "、".join(res["names"]))
+	_show_toast("获得证据：" + "、".join(res["names"]))
 
 
 func _tec_talk_lines(sid: String) -> Array:
@@ -6992,8 +6973,7 @@ func _on_first_expand(kind: String, id: String, was_explored: bool) -> void:
 			_tec_hint("「%s」的档案可以解读——把场景节点拖给我分析。" % title, false, true)
 		else:
 			_tec_hint("先看看「%s」里有什么；可疑的东西可以拖给我。" % title)
-	elif _tec_reaction_text(kind, id) != "" or _hidden_clue_of(kind, id) != null \
-			or not _hidden_evidence_of(kind, id).is_empty():
+	elif _tec_reaction_text(kind, id) != "" or _hidden_clue_of(kind, id) != null:
 		_tec_hint("「%s」可以拖给我看看。" % title)
 
 
@@ -7007,7 +6987,7 @@ func _tec_reaction(key: String) -> bool:
 	var hit := _tec_reaction_hit(String(n["kind"]), id)
 	var raw := String(hit.get("text", ""))
 	if raw == "":
-		_tec.append_line("关于「%s」，我暂时没有更多线索。试试把它和别的节点组合。" % String(n["label"]))
+		_tec.append_line("关于「%s」，我暂时没有更多证据。试试把它和别的节点组合。" % String(n["label"]))
 		_log("TEC 对「%s」没有特别的反应" % String(n["label"]), "warn")
 		graph.tried[key + ">tec-dock"] = true
 		return false
@@ -7032,11 +7012,11 @@ func _tec_next_hint() -> String:
 	else:
 		hints.append("方向：还有没展开的现场或容器；双击它们，再看看人物名册。")
 	if graph.matrix_count() <= 0:
-		hints.append("操作：双击「推演器」，把线索放到推演桌布上。")
-		hints.append("明示：桌布空着不会触发推演——先放至少一条线索，再长按执行者。")
+		hints.append("操作：双击「推演器」，把证放到推演桌布上。")
+		hints.append("明示：桌布空着不会触发推演——先放至少一条证，再长按执行者。")
 	else:
-		hints.append("操作：长按桌布中央的执行者推演；不对就把线索取回画布再换。")
-		hints.append("明示：配方要正好匹配——多一条、少一条都会失败；先在日志里核对已有线索。")
+		hints.append("操作：长按桌布中央的执行者推演；不对就把证取回画布再换。")
+		hints.append("明示：配方要正好匹配——多一条、少一条都会失败；先在日志里核对已有的证。")
 	## G11：场上有带密码锁、且 TEC 有专属反应的东西时，直接把「拖给我」说明白。
 	for key in graph.nodes.keys():
 		var n := graph.node(String(key))
@@ -7112,7 +7092,7 @@ func _on_tec_analysis_done(target: String) -> void:
 		var unread := talks.size() - prog
 		var hidden := _capture_node_hidden_clues(kind, id, key)
 		if not (hidden["keys"] as Array).is_empty():
-			var hidden_line := "分析完成：「%s」中提取到线索 —— %s。（已落到画布上，可自由拖动）" \
+			var hidden_line := "分析完成：「%s」中得出证 —— %s。（已落到画布上，可自由拖动）" \
 				% [label, "、".join(hidden["names"])]
 			if _has_true_name_clue(hidden["keys"]):
 				_tec.append_true_clue(hidden_line)
@@ -7120,11 +7100,11 @@ func _on_tec_analysis_done(target: String) -> void:
 				_tec.append_line(hidden_line)
 			if String(hidden["text"]) != "":
 				_tec.append_line(String(hidden["text"]))
-			_log("TEC 捕获「%s」的隐藏线索：%s" % [label, "、".join(hidden["names"])], "cap")
-			_show_toast("捕获线索：" + "、".join(hidden["names"]))
+			_log("TEC 从「%s」得出证：%s" % [label, "、".join(hidden["names"])], "cap")
+			_show_toast("获得证据：" + "、".join(hidden["names"]))
 		elif unread <= 0:
-			_tec.append_line("分析完成：「%s」中没有可以捕获的线索。" % label)
-			_log("TEC 分析「%s」：无可捕获线索" % label, "warn")
+			_tec.append_line("分析完成：「%s」中没有新的证。" % label)
+			_log("TEC 分析「%s」：没有新的证" % label, "warn")
 		if not talks.is_empty() and unread > 0:
 			var line := String(talks[prog])
 			graph.tec_prog[id] = prog + 1
@@ -7132,16 +7112,11 @@ func _on_tec_analysis_done(target: String) -> void:
 			_log("TEC 解读了「%s」的档案（%d/%d）" % [label, prog + 1, talks.size()], "sys")
 		elif not talks.is_empty():
 			_tec.append_line("「%s」的档案已经全部解读完毕。" % label)
-		var scene_ev := _capture_node_hidden_evidence(kind, id, key)
-		if not (scene_ev["keys"] as Array).is_empty():
-			_tec.append_line("分析完成：「%s」中提取到证据 —— %s。（已落到画布上）" \
-				% [label, "、".join(scene_ev["names"])])
-			_log("TEC 从「%s」提取证据：%s" % [label, "、".join(scene_ev["names"])], "cap")
 	else:
 		_tec_reaction(key)
 		var ent_hidden := _capture_node_hidden_clues(kind, id, key)
 		if not (ent_hidden["keys"] as Array).is_empty():
-			var ent_line := "分析完成：「%s」中提取到线索 —— %s。（已落到画布上，可自由拖动）" \
+			var ent_line := "分析完成：「%s」中得出证 —— %s。（已落到画布上，可自由拖动）" \
 				% [label, "、".join(ent_hidden["names"])]
 			if _has_true_name_clue(ent_hidden["keys"]):
 				_tec.append_true_clue(ent_line)
@@ -7149,13 +7124,8 @@ func _on_tec_analysis_done(target: String) -> void:
 				_tec.append_line(ent_line)
 			if String(ent_hidden["text"]) != "":
 				_tec.append_line(String(ent_hidden["text"]))
-			_log("TEC 捕获「%s」的隐藏线索：%s" % [label, "、".join(ent_hidden["names"])], "cap")
-			_show_toast("捕获线索：" + "、".join(ent_hidden["names"]))
-		var ent_ev := _capture_node_hidden_evidence(kind, id, key)
-		if not (ent_ev["keys"] as Array).is_empty():
-			_tec.append_line("分析完成：「%s」中提取到证据 —— %s。（已落到画布上）" \
-				% [label, "、".join(ent_ev["names"])])
-			_log("TEC 从「%s」提取证据：%s" % [label, "、".join(ent_ev["names"])], "cap")
+			_log("TEC 从「%s」得出证：%s" % [label, "、".join(ent_hidden["names"])], "cap")
+			_show_toast("获得证据：" + "、".join(ent_hidden["names"]))
 	if _tec_min:
 		_tec_dot = true
 		_sync_tec_chip()

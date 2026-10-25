@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_clue"]
+
+[resource]
+script = ExtResource("1_clue")
+id = "CLUES_INVESTIGATOR_CERT"
+tier = "zheng"
+sense = "vision"
+origin = "deduce"
+label = "调查员证"
+desc = "TEC 已核对：证件格式有效，只差填写姓名、编号、日期和照片。"
+source_text = "TEC 核对所得。"

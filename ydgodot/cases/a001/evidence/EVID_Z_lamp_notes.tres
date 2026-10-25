@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_st8pe")
-tier = "zheng"
+origin = "synth"
 id = "EVID_Z_lamp_notes"
 label = "台灯下的字迹"
 desc = "笔记的压痕与台灯位置对得上，说明有人在灯下反复改写。"

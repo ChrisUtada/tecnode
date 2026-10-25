@@ -93,7 +93,7 @@ func _test_reveal_light_gate() -> void:
 	check("摊出的东西连到笔记（entity 边）", g.has_edge("item:ITEM_sxbj", "item:ITEMS_dlh", "entity"))
 
 
-# ── 4. conditional：线索不齐就不放行（植物 → 铁门）─────────────────────
+# ── 4. conditional：证不齐就不放行（植物 → 铁门）─────────────────────
 func _test_conditional() -> void:
 	var it := c.item_of("ITEMS_zhiwu")
 	var cmd: ConditionalCommandDef = null
@@ -102,17 +102,17 @@ func _test_conditional() -> void:
 			cmd = x
 	check("植物配的是 conditional 命令", cmd != null and cmd.conditions.size() >= 5)
 	var bad := cs.execute(g.key_of("item", "ITEMS_zhiwu"), cmd)
-	check("线索不齐：被拦下且给出 failMessage",
+	check("证不齐：被拦下且给出 failMessage",
 		bool(bad.get("blocked", false)) and String(bad.get("message", "")).length() > 0)
 	check("拦下时没有长出铁门说明", not String(bad.get("message", "")).contains("铁门"))
 
 	for cond in cmd.conditions:
 		g.captured[cond.clue.id] = true
 	var good := cs.execute(g.key_of("item", "ITEMS_zhiwu"), cmd)
-	check("线索齐了：放行并说出铁门", bool(good.get("ok", false)) and String(good.get("message", "")).contains("铁门"))
-	check("线索齐了：产出「门的后面」场景",
+	check("证齐了：放行并说出铁门", bool(good.get("ok", false)) and String(good.get("message", "")).contains("铁门"))
+	check("证齐了：产出「门的后面」场景",
 		(good.get("reveal", []) as Array).has("loc:SCENES_mdhm") or g.has("loc", "SCENES_mdhm"))
-	check("线索齐了：成功文案提示双击进入", String(good.get("message", "")).contains("双击"))
+	check("证齐了：成功文案提示双击进入", String(good.get("message", "")).contains("双击"))
 
 
 # ── 5. password：木盒 0321（错的不推进、对的开箱给东西）────────────────

@@ -16,9 +16,8 @@ extends Resource
 @export_multiline var desc: String = ""
 @export var image: String = ""
 @export var can_be_picked: bool = false
+## TEC 分析该场景时产出的证（字段名保留 hidden_clue，内容已收敛为证）。
 @export var hidden_clue: HiddenClueDef = null
-## TEC 分析该场景时一并掉落的「物」级证据。
-@export var hidden_evidence: Array[EvidenceDef] = []
 ## 双击可先跑的命令（Web `SCENES[id].commands`，a001 里 0/11 用到；为未来案件铺路）。
 ## 空数组 = 回到容器展开 / 折叠的默认行为。
 @export var commands: Array[CommandDef] = []

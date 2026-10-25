@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_00580"]
+
+[resource]
+script = ExtResource("1_00580")
+sense = "taste"
+id = "CLUES_yjhds"
+label = "洋金花毒素"
+desc = "全株有毒，毒性成分主要是东莨菪碱、阿托品和山莨菪碱等生物碱。"
+source_text = "TEC 分析所得。"

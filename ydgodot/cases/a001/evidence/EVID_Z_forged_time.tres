@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_boqen")
-tier = "zheng"
+origin = "synth"
 id = "EVID_Z_forged_time"
 label = "伪造的时间"
 desc = "有人改写了笔记和证词里的时间，让死亡时刻看起来更早。"

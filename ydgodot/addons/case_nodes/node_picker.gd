@@ -1,6 +1,6 @@
 @tool
 extends AcceptDialog
-## 「画布节点」编辑窗口：四栏（物品 / 人物 / 地点 / 线索）各一个 tab。
+## 「画布节点」编辑窗口：四栏（物品 / 人物 / 地点 / 证据）各一个 tab。
 ##
 ## 为什么不在检查器里做：检查器每次刷新都重建 `EditorProperty`，把列表画在那里
 ## 等于每次刷新 free + 重建几十个 Control，还要扫案件目录 —— 检查器会明显变卡。
@@ -14,9 +14,9 @@ const PARTS: Array = [
 	{"field": "node_items", "kind": "item", "label": "物品", "dir": "items"},
 	{"field": "node_chars", "kind": "char", "label": "人物", "dir": "chars"},
 	{"field": "node_locs", "kind": "loc", "label": "地点", "dir": "scenes"},
-	{"field": "node_clues", "kind": "clue", "label": "线索", "dir": "clues"},
+	{"field": "node_clues", "kind": "evidence", "label": "证据", "dir": "evidence"},
 ]
-const KIND_LABEL := {"item": "物品", "char": "人物", "loc": "地点", "clue": "线索"}
+const KIND_LABEL := {"item": "物品", "char": "人物", "loc": "地点", "evidence": "证据"}
 const Index := preload("res://addons/case_nodes/case_index.gd")
 
 ## 单例：编辑器里只存在一个窗口，反复点「编辑…」只是换绑对象（避免窗口越开越多）

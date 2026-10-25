@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_tama2")
 tier = "ci"
+origin = "synth"
 id = "EVID_CI_lhs_mem"
 label = "陆珩松的回忆"
 desc = "6月2日的合影与快门声，藏着他没有说完的承诺。"

@@ -1,12 +1,12 @@
-[gd_resource type="Resource" script_class="ItemDef" format=3]
+[gd_resource type="Resource" script_class="ItemDef" format=3 uid="uid://khs6s81wj7cr"]
 
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_odxdk"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_gv1tk"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_odxdk"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_gv1tk"]
 [ext_resource type="Resource" path="res://cases/a001/items/ITEMS_zbbdz.tres" id="2_rlndn"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_gv1tk"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_xds.tres" id="3_pdhfu"]
-[ext_resource type="Script" path="res://core/defs/commands/UseItemCommandDef.gd" id="4_pdhfu"]
-[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="5_n0h78"]
+[ext_resource type="Script" uid="uid://bfyp6gjma7kwr" path="res://core/defs/ItemDef.gd" id="3_gv1tk"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_xds.tres" id="3_pdhfu"]
+[ext_resource type="Script" uid="uid://cahtap1xp8427" path="res://core/defs/commands/UseItemCommandDef.gd" id="4_pdhfu"]
+[ext_resource type="Script" uid="uid://b02w85llmhtcr" path="res://core/defs/ExcerptDef.gd" id="5_n0h78"]
 
 [sub_resource type="Resource" id="Resource_m3njp"]
 script = ExtResource("4_pdhfu")

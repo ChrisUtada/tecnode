@@ -1,18 +1,16 @@
-[gd_resource type="Resource" script_class="ItemDef" format=3]
+[gd_resource type="Resource" script_class="ItemDef" format=3 uid="uid://csg24nf0vpybt"]
 
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_ljlx5"]
-[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_2h1kp"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="3_ikslc"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_mc.tres" id="4_ce506"]
-[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="5_5wcn4"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="6_upcah"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_ljlx5"]
+[ext_resource type="Script" uid="uid://b02w85llmhtcr" path="res://core/defs/ExcerptDef.gd" id="2_2h1kp"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_mc.tres" id="4_ce506"]
+[ext_resource type="Script" uid="uid://cti0guintk12h" path="res://core/defs/HiddenClueDef.gd" id="5_5wcn4"]
+[ext_resource type="Script" uid="uid://bfyp6gjma7kwr" path="res://core/defs/ItemDef.gd" id="6_upcah"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
 
-[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
-[ext_resource type="Resource" path="res://cases/a001/evidence/EVID_WU_rope.tres" id="ev_rope"]
 [sub_resource type="Resource" id="Resource_4on64"]
 script = ExtResource("5_5wcn4")
 text = "毛刺硬得如同针一般，轻易就扎破了手指。鲜血很快就被吸收了。"
-clues = Array[ExtResource("3_ikslc")]([ExtResource("4_ce506")])
+clues = Array[ExtResource("evd_script")]([ExtResource("4_ce506")])
 
 [resource]
 script = ExtResource("6_upcah")
@@ -25,4 +23,3 @@ node_items = PackedStringArray()
 node_chars = PackedStringArray()
 node_locs = PackedStringArray()
 node_clues = PackedStringArray()
-hidden_evidence = Array[ExtResource("evd_script")]([ExtResource("ev_rope")])

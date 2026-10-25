@@ -216,10 +216,7 @@
       "nodeItems": [],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": [],
-      "hiddenEvidence": [
-        "EVID_WU_lamp"
-      ]
+      "nodeClues": []
     },
     "ITEM_chouti": {
       "baggable": false,
@@ -322,7 +319,13 @@
       "nodeItems": [],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": []
+      "nodeClues": [],
+      "hiddenClue": {
+        "text": "帘幕缝隙里透进一线阳光。",
+        "ids": [
+          "DATA_T_sun"
+        ]
+      }
     },
     "ITEMS_zhiwu": {
       "label": "植物",
@@ -550,10 +553,7 @@
       "nodeItems": [],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": [],
-      "hiddenEvidence": [
-        "EVID_WU_rope"
-      ]
+      "nodeClues": []
     },
     "ITEMS_jzmh": {
       "label": "精致的木盒",
@@ -682,10 +682,7 @@
       "nodeItems": [],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": [],
-      "hiddenEvidence": [
-        "EVID_WU_knife"
-      ]
+      "nodeClues": []
     },
     "ITEMS_yjh": {
       "label": "洋金花",
@@ -732,7 +729,13 @@
       "nodeItems": [],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": []
+      "nodeClues": [],
+      "hiddenClue": {
+        "text": "注射器里残留的液体，提取得出抑制素。",
+        "ids": [
+          "CLUES_yzs"
+        ]
+      }
     },
     "ITEMS_dlh": {
       "label": "大丽花",
@@ -820,10 +823,7 @@
       "nodeItems": [],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": [],
-      "hiddenEvidence": [
-        "EVID_WU_note"
-      ]
+      "nodeClues": []
     },
     "ITEM_shuzhuo": {
       "baggable": false,
@@ -857,7 +857,13 @@
       ],
       "nodeChars": [],
       "nodeLocs": [],
-      "nodeClues": []
+      "nodeClues": [],
+      "hiddenClue": {
+        "text": "垃圾桶底部积着细白的灰烬。",
+        "ids": [
+          "DATA_V_huij"
+        ]
+      }
     }
   },
   "chars": {
@@ -1263,108 +1269,6 @@
         }
       },
       "avatar": "images/avatar_CHARS_TEC.png"
-    }
-  },
-  "clues": {
-    "DATA_T_sun": {
-      "label": "阳光",
-      "type": "touch",
-      "desc": "灼热的阳光穿透了玻璃窗。"
-    },
-    "DATA_V_huij": {
-      "label": "灰烬",
-      "type": "vision",
-      "desc": "漫天灰烬"
-    },
-    "DATA_H_music": {
-      "label": "G弦上的咏叹调",
-      "type": "hearing",
-      "desc": "《G弦上的咏叹调》是德国作曲家巴赫（Johann Sebastian Bach 1685年3月21日—1750年7月28日）创作的《第三号管弦乐组曲》第二乐章主题。"
-    },
-    "CLUES_V_luheng": {
-      "label": "植物学家陆珩松",
-      "type": "vision",
-      "desc": "植物学家陆珩松。"
-    },
-    "CLUES_gcs": {
-      "label": "贯穿伤",
-      "type": "vision",
-      "desc": "被利器从下腹部插入，留下了一道深深的伤口。"
-    },
-    "CLUES_wmhj": {
-      "label": "陆珩松的录音",
-      "type": "hearing",
-      "desc": "JS，当你听到这个录音的时候，我距离解开了所有的秘密只有一步之遥了。但我的时间已经不够了……我留下了足够你理解的笔记，也只有你能完成最后的步骤。现在，我可以安静等待死亡，以及与你重逢了。另外，在万事俱备之前，无论如何都不要拉开帘幕。"
-    },
-    "CLUES_JS": {
-      "label": "植物学家槿杉",
-      "type": "vision",
-      "desc": "植物学家槿杉。"
-    },
-    "CLUES_nm": {
-      "label": "鸟鸣",
-      "type": "hearing",
-      "desc": "隐隐约约听到类似鹦哥的鸣叫。"
-    },
-    "CLUES_CBKW": {
-      "label": "草本的苦味",
-      "type": "taste",
-      "desc": "一股淡淡的苦味。"
-    },
-    "CLUES_mc": {
-      "label": "毛刺",
-      "type": "touch",
-      "desc": "绳索上坚硬的毛刺，如同一根根针。"
-    },
-    "CLUES_xds": {
-      "label": "呋喃香豆素",
-      "type": "smell",
-      "desc": "呋喃香豆素"
-    },
-    "CLUES_fb": {
-      "label": "植物研究所所长傅柏",
-      "type": "vision",
-      "desc": "植物研究所所长傅柏"
-    },
-    "CLUES_zs": {
-      "label": "朱穗",
-      "type": "vision",
-      "desc": "助手"
-    },
-    "CLUES_yzs": {
-      "label": "抑制素",
-      "type": "taste",
-      "desc": "从陆珩松体内提取出的特殊物质。"
-    },
-    "CLUES_qsan": {
-      "label": "墙上的按钮",
-      "type": "touch",
-      "desc": "按下墙上的按钮。"
-    },
-    "CLUES_zhpt": {
-      "label": "最后的一块拼图",
-      "type": "touch",
-      "desc": "距离成功只有一步之遥。"
-    },
-    "CLUES_mgd": {
-      "label": "染血的美工刀",
-      "type": "vision",
-      "desc": "一把染血的美工刀，被藏在带着密码锁的木盒之中。"
-    },
-    "CLUES_yjhds": {
-      "label": "洋金花毒素",
-      "type": "taste",
-      "desc": "全株有毒，毒性成分主要是东莨菪碱、阿托品和山莨菪碱等生物碱。"
-    },
-    "CLUES_a4": {
-      "label": "A4大小的纸",
-      "type": "vision",
-      "desc": "一张写着献祭与捕获的纸。"
-    },
-    "CLUES_cjdcy": {
-      "label": "初级调查员",
-      "type": "vision",
-      "desc": "初级调查员"
     }
   },
   "memories": [
@@ -1779,85 +1683,238 @@
     }
   ],
   "evidences": {
-    "EVID_WU_note": {
-      "label": "手写笔记",
-      "tier": "wu",
-      "desc": "写满植物名与习性的手写笔记，纸页边缘有反复翻动的痕迹。",
-      "sourceText": "从书桌的手写笔记中提取。"
-    },
-    "EVID_WU_lamp": {
-      "label": "台灯",
-      "tier": "wu",
-      "desc": "老式台灯，铜链被反复拉动，灯罩下有一圈焦痕。",
-      "sourceText": "从书桌台灯中提取。"
-    },
-    "EVID_WU_rope": {
-      "label": "粗糙的绳索",
-      "tier": "wu",
-      "desc": "渗着黑红血迹的粗绳，毛刺上还挂着皮屑。",
-      "sourceText": "从尸体旁的粗糙绳索中提取。"
-    },
-    "EVID_WU_knife": {
-      "label": "染血的美工刀",
-      "tier": "wu",
-      "desc": "刀刃与下腹伤口吻合，是一把被藏起来的凶器。",
-      "sourceText": "从染血的美工刀中提取。"
-    },
     "EVID_CI_lhs_word": {
       "label": "陆珩松的独白",
       "tier": "ci",
       "desc": "他坚持没有人会死去，语气却像在告别。",
-      "sourceText": "完整听完陆珩松的独白。"
+      "sourceText": "完整听完陆珩松的独白。",
+      "origin": "synth",
+      "sense": "vision"
     },
     "EVID_CI_lhs_mem": {
       "label": "陆珩松的回忆",
       "tier": "ci",
       "desc": "6月2日的合影与快门声，藏着他没有说完的承诺。",
-      "sourceText": "完整看完6月2日陆珩松的回忆。"
+      "sourceText": "完整看完6月2日陆珩松的回忆。",
+      "origin": "synth",
+      "sense": "vision"
     },
     "EVID_CI_zs_word": {
       "label": "朱穗的证词",
       "tier": "ci",
       "desc": "她承认自己把刀插进了陆老师的腹部。",
-      "sourceText": "完整听完朱穗与陆珩松的对话。"
+      "sourceText": "完整听完朱穗与陆珩松的对话。",
+      "origin": "synth",
+      "sense": "vision"
     },
     "EVID_Z_lamp_notes": {
       "label": "台灯下的字迹",
       "tier": "zheng",
       "desc": "笔记的压痕与台灯位置对得上，说明有人在灯下反复改写。",
-      "sourceText": "由「手写笔记」与「台灯」合成。"
+      "sourceText": "由「手写笔记」与「台灯」合成。",
+      "origin": "synth",
+      "sense": "vision"
     },
     "EVID_Z_note_voice": {
       "label": "笔记与证词对应",
       "tier": "zheng",
       "desc": "陆珩松的说法与笔记里的修改痕迹互相印证。",
-      "sourceText": "由「手写笔记」与「陆珩松的独白」合成。"
+      "sourceText": "由「手写笔记」与「陆珩松的独白」合成。",
+      "origin": "synth",
+      "sense": "hearing"
     },
     "EVID_Z_forged_time": {
       "label": "伪造的时间",
       "tier": "zheng",
       "desc": "有人改写了笔记和证词里的时间，让死亡时刻看起来更早。",
-      "sourceText": "由「台灯下的字迹」与「陆珩松的独白」合成。"
+      "sourceText": "由「台灯下的字迹」与「陆珩松的独白」合成。",
+      "origin": "synth",
+      "sense": "vision"
     },
     "EVID_Z_strangled": {
       "label": "被掩盖的缢死",
       "tier": "zheng",
       "desc": "时间可以被改写，但绳索留下的痕迹不会说谎：真正的死因是缢死。",
-      "sourceText": "由「伪造的时间」与「粗糙的绳索」合成。"
+      "sourceText": "由「伪造的时间」与「粗糙的绳索」合成。",
+      "origin": "synth",
+      "sense": "touch"
     },
     "EVID_Z_zs_knife": {
       "label": "朱穗的刀伤",
       "tier": "zheng",
       "desc": "朱穗的证词与凶器吻合，她确实刺伤了陆珩松。",
-      "sourceText": "由「朱穗的证词」与「染血的美工刀」合成。"
+      "sourceText": "由「朱穗的证词」与「染血的美工刀」合成。",
+      "origin": "synth",
+      "sense": "vision"
+    },
+    "DATA_T_sun": {
+      "label": "阳光",
+      "tier": "zheng",
+      "sense": "touch",
+      "origin": "tec",
+      "desc": "灼热的阳光穿透了玻璃窗。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "DATA_V_huij": {
+      "label": "灰烬",
+      "tier": "zheng",
+      "sense": "vision",
+      "origin": "tec",
+      "desc": "漫天灰烬",
+      "sourceText": "TEC 分析所得。"
+    },
+    "DATA_H_music": {
+      "label": "G弦上的咏叹调",
+      "tier": "zheng",
+      "sense": "hearing",
+      "origin": "tec",
+      "desc": "《G弦上的咏叹调》是德国作曲家巴赫（Johann Sebastian Bach 1685年3月21日—1750年7月28日）创作的《第三号管弦乐组曲》第二乐章主题。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_V_luheng": {
+      "label": "植物学家陆珩松",
+      "tier": "zheng",
+      "sense": "vision",
+      "origin": "tec",
+      "desc": "植物学家陆珩松。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_gcs": {
+      "label": "贯穿伤",
+      "tier": "zheng",
+      "sense": "vision",
+      "origin": "tec",
+      "desc": "被利器从下腹部插入，留下了一道深深的伤口。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_wmhj": {
+      "label": "陆珩松的录音",
+      "tier": "zheng",
+      "sense": "hearing",
+      "origin": "tec",
+      "desc": "JS，当你听到这个录音的时候，我距离解开了所有的秘密只有一步之遥了。但我的时间已经不够了……我留下了足够你理解的笔记，也只有你能完成最后的步骤。现在，我可以安静等待死亡，以及与你重逢了。另外，在万事俱备之前，无论如何都不要拉开帘幕。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_JS": {
+      "label": "植物学家槿杉",
+      "tier": "zheng",
+      "sense": "vision",
+      "origin": "tec",
+      "desc": "植物学家槿杉。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_nm": {
+      "label": "鸟鸣",
+      "tier": "zheng",
+      "sense": "hearing",
+      "origin": "tec",
+      "desc": "隐隐约约听到类似鹦哥的鸣叫。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_CBKW": {
+      "label": "草本的苦味",
+      "tier": "zheng",
+      "sense": "taste",
+      "origin": "tec",
+      "desc": "一股淡淡的苦味。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_mc": {
+      "label": "毛刺",
+      "tier": "zheng",
+      "sense": "touch",
+      "origin": "deduce",
+      "desc": "绳索上坚硬的毛刺，如同一根根针。",
+      "sourceText": "档案演绎所得。"
+    },
+    "CLUES_xds": {
+      "label": "呋喃香豆素",
+      "tier": "zheng",
+      "sense": "smell",
+      "origin": "tec",
+      "desc": "呋喃香豆素",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_fb": {
+      "label": "植物研究所所长傅柏",
+      "tier": "zheng",
+      "sense": "vision",
+      "origin": "tec",
+      "desc": "植物研究所所长傅柏",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_zs": {
+      "label": "朱穗",
+      "tier": "zheng",
+      "sense": "vision",
+      "origin": "tec",
+      "desc": "助手",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_yzs": {
+      "label": "抑制素",
+      "tier": "zheng",
+      "sense": "taste",
+      "origin": "tec",
+      "desc": "从陆珩松体内提取出的特殊物质。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_qsan": {
+      "label": "墙上的按钮",
+      "tier": "zheng",
+      "sense": "touch",
+      "origin": "tec",
+      "desc": "按下墙上的按钮。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_zhpt": {
+      "label": "最后的一块拼图",
+      "tier": "zheng",
+      "sense": "touch",
+      "origin": "tec",
+      "desc": "距离成功只有一步之遥。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_mgd": {
+      "label": "染血的美工刀",
+      "tier": "zheng",
+      "sense": "vision",
+      "origin": "tec",
+      "desc": "一把染血的美工刀，被藏在带着密码锁的木盒之中。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_yjhds": {
+      "label": "洋金花毒素",
+      "tier": "zheng",
+      "sense": "taste",
+      "origin": "tec",
+      "desc": "全株有毒，毒性成分主要是东莨菪碱、阿托品和山莨菪碱等生物碱。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_a4": {
+      "label": "A4大小的纸",
+      "tier": "zheng",
+      "sense": "vision",
+      "origin": "tec",
+      "desc": "一张写着献祭与捕获的纸。",
+      "sourceText": "TEC 分析所得。"
+    },
+    "CLUES_cjdcy": {
+      "label": "初级调查员",
+      "tier": "zheng",
+      "sense": "vision",
+      "origin": "tec",
+      "desc": "初级调查员",
+      "sourceText": "TEC 分析所得。"
     }
   },
   "evidenceRecipes": [
     {
       "id": "RECIPE_lamp_notes",
-      "a": "EVID_WU_note",
-      "b": "EVID_WU_lamp",
+      "a": "ITEM_sxbj",
+      "b": "ITEM_taideng",
       "evidence": "EVID_Z_lamp_notes",
+      "sense": "vision",
       "text": "笔记的压痕与台灯的位置对上了。"
     },
     {
@@ -1865,34 +1922,39 @@
       "a": "EVID_Z_lamp_notes",
       "b": "EVID_CI_lhs_word",
       "evidence": "EVID_Z_forged_time",
+      "sense": "vision",
       "text": "台灯下的字迹与他的独白互相矛盾——时间被人改过。"
     },
     {
       "id": "RECIPE_strangled",
       "a": "EVID_Z_forged_time",
-      "b": "EVID_WU_rope",
+      "b": "ITEMS_ccss",
       "evidence": "EVID_Z_strangled",
+      "sense": "touch",
       "text": "时间被伪造，但绳索上的血痕不会说谎。"
     },
     {
       "id": "RECIPE_note_voice",
-      "a": "EVID_WU_note",
+      "a": "ITEM_sxbj",
       "b": "EVID_CI_lhs_word",
       "evidence": "EVID_Z_note_voice",
+      "sense": "hearing",
       "text": "笔记与证词能互相印证，但这还不能说明死因。"
     },
     {
       "id": "RECIPE_zs_knife",
       "a": "EVID_CI_zs_word",
-      "b": "EVID_WU_knife",
+      "b": "ITEMS_rxbs",
       "evidence": "EVID_Z_zs_knife",
+      "sense": "vision",
       "text": "朱穗的证词与凶器完全吻合。"
     },
     {
       "id": "RECIPE_mem_voice",
-      "a": "EVID_WU_note",
+      "a": "ITEM_sxbj",
       "b": "EVID_CI_lhs_mem",
       "evidence": "EVID_Z_note_voice",
+      "sense": "hearing",
       "text": "笔记与回忆里的细节互相印证。"
     }
   ]

@@ -82,7 +82,7 @@ func _validate_legacy_copy() -> bool:
 
 
 func _clean_old() -> void:
-	for sub in ["scenes", "items", "chars", "clues", "evidence",
+	for sub in ["scenes", "items", "chars", "evidence",
 			"memories", "dialogues", "endings"]:
 		var dir_path: String = OUT_ROOT + "/" + sub
 		DirAccess.make_dir_recursive_absolute(dir_path)
@@ -111,8 +111,6 @@ func _make_shells() -> void:
 		_shell("res://core/defs/ItemDef.gd", id, "items")
 	for id in data["chars"].keys():
 		_shell("res://core/defs/CharDef.gd", id, "chars")
-	for id in data["clues"].keys():
-		_shell("res://core/defs/ClueDef.gd", id, "clues")
 	for id in _dict(data.get("evidences")).keys():
 		_shell("res://core/defs/EvidenceDef.gd", id, "evidence")
 	for r in data.get("evidenceRecipes", []):
@@ -151,15 +149,6 @@ func _dict(v) -> Dictionary:
 func _is_type(r: Resource, script_name: String) -> bool:
 	var s: Script = r.get_script()
 	return s != null and String(s.get_global_name()) == script_name
-
-
-func _clue_refs(ids) -> Array[ClueDef]:
-	var out: Array[ClueDef] = []
-	for id in (ids if ids != null else []):
-		var r := _ref(String(id), "ClueDef")
-		if r != null:
-			out.append(r)
-	return out
 
 
 func _evidence_refs(ids) -> Array[EvidenceDef]:
@@ -208,8 +197,6 @@ func _fill_all() -> void:
 		_fill_item(idx[id], data["items"][id])
 	for id in data["chars"].keys():
 		_fill_char(idx[id], data["chars"][id])
-	for id in data["clues"].keys():
-		_fill_clue(idx[id], data["clues"][id])
 	for id in _dict(data.get("evidences")).keys():
 		_fill_evidence(idx[id], _dict(data["evidences"])[id])
 	for r in data.get("evidenceRecipes", []):
@@ -321,14 +308,14 @@ func _reactions(map: Dictionary, kind: String) -> Array[ReactionDef]:
 		var rec := ReactionDef.new()
 		rec.trigger_id = String(key)
 		var rec_data := _dict(map[key])
-		rec.clues = _clue_refs(rec_data.get("clues", []))
+		rec.clues = _evidence_refs(rec_data.get("clues", []))
 		var target: Resource = idx.get(String(key), null)
 		if target == null:
 			data_issues.append("%s 反应表指向不存在的实体 `%s`（Web 版同样永不触发；已保留 trigger_id）" % [kind, key])
 		else:
 			refs_ok += 1
-			if kind == "clue" and _is_type(target, "ClueDef"):
-				rec.clue = target as ClueDef
+			if (kind == "clue" or kind == "evidence") and _is_type(target, "EvidenceDef"):
+				rec.clue = target as EvidenceDef
 			elif kind == "item" and _is_type(target, "ItemDef"):
 				rec.item = target as ItemDef
 			else:
@@ -339,24 +326,30 @@ func _reactions(map: Dictionary, kind: String) -> Array[ReactionDef]:
 	return out
 
 
-func _fill_clue(r: Resource, d: Dictionary) -> void:
-	r.set("label", String(d.get("label", "")))
-	r.set("sense", String(d.get("type", "vision")))
-	r.set("desc", String(d.get("desc", "")))
-
-
 func _fill_evidence(r: Resource, d: Dictionary) -> void:
 	r.set("label", String(d.get("label", "")))
-	r.set("tier", String(d.get("tier", "wu")))
+	r.set("tier", String(d.get("tier", "zheng")))
+	r.set("sense", String(d.get("sense", "vision")))
+	r.set("origin", String(d.get("origin", "tec")))
 	r.set("desc", String(d.get("desc", "")))
 	r.set("source_text", String(d.get("sourceText", "")))
 
 
 func _fill_recipe(r: Resource, d: Dictionary) -> void:
-	r.set("a", _ref(String(d.get("a", "")), "EvidenceDef"))
-	r.set("b", _ref(String(d.get("b", "")), "EvidenceDef"))
+	r.set("a", _raw_ref(String(d.get("a", ""))))
+	r.set("b", _raw_ref(String(d.get("b", ""))))
 	r.set("evidence", _ref(String(d.get("evidence", "")), "EvidenceDef"))
+	r.set("sense", String(d.get("sense", "vision")))
 	r.set("text", String(d.get("text", "")))
+
+
+## 配方原料：物 = ItemDef，词/证 = EvidenceDef。
+func _raw_ref(id: String) -> Resource:
+	if id == "":
+		return null
+	if id.begins_with("ITEM"):
+		return _ref(id, "ItemDef")
+	return _ref(id, "EvidenceDef")
 
 
 func _fill_field(r: Resource, d: Dictionary) -> void:
@@ -366,7 +359,7 @@ func _fill_field(r: Resource, d: Dictionary) -> void:
 	r.set("correct", String(d.get("correct", "")))
 	r.set("support", _evidence_refs(d.get("support", [])))
 	var clue_id := String(d.get("dropClue", ""))
-	r.set("drop_clue", _ref(clue_id, "ClueDef") if clue_id != "" else null)
+	r.set("drop_clue", _ref(clue_id, "EvidenceDef") if clue_id != "" else null)
 
 
 func _fill_memory(r: Resource, d: Dictionary) -> void:
@@ -391,7 +384,7 @@ func _fill_dialogue(r: Resource, d: Dictionary) -> void:
 func _fill_ending(r: Resource, d: Dictionary) -> void:
 	r.set("name", String(d.get("name", "")))
 	r.set("truename", String(d.get("truename", "")))
-	r.set("recipe", _clue_refs(d.get("recipe", [])))
+	r.set("recipe", _evidence_refs(d.get("recipe", [])))
 	r.set("is_true_capture", bool(d.get("isTrueCapture", false)))
 	r.set("message", String(d.get("message", "")))
 	var lines: Array[EndingLineDef] = []
@@ -428,7 +421,7 @@ func _hidden(h) -> HiddenClueDef:
 		return null
 	var hc := HiddenClueDef.new()
 	hc.text = String(h.get("text", ""))
-	hc.clues = _clue_refs(h.get("ids", []))
+	hc.clues = _evidence_refs(h.get("ids", []))
 	return hc
 
 
@@ -458,7 +451,7 @@ func _command(c: Dictionary) -> CommandDef:
 			var conds: Array[ConditionDef] = []
 			for cond in c.get("conditions", []):
 				var cd := ConditionDef.new()
-				cd.clue = _ref(String(cond.get("clue", "")), "ClueDef") as ClueDef
+				cd.clue = _ref(String(cond.get("clue", "")), "EvidenceDef") as EvidenceDef
 				cd.fail_message = String(cond.get("failMessage", ""))
 				conds.append(cd)
 			cond_cmd.conditions = conds
@@ -489,7 +482,7 @@ func _command(c: Dictionary) -> CommandDef:
 	cmd.label = String(c.get("label", ""))
 	cmd.fail_message = String(c.get("failMessage", ""))
 	cmd.requires_lit = _item_refs(c.get("requiresLit", []))
-	cmd.clues = _clue_refs(c.get("clues", []))
+	cmd.clues = _evidence_refs(c.get("clues", []))
 	return cmd
 
 
@@ -501,7 +494,7 @@ func _payload(p, fallback_message := "") -> PayloadDef:
 	if p.get("scene", null) != null:
 		pay.scene = _ref(String(p["scene"]), "SceneDef") as SceneDef
 	pay.items = _item_refs(p.get("items", []))
-	pay.clues = _clue_refs(p.get("clues", []))
+	pay.clues = _evidence_refs(p.get("clues", []))
 	return pay
 
 
@@ -529,7 +522,6 @@ func _write_all() -> void:
 	var scenes: Array[SceneDef] = []
 	var items: Array[ItemDef] = []
 	var chars: Array[CharDef] = []
-	var clues: Array[ClueDef] = []
 	var evs: Array[EvidenceDef] = []
 	var recs: Array[EvidenceRecipeDef] = []
 	var mems: Array[MemoryDef] = []
@@ -538,7 +530,6 @@ func _write_all() -> void:
 	_fill_typed(scenes, by_class.get("SceneDef", []))
 	_fill_typed(items, by_class.get("ItemDef", []))
 	_fill_typed(chars, by_class.get("CharDef", []))
-	_fill_typed(clues, by_class.get("ClueDef", []))
 	_fill_typed(evs, by_class.get("EvidenceDef", []))
 	_fill_typed(recs, by_class.get("EvidenceRecipeDef", []))
 	_fill_typed(mems, by_class.get("MemoryDef", []))
@@ -547,7 +538,6 @@ func _write_all() -> void:
 	case_def.scenes = scenes
 	case_def.items = items
 	case_def.chars = chars
-	case_def.clues = clues
 	case_def.evidences = evs
 	case_def.evidence_recipes = recs
 	case_def.memories = mems
@@ -562,7 +552,7 @@ func _write_all() -> void:
 	case_def.memory_scenes = memory_refs
 	type_counts = {
 		"SceneDef": scenes.size(), "ItemDef": items.size(), "CharDef": chars.size(),
-		"ClueDef": clues.size(), "EvidenceDef": evs.size(),
+		"EvidenceDef": evs.size(),
 		"EvidenceRecipeDef": recs.size(),
 		"EvidenceFieldDef": (by_class.get("EvidenceFieldDef", []) as Array).size(),
 		"MemoryDef": mems.size(), "DialogueDef": dlgs.size(),
@@ -602,8 +592,6 @@ func _blob_of(r: Resource, cls: String) -> String:
 			return "%s\u0001%s\u0001%s" % [r.get("label"), r.get("desc"), r.get("content")]
 		"CharDef":
 			return "%s\u0001%s" % [r.get("name"), r.get("desc")]
-		"ClueDef":
-			return "%s\u0001%s" % [r.get("label"), r.get("desc")]
 		"EvidenceDef":
 			return "%s\u0001%s\u0001%s" % [r.get("label"), r.get("desc"), r.get("source_text")]
 		"EvidenceRecipeDef":

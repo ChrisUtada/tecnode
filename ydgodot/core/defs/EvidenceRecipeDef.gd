@@ -5,7 +5,10 @@ extends Resource
 ## 「签名配方 = 物 × 词 → 证」是教学口径，不是硬编码限制。
 
 @export var id: String = ""
-@export var a: EvidenceDef = null
-@export var b: EvidenceDef = null
+## 原料可以是 ItemDef（物）或 EvidenceDef（词 / 证）；无序对。
+@export var a: Resource = null
+@export var b: Resource = null
 @export var evidence: EvidenceDef = null
+## 产出的证落到哪个五感槽位；纳入可达性检查。
+@export_enum("vision", "hearing", "touch", "taste", "smell") var sense: String = "vision"
 @export_multiline var text: String = ""

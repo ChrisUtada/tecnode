@@ -1,12 +1,12 @@
-[gd_resource type="Resource" script_class="DialogueDef" format=3]
+[gd_resource type="Resource" script_class="DialogueDef" format=3 uid="uid://1clcjrh2gt4p"]
 
-[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="1_x134g"]
-[ext_resource type="Resource" path="res://cases/a001/chars/CHARS_luhengs.tres" id="2_3klr4"]
-[ext_resource type="Script" path="res://core/defs/DialogueDef.gd" id="3_n8vnq"]
-[ext_resource type="Script" path="res://core/defs/DialogueLineDef.gd" id="4_lf4dw"]
-
-[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
+[ext_resource type="Script" uid="uid://dxeogelwlsx1c" path="res://core/defs/CharDef.gd" id="1_x134g"]
+[ext_resource type="Resource" uid="uid://clqpdkyqimoca" path="res://cases/a001/chars/CHARS_luhengs.tres" id="2_3klr4"]
+[ext_resource type="Script" uid="uid://qct6qckonw31" path="res://core/defs/DialogueDef.gd" id="3_n8vnq"]
+[ext_resource type="Script" uid="uid://dn86qlm67oq1c" path="res://core/defs/DialogueLineDef.gd" id="4_lf4dw"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="evd_script"]
 [ext_resource type="Resource" path="res://cases/a001/evidence/EVID_CI_lhs_word.tres" id="ev_word"]
+
 [sub_resource type="Resource" id="Resource_3c823"]
 script = ExtResource("4_lf4dw")
 text = "陆珩松把录音针挪近了一点，像是怕惊动谁。"

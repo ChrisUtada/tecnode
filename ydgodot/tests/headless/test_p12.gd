@@ -67,7 +67,7 @@ func _test_bag() -> void:
 func _test_ledger() -> void:
 	var clue: String = String(g.add_node("clue", "CLUES_nm")["key"])
 	var item: String = String(g.add_node("item", "ITEMS_bd")["key"])
-	check("册：线索收得进", g.ledger_store(clue))
+	check("册：证收得进", g.ledger_store(clue))
 	check("册：普通物品收不进", not g.ledger_store(item))
 	check("册：记账去向 LEDGER", String(g.stored.get(clue, "")) == GraphState.LEDGER)
 	check("册：取回后可见", g.take_back(clue) and g.is_visible(clue))
@@ -77,20 +77,22 @@ func _test_ledger() -> void:
 func _test_matrix() -> void:
 	var clue: String = String(g.add_node("clue", "CLUES_nm")["key"])
 	var sense := c.clue_of("CLUES_nm").sense
-	check("桌布：感官对的线索能归位", g.matrix_assign(clue, sense))
+	check("桌布：感官对的证能归位", g.matrix_assign(clue, sense))
 	check("桌布：记账去向 MATRIX", String(g.stored.get(clue, "")) == GraphState.MATRIX)
 	check("桌布：感官不对不收", not g.matrix_assign(clue, "taste" if sense != "taste" else "vision"))
 	check("桌布：能取回画布", g.matrix_take(clue) and g.is_visible(clue))
 
 
-# ── 4. 跨窗搬运（袋 ↔ 册）：只改去向 ──────────────────────────────────
+# ── 4. 跨窗搬运：袋（物/词）与册（证）不再互通 ──────────────────────────
 func _test_restash() -> void:
-	var clue: String = String(g.add_node("clue", "CLUES_JS")["key"])
-	g.bag_store(clue)
-	check("搬运：袋 → 册 成功", g.restash(clue, GraphState.BAG, GraphState.LEDGER))
-	check("搬运：去向改成 LEDGER", String(g.stored.get(clue, "")) == GraphState.LEDGER)
-	check("搬运：从错的地方搬不动", not g.restash(clue, GraphState.BAG, GraphState.LEDGER))
-	check("搬运：搬到同一个地方算无效", not g.restash(clue, GraphState.LEDGER, GraphState.LEDGER))
+	var word: String = String(g.add_node("evidence", "EVID_CI_lhs_word")["key"])
+	check("词进证物袋", g.bag_store(word))
+	check("词不能搬进证据册", not g.restash(word, GraphState.BAG, GraphState.LEDGER))
+	var zheng: String = String(g.add_node("evidence", "CLUES_JS")["key"])
+	check("证不进证物袋", not g.bag_store(zheng))
+	check("证进证据册", g.ledger_store(zheng))
+	check("证不能搬进证物袋", not g.restash(zheng, GraphState.LEDGER, GraphState.BAG))
+	check("搬运：搬到同一个地方算无效", not g.restash(zheng, GraphState.LEDGER, GraphState.LEDGER))
 
 
 # ── 5. 折叠后的隐藏重算 ────────────────────────────────────────────────

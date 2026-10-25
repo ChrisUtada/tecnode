@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="SceneDef" format=3]
+[gd_resource type="Resource" script_class="SceneDef" format=3 uid="uid://ujploi7bjxjv"]
 
-[ext_resource type="Script" path="res://core/defs/SceneDef.gd" id="1_scene"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_2a8mg"]
+[ext_resource type="Script" uid="uid://d0h5mowj0fpy1" path="res://core/defs/SceneDef.gd" id="1_scene"]
 
 [resource]
 script = ExtResource("1_scene")

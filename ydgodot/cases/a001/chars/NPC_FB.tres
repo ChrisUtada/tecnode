@@ -1,12 +1,13 @@
-[gd_resource type="Resource" script_class="CharDef" format=3]
+[gd_resource type="Resource" script_class="CharDef" format=3 uid="uid://b6n03mh02lhqd"]
 
-[ext_resource type="Script" path="res://core/defs/ReactionDef.gd" id="1_uvc4b"]
-[ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_0602.tres" id="2_235sb"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="3_pntgt"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_fb.tres" id="4_sapxa"]
-[ext_resource type="Script" path="res://core/defs/HiddenClueDef.gd" id="5_fxuao"]
-[ext_resource type="Script" path="res://core/defs/SceneTalkDef.gd" id="6_ao4tr"]
-[ext_resource type="Script" path="res://core/defs/CharDef.gd" id="7_hnpqm"]
+[ext_resource type="Script" uid="uid://c7gtygfp6r5fl" path="res://core/defs/ReactionDef.gd" id="1_uvc4b"]
+[ext_resource type="Resource" uid="uid://bq2bg0dg2s18d" path="res://cases/a001/scenes/SCENES_0602.tres" id="2_235sb"]
+[ext_resource type="Script" uid="uid://db18133kvvrw1" path="res://core/defs/EvidenceFieldDef.gd" id="3_235sb"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="3_pntgt"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_fb.tres" id="4_sapxa"]
+[ext_resource type="Script" uid="uid://cti0guintk12h" path="res://core/defs/HiddenClueDef.gd" id="5_fxuao"]
+[ext_resource type="Script" uid="uid://bmcrp4piui0ds" path="res://core/defs/SceneTalkDef.gd" id="6_ao4tr"]
+[ext_resource type="Script" uid="uid://dxeogelwlsx1c" path="res://core/defs/CharDef.gd" id="7_hnpqm"]
 
 [sub_resource type="Resource" id="Resource_lrqc5"]
 script = ExtResource("5_fxuao")

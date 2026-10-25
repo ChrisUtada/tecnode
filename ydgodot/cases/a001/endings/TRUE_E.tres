@@ -1,13 +1,13 @@
-[gd_resource type="Resource" script_class="EndingDef" format=3]
+[gd_resource type="Resource" script_class="EndingDef" format=3 uid="uid://c603tdwpfxf63"]
 
-[ext_resource type="Script" path="res://core/defs/EndingLineDef.gd" id="1_o5x0w"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_mqxju"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_V_luheng.tres" id="3_0xvp0"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_nm.tres" id="4_lccu7"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_mc.tres" id="5_2pmu5"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_CBKW.tres" id="6_b88e5"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_xds.tres" id="7_oo51x"]
-[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="8_30axm"]
+[ext_resource type="Script" uid="uid://c4yfit112qpl2" path="res://core/defs/EndingLineDef.gd" id="1_o5x0w"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_mqxju"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_V_luheng.tres" id="3_0xvp0"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_nm.tres" id="4_lccu7"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_mc.tres" id="5_2pmu5"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_CBKW.tres" id="6_b88e5"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_xds.tres" id="7_oo51x"]
+[ext_resource type="Script" uid="uid://cda863exsx2j" path="res://core/defs/EndingDef.gd" id="8_30axm"]
 
 [sub_resource type="Resource" id="Resource_potp0"]
 script = ExtResource("1_o5x0w")

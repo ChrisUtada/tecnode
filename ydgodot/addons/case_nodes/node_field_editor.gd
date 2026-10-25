@@ -8,7 +8,7 @@ extends EditorProperty
 ## 现在这里只有 2 个节点、只改一次文本，零文件 IO；列表 / 增删 / 调序 / 拖放全部搬进
 ## 点击后打开的 `node_picker.gd`，只在用户主动点开时构建。
 
-const KIND_LABEL := {"item": "物品", "char": "人物", "loc": "地点", "clue": "线索"}
+const KIND_LABEL := {"item": "物品", "char": "人物", "loc": "地点", "evidence": "证据"}
 const Index := preload("res://addons/case_nodes/case_index.gd")
 
 ## 由 `node_list_inspector.gd` 在 `add_property_editor()` 之前设好

@@ -325,13 +325,13 @@ func _test_desktop(c: CaseLoader) -> void:
 	scene.dbg_combo_ui("CLUES_qsan", "CHARS_zs")
 	await process_frame
 	var clue_chat: ChatWindow = scene.dbg_chat()
-	check("线索反应独白打开", clue_chat != null)
+	check("证据反应独白打开", clue_chat != null)
 	if clue_chat != null:
 		var qsan_label := c.label_of("clue", "CLUES_qsan")
-		check("线索反应标题带对象",
+		check("证据反应标题带对象",
 			scene.dbg_chat_title() == "独白 · 朱穗 · 对「%s」的反应" % qsan_label,
 			scene.dbg_chat_title())
-		check("线索反应一次贴完整句",
+		check("证据反应一次贴完整句",
 			clue_chat.line_count() == 1 and not clue_chat.is_typing(),
 			"%d / %s" % [clue_chat.line_count(), str(clue_chat.is_typing())])
 		scene.dbg_chat_close()

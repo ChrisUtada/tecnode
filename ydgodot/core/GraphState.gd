@@ -87,6 +87,8 @@ func _blank_matrix() -> void:
 func normalize_kind(kind: String, id: String) -> String:
 	if kind == "scene":
 		kind = "loc"
+	if kind == "clue" or kind == "data":
+		kind = "evidence"
 	if kind == "loc" and case_def != null and case_def.is_time_id(id):
 		return "time"
 	return kind
@@ -131,13 +133,16 @@ func add_node(kind: String, id: String) -> Dictionary:
 		"pinned": false,     # 钉住：折叠容器时不跟着藏（Web 版右键钉住）
 		"bag_from": "",      # 进袋前的来源容器 id（袋清单标注「来自 ×××」）
 		"installed": {},      # 装在本节点上的零件（item id -> true）
-		"captured": kind == "clue" and captured.has(id),
+		"captured": kind == "evidence" and captured.has(id),
 		"fresh": false,       # 本次新出现（档案 / 卡片的「新」角标）
 		"unread": false,      # 玩家还没点过它
 	}
 	if kind == "evidence":
 		var ev := case_def.evidence_of(id) if case_def != null else null
-		n["tier"] = ev.tier if ev != null else "wu"
+		n["tier"] = ev.tier if ev != null else "zheng"
+		n["sense"] = ev.sense if ev != null else "vision"
+		n["origin"] = ev.origin if ev != null else "tec"
+		n["captured"] = String(n["tier"]) == "zheng" and captured.has(id)
 		## 证据是玩家已经拿到的知识，不随时刻 / 折叠容器消失。
 		n["always_visible"] = true
 	nodes[key] = n
@@ -613,10 +618,8 @@ func can_bag(key: String) -> bool:
 		return false
 	var kind := String(n.get("kind", ""))
 	if kind == "evidence":
-		return true
-	## 旧版证物袋也收线索，再由 restash 搬去线索册；保留这条兼容路径。
-	if kind == "clue":
-		return true
+		## 袋 = 物与言；证是知识，进证据册，不进证物袋。
+		return String(n.get("tier", "")) == "ci"
 	if kind != "item":
 		return false
 	var it := case_def.item_of(String(n.get("id", "")))
@@ -635,12 +638,12 @@ func bag_store(key: String) -> bool:
 	return true
 
 
-## 收进线索册：只有线索能进
+## 收进证据册：只有「证」能进（词进证物袋，物不进册）。
 func ledger_store(key: String) -> bool:
 	var n := node(key)
 	if n.is_empty() or stored.has(key):
 		return false
-	if String(n["kind"]) != "clue":
+	if String(n["kind"]) != "evidence" or String(n.get("tier", "")) != "zheng":
 		return false
 	n["pinned"] = false
 	stored[key] = LEDGER
@@ -672,6 +675,13 @@ func restash(key: String, from: String, to: String) -> bool:
 	if to != BAG and to != LEDGER:
 		return false
 	var n := node(key)
+	## 袋收物与词，册收证：两边不互通。
+	var kind := String(n.get("kind", ""))
+	var tier := String(n.get("tier", ""))
+	if to == BAG and not (kind == "item" or (kind == "evidence" and tier == "ci")):
+		return false
+	if to == LEDGER and not (kind == "evidence" and tier == "zheng"):
+		return false
 	if from == MATRIX:
 		_remove_from_matrix(String(n.get("id", "")))
 	n["pinned"] = false
@@ -688,22 +698,23 @@ func restash(key: String, from: String, to: String) -> bool:
 ## 归位到推演桌布（线索 → 某感官槽位）。`sense` 省略时按线索自身的感官归位。
 ## 与 Web 的 assignClue 同口径：不管线索现在在画布 / 袋 / 册，都能直接改写去向；
 ## 同一槽位重复归位返回 false；感官不符也返回 false。
+## 归位到推演桌布（证 → 某感官槽位）。词 / 物没有五感，不收。
 func matrix_assign(key: String, sense: String = "") -> bool:
 	var n := node(key)
-	if n.is_empty() or String(n["kind"]) != "clue":
+	if n.is_empty() or String(n["kind"]) != "evidence" or String(n.get("tier", "")) != "zheng":
 		return false
-	var cl := case_def.clue_of(String(n["id"]))
-	if cl == null:
+	var ev := case_def.evidence_of(String(n["id"]))
+	if ev == null:
 		return false
 	if sense == "":
-		sense = cl.sense
-	if not matrix.has(sense) or cl.sense != sense:
+		sense = ev.sense
+	if not matrix.has(sense) or ev.sense != sense:
 		return false
 	var list: Array = matrix[sense]
-	if list.has(cl.id):
+	if list.has(ev.id):
 		return false
-	_remove_from_matrix(cl.id)
-	list.append(cl.id)
+	_remove_from_matrix(ev.id)
+	list.append(ev.id)
 	stored[key] = MATRIX
 	hidden.erase(key)
 	n["pinned"] = false
@@ -785,32 +796,44 @@ func mark_ending(id: String) -> void:
 	endings[id] = true
 
 
-## §7-2：只从显式结构化线索引用捕获，不再解析正文标签。
-func capture_clue_refs(refs: Array, from_key: String = "") -> Array:
+## 只从显式结构化证据引用落地，不再解析正文标签。
+func capture_evidence_refs(refs: Array, from_key: String = "", origin: String = "synth") -> Array:
 	var got: Array = []
 	for ref in refs:
-		var cid := String((ref as ClueDef).id) if ref is ClueDef else String(ref)
-		if cid == "" or captured.has(cid):
+		var eid := String((ref as EvidenceDef).id) if ref is EvidenceDef else String(ref)
+		if eid == "":
 			continue
-		got.append(capture_clue(cid, from_key))
+		if captured.has(eid) and nodes.has(key_of("evidence", eid)):
+			continue
+		got.append(capture_evidence(eid, from_key, -1.0, -1.0, origin))
 	return got
 
 
+## 兼容旧调用名：旧“线索”现在就是证。
+func capture_clue_refs(refs: Array, from_key: String = "") -> Array:
+	return capture_evidence_refs(refs, from_key, "tec")
+
+
 func capture_clue(cid: String, from_key: String = "") -> String:
-	captured[cid] = true
-	var n := add_node("clue", cid)
-	n["captured"] = true
-	if from_key != "":
-		link(from_key, String(n["key"]), "entity")
-	return String(n["key"])
+	return capture_evidence(cid, from_key, -1.0, -1.0, "tec")
 
 
 ## 证据落地（TEC / 对话 / 回忆 / 配方共用）：已存在则返回同一个 key，不重复掉落。
-func capture_evidence(eid: String, from_key: String = "", x: float = -1.0, y: float = -1.0) -> String:
+## `origin` 记来源（tec/synth/deduce）；`词`不设 captured，`证`落地即已捕获。
+func capture_evidence(eid: String, from_key: String = "", x: float = -1.0, y: float = -1.0,
+		origin: String = "synth") -> String:
 	var existing := key_of("evidence", eid)
 	if nodes.has(existing):
+		var old := nodes[existing] as Dictionary
+		if String(old.get("tier", "")) == "zheng":
+			captured[eid] = true
+			old["captured"] = true
 		return existing
 	var n := add_node("evidence", eid)
+	n["origin"] = origin
+	if String(n.get("tier", "")) == "zheng":
+		captured[eid] = true
+		n["captured"] = true
 	if from_key != "":
 		link(from_key, String(n["key"]), "entity")
 		var src := node(from_key)

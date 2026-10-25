@@ -62,7 +62,7 @@ func _test_assign_take() -> void:
 	check("归位：记去向 MATRIX", String(g.stored.get(nm, "")) == GraphState.MATRIX)
 	check("归位：画布上不可见", not g.is_visible(nm))
 	check("归位：落进听觉槽", g.matrix_slot_of("CLUES_nm") == "hearing")
-	check("归位：槽位里有这条线索", (g.matrix["hearing"] as Array).has("CLUES_nm"))
+	check("归位：槽位里有这条证", (g.matrix["hearing"] as Array).has("CLUES_nm"))
 	check("重复归位：拒绝", not g.matrix_assign(nm, "hearing"))
 	check("归位：matrix_ids 摊平", g.matrix_ids() == ["CLUES_nm"], str(g.matrix_ids()))
 	check("取回：成功", g.matrix_take(nm))
@@ -70,18 +70,19 @@ func _test_assign_take() -> void:
 	check("取回：画布上重新可见", g.is_visible(nm))
 
 
-# ── 3. 跨窗搬运 ────────────────────────────────────────────────────────
+# ── 3. 跨窗搬运（证据册 ↔ 桌布）────────────────────────────────────────
 func _test_cross_window() -> void:
 	var g := GraphState.new(c)
-	var mc := String(g.add_node("clue", "CLUES_mc")["key"])
-	g.bag_store(mc)
-	check("袋 → 桌布：直接归位", g.matrix_assign(mc))
-	check("袋 → 桌布：去向改成 MATRIX", String(g.stored.get(mc, "")) == GraphState.MATRIX)
-	check("袋 → 桌布：落进触觉槽", g.matrix_slot_of("CLUES_mc") == "touch")
+	var mc := String(g.add_node("evidence", "CLUES_mc")["key"])
+	check("证不进证物袋", not g.bag_store(mc))
+	check("证进证据册", g.ledger_store(mc))
+	check("册 → 桌布：直接归位", g.matrix_assign(mc))
+	check("册 → 桌布：去向改成 MATRIX", String(g.stored.get(mc, "")) == GraphState.MATRIX)
+	check("册 → 桌布：落进触觉槽", g.matrix_slot_of("CLUES_mc") == "touch")
 	check("桌布 → 册：restash 成功", g.restash(mc, GraphState.MATRIX, GraphState.LEDGER))
 	check("桌布 → 册：槽位已摘掉", g.matrix_slot_of("CLUES_mc") == "")
 	check("桌布 → 册：去向改成 LEDGER", String(g.stored.get(mc, "")) == GraphState.LEDGER)
-	check("桌布 → 袋：restash 成功", g.restash(mc, GraphState.LEDGER, GraphState.BAG))
+	check("证不能再搬回证物袋", not g.restash(mc, GraphState.LEDGER, GraphState.BAG))
 
 
 # ── 4. 捕获线索 ────────────────────────────────────────────────────────
@@ -89,10 +90,10 @@ func _test_capture() -> void:
 	var g := GraphState.new(c)
 	var key := g.capture_clue("CLUES_nm")
 	check("捕获：记入 captured", g.captured.has("CLUES_nm"))
-	check("捕获：建出线索节点", g.has("clue", "CLUES_nm"))
+	check("捕获：建出证节点", g.has("clue", "CLUES_nm"))
 	check("捕获：节点带 captured 标记", bool(g.node(key).get("captured", false)))
 	var from_refs := g.capture_clue_refs([c.clue_of("CLUES_xds")])
-	check("§7-2 结构化线索引用捕获", from_refs.size() == 1 and g.captured.has("CLUES_xds"))
+	check("§7-2 结构化证据引用捕获", from_refs.size() == 1 and g.captured.has("CLUES_xds"))
 
 
 # ── 5. 配方必须恰好相等 ────────────────────────────────────────────────
@@ -109,9 +110,9 @@ func _test_recipe_exact() -> void:
 
 	var extra := String(g.add_node("clue", "CLUES_JS")["key"])
 	g.matrix_assign(extra)
-	check("多一条线索：不命中", g.match_ending() == null)
+	check("多一条证：不命中", g.match_ending() == null)
 	g.matrix_take(extra)
-	check("拿掉多余线索：重新命中", _ending_id(g.match_ending()) == "TRUE_E")
+	check("拿掉多余证：重新命中", _ending_id(g.match_ending()) == "TRUE_E")
 
 	var g2 := GraphState.new(c)
 	var normal := c.ending_by_id("END_NORMAL")
@@ -140,8 +141,8 @@ func _test_desktop_flow() -> void:
 	await process_frame
 	await process_frame
 	var st: Dictionary = scene.dbg_state()
-	check("TEC 解读：捕获尸体隐藏线索", (st["captured"] as Array).has("CLUES_V_luheng"), str(st["captured"]))
-	check("TEC 解读：线索卡上画布", _cards(scene).has("clue:CLUES_V_luheng"))
+	check("TEC 解读：捕获尸体隐藏证据", (st["captured"] as Array).has("CLUES_V_luheng"), str(st["captured"]))
+	check("TEC 解读：证卡上画布", _cards(scene).has("evidence:CLUES_V_luheng"))
 
 	# 桌布窗口：归位 / 取回
 	scene.dbg_ensure("clue", "CLUES_nm")
@@ -152,21 +153,21 @@ func _test_desktop_flow() -> void:
 	check("K10 推演器窗标题统一", mw != null and mw.title == "推演器", mw.title if mw != null else "null")
 	check("桌布五感芯片初始为空", mw != null and mw.chip_count() == 0)
 	check("普通物品不能归位", not scene.dbg_matrix_assign("item:ITEMS_bd"))
-	_drag_card_to(_cards(scene)["clue:CLUES_nm"], mw.board_global_rect().get_center())
+	_drag_card_to(_cards(scene)["evidence:CLUES_nm"], mw.board_global_rect().get_center())
 	await process_frame
-	check("把线索卡拖到桌布上：归位成功", mw != null and mw.has_chip("CLUES_nm"))
+	check("把证卡拖到桌布上：归位成功", mw != null and mw.has_chip("CLUES_nm"))
 	check("归位后桌布出现芯片", mw != null and mw.has_chip("CLUES_nm"))
 	check("归位后听觉槽有 1 条", mw != null and mw.chip_count("hearing") == 1)
-	check("归位后画布上的卡片收起", not (_cards(scene)["clue:CLUES_nm"] as NodeCard).visible)
+	check("归位后画布上的卡片收起", not (_cards(scene)["evidence:CLUES_nm"] as NodeCard).visible)
 	check("归位后状态里有 MATRIX", (scene.dbg_state()["matrix_ids"] as Array).has("CLUES_nm"))
 
-	scene.dbg_matrix_take("clue:CLUES_nm")
+	scene.dbg_matrix_take("evidence:CLUES_nm")
 	await process_frame
 	check("取回后芯片消失", mw != null and not mw.has_chip("CLUES_nm"))
-	check("取回后卡片重新可见", (_cards(scene)["clue:CLUES_nm"] as NodeCard).visible)
+	check("取回后卡片重新可见", (_cards(scene)["evidence:CLUES_nm"] as NodeCard).visible)
 
 	# 配方不全就推演：失败 + 心碎表情
-	scene.dbg_matrix_assign("clue:CLUES_nm")
+	scene.dbg_matrix_assign("evidence:CLUES_nm")
 	await process_frame
 	scene.dbg_matrix_charge()
 	await process_frame
@@ -182,7 +183,7 @@ func _test_desktop_flow() -> void:
 		if clue.id == "CLUES_nm":
 			continue
 		scene.dbg_ensure("clue", clue.id)
-		scene.dbg_matrix_assign("clue:" + clue.id)
+		scene.dbg_matrix_assign("evidence:" + clue.id)
 	await process_frame
 	check("五感归位完成：matrix_count = 5",
 		(scene.dbg_state()["matrix_ids"] as Array).size() == 5, str(scene.dbg_state()["matrix_ids"]))

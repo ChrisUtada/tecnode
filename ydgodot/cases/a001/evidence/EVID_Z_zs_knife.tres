@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_gftpg")
-tier = "zheng"
+origin = "synth"
 id = "EVID_Z_zs_knife"
 label = "朱穗的刀伤"
 desc = "朱穗的证词与凶器吻合，她确实刺伤了陆珩松。"

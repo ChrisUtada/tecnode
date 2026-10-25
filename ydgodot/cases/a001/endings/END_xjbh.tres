@@ -1,10 +1,10 @@
-[gd_resource type="Resource" script_class="EndingDef" format=3]
+[gd_resource type="Resource" script_class="EndingDef" format=3 uid="uid://boxe3y7leu5uw"]
 
-[ext_resource type="Script" path="res://core/defs/EndingLineDef.gd" id="1_uehrv"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_xcfsw"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_a4.tres" id="3_r4nfq"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_fb.tres" id="4_i4j6i"]
-[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="5_8d635"]
+[ext_resource type="Script" uid="uid://c4yfit112qpl2" path="res://core/defs/EndingLineDef.gd" id="1_uehrv"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_xcfsw"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_a4.tres" id="3_r4nfq"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_fb.tres" id="4_i4j6i"]
+[ext_resource type="Script" uid="uid://cda863exsx2j" path="res://core/defs/EndingDef.gd" id="5_8d635"]
 
 [resource]
 script = ExtResource("5_8d635")

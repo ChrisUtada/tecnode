@@ -22,7 +22,7 @@ var memory_scenes: Array[SceneDef] = []
 var scenes: Dictionary = {}      # id -> SceneDef
 var items: Dictionary = {}       # id -> ItemDef
 var chars: Dictionary = {}       # id -> CharDef
-var clues: Dictionary = {}       # id -> ClueDef
+var clues: Dictionary = {}       # id -> EvidenceDef（旧名兼容别名）
 var evidences: Dictionary = {}   # id -> EvidenceDef
 var evidence_recipes: Array[EvidenceRecipeDef] = []
 var memories: Array[MemoryDef] = []
@@ -83,23 +83,36 @@ func validate_nodes() -> Array:
 func validate_evidence() -> Array:
 	var out: Array = []
 	var valid_tiers := ["wu", "ci", "zheng"]
+	var valid_origins := ["tec", "synth", "deduce"]
 	var available := {}
-	for ev in case_def.evidences:
+	for ev in evidences.values():
 		if ev == null or ev.id == "":
 			out.append("证据定义缺 id")
 			continue
 		if not valid_tiers.has(String(ev.tier)):
 			out.append("%s 的 tier 非法：%s" % [ev.id, ev.tier])
+		if not valid_origins.has(String(ev.origin)):
+			out.append("%s 的 origin 非法：%s" % [ev.id, ev.origin])
+		if String(ev.tier) == "zheng" and not GraphState.SENSES.has(String(ev.sense)):
+			out.append("%s 的 sense 非法：%s" % [ev.id, ev.sense])
 		if ev.label.strip_edges() == "":
 			out.append("%s 缺 label" % ev.id)
+	# TEC 产出：物品 / 场景 / 人物的 hidden_clue（字段名沿用）里列出的证。
 	for it in case_def.items:
-		for ev in it.hidden_evidence:
-			if ev != null:
-				available[ev.id] = true
+		if it.hidden_clue != null:
+			for ev in it.hidden_clue.clues:
+				if ev != null:
+					available[ev.id] = true
 	for s in case_def.scenes:
-		for ev in s.hidden_evidence:
-			if ev != null:
-				available[ev.id] = true
+		if s.hidden_clue != null:
+			for ev in s.hidden_clue.clues:
+				if ev != null:
+					available[ev.id] = true
+	for ch in case_def.chars:
+		if ch.hidden_clue != null:
+			for ev in ch.hidden_clue.clues:
+				if ev != null:
+					available[ev.id] = true
 	for d in case_def.dialogues:
 		for ev in d.drops_evidence:
 			if ev != null:
@@ -108,27 +121,65 @@ func validate_evidence() -> Array:
 		for ev in m.drops_evidence:
 			if ev != null:
 				available[ev.id] = true
-	# 配方产出可以继续作为下一层原料：迭代到稳定。
+	# 命令 / 反应也能产证：纳入可达性。
+	for it in case_def.items:
+		for cmd in it.commands:
+			for ev in cmd.clues:
+				if ev != null: available[ev.id] = true
+			var pay = cmd.get("on_success")
+			if pay is PayloadDef:
+				for ev in (pay as PayloadDef).clues:
+					if ev != null: available[ev.id] = true
+			if cmd is ChoiceCommandDef:
+				for opt in (cmd as ChoiceCommandDef).options:
+					if opt != null and opt.payload != null:
+						for ev in opt.payload.clues:
+							if ev != null: available[ev.id] = true
+	for ch in case_def.chars:
+		for row in ch.clue_reactions:
+			for ev in row.clues:
+				if ev != null: available[ev.id] = true
+		for row in ch.item_reactions:
+			for ev in row.clues:
+				if ev != null: available[ev.id] = true
+	# 配方产出可以继续作为下一层原料：迭代到稳定。物品本体天然算「物」原料。
 	var changed := true
 	while changed:
 		changed = false
 		for r in case_def.evidence_recipes:
 			if r == null or r.a == null or r.b == null or r.evidence == null:
 				continue
-			if available.has(r.a.id) and available.has(r.b.id) and not available.has(r.evidence.id):
+			if _recipe_side_available(r.a, available) and _recipe_side_available(r.b, available) \
+					and not available.has(r.evidence.id):
 				available[r.evidence.id] = true
 				changed = true
 	for r in case_def.evidence_recipes:
 		if r == null or r.a == null or r.b == null or r.evidence == null:
 			out.append("配方缺 a / b / evidence")
 			continue
-		if r.a.id == r.b.id:
-			out.append("配方 %s 的两端是同一张证据" % r.id)
+		if r.a == r.b:
+			out.append("配方 %s 的两端是同一张原料" % r.id)
 		if String(r.evidence.tier) != "zheng":
 			out.append("配方 %s 的产物不是「证」：%s" % [r.id, r.evidence.tier])
-		for ev in [r.a, r.b, r.evidence]:
-			if not available.has(ev.id):
-				out.append("配方 %s 的「%s」没有可达来源" % [r.id, ev.id])
+		if not GraphState.SENSES.has(String(r.sense)):
+			out.append("配方 %s 的 sense 非法：%s" % [r.id, r.sense])
+		for raw in [r.a, r.b]:
+			if not _recipe_side_available(raw, available):
+				out.append("配方 %s 的「%s」没有可达来源" % [r.id, _raw_id(raw)])
+		if not available.has(r.evidence.id):
+			out.append("配方 %s 的产物「%s」不可达" % [r.id, r.evidence.id])
+	# 结局配方必须覆盖它需要的五感：每个 sense 至少要有一张可达的证。
+	var sense_ok := {}
+	for eid in available.keys():
+		var ev := evidence_of(String(eid))
+		if ev != null and String(ev.tier) == "zheng":
+			sense_ok[String(ev.sense)] = true
+	for end in case_def.endings:
+		for ev in end.recipe:
+			if ev == null or not available.has(ev.id):
+				out.append("结局 %s 的「%s」不可达" % [end.id, _raw_id(ev)])
+			elif not sense_ok.has(String(ev.sense)):
+				out.append("结局 %s 的「%s」缺少同感官可达证据" % [end.id, ev.id])
 	for ch in case_def.chars:
 		for f in ch.evidence_fields:
 			if f == null:
@@ -139,11 +190,29 @@ func validate_evidence() -> Array:
 			if f.support.is_empty():
 				out.append("%s / %s 没有支撑证据" % [ch.id, f.id])
 			for ev in f.support:
-				if ev == null or not available.has(ev.id):
-					out.append("%s / %s 的支撑证据不可达" % [ch.id, f.id])
+				if ev == null or not available.has(ev.id) or String(ev.tier) != "zheng":
+					out.append("%s / %s 的支撑证据不可达或不是证" % [ch.id, f.id])
 			if f.drop_clue == null:
-				out.append("%s / %s 没有完成掉落线索" % [ch.id, f.id])
+				out.append("%s / %s 没有完成掉落证据" % [ch.id, f.id])
 	return out
+
+
+func _recipe_side_available(raw: Resource, available: Dictionary) -> bool:
+	if raw is ItemDef:
+		return items.has(String((raw as ItemDef).id))
+	if raw is EvidenceDef:
+		return available.has(String((raw as EvidenceDef).id))
+	return false
+
+
+func _raw_id(raw: Resource) -> String:
+	if raw == null:
+		return ""
+	if raw is ItemDef:
+		return String((raw as ItemDef).id)
+	if raw is EvidenceDef:
+		return String((raw as EvidenceDef).id)
+	return ""
 
 
 ## 扫描所有数据资源里的字符串，找 `[item:` / `[clue:` 这类退役标签。
@@ -194,10 +263,13 @@ func _index() -> void:
 		items[it.id] = it
 	for c in case_def.chars:
 		chars[c.id] = c
-	for cl in case_def.clues:
-		clues[cl.id] = cl
+	## 旧 `clues` 数组也并入 evidences：迁移期兼容，新数据不再写 clues。
+	for ev in case_def.clues:
+		evidences[ev.id] = ev
 	for ev in case_def.evidences:
 		evidences[ev.id] = ev
+	## 旧调用方仍可用 `clue_of` / `clues`；底层已经是证。
+	clues = evidences
 	evidence_recipes = case_def.evidence_recipes
 	memories = case_def.memories
 	dialogues = case_def.dialogues
@@ -222,9 +294,8 @@ static func kind_of_ref(ref_id: String) -> String:
 		return "item"
 	if p.begins_with("CHARS_") or p.begins_with("CHAR_"):
 		return "char"
-	if p.begins_with("CLUES_") or p.begins_with("CLUE_") or p.begins_with("DATA_"):
-		return "clue"
-	if p.begins_with("EVID_") or p.begins_with("EVIDENCE_"):
+	if p.begins_with("CLUES_") or p.begins_with("CLUE_") or p.begins_with("DATA_") \
+			or p.begins_with("EVID_") or p.begins_with("EVIDENCE_"):
 		return "evidence"
 	return "data"
 
@@ -265,22 +336,45 @@ static func avatar_path_of_def(ch: CharDef) -> String:
 	return ""
 
 
-func clue_of(id: String) -> ClueDef:
-	return clues.get(id, null)
+## 兼容旧调用名：旧“线索”现在就是证。
+func clue_of(id: String) -> EvidenceDef:
+	return evidences.get(id, null)
 
 
 func evidence_of(id: String) -> EvidenceDef:
 	return evidences.get(id, null)
 
 
-## 无序对配方：`a × b` 与 `b × a` 都能命中。
-func evidence_recipe_for(a_id: String, b_id: String) -> EvidenceRecipeDef:
+## 无序对配方：`a × b` 与 `b × a` 都能命中。原料可以是物品（物）或证据（词/证），
+## 因此必须同时比较 kind，避免同名 id / 类型串线。
+func evidence_recipe_for(a_kind: String, a_id: String, b_kind: String, b_id: String) -> EvidenceRecipeDef:
 	for r in evidence_recipes:
 		if r == null or r.a == null or r.b == null:
 			continue
-		if (r.a.id == a_id and r.b.id == b_id) or (r.a.id == b_id and r.b.id == a_id):
+		if _recipe_side_matches(r.a, a_kind, a_id) and _recipe_side_matches(r.b, b_kind, b_id):
+			return r
+		if _recipe_side_matches(r.a, b_kind, b_id) and _recipe_side_matches(r.b, a_kind, a_id):
 			return r
 	return null
+
+
+func _recipe_side_matches(raw: Resource, kind: String, id: String) -> bool:
+	if raw is ItemDef:
+		return kind == "item" and String((raw as ItemDef).id) == id
+	if raw is EvidenceDef:
+		return kind == "evidence" and String((raw as EvidenceDef).id) == id
+	return false
+
+
+## 物品是否被任何证据配方引用：详情窗据此显示「可用作证据原料」。
+func item_used_in_recipe(id: String) -> bool:
+	for r in evidence_recipes:
+		if r == null:
+			continue
+		for raw in [r.a, r.b]:
+			if raw is ItemDef and String((raw as ItemDef).id) == id:
+				return true
+	return false
 
 
 func evidence_tier_of(id: String) -> String:
@@ -297,9 +391,7 @@ func def_of(kind: String, id: String) -> Resource:
 			return item_of(id)
 		"char":
 			return char_of(id)
-		"clue", "data":
-			return clue_of(id)
-		"evidence":
+		"clue", "data", "evidence":
 			return evidence_of(id)
 	return null
 
@@ -315,10 +407,7 @@ func label_of(kind: String, id: String) -> String:
 		"char":
 			var ch := char_of(id)
 			return ch.name if ch != null else id
-		"clue", "data":
-			var cl := clue_of(id)
-			return cl.label if cl != null else id
-		"evidence":
+		"clue", "data", "evidence":
 			var ev := evidence_of(id)
 			return ev.label if ev != null else id
 	return id
@@ -363,7 +452,7 @@ func _merge_nodes(items_s: PackedStringArray, chars_s: PackedStringArray,
 	_collect_ids(out, "item", items_s, items, host_id)
 	_collect_ids(out, "char", chars_s, chars, host_id)
 	_collect_ids(out, "loc", locs_s, scenes, host_id)
-	_collect_ids(out, "clue", clues_s, clues, host_id)
+	_collect_ids(out, "evidence", clues_s, evidences, host_id)
 	return out
 
 

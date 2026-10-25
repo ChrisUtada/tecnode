@@ -13,7 +13,7 @@ var case_def: CaseDef
 var by_item := {}
 var by_char := {}
 var by_scene := {}
-var by_clue := {}
+var by_evidence := {}
 var tag_re: RegEx
 var changed := 0
 
@@ -33,7 +33,7 @@ func _initialize() -> void:
 	for s in case_def.scenes:
 		by_scene[s.id] = s
 	for cl in case_def.clues:
-		by_clue[cl.id] = cl
+		by_evidence[cl.id] = cl
 
 	for s in case_def.scenes:
 		_process_host(s)
@@ -210,8 +210,8 @@ func _label(kind: String, id: String) -> String:
 		"loc":
 			var s: SceneDef = by_scene.get(id)
 			return s.title if s != null else id
-		"clue", "data":
-			var cl: ClueDef = by_clue.get(id)
+		"clue", "data", "evidence":
+			var cl: EvidenceDef = by_evidence.get(id)
 			return cl.label if cl != null else id
 	return id
 
@@ -231,12 +231,12 @@ func _append_clues(obj: Object, ids: Array) -> void:
 		refs = []
 	var changed_now := false
 	for id in ids:
-		var cl: ClueDef = by_clue.get(String(id))
+		var cl: EvidenceDef = by_evidence.get(String(id))
 		if cl == null:
 			continue
 		var exists := false
 		for r in refs:
-			if r is ClueDef and (r as ClueDef).id == cl.id:
+			if r is EvidenceDef and (r as EvidenceDef).id == cl.id:
 				exists = true
 				break
 		if not exists:

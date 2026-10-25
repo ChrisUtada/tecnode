@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_aggjo"]
+
+[resource]
+script = ExtResource("1_aggjo")
+id = "CLUES_fb"
+label = "植物研究所所长傅柏"
+desc = "植物研究所所长傅柏"
+source_text = "TEC 分析所得。"

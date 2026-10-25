@@ -228,9 +228,9 @@ func _test_desktop() -> void:
 	var assigned := true
 	for clue in true_e.recipe:
 		scene.dbg_ensure("clue", clue.id)
-		if not scene.dbg_matrix_assign("clue:" + clue.id):
+		if not scene.dbg_matrix_assign("evidence:" + clue.id):
 			assigned = false
-	check("配方线索全部归位", assigned and (scene.dbg_state()["matrix_ids"] as Array).size() == 5,
+	check("配方证全部归位", assigned and (scene.dbg_state()["matrix_ids"] as Array).size() == 5,
 		str(scene.dbg_state()["matrix_ids"]))
 	scene.dbg_open_matrix()
 	scene.dbg_matrix_charge()

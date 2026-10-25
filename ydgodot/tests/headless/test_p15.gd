@@ -136,7 +136,7 @@ func _test_restore_in_place() -> void:
 	check("恢复前：状态已变", g.captured.has("CLUES_mc"))
 	check("原地恢复成功", ss.restore(snap))
 	check("原地恢复：同一 graph 引用", cs.graph == g)
-	check("原地恢复：新增线索被撤掉", not g.captured.has("CLUES_mc"))
+	check("原地恢复：新增证据被撤掉", not g.captured.has("CLUES_mc"))
 	check("原地恢复：命令系统仍能执行", not cs.execute(g.key_of("item", "ITEM_taideng"), null)["ok"])
 	check("原地恢复：hidden 已重算",
 		g.is_visible(g.key_of("item", "ITEM_shuzhuo"))
@@ -314,7 +314,7 @@ func _test_desktop() -> void:
 	check("桌面：撤销取回", scene.dbg_undo())
 	await process_frame
 	await process_frame
-	check("桌面：线索回到袋里", (scene.dbg_state()["stored"] as Array).has("item:ITEM_taideng"))
+	check("桌面：物品回到袋里", (scene.dbg_state()["stored"] as Array).has("item:ITEM_taideng"))
 
 	scene.dbg_use_temp_save(temp)
 	check("桌面：写临时存档", scene.dbg_save())

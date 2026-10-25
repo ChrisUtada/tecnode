@@ -15,7 +15,7 @@ const FIELDS := {
 	"node_items": "item",
 	"node_chars": "char",
 	"node_locs": "loc",
-	"node_clues": "clue",
+	"node_clues": "evidence",
 }
 
 

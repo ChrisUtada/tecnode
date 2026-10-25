@@ -1,14 +1,14 @@
-[gd_resource type="Resource" script_class="ItemDef" format=3]
+[gd_resource type="Resource" script_class="ItemDef" format=3 uid="uid://cgis0dipsqqx2"]
 
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_ly2og"]
-[ext_resource type="Script" path="res://core/defs/ChoiceOptionDef.gd" id="2_i4iou"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_moej5"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_moej5"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_ly2og"]
+[ext_resource type="Script" uid="uid://dkyhuc6wefimy" path="res://core/defs/ChoiceOptionDef.gd" id="2_i4iou"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_moej5"]
+[ext_resource type="Script" uid="uid://bfyp6gjma7kwr" path="res://core/defs/ItemDef.gd" id="3_moej5"]
 [ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_choutiyi.tres" id="4_66vs6"]
-[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="5_qa4r7"]
+[ext_resource type="Script" uid="uid://ddv5xqm2n7vet" path="res://core/defs/PayloadDef.gd" id="5_qa4r7"]
 [ext_resource type="Resource" path="res://cases/a001/scenes/SCENES_choutier.tres" id="6_ue5hu"]
-[ext_resource type="Script" path="res://core/defs/commands/ChoiceCommandDef.gd" id="7_1immc"]
-[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="8_5bt6u"]
+[ext_resource type="Script" uid="uid://c70gudwpn2jnt" path="res://core/defs/commands/ChoiceCommandDef.gd" id="7_1immc"]
+[ext_resource type="Script" uid="uid://b02w85llmhtcr" path="res://core/defs/ExcerptDef.gd" id="8_5bt6u"]
 
 [sub_resource type="Resource" id="Resource_ms3yw"]
 script = ExtResource("5_qa4r7")
@@ -37,10 +37,10 @@ label = "打开抽屉"
 
 [resource]
 script = ExtResource("3_moej5")
-baggable = false
 id = "ITEM_chouti"
 label = "抽屉"
 desc = "书桌的两个抽屉紧闭着，但没有上锁。"
+baggable = false
 commands = Array[ExtResource("1_ly2og")]([SubResource("Resource_56t56")])
 node_items = PackedStringArray()
 node_chars = PackedStringArray()

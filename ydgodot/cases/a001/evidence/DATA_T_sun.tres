@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_ptunm"]
+
+[resource]
+script = ExtResource("1_ptunm")
+sense = "touch"
+id = "DATA_T_sun"
+label = "阳光"
+desc = "灼热的阳光穿透了玻璃窗。"
+source_text = "TEC 分析所得。"

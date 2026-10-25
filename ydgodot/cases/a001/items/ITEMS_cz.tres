@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="ItemDef" format=3]
+[gd_resource type="Resource" script_class="ItemDef" format=3 uid="uid://ckvygqg03irsx"]
 
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_cbnn1"]
-[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="2_mbyf7"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="3_ri33h"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_cbnn1"]
+[ext_resource type="Script" uid="uid://b02w85llmhtcr" path="res://core/defs/ExcerptDef.gd" id="2_mbyf7"]
+[ext_resource type="Script" uid="uid://bfyp6gjma7kwr" path="res://core/defs/ItemDef.gd" id="3_ri33h"]
 
 [resource]
 script = ExtResource("3_ri33h")

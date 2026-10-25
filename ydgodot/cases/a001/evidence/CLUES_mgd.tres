@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_nv863"]
+
+[resource]
+script = ExtResource("1_nv863")
+id = "CLUES_mgd"
+label = "染血的美工刀"
+desc = "一把染血的美工刀，被藏在带着密码锁的木盒之中。"
+source_text = "TEC 分析所得。"

@@ -1,15 +1,16 @@
-[gd_resource type="Resource" script_class="ItemDef" format=3]
+[gd_resource type="Resource" script_class="ItemDef" format=3 uid="uid://b23brq0j5qpdx"]
 
-[ext_resource type="Script" path="res://core/defs/commands/CommandDef.gd" id="1_mbwo5"]
-[ext_resource type="Script" path="res://core/defs/ConditionDef.gd" id="2_8ynu0"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_uqgr1"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_xds.tres" id="3_uqgr1"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zhpt.tres" id="4_qib0t"]
-[ext_resource type="Script" path="res://core/defs/ItemDef.gd" id="5_x5bvh"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_yzs.tres" id="6_qib0t"]
-[ext_resource type="Script" path="res://core/defs/PayloadDef.gd" id="6_ulajk"]
-[ext_resource type="Script" path="res://core/defs/commands/ConditionalCommandDef.gd" id="7_wteae"]
-[ext_resource type="Script" path="res://core/defs/ExcerptDef.gd" id="8_14ji1"]
+[ext_resource type="Script" uid="uid://b23txrp1nong0" path="res://core/defs/commands/CommandDef.gd" id="1_mbwo5"]
+[ext_resource type="Script" uid="uid://cpr8ejgybxq4o" path="res://core/defs/ConditionDef.gd" id="2_8ynu0"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_uqgr1"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_xds.tres" id="3_uqgr1"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_zhpt.tres" id="4_qib0t"]
+[ext_resource type="Script" uid="uid://bfyp6gjma7kwr" path="res://core/defs/ItemDef.gd" id="5_x5bvh"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_yzs.tres" id="6_qib0t"]
+[ext_resource type="Script" uid="uid://ddv5xqm2n7vet" path="res://core/defs/PayloadDef.gd" id="6_ulajk"]
+[ext_resource type="Script" uid="uid://dtqa0xqm8cmyc" path="res://core/defs/commands/ConditionalCommandDef.gd" id="7_wteae"]
+[ext_resource type="Script" uid="uid://b02w85llmhtcr" path="res://core/defs/ExcerptDef.gd" id="8_14ji1"]
+[ext_resource type="Script" uid="uid://cti0guintk12h" path="res://core/defs/HiddenClueDef.gd" id="11_qib0t"]
 
 [sub_resource type="Resource" id="Resource_qpge6"]
 script = ExtResource("2_8ynu0")
@@ -32,6 +33,11 @@ conditions = Array[ExtResource("2_8ynu0")]([SubResource("Resource_qpge6"), SubRe
 on_success = SubResource("Resource_nw55k")
 label = "查看内部"
 
+[sub_resource type="Resource" id="Resource_x5bvh"]
+script = ExtResource("11_qib0t")
+text = "注射器里残留的液体，提取得出抑制素。"
+clues = Array[ExtResource("2_uqgr1")]([ExtResource("6_qib0t")])
+
 [resource]
 script = ExtResource("5_x5bvh")
 id = "ITEMS_zsq"
@@ -39,6 +45,7 @@ label = "注射器"
 desc = "一根注射器，针筒内有半管透明的不知名液体。"
 can_be_picked = true
 commands = Array[ExtResource("1_mbwo5")]([SubResource("Resource_8a7sn")])
+hidden_clue = SubResource("Resource_x5bvh")
 node_items = PackedStringArray()
 node_chars = PackedStringArray()
 node_locs = PackedStringArray()

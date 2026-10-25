@@ -265,8 +265,12 @@ func _status_text(n: Dictionary, kind: String) -> String:
 		return "已聊完" if int(_graph.talk_prog.get(_key, 0)) >= total else "可对话"
 	if kind == "evidence":
 		var ev := _case.evidence_of(String(n["id"]))
-		var tier := String(ev.tier) if ev != null else "wu"
-		return {"wu": "物证原料", "ci": "言词证据", "zheng": "结论 · 可填入档案"}.get(tier, tier)
+		if ev == null:
+			return ""
+		if String(ev.tier) == "ci":
+			return "词 · 证言（与物合成证）"
+		var origin: String = String({"tec": "TEC 分析", "synth": "物 × 词合成", "deduce": "档案演绎"}.get(String(ev.origin), String(ev.origin)))
+		return "证 · %s · %s" % [String(GraphState.SENSE_NAMES.get(ev.sense, ev.sense)), origin]
 	if kind != "item":
 		return ""
 	var it := _case.item_of(String(n["id"]))
@@ -298,6 +302,8 @@ func _status_text(n: Dictionary, kind: String) -> String:
 		for rid in need:
 			names.append(_case.label_of("item", String(rid)))
 		st.append("待装上 " + "、".join(names))
+	if _case.item_used_in_recipe(String(n.get("id", ""))):
+		st.append("可用作证据原料")
 	return " · ".join(st)
 
 

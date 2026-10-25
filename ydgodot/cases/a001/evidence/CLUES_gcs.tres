@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EvidenceDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/EvidenceDef.gd" id="1_uwvya"]
+
+[resource]
+script = ExtResource("1_uwvya")
+id = "CLUES_gcs"
+label = "贯穿伤"
+desc = "被利器从下腹部插入，留下了一道深深的伤口。"
+source_text = "TEC 分析所得。"

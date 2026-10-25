@@ -40,21 +40,20 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	check("实体数量一致（场景/物品/人物/线索/证据/配方/回忆/对话/结局）",
+	check("实体数量一致（场景/物品/人物/证据/配方/回忆/对话/结局）",
 		c.scenes.size() == jd["scenes"].size() and c.items.size() == jd["items"].size()
-		and c.chars.size() == jd["chars"].size() and c.clues.size() == jd["clues"].size()
+		and c.chars.size() == jd["chars"].size()
 		and c.evidences.size() == jd["evidences"].size()
 		and c.evidence_recipes.size() == jd["evidenceRecipes"].size()
 		and c.memories.size() == jd["memories"].size() and c.dialogues.size() == jd["dialogues"].size()
 		and c.endings.size() == jd["endings"].size(),
-		"%d/%d/%d/%d/%d/%d/%d/%d/%d" % [c.scenes.size(), c.items.size(), c.chars.size(),
-			c.clues.size(), c.evidences.size(), c.evidence_recipes.size(),
+		"%d/%d/%d/%d/%d/%d/%d/%d" % [c.scenes.size(), c.items.size(), c.chars.size(),
+			c.evidences.size(), c.evidence_recipes.size(),
 			c.memories.size(), c.dialogues.size(), c.endings.size()])
 
 	var scenes := _by_id(c.scenes)
 	var items := _by_id(c.items)
 	var chars := _by_id(c.chars)
-	var clues := _by_id(c.clues)
 	var evs := _by_id(c.evidences)
 	var recs := _by_id(c.evidence_recipes)
 	var mems := _by_id(c.memories)
@@ -94,15 +93,6 @@ func _initialize() -> void:
 			bad += 1
 			print("     ✗ char ", id)
 	check("人物 %d 个逐字段一致（含 talkQueue / sceneTalks / 反应表）" % jd["chars"].size(), bad == 0, "%d 个不一致" % bad)
-
-	bad = 0
-	for id in jd["clues"]:
-		var r: ClueDef = clues.get(id)
-		if r == null or r.label != jd["clues"][id]["label"] or r.sense != jd["clues"][id]["type"] \
-			or r.desc != jd["clues"][id]["desc"]:
-			bad += 1
-			print("     ✗ clue ", id)
-	check("线索 %d 个逐字段一致（含五感枚举）" % jd["clues"].size(), bad == 0, "%d 个不一致" % bad)
 
 	bad = 0
 	for id in jd["evidences"]:
@@ -240,25 +230,32 @@ func _evidence_ids(list) -> Array:
 
 
 func _norm_evidence(r: EvidenceDef) -> Dictionary:
-	return {"label": r.label, "tier": r.tier, "desc": r.desc, "sourceText": r.source_text}
+	return {"label": r.label, "tier": r.tier, "sense": r.sense, "origin": r.origin,
+		"desc": r.desc, "sourceText": r.source_text}
 
 
 func _norm_evidence_json(d: Dictionary) -> Dictionary:
-	return {"label": String(d.get("label", "")), "tier": String(d.get("tier", "wu")),
+	return {"label": String(d.get("label", "")), "tier": String(d.get("tier", "zheng")),
+		"sense": String(d.get("sense", "vision")), "origin": String(d.get("origin", "tec")),
 		"desc": String(d.get("desc", "")), "sourceText": String(d.get("sourceText", ""))}
 
 
 func _norm_recipe(r: EvidenceRecipeDef) -> Dictionary:
-	return {"id": r.id, "a": String(r.a.id) if r.a != null else "",
-		"b": String(r.b.id) if r.b != null else "",
+	return {"id": r.id, "a": _raw_id(r.a), "b": _raw_id(r.b),
 		"evidence": String(r.evidence.id) if r.evidence != null else "",
-		"text": r.text}
+		"sense": r.sense, "text": r.text}
 
 
 func _norm_recipe_json(d: Dictionary) -> Dictionary:
 	return {"id": String(d.get("id", "")), "a": String(d.get("a", "")),
 		"b": String(d.get("b", "")), "evidence": String(d.get("evidence", "")),
-		"text": String(d.get("text", ""))}
+		"sense": String(d.get("sense", "vision")), "text": String(d.get("text", ""))}
+
+
+func _raw_id(r: Resource) -> String:
+	if r == null:
+		return ""
+	return String(r.get("id"))
 
 
 func _norm_field(f: EvidenceFieldDef) -> Dictionary:
@@ -281,8 +278,7 @@ func _norm_field_json(f: Dictionary) -> Dictionary:
 func _norm_scene(r: SceneDef) -> Dictionary:
 	return {"title": r.title, "canBePicked": r.can_be_picked,
 		"hiddenText": (r.hidden_clue.text if r.hidden_clue != null else null),
-		"hiddenIds": _clue_ids(r.hidden_clue),
-		"hiddenEvidence": _evidence_ids(r.hidden_evidence)}
+		"hiddenIds": _clue_ids(r.hidden_clue)}
 
 
 func _norm_scene_json(d: Dictionary) -> Dictionary:
@@ -290,8 +286,7 @@ func _norm_scene_json(d: Dictionary) -> Dictionary:
 	return {"title": String(d.get("title", "")),
 		"canBePicked": bool(d.get("canBePicked", false)),
 		"hiddenText": (String(h.get("text", "")) if h != null else null),
-		"hiddenIds": (h.get("ids", []) if h != null else []),
-		"hiddenEvidence": d.get("hiddenEvidence", [])}
+		"hiddenIds": (h.get("ids", []) if h != null else [])}
 
 
 func _norm_item(r: ItemDef) -> Dictionary:
@@ -307,8 +302,7 @@ func _norm_item(r: ItemDef) -> Dictionary:
 		"litOn": r.lit_on_message, "litOff": r.lit_off_message, "litFail": r.lit_fail_message,
 		"commands": cmds, "excerpts": exs,
 		"hiddenText": (r.hidden_clue.text if r.hidden_clue != null else null),
-		"hiddenIds": _clue_ids(r.hidden_clue),
-		"hiddenEvidence": _evidence_ids(r.hidden_evidence)}
+		"hiddenIds": _clue_ids(r.hidden_clue)}
 
 
 func _norm_item_json(d: Dictionary) -> Dictionary:
@@ -326,8 +320,7 @@ func _norm_item_json(d: Dictionary) -> Dictionary:
 		"litFail": String(d.get("litFailMessage", "")),
 		"commands": cmds, "excerpts": exs,
 		"hiddenText": (String(h.get("text", "")) if h != null else null),
-		"hiddenIds": (h.get("ids", []) if h != null else []),
-		"hiddenEvidence": d.get("hiddenEvidence", [])}
+		"hiddenIds": (h.get("ids", []) if h != null else [])}
 
 
 func _norm_cmd(cmd: CommandDef) -> Dictionary:

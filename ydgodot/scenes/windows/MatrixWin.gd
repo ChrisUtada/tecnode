@@ -87,7 +87,7 @@ func setup_matrix(p_graph: GraphState, p_case: CaseLoader) -> void:
 	_build_executor()
 	_build_seed_pop()
 
-	_hint = TecTheme.label("长按执行者推演 · 单击线索看详情，点「取回」或拖出桌布放回画布", TecTheme.FS_BODY, TecTheme.MUTED)
+	_hint = TecTheme.label("长按执行者推演 · 单击证看详情，点「取回」或拖出桌布放回画布", TecTheme.FS_BODY, TecTheme.MUTED)
 	_hint.position = Vector2(12, BOARD_H - 20)
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_board.add_child(_hint)
@@ -224,7 +224,7 @@ func refresh_matrix() -> void:
 
 
 func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
-	var key := graph.key_of("clue", cid)
+	var key := graph.key_of("evidence", cid)
 	var n := graph.node(key)
 	var chip := PanelContainer.new()
 	chip.name = "chip_" + cid
@@ -232,7 +232,7 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	chip.size = Vector2(CHIP_W, CHIP_H)
 	chip.custom_minimum_size = Vector2(CHIP_W, CHIP_H)
 	chip.mouse_filter = Control.MOUSE_FILTER_STOP
-	chip.tooltip_text = "单击 = 查看详情；拖出桌布 = 放回画布；拖到线索册 = 收进册子"
+	chip.tooltip_text = "单击 = 查看详情；拖出桌布 = 放回画布；拖到证据册 = 收进册子"
 	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE, 1)
 	chip.add_theme_stylebox_override("panel", sb)
 
@@ -257,8 +257,6 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	col.add_child(foot)
 
 	var sub := TecTheme.label("推演桌布", TecTheme.FS_BODY, TecTheme.MUTED)
-	if not bool(n.get("captured", false)):
-		sub.text = "线索"
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sub.clip_text = true

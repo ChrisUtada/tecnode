@@ -57,7 +57,7 @@ const DBL_MS := 500
 
 ## 类型名。**卡面上不显示它** —— 类型改由左侧的类型色符号承担（见 `ui/KindGlyph.gd`），
 ## 这个名字只给详情窗 `_kind_name()` 用。
-const KIND_NAME := {"loc": "场景", "item": "物品", "char": "人物", "clue": "线索",
+const KIND_NAME := {"loc": "场景", "item": "物品", "char": "人物", "clue": "证",
 	"time": "时刻", "evidence": "证据"}
 const DARK_HI := TecTheme.FACE_DARK_HI
 const DARK_LO := TecTheme.FACE_DARK_LO
@@ -395,7 +395,8 @@ func _apply_shell() -> void:
 	if _over:
 		_apply_over_look()
 		return
-	var got := kind == "clue" and bool(node_data.get("captured", false))
+	var got := kind == "evidence" and String(node_data.get("tier", "")) == "zheng" \
+		and bool(node_data.get("captured", false))
 	var lit := kind == "item" and bool(node_data.get("lit", false))
 	if got:
 		_apply_got_look()
@@ -626,7 +627,8 @@ func is_selected() -> bool:
 func look_state() -> String:
 	if _over:
 		return "over"
-	if kind == "clue" and bool(node_data.get("captured", false)):
+	if kind == "evidence" and String(node_data.get("tier", "")) == "zheng" \
+			and bool(node_data.get("captured", false)):
 		return "got"
 	if kind == "item" and bool(node_data.get("lit", false)):
 		return "lit"

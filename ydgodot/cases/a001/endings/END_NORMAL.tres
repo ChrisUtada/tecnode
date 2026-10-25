@@ -1,11 +1,11 @@
-[gd_resource type="Resource" script_class="EndingDef" format=3]
+[gd_resource type="Resource" script_class="EndingDef" format=3 uid="uid://djlb21e5ooxda"]
 
-[ext_resource type="Script" path="res://core/defs/EndingLineDef.gd" id="1_kokb7"]
-[ext_resource type="Script" path="res://core/defs/ClueDef.gd" id="2_iruru"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_JS.tres" id="3_p2nc5"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_wmhj.tres" id="4_xmkje"]
-[ext_resource type="Resource" path="res://cases/a001/clues/CLUES_zhpt.tres" id="5_305p4"]
-[ext_resource type="Script" path="res://core/defs/EndingDef.gd" id="6_48l1k"]
+[ext_resource type="Script" uid="uid://c4yfit112qpl2" path="res://core/defs/EndingLineDef.gd" id="1_kokb7"]
+[ext_resource type="Script" uid="uid://b6tymna6bl0ci" path="res://core/defs/EvidenceDef.gd" id="2_iruru"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_JS.tres" id="3_p2nc5"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_wmhj.tres" id="4_xmkje"]
+[ext_resource type="Resource" path="res://cases/a001/evidence/CLUES_zhpt.tres" id="5_305p4"]
+[ext_resource type="Script" uid="uid://cda863exsx2j" path="res://core/defs/EndingDef.gd" id="6_48l1k"]
 
 [resource]
 script = ExtResource("6_48l1k")

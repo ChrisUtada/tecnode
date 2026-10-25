@@ -9,4 +9,5 @@ extends Resource
 @export var options: PackedStringArray = PackedStringArray()
 @export var correct: String = ""
 @export var support: Array[EvidenceDef] = []
-@export var drop_clue: ClueDef = null
+## 字段全部核准后掉落的人物证据（origin=deduce，落地即已捕获）。
+@export var drop_clue: EvidenceDef = null
