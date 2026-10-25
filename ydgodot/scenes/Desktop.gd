@@ -4863,6 +4863,13 @@ func _place_person_card() -> void:
 		return
 	var desk_w := _desk.size.x
 	var desk_h := _desk.size.y
+	## 玩家拖过就保留位置；resize 只钳回桌面，不再贴回右上。
+	if _people_card.user_placed():
+		var kept: Vector2 = _people_card.position
+		kept.x = clampf(kept.x, 12.0, maxf(12.0, desk_w - _people_card.size.x - 12.0))
+		kept.y = clampf(kept.y, 12.0, maxf(12.0, desk_h - _people_card.size.y - 12.0))
+		_people_card.position = kept
+		return
 	var pos := Vector2(maxf(12.0, desk_w - _people_card.size.x - 24.0), 60.0)
 	if _people_win != null and is_instance_valid(_people_win):
 		pos = Vector2(_people_win.position.x - _people_card.size.x - 12.0,

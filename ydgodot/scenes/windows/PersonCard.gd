@@ -32,6 +32,12 @@ var _action_btn: Button
 var _close_btn: Button
 var _note_dirty := false
 var _loading := false
+## 卡片空白处可拖动；拖动后 Desktop 不再在窗口尺寸变化时把它自动归位。
+var _drag_active := false
+var _dragging := false
+var _user_placed := false
+var _drag_press := Vector2.ZERO
+var _drag_grab := Vector2.ZERO
 
 
 ## 待核对态：墨色虚线框。PanelContainer 的 StyleBox 画不出虚线，单独叠一层。
@@ -56,6 +62,8 @@ func setup_card(p: Dictionary) -> void:
 	_card_h = minf(620.0, H + float(field_count) * 118.0 + (8.0 if field_count > 0 else 0.0))
 	size = Vector2(W + SHADOW, _card_h + SHADOW)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_default_cursor_shape = Control.CURSOR_DRAG
+	tooltip_text = "拖动卡片空白处可移动档案卡"
 
 	var shadow := ColorRect.new()
 	shadow.name = "card_shadow"
@@ -365,6 +373,55 @@ func _rule() -> ColorRect:
 	rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return rule
+
+
+## 玩家亲手拖过之后，Desktop 的重排 / resize 只钳边界，不再自动贴回右上。
+func user_placed() -> bool:
+	return _user_placed
+
+
+func _clamp_to_host(p: Vector2) -> Vector2:
+	var host := get_parent() as Control
+	if host == null:
+		return p
+	var margin := 8.0
+	var lim := host.size - size
+	return Vector2(
+		clampf(p.x, margin, maxf(margin, lim.x - margin)),
+		clampf(p.y, margin, maxf(margin, lim.y - margin)))
+
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if mb.pressed:
+			_drag_active = true
+			_dragging = false
+			_drag_press = mb.global_position
+			_drag_grab = position
+			if _note != null:
+				_note.release_focus()
+			accept_event()
+		elif _drag_active:
+			_drag_active = false
+			if _dragging:
+				_dragging = false
+				position = _clamp_to_host(position)
+				_user_placed = true
+			accept_event()
+	elif event is InputEventMouseMotion and _drag_active:
+		if (event.button_mask & MOUSE_BUTTON_MASK_LEFT) == 0:
+			_drag_active = false
+			_dragging = false
+			return
+		var at: Vector2 = (event as InputEventMouseMotion).global_position
+		if not _dragging and (at - _drag_press).length() > 4.0:
+			_dragging = true
+		if _dragging:
+			position = _clamp_to_host(_drag_grab + (at - _drag_press))
+			accept_event()
 
 
 func payload() -> Dictionary:

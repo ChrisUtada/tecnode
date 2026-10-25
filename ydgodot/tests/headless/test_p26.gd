@@ -477,6 +477,34 @@ func _test_desktop(c: CaseLoader) -> void:
 	scene._desk.size = desk_old
 	scene._place_person_card()
 
+	# 档案卡可自由拖动；拖过之后 resize / 重排只钳边界，不贴回右上。
+	if card != null:
+		var old_pos: Vector2 = card.position
+		var press_at: Vector2 = card.get_global_rect().position + Vector2(120.0, 100.0)
+		var down := InputEventMouseButton.new()
+		down.button_index = MOUSE_BUTTON_LEFT
+		down.pressed = true
+		down.global_position = press_at
+		down.position = press_at
+		card._gui_input(down)
+		var motion := InputEventMouseMotion.new()
+		motion.button_mask = MOUSE_BUTTON_MASK_LEFT
+		motion.global_position = press_at + Vector2(-70.0, 40.0)
+		motion.position = motion.global_position
+		card._gui_input(motion)
+		var up := InputEventMouseButton.new()
+		up.button_index = MOUSE_BUTTON_LEFT
+		up.pressed = false
+		up.global_position = motion.global_position
+		up.position = up.global_position
+		card._gui_input(up)
+		check("人物卡可自由拖动", card.position.distance_to(old_pos) > 20.0 and card.user_placed(),
+			"%s -> %s" % [old_pos, card.position])
+		var dragged_pos: Vector2 = card.position
+		scene._place_person_card()
+		check("拖动后重排不贴回右上", card.position.is_equal_approx(dragged_pos),
+			"%s -> %s" % [dragged_pos, card.position])
+
 	# 备注：写入即进 graph.notes / 快照；撤销一个无关操作不回滚。
 	var note_edit := card.find_child("card_note", true, false) as TextEdit if card != null else null
 	check("档案卡有可编辑备注区", note_edit != null and note_edit.placeholder_text != "",
