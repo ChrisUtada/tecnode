@@ -763,7 +763,15 @@ func _release_drop(at_global: Vector2) -> void:
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	# 1) 落点表（图标 / 两扇收纳窗 / 推演桌布 / TEC / 对话窗）：命中即回原位
 	if drop_sink.is_valid() and bool(drop_sink.call(card_key, at_global)):
-		spring_back()
+		## 收纳成功时卡片已被隐藏：不要在后台再弹一次旧 home，拖出时会被它拖回旧坐标。
+		if visible:
+			spring_back()
+		else:
+			if _spring != null and _spring.is_valid():
+				_spring.kill()
+			_spring = null
+			_debug_event("drop_handled_hidden key=%s pos=%s home=%s（跳过 spring）" % [
+				card_key, position, _home])
 		drag_finished.emit(card_key, _home, true)
 		return
 	# 2) 落在别的节点上 = 组合，自己也回原位

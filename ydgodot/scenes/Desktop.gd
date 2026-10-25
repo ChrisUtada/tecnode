@@ -644,16 +644,26 @@ func _finish_sdrag(at: Vector2) -> void:
 	var world := (at - _stage.get_global_position() - _view_pos) / maxf(_view_k, 0.01)
 	world.x = maxf(0.0, world.x)
 	world.y = maxf(0.0, world.y)
-	_dbg_storage_flow("画布落点 world=%s view=%s k=%.3f node_before=(%.1f,%.1f) card_before=%s" % [
-		world, _view_pos, _view_k, float(n.get("x", -1.0)), float(n.get("y", -1.0)),
+	## 行拖拽没有「抓住卡片内部」的偏移：把卡片中心放在光标处，避免落点看起来
+	## 永远偏到光标右下方半个卡身。落位仍按 8px 网格。
+	var place := world
+	var cw := card0.size.x if card0 != null else 0.0
+	var chh := card0.size.y if card0 != null else 0.0
+	if card0 != null:
+		place -= card0.size * 0.5
+	place.x = clampf(place.x, 0.0, maxf(0.0, WORLD_W - cw))
+	place.y = clampf(place.y, 0.0, maxf(0.0, WORLD_H - chh))
+	place = place.snapped(Vector2(8, 8))
+	_dbg_storage_flow("画布落点 world=%s place=%s view=%s k=%.3f node_before=(%.1f,%.1f) card_before=%s" % [
+		world, place, _view_pos, _view_k, float(n.get("x", -1.0)), float(n.get("y", -1.0)),
 		str(card0.position) if card0 != null else "无卡"])
-	graph.take_back(key, world.x, world.y)
+	graph.take_back(key, place.x, place.y)
 	_apply_hidden()
 	_refresh_storage_wins()
 	var card := _cards.get(key, null) as NodeCard
 	if card != null:
-		card.position = world
-		card.set_home(world)
+		card.position = place
+		card.set_home(place)
 		_dbg_storage_flow("放置完成 card=%s global=%s graph=(%.1f,%.1f) scale=%s popping=%s move_tween=%s layout_job=%s" % [
 			card.position, card.global_position, float(graph.node(key).get("x", -1.0)),
 			float(graph.node(key).get("y", -1.0)), str(card.scale), str(card.is_popping()),
