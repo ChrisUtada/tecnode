@@ -74,7 +74,67 @@ func validate_nodes() -> Array:
 		nodes_of_item(it)
 	if not unknown_nodes.is_empty():
 		push_warning("画布节点清单有 %d 个 id 解析不到：%s" % [unknown_nodes.size(), str(unknown_nodes)])
+	var cycles := containment_cycles()
+	if not cycles.is_empty():
+		push_warning("画布节点清单有 %d 组包含环（折叠时会互相隐藏）：%s" % [
+			cycles.size(), str(cycles.slice(0, 3))])
 	return unknown_nodes
+
+
+## 容器包含环：A 的 node_items 里有 B，B 的 node_items 里又有 A。
+## 这类数据在折叠时会让两个容器互相判定「该藏」，最终整组节点消失。
+## 场景 / 物品都纳入；返回 [[key, key, ...], ...]。
+func containment_cycles() -> Array:
+	var adj := {}
+	for s in case_def.scenes:
+		var children: Array[String] = []
+		for id in s.node_items:
+			if items.has(id):
+				children.append("item:" + String(id))
+			elif scenes.has(id):
+				children.append(scene_kind(String(id)) + ":" + String(id))
+		adj[scene_kind(String(s.id)) + ":" + String(s.id)] = children
+	for it in case_def.items:
+		var children: Array[String] = []
+		for id in it.node_items:
+			if items.has(id):
+				children.append("item:" + String(id))
+			elif scenes.has(id):
+				children.append(scene_kind(String(id)) + ":" + String(id))
+		adj["item:" + String(it.id)] = children
+	var color := {}
+	var stack: Array[String] = []
+	var out: Array = []
+	var seen := {}
+	for v in adj.keys():
+		if int(color.get(v, 0)) == 0:
+			_cycle_dfs(String(v), adj, color, stack, out, seen)
+	return out
+
+
+func _cycle_dfs(v: String, adj: Dictionary, color: Dictionary, stack: Array[String],
+		out: Array, seen: Dictionary) -> void:
+	color[v] = 1
+	stack.append(v)
+	for raw in adj.get(v, []):
+		var w := String(raw)
+		if not adj.has(w):
+			continue
+		var c := int(color.get(w, 0))
+		if c == 0:
+			_cycle_dfs(w, adj, color, stack, out, seen)
+		elif c == 1:
+			var at := stack.find(w)
+			if at < 0:
+				continue
+			var cycle: Array[String] = stack.slice(at)
+			cycle.append(w)
+			var sig := "|".join(cycle)
+			if not seen.has(sig):
+				seen[sig] = true
+				out.append(cycle)
+	stack.pop_back()
+	color[v] = 2
 
 
 ## 证据链可达性：每个原料证据必须有来源（TEC / 对话 / 回忆 / 配方），

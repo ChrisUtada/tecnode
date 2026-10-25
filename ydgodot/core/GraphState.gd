@@ -171,9 +171,13 @@ func has_edge(a: String, b: String, rel: String = "") -> bool:
 func delete_node(key: String) -> bool:
 	if not nodes.has(key):
 		return false
+	var gone_id := String((nodes[key] as Dictionary).get("id", ""))
 	nodes.erase(key)
 	hidden.erase(key)
 	stored.erase(key)
+	## 删掉的容器不能留下 collapsed 记账：否则同 id 再出现 / 子节点还在时会被旧状态藏掉。
+	if gone_id != "":
+		collapsed.erase(gone_id)
 	var kept: Array = []
 	for e in edges:
 		if e["a"] != key and e["b"] != key:
@@ -235,8 +239,7 @@ func reveal_scene(sid: String) -> Array:
 		## 场景 / 时间点通过 `node_locs` 连过来是「通路」，不是「被场景装下」。
 		## 若把目的地场景的 home_scene 写成当前场景，会和反向通路组成环，
 		## 两边都折叠时会互相隐藏，最后整张画布清空。
-		if not is_scene_kind(kind) and String(n.get("home_scene", "")) == "":
-			n["home_scene"] = sid
+		_assign_home(n, String(sn["key"]))
 		if not existed:
 			fresh.append(n["key"])
 			mark_fresh(String(n["key"]))
@@ -291,8 +294,7 @@ func reveal_container(kind: String, id: String) -> Array:
 		var n := add_node(k, cid)
 		## 同 reveal_scene：`node_locs` 是通路，不是归属。书桌的 node_locs 里
 		## 回指花园，不能把花园的 home_scene 改成书桌，否则折叠会成环。
-		if not is_scene_kind(k) and String(n.get("home_scene", "")) == "":
-			n["home_scene"] = id
+		_assign_home(n, host_key)
 		if not existed:
 			fresh.append(n["key"])
 			mark_fresh(String(n["key"]))
@@ -300,6 +302,50 @@ func reveal_container(kind: String, id: String) -> Array:
 			meet_char_at(cid, id)
 		link(host_key, n["key"], "move" if is_scene_kind(String(n["kind"])) else "entity")
 	return fresh
+
+
+## 写入归属前先做环检查：容器自己不能是子节点的后代。
+## 例：书桌 node_locs 指回花园（通路），垃圾桶 node_items 又写了书桌（上下文提及），
+## 若直接写 home_scene 会得到「书桌属于垃圾桶、垃圾桶属于书桌」，折叠时互相藏光。
+func _assign_home(n: Dictionary, host_key: String) -> void:
+	if String(n.get("home_scene", "")) != "":
+		return
+	if is_scene_kind(String(n.get("kind", ""))):
+		return
+	if _home_would_cycle(String(n.get("key", "")), host_key):
+		return
+	var host: Dictionary = nodes.get(host_key, {})
+	if host.is_empty():
+		return
+	n["home_scene"] = String(host.get("id", ""))
+
+
+func _home_would_cycle(child_key: String, host_key: String) -> bool:
+	if child_key == host_key:
+		return true
+	var cursor := host_key
+	var seen := {}
+	while cursor != "":
+		if cursor == child_key:
+			return true
+		if seen.has(cursor):
+			return true
+		seen[cursor] = true
+		var host: Dictionary = nodes.get(cursor, {})
+		if host.is_empty():
+			return false
+		var home_id := String(host.get("home_scene", ""))
+		if home_id == "":
+			return false
+		cursor = _key_of_id(home_id)
+	return false
+
+
+func _key_of_id(id: String) -> String:
+	for k in nodes.keys():
+		if String((nodes[k] as Dictionary).get("id", "")) == id:
+			return String(k)
+	return ""
 
 
 ## 折叠：把容器自己标记为「已收起」（画面上保留节点，内容不再展开）
@@ -947,12 +993,25 @@ func recompute_hidden() -> void:
 		(adj[a] as Array).append(b)
 		(adj[b] as Array).append(a)
 	var by_scene := {}
+	var id_to_key := {}
 	for key in nodes.keys():
-		var node_kind := String((nodes[key] as Dictionary).get("kind", ""))
-		## 场景 / 时间点永远是根：即使旧存档把 home_scene 写成了某个物品（历史成环数据），
-		## 也不能因为那个容器折叠而把整张场景卡藏掉。
-		if is_scene_kind(node_kind):
+		id_to_key[String((nodes[key] as Dictionary).get("id", ""))] = String(key)
+	## 先修历史坏数据：
+	## · 场景 / 时间点永远是根，home_scene 一律清空；
+	## · 物品归属若成环（A→B→A），把环上节点全部改成根，否则先后折叠会互相藏光。
+	var cyclic := {}
+	for key in nodes.keys():
+		var n: Dictionary = nodes[key]
+		if is_scene_kind(String(n.get("kind", ""))):
+			n["home_scene"] = ""
 			continue
+		if String(n.get("home_scene", "")) == "":
+			continue
+		if _home_chain_cycles(String(key), id_to_key):
+			cyclic[key] = true
+	for key in cyclic.keys():
+		(nodes[key] as Dictionary)["home_scene"] = ""
+	for key in nodes.keys():
 		var home := String((nodes[key] as Dictionary).get("home_scene", ""))
 		if home == "":
 			continue
@@ -991,6 +1050,27 @@ func recompute_hidden() -> void:
 				if not exported:
 					hidden[key] = true
 					changed = true
+
+
+## 沿着 home_scene 链走，若回到起点（或撞上链内已有节点）就是环。
+func _home_chain_cycles(key: String, id_to_key: Dictionary) -> bool:
+	var seen := {key: true}
+	var cursor := key
+	while true:
+		var n: Dictionary = nodes.get(cursor, {})
+		if n.is_empty():
+			return false
+		var home := String(n.get("home_scene", ""))
+		if home == "":
+			return false
+		var next_key := String(id_to_key.get(home, ""))
+		if next_key == "":
+			return false
+		if seen.has(next_key):
+			return true
+		seen[next_key] = true
+		cursor = next_key
+	return false
 
 
 ## 枢纽场景：入边 + 出边 >= 5（对齐 Web `isHub`）。

@@ -21,7 +21,7 @@ content = "书桌边的垃圾桶中堆积着不知从何而来的灰烬，像是
 在灰烬之中，有一片未被焚烧干净的纸片。"
 baggable = false
 hidden_clue = SubResource("Resource_bqgo2")
-node_items = PackedStringArray("ITEM_shuzhuo", "ITEMS_wbfs")
+node_items = PackedStringArray("ITEMS_wbfs")
 node_chars = PackedStringArray()
 node_locs = PackedStringArray()
 node_clues = PackedStringArray()

@@ -34,7 +34,6 @@
       "content": "书桌的左侧抽屉中放着一把手电筒，应该还能使用。",
       "desc": "抽屉中放着一把老式手电筒，应该还能使用。",
       "nodeItems": [
-        "ITEM_shuzhuo",
         "ITEM_shoudiantong"
       ],
       "nodeChars": [],
@@ -87,7 +86,6 @@
       "content": "书桌右侧抽屉里摆放着一把锋利的剪刀和一个精致的木盒。\n\n问问TEC",
       "desc": "右侧的抽屉里摆放着一把锋利的剪刀和一个精致的木盒。",
       "nodeItems": [
-        "ITEM_shuzhuo",
         "ITEMS_jd",
         "ITEMS_jzmh"
       ],
@@ -852,7 +850,6 @@
       "desc": "书桌边的垃圾桶中堆积着不知从何而来的灰烬。",
       "content": "书桌边的垃圾桶中堆积着不知从何而来的灰烬，像是焚烧什么留下的。数量多得让人不解。\n在灰烬之中，有一片未被焚烧干净的纸片。",
       "nodeItems": [
-        "ITEM_shuzhuo",
         "ITEMS_wbfs"
       ],
       "nodeChars": [],

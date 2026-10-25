@@ -150,6 +150,36 @@ func _test_collapse_hidden() -> void:
 	g10.collapse("ITEM_shuzhuo")
 	check("旧存档成环数据：场景卡仍不消失", g10.is_visible("loc:SCENES_garden"),
 		str(g10.hidden.keys()))
+	check("旧存档场景归属被顺手修正",
+		String(g10.node("loc:SCENES_garden").get("home_scene", "")) == "",
+		str(g10.node("loc:SCENES_garden")))
+
+	check("数据层：容器 node_items 无包含环", c.containment_cycles().is_empty(),
+		str(c.containment_cycles()))
+
+	# 旧存档里的物品归属也可能成环：A→B→A。成环节点按根处理，不能互相藏光。
+	var g11 := GraphState.new(c)
+	var desk11 := g11.add_node("item", "ITEM_shuzhuo")
+	var trash11 := g11.add_node("item", "ITEMS_ljt")
+	desk11["home_scene"] = "ITEMS_ljt"
+	trash11["home_scene"] = "ITEM_shuzhuo"
+	g11.collapse("ITEM_shuzhuo")
+	g11.collapse("ITEMS_ljt")
+	check("物品 home 成环：两张卡都不会消失",
+		g11.is_visible(String(desk11["key"])) and g11.is_visible(String(trash11["key"])),
+		str(g11.hidden.keys()))
+	check("物品 home 成环：旧数据被改成根",
+		String(desk11.get("home_scene", "")) == "" and String(trash11.get("home_scene", "")) == "",
+		"%s / %s" % [desk11.get("home_scene", ""), trash11.get("home_scene", "")])
+
+	# 新写入归属时也要挡住环：书桌已经属于垃圾桶时，不能再把垃圾桶挂回书桌下。
+	var g12 := GraphState.new(c)
+	var desk12 := g12.add_node("item", "ITEM_shuzhuo")
+	desk12["home_scene"] = "ITEMS_ljt"
+	var trash12 := g12.add_node("item", "ITEMS_ljt")
+	g12._assign_home(trash12, String(desk12["key"]))
+	check("新归属不会写成环", String(trash12.get("home_scene", "")) == "",
+		str(trash12.get("home_scene", "")))
 
 
 # ── 6. useItem 判定顺序：先零件，后发光 ───────────────────────────────
@@ -227,3 +257,12 @@ func _test_delete_node() -> void:
 		not g8.tried.has("item:ITEM_shoudiantong>loc:SCENES_garden"))
 	check("U5 不误删无关 tried", g8.tried.has("loc:SCENES_garden>char:NPC_FB"))
 	check("删不存在的节点返回 false", not g8.delete_node("item:ITEM_shoudiantong"))
+
+	# 删除折叠中的容器：不能留下 collapsed 记账，否则后续重置 / 重建会被旧状态藏掉。
+	var g13 := GraphState.new(c)
+	g13.reveal_container("item", "ITEM_shuzhuo")
+	g13.collapse("ITEM_shuzhuo")
+	check("删除前：容器已折叠", g13.collapsed.has("ITEM_shuzhuo"))
+	g13.delete_node("item:ITEM_shuzhuo")
+	check("删除容器：collapsed 记账一起清掉", not g13.collapsed.has("ITEM_shuzhuo"),
+		str(g13.collapsed.keys()))

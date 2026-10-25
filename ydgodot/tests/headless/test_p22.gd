@@ -421,6 +421,21 @@ func _test_desktop() -> void:
 		scene.dbg_tec_win().line_count() == lines_after_first,
 		str(scene.dbg_tec_win().line_count() - lines_after_first))
 
+	# 回归：花园与书桌都展开后先后折叠，不能把所有卡片（包括花园场景卡）藏光。
+	scene._toggle_container("item", "ITEM_shuzhuo")   # 展开书桌
+	scene._toggle_container("loc", "SCENES_garden")   # 折叠花园
+	scene._toggle_container("item", "ITEM_shuzhuo")   # 折叠书桌
+	var reg_garden: NodeCard = scene._cards.get("loc:SCENES_garden", null)
+	check("连续折叠花园/书桌：花园场景卡仍在",
+		reg_garden != null and reg_garden.visible,
+		"null" if reg_garden == null else str(reg_garden.visible))
+	var reg_visible := 0
+	for raw_key in scene._cards.keys():
+		if (scene._cards[raw_key] as NodeCard).visible:
+			reg_visible += 1
+	check("连续折叠花园/书桌：画布没有清空", reg_visible > 0, str(reg_visible))
+	scene._toggle_container("loc", "SCENES_garden")   # 恢复展开，后续 TEC 用例继续
+
 	# W26：同文本提示不重复追加。
 	scene.dbg_tec_win().finish_typing()
 	var dup0: int = scene.dbg_tec_win().line_count()

@@ -11,7 +11,7 @@ content = "书桌右侧抽屉里摆放着一把锋利的剪刀和一个精致的
 
 问问TEC"
 desc = "右侧的抽屉里摆放着一把锋利的剪刀和一个精致的木盒。"
-node_items = PackedStringArray("ITEM_shuzhuo", "ITEMS_jd", "ITEMS_jzmh")
+node_items = PackedStringArray("ITEMS_jd", "ITEMS_jzmh")
 node_chars = PackedStringArray()
 node_locs = PackedStringArray()
 node_clues = PackedStringArray()
