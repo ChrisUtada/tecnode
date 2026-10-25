@@ -611,11 +611,8 @@ func _make_drag_ghost(text: String) -> PanelContainer:
 func _sdrag_ghost_position(at_global: Vector2) -> Vector2:
 	if _desk == null or not is_instance_valid(_desk):
 		return at_global
-	var p := _desk.get_global_transform().affine_inverse() * at_global
-	## 幽灵中心对准光标；创建前拿不到真实尺寸时退回一个小偏移。
-	if _sdrag_ghost != null and is_instance_valid(_sdrag_ghost):
-		return p - _sdrag_ghost.size * 0.5
-	return p + Vector2(12, 10)
+	## 行拖拽没有抓取点：幽灵左上角直接贴光标，松手后卡片也按左上角落位。
+	return _desk.get_global_transform().affine_inverse() * at_global
 
 
 func _sdrag_cancel() -> void:
@@ -671,16 +668,12 @@ func _finish_sdrag(at: Vector2) -> void:
 	var world := (at - _stage.get_global_position() - _view_pos) / maxf(_view_k, 0.01)
 	world.x = maxf(0.0, world.x)
 	world.y = maxf(0.0, world.y)
-	## 行拖拽没有「抓住卡片内部」的偏移：把卡片中心放在光标处，避免落点看起来
-	## 永远偏到光标右下方半个卡身。落位仍按 8px 网格。
+	## 行拖拽没有「抓住卡片内部」的偏移：幽灵和卡片都用左上角贴光标。
+	## 这里不吸 8px 网格，保证落点与光标严格一致；后续手动拖动再按网格夹取。
 	var place := world
-	var cw := card0.size.x if card0 != null else 0.0
-	var chh := card0.size.y if card0 != null else 0.0
 	if card0 != null:
-		place -= card0.size * 0.5
-	place.x = clampf(place.x, 0.0, maxf(0.0, WORLD_W - cw))
-	place.y = clampf(place.y, 0.0, maxf(0.0, WORLD_H - chh))
-	place = place.snapped(Vector2(8, 8))
+		place.x = clampf(place.x, 0.0, maxf(0.0, WORLD_W - card0.size.x))
+		place.y = clampf(place.y, 0.0, maxf(0.0, WORLD_H - card0.size.y))
 	_dbg_storage_flow("画布落点 world=%s place=%s view=%s k=%.3f node_before=(%.1f,%.1f) card_before=%s" % [
 		world, place, _view_pos, _view_k, float(n.get("x", -1.0)), float(n.get("y", -1.0)),
 		str(card0.position) if card0 != null else "无卡"])
