@@ -246,10 +246,18 @@ func _test_desktop(c: CaseLoader) -> void:
 
 	scene.dbg_click_music_icon()
 	st = scene.dbg_music_state()
-	check("图标再点关窗", not bool(st["win_visible"]) and bool(st["playing"]), str(st))
+	check("K9 单击音乐图标不再关窗", bool(st["win_visible"]) and bool(st["playing"]), str(st))
+	scene.dbg_close_music()
+	st = scene.dbg_music_state()
+	check("× 关闭后音频继续", not bool(st["win_visible"]) and bool(st["playing"]), str(st))
+	scene._icon_last_app = ""
+	scene._icon_last_ms = -100000
 	scene.dbg_click_music_icon()
 	st = scene.dbg_music_state()
-	check("图标再点开窗", bool(st["win_visible"]) and not bool(st["dock_visible"]), str(st))
+	check("K9 单击音乐图标不直接开窗", not bool(st["win_visible"]), str(st))
+	scene.dbg_double_click_icon("music")
+	st = scene.dbg_music_state()
+	check("K9 双击音乐图标开窗", bool(st["win_visible"]) and not bool(st["dock_visible"]), str(st))
 
 	scene.dbg_close_music()
 	st = scene.dbg_music_state()

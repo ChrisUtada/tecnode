@@ -29,7 +29,7 @@ var _typing_shown := 0.0
 ## 与上下 20 —— 传 383 才对应 340 的列表区。
 func setup_log(p_graph: GraphState, w: float = 320.0, h: float = 383.0) -> void:
 	graph = p_graph
-	setup("因果追踪", w, h)
+	setup("日志", w, h)
 	_scroll = ScrollContainer.new()
 	_scroll.name = "log_scroll"
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

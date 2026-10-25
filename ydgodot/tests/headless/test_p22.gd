@@ -106,15 +106,17 @@ func _test_desktop() -> void:
 	check("闲聊共 3 条", scene.dbg_tec_win().line_count() == 3, str(scene.dbg_tec_win().line_count()))
 	check("闲聊进度 3", int(scene.graph.tec_prog.get("_def", 0)) == 3)
 	scene.dbg_tec_talk()
-	check("闲聊说完不推进", scene.dbg_tec_win().line_count() == 3, str(scene.dbg_tec_win().line_count()))
+	check("G7 闲聊说完给分级提示", scene.dbg_tec_win().line_count() == 4,
+		str(scene.dbg_tec_win().line_count()))
+	check("G7 提示不推进闲聊进度", int(scene.graph.tec_prog.get("_def", 0)) == 3)
 
 	scene.dbg_tec_close()
 	info = scene.dbg_tec_info()
 	check("关闭 TEC 窗", not bool(info["visible"]))
 	check("关闭后不显示卡片", not bool(info["chip_visible"]))
-	check("关闭保留对话历史", scene.dbg_tec_win().line_count() == 3, str(scene.dbg_tec_win().line_count()))
+	check("关闭保留对话历史", scene.dbg_tec_win().line_count() == 4, str(scene.dbg_tec_win().line_count()))
 	scene.dbg_tec_open()
-	check("重开保留对话历史", scene.dbg_tec_win().line_count() == 3)
+	check("重开保留对话历史", scene.dbg_tec_win().line_count() == 4)
 
 	scene.dbg_tec_minimize()
 	info = scene.dbg_tec_info()
@@ -126,7 +128,7 @@ func _test_desktop() -> void:
 	info = scene.dbg_tec_info()
 	check("点卡片还原 TEC 窗", bool(info["visible"]) and not bool(info["min"]))
 	check("还原后卡片隐藏", not bool(info["chip_visible"]))
-	check("还原保留对话历史", scene.dbg_tec_win().line_count() == 3)
+	check("还原保留对话历史", scene.dbg_tec_win().line_count() == 4)
 
 	scene.dbg_expand("SCENES_body")
 	await process_frame
@@ -272,13 +274,24 @@ func _test_desktop() -> void:
 	check("完成后卡片打点", bool(scene.dbg_tec_info()["dot"]))
 	check("远处不是拖放点", not scene.dbg_tec_drop_hit(Vector2(10, 700)))
 
+	# K7：最小化 = 后台继续；关闭 = 取消并明确告知。
+	scene.dbg_tec_drop("loc:SCENES_garden", chip.get_global_rect().get_center())
+	check("K7 卡片上可再次开始分析", bool(scene.dbg_tec_info()["win"]["analyzing"]))
+	scene._hide_toast()
+	scene.dbg_tec_close()
+	info = scene.dbg_tec_info()
+	check("K7 关闭 TEC 会取消分析", not bool(info["win"]["analyzing"]))
+	check("K7 关闭取消有明确提示", scene.dbg_toast_text().contains("取消")
+		and scene.dbg_toast_text().contains("助手卡片"), scene.dbg_toast_text())
+
 	scene.dbg_tec_open()
 	var click_ev := InputEventMouseButton.new()
 	click_ev.button_index = MOUSE_BUTTON_LEFT
 	click_ev.pressed = true
 	var lines_before: int = scene.dbg_tec_win().line_count()
 	scene.dbg_tec_win()._gui_input(click_ev)
-	check("点窗内闲聊", scene.dbg_tec_win().line_count() == lines_before, "说完不推进")
+	check("G7 点窗内闲聊仍给分级提示", scene.dbg_tec_win().line_count() == lines_before + 1,
+		str(scene.dbg_tec_win().line_count()))
 	check("闲聊进度已满", int(scene.graph.tec_prog.get("_def", 0)) == 3)
 
 	scene.dbg_ensure("loc", "SCENES_0704")
@@ -291,6 +304,22 @@ func _test_desktop() -> void:
 	await process_frame
 	await process_frame
 	check("撤销回退 TEC 进度", int(scene.graph.tec_prog.get("SCENES_0704", 0)) == 0)
+
+	# G7：双击场景（`_toggle_container`）这条首次展开路径也要有 TEC 引导。
+	var lines_before_expand: int = scene.dbg_tec_win().line_count()
+	scene._toggle_container("loc", "SCENES_garden")
+	check("G7 首次展开场景时 TEC 主动提示",
+		scene.dbg_tec_win().line_count() == lines_before_expand + 1,
+		str(scene.dbg_tec_win().line_count() - lines_before_expand))
+	check("G7 提示指向可解读档案",
+		String(scene.dbg_tec_win().dbg_lines()[-1]).contains("档案"),
+		String(scene.dbg_tec_win().dbg_lines()[-1]))
+	var lines_after_first: int = scene.dbg_tec_win().line_count()
+	scene._toggle_container("loc", "SCENES_garden")   # 收起
+	scene._toggle_container("loc", "SCENES_garden")   # 再展开
+	check("G7 再次展开/收起不重复提示",
+		scene.dbg_tec_win().line_count() == lines_after_first,
+		str(scene.dbg_tec_win().line_count() - lines_after_first))
 
 	scene.dbg_tec_analyze("loc:SCENES_garden")
 	check("分析中", bool(scene.dbg_tec_info()["win"]["analyzing"]))

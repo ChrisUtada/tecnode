@@ -313,7 +313,7 @@ Web 原版同样拒收（`06-storage.js:73`），且 Web 是**静默弹回**，G
 ## 5. 本轮不做
 
 - 不重排玩法逻辑（组合、反应表、解锁流程）；W8/W25 只修「高亮与命中一致」「淡化不压高亮」这类表现层。
-- 不动 `INTERACTION_GAP_REPORT.md` 已锁定并与 Web 对齐的行为（500ms 双击窗、落点表 11 项、幽灵线样式等），除非本文档显式列出（W20 属于统一既有口径）。
+- 不动 `INTERACTION_GAP_REPORT.md` 已锁定并与 Web 对齐的行为（500ms 双击窗、落点表 10 项、幽灵线样式等），除非本文档显式列出（W20 属于统一既有口径）。
 - 不做视觉改版（圆角、配色、头像框等——归 `UI_AESTHETIC_PLAN.md`）。
 - 不引入新的窗口类型或 Dock 结构变化。
 
@@ -327,3 +327,9 @@ Web 原版同样拒收（`06-storage.js:73`），且 Web 是**静默弹回**，G
 - **S1**：新增 `_reset_camera()`，`_start_slice()` 开头复位 `_view_k/_view_pos/_view_user`，随后由 `_relayout()` 自动 fit。
 - **W4**：`SysWindow` 标题栏拖动增加 `_clamp_window_pos()`，窗口至少保留 40px 在桌面内且 y≥0；打开 / resize 时 `clamp_into_parent()` 兜底。
 - **验证**：`test_ui` 421、`test_p12` 39、`test_p16` 72、`test_p21` 73、`test_p25` 166、`test_p26` 98；全套 1506 项、p28 4/4。960×560 的 dock / TEC 边界由 `test_p21` / `test_ui` 覆盖。
+
+### 跨计划口径（2026-10-25，UX_FLOW_PLAN 批 3 收尾）
+
+- K4/K6 已把画布卡片 / 收纳行 / 桌布线索引合成 `_dispatch_drop()`；W2「拖回原来那扇窗 = 被取回画布」由 `to == from` 的早退覆盖。
+- K5 移除「场景 → 档案图标 = 前往」落点：落点表由 11 项减为 **10 项**；`_drop_blocker_at()` 仍拦截并说明「档案只收时间点」，不会穿透画布。
+- K7：TEC 的「关闭」= 取消分析并提示，「最小化」= 后台继续并保留进度卡片；与 W9/W11 的窗口语义一致。

@@ -7,12 +7,12 @@ const DEFAULT_ID := "A001"
 const CASES := [
 	{
 		"id": "A001", "data_id": "a001", "code": "CASE A-001",
-		"title": "植物学家的花园", "note": "异动区域 · 已解密",
+		"title": "植物学家的花园", "note": "异动区域 · 已解锁",
 		"path": "res://cases/a001/case.tres",
 	},
 	{
 		"id": "A002", "data_id": "a002", "code": "CASE A-002",
-		"title": "？？？？？？", "note": "加密 · 需在 A-001 捕获真名后解密",
+		"title": "？？？？？？", "note": "锁定 · 需在 A-001 捕获真名后解锁",
 		"path": "",
 	},
 ]
@@ -97,7 +97,7 @@ func note_for(id: String) -> String:
 	if not is_unlocked(id):
 		return base_note_of(id)
 	if not data_ready(id):
-		return "地址已解密 · 案件数据待接入"
+		return "地址已解锁 · 案件数据待接入"
 	return base_note_of(id) + (" · 有存档" if has_save(id) else "")
 
 

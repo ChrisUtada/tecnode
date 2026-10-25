@@ -148,6 +148,15 @@ func _initialize() -> void:
 	await process_frame
 	check("密码错：弹窗还在", scene.get_node_or_null("desk/pw_pop") != null)
 	check("密码错：还没开箱", not _cards().has("item:ITEMS_htys"))
+	scene.dbg_password("item:ITEMS_jzmh", "2222")
+	await process_frame
+	check("G11 连续错两次：仍未开箱", not _cards().has("item:ITEMS_htys"))
+	var last_pw_log := String(scene.dbg_log_texts()[-1]) if not scene.dbg_log_texts().is_empty() else ""
+	check("G11 连续错两次：日志指向 TEC 分析",
+		last_pw_log.contains("TEC") and last_pw_log.contains("木盒"), last_pw_log)
+	var last_pw_tec := String(scene._tec.dbg_lines()[-1]) if not scene._tec.dbg_lines().is_empty() else ""
+	check("G11 TEC 对话留下密码提示",
+		last_pw_tec.contains("密码") and last_pw_tec.contains("木盒"), last_pw_tec)
 	scene.dbg_password("item:ITEMS_jzmh", "0321")
 	await process_frame
 	check("密码对：弹窗收走", scene.get_node_or_null("desk/pw_pop") == null)
@@ -198,6 +207,17 @@ func _initialize() -> void:
 	check("册里列出线索", ledger != null and (ledger as StorageWin).items().has("clue:CLUES_nm"))
 	check("台灯不在册里（册只收线索）",
 		ledger != null and not (ledger as StorageWin).items().has("item:ITEM_taideng"))
+	# K6：拒收话术按目标分派，场景拖到线索册不能再报「收纳袋」，且必须写日志。
+	scene._hide_toast()
+	var k6_log0: int = scene.graph.log_count()
+	scene._store_into(GraphState.LEDGER, "loc:SCENES_garden")
+	check("K6 场景拖线索册话术按目标",
+		scene.dbg_toast_text().contains("线索册") and not scene.dbg_toast_text().contains("收纳袋"),
+		scene.dbg_toast_text())
+	check("K6 拒收写一条 warning 日志",
+		scene.graph.log_count() == k6_log0 + 1
+			and String(scene.dbg_log_kinds()[-1]) == "warn",
+		str(scene.graph.log_count() - k6_log0))
 
 	# 从册里取回
 	(ledger as StorageWin)._take("clue:CLUES_nm")
@@ -224,6 +244,12 @@ func _initialize() -> void:
 	var crumb := scene.get_node_or_null("header/crumb") as Label
 	check("面包屑用计数口径", crumb != null and crumb.text.begins_with("节点 ")
 		and crumb.text.contains("已探索场景"))
+	var goal := scene.get_node_or_null("header/goal") as Label
+	check("G6 页眉有可读的当前目标", goal != null and goal.visible
+		and goal.text.begins_with("当前目标：") and goal.size.x >= 280.0,
+		("null" if goal == null else goal.text + " / " + str(goal.size.x)))
+	check("G6 目标条不挤占计数面包屑", crumb != null and crumb.size.x >= 280.0,
+		"null" if crumb == null else str(crumb.size.x))
 	# A1：右侧只留正式「撤销」+「调试」入口；调试项不再摊在页眉上。
 	var slots := {"btn_撤销": 1144.0, "btn_调试": 1202.0}
 	var bad_slots: Array = []
@@ -453,17 +479,31 @@ func _initialize() -> void:
 	#     Godot 合并成同一条表，悬停高亮与松手分派共用 —— 不会"亮了却不生效"。
 	var ids: Array = scene.dbg_drop_target_ids()
 	var whitelist := ["chat-win", "bag-win", "clue-win", "bag-dock", "clue-icon",
-		"tec-dock", "infer-icon", "goto-icon", "tec-avatar", "tec-chip", "mx-board"]
+		"tec-dock", "infer-icon", "tec-avatar", "tec-chip", "mx-board"]
 	var stray: Array = []
 	for did in ids:
 		if not whitelist.has(String(did)):
 			stray.append(did)
-	check("落点 id 全部在 11 项白名单内", stray.is_empty(), str(stray))
+	check("K5 落点 id 全部在 10 项白名单内（档案不再是落点）", stray.is_empty(), str(stray))
+	check("K5 档案图标已从落点表移除", not ids.has("goto-icon"), str(ids))
 	var icons_all := true
-	for need in ["bag-dock", "clue-icon", "tec-dock", "infer-icon", "goto-icon"]:
+	for need in ["bag-dock", "clue-icon", "tec-dock", "infer-icon"]:
 		if not ids.has(need):
 			icons_all = false
-	check("五个桌面图标落点都在表里", icons_all, str(ids))
+	check("四个桌面图标落点都在表里", icons_all, str(ids))
+	# K5：拖场景到档案图标不再「前往」，但仍要拦住并说明原因。
+	var goto_icon := scene.get_node("desk/icons/icon_goto") as Control
+	if goto_icon != null and goto_icon.visible:
+		scene._hide_toast()
+		var before_explored: Array = (scene.dbg_state()["explored"] as Array).duplicate()
+		var k_goto := "loc:SCENES_garden"
+		check("K5 拖场景到档案被拦截",
+			scene._handle_card_drop(k_goto, goto_icon.get_global_rect().get_center()))
+		check("K5 档案拒收不改探索状态",
+			(scene.dbg_state()["explored"] as Array) == before_explored)
+		check("K5 档案拒收给 warning toast",
+			scene.dbg_toast_text().contains("档案") and scene.dbg_toast_text().contains("时间点"),
+			scene.dbg_toast_text())
 
 	# 5) 推演器图标：线索能归位，非线索给提示
 	var clue_card: NodeCard = null
@@ -770,6 +810,24 @@ func _initialize() -> void:
 		and back.get_global_rect().has_point(drop_at),
 		str(back.get_global_rect()) if back != null else "null")
 
+	# K4/K6：收纳行拖到「另一扇收纳图标」必须被分派器接住并拒绝，不能掉回画布取回。
+	scene._store_into(GraphState.BAG, TORCH)
+	check("K4 先把物品收回证物袋", String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG)
+	scene._hide_toast()
+	scene.dbg_storage_drag(TORCH, (scene.get_node("desk/icons/icon_clue") as Control).get_global_rect().get_center())
+	await process_frame
+	check("K4 袋行拖到线索册图标仍留在袋里",
+		String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG,
+		String(scene.graph.stored.get(TORCH, "")))
+	check("K6 物品进线索册按目标回绝",
+		scene.dbg_toast_text().contains("线索册") and scene.dbg_toast_text().contains("只有线索"),
+		scene.dbg_toast_text())
+	scene.graph.take_back(TORCH)
+	scene._apply_hidden()
+	scene._refresh_or_spawn_card(TORCH)
+	await process_frame
+	check("K4 复原手电筒到画布", not scene.graph.stored.has(TORCH))
+
 	# ── P0 交互（批 2）：拖动幽灵线 · 桌布 chip 带坐标取回 ──
 	var mw: MatrixWin = scene.dbg_open_matrix()
 	await process_frame
@@ -805,6 +863,26 @@ func _initialize() -> void:
 	await process_frame
 	var chip_panel: Control = mw._chips.get("CLUES_nm", null) as Control
 	check("归位后桌布上有芯片", chip_panel != null)
+	# K2：单击芯片 = 看详情；不再用双击偷偷取回。
+	_chip_press(chip_panel, chip_panel.get_global_rect().get_center())
+	_chip_release(chip_panel, chip_panel.get_global_rect().get_center())
+	await process_frame
+	check("K2 单击桌布芯片仍留在桌布", String(scene.graph.stored.get(clue_key, "")) == GraphState.MATRIX,
+		String(scene.graph.stored.get(clue_key, "")))
+	check("K2 单击桌布芯片打开详情", scene._detail_win != null and scene._detail_win.visible
+		and scene._selected == clue_key, scene._selected)
+	var dbl := InputEventMouseButton.new()
+	dbl.button_index = MOUSE_BUTTON_LEFT
+	dbl.pressed = true
+	dbl.double_click = true
+	dbl.global_position = chip_panel.get_global_rect().get_center()
+	chip_panel.gui_input.emit(dbl)
+	_chip_release(chip_panel, chip_panel.get_global_rect().get_center())
+	await process_frame
+	check("K2 双击芯片不再取回", String(scene.graph.stored.get(clue_key, "")) == GraphState.MATRIX,
+		String(scene.graph.stored.get(clue_key, "")))
+	var take_btn := chip_panel.find_child("take", true, false) as Button
+	check("K2 芯片有明确的取回按钮", take_btn != null and take_btn.text.contains("取回"))
 	_chip_press(chip_panel, chip_panel.get_global_rect().get_center())
 	_chip_motion(chip_panel, blank_pt)
 	_chip_release(chip_panel, blank_pt)
@@ -1904,6 +1982,17 @@ func _initialize() -> void:
 	await process_frame
 	check("G6 照片写进证件", scene._investigator.get("avatarId", "") == "CHARS_ANON")
 	Investigator.clear(scene._inv_path)
+
+	# G6：普通结局后，目标条要接着指路，而不是演完就静场。
+	var normal_end: EndingDef = scene.case_def.ending_by_id("END_NORMAL")
+	check("G6 普通结局样本存在", normal_end != null and not normal_end.is_true_capture)
+	if normal_end != null:
+		scene.graph.mark_ending(normal_end.id)
+		scene._last_ending_id = normal_end.id
+		scene._refresh_crumbs()
+		check("G6 普通结局后显示已记录 X/Y 与真名",
+			scene._goal.text.contains("已记录") and scene._goal.text.contains("真名"),
+			scene._goal.text)
 
 	print("=== %d 项，失败 %d ===" % [total, fails])
 	quit(0 if fails == 0 else 1)

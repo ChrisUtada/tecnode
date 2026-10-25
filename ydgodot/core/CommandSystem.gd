@@ -115,6 +115,8 @@ func _run_conditional(node_key: String, cmd: ConditionalCommandDef) -> Dictionar
 	var out := _ok(case_def.strip_tags(text))
 	out["spawn"] = r.get("spawn", [])
 	out["reveal"] = r.get("reveal", [])
+	out["next_scene"] = r.get("next_scene", "")
+	out["first_scene"] = r.get("first_scene", "")
 	out["captured"] = _capture_clues(cmd.success_message)
 	return out
 
@@ -150,6 +152,7 @@ func _run_use_item(node_key: String, n: Dictionary, cmd: UseItemCommandDef) -> D
 	out["spawn"] = r.get("spawn", [])
 	out["reveal"] = r.get("reveal", [])
 	out["next_scene"] = r.get("next_scene", "")
+	out["first_scene"] = r.get("first_scene", "")
 	out["captured"] = _capture_clues(cmd.success_message)
 
 	# 消耗：非可复用工具用完就没了（Web 版 tg-consume 开关，默认开）
@@ -184,6 +187,8 @@ func submit_password(node_key: String, cmd: PasswordCommandDef, input: String) -
 	var r := _apply_payload(cmd.on_success, node_key)
 	out["spawn"] = r.get("spawn", [])
 	out["reveal"] = r.get("reveal", [])
+	out["next_scene"] = r.get("next_scene", "")
+	out["first_scene"] = r.get("first_scene", "")
 	out["captured"] = _capture_clues(String(r.get("message", "")))
 	out["message"] = case_def.strip_tags(String(r.get("message", "")))
 	return out
@@ -209,7 +214,7 @@ func _light_on(lamps: Array[ItemDef]) -> bool:
 
 
 func _apply_payload(payload: PayloadDef, node_key: String) -> Dictionary:
-	var out := {"message": "", "spawn": [], "reveal": [], "next_scene": ""}
+	var out := {"message": "", "spawn": [], "reveal": [], "next_scene": "", "first_scene": ""}
 	if payload == null:
 		return out
 	out["message"] = case_def.strip_tags(payload.message)
@@ -220,9 +225,12 @@ func _apply_payload(payload: PayloadDef, node_key: String) -> Dictionary:
 		graph.link(node_key, key, "entity")
 		(out["spawn"] as Array).append(key)
 	if payload.scene != null:
+		var was_explored := graph.explored.has(payload.scene.id)
 		var fresh := graph.reveal_scene(payload.scene.id)
 		(out["reveal"] as Array).append_array(fresh)
 		out["next_scene"] = payload.scene.id
+		if not was_explored:
+			out["first_scene"] = payload.scene.id
 	_capture_clues(payload.message)
 	return out
 

@@ -149,6 +149,7 @@ func _test_desktop_flow() -> void:
 	var mw: MatrixWin = scene.dbg_open_matrix()
 	await process_frame
 	check("桌布窗口能打开", mw != null)
+	check("K10 推演器窗标题统一", mw != null and mw.title == "推演器", mw.title if mw != null else "null")
 	check("桌布五感芯片初始为空", mw != null and mw.chip_count() == 0)
 	check("普通物品不能归位", not scene.dbg_matrix_assign("item:ITEMS_bd"))
 	_drag_card_to(_cards(scene)["clue:CLUES_nm"], mw.board_global_rect().get_center())

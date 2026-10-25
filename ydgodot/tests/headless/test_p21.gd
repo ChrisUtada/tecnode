@@ -48,7 +48,8 @@ func _test_catalog() -> void:
 	check("默认最后案件 A001", c.last == "A001")
 	check("默认无完成记录", c.completed.is_empty())
 	check("A002 锁定文案", c.note_for("A002") == CaseCatalog.base_note_of("A002"))
-	check("A001 已解密文案", c.note_for("A001").contains("已解密"), c.note_for("A001"))
+	check("K10 A001 用「已解锁」文案", c.note_for("A001").contains("已解锁")
+		and not c.note_for("A001").contains("解密"), c.note_for("A001"))
 
 	check("解锁 A002 成功", c.unlock("A002"))
 	check("A002 解锁文案待接入", c.note_for("A002").contains("待接入"), c.note_for("A002"))

@@ -147,15 +147,16 @@ func _make_row(key: String) -> Control:
 	hb.add_child(actions)
 
 	if store_kind == GraphState.LEDGER:
-		var to_mx := TecTheme.button("上桌布")
+		var to_mx := TecTheme.button("去推演")
+		to_mx.tooltip_text = "把这条线索放到推演桌布"
 		to_mx.custom_minimum_size = Vector2(54, 22)
 		to_mx.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		to_mx.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 		to_mx.pressed.connect(func(): to_matrix.emit(key))
 		actions.add_child(to_mx)
 
-	var btn := TecTheme.button("取回")
-	btn.custom_minimum_size = Vector2(44, 22)
+	var btn := TecTheme.button("取回画布")
+	btn.custom_minimum_size = Vector2(66, 22)
 	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	btn.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
 	btn.pressed.connect(func(): _take(key))

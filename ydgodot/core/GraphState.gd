@@ -43,9 +43,9 @@ var logs: Array = []
 ## 名册常驻成员（Web `ROSTER_PINNED`）：一进游戏就在册，不靠「已结识」判定；
 ## 两者都没有画布节点，点一行 = 打开各自的窗。
 const ROSTER_PINNED := ["CHARS_TEC", "CHARS_EXEC"]
-const ROSTER_PINNED_TAG := {"CHARS_TEC": "助手窗", "CHARS_EXEC": "逻辑阵列"}
+const ROSTER_PINNED_TAG := {"CHARS_TEC": "助手窗", "CHARS_EXEC": "推演器"}
 const ROSTER_PINNED_NAME := {"CHARS_EXEC": "执行者"}
-const ROSTER_PINNED_DESC := {"CHARS_EXEC": "逻辑阵列中央的执行者，长按 2.5 秒激活归因。"}
+const ROSTER_PINNED_DESC := {"CHARS_EXEC": "推演桌布中央的执行者，长按 2.5 秒执行推演。"}
 
 ## 三个收纳落点（与 Web 版 06-storage.js / 12-panels.js / 13-matrix.js 同名）
 const BAG := "BAG"                # 证物袋：什么都收

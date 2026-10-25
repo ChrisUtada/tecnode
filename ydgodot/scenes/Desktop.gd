@@ -63,6 +63,8 @@ const HDR_X_CHIP := 318.0
 const HDR_W_CHIP := 190.0
 const HDR_X_CRUMB := 522.0
 const HDR_W_CRUMB := 134.0
+## G6：目标 / 计数两行共用这一块，实际宽度在 `_layout_header_left()` 里按右组左沿现算。
+const HDR_GOAL_W := 610.0
 const HDR_BTN_Y := 11.5
 const HDR_BTN_H := 27.0
 const HDR_TOG_Y := 12.5
@@ -108,8 +110,10 @@ var _pan_origin := Vector2.ZERO
 var _opt_focus := true          # 页眉「聚焦选中」
 var _opt_reveal := true         # 页眉「新节点自动居中」
 var _crumb: Label
+var _goal: Label
 var _brand_sub: Label
 var _debug_btn: Button
+var _undo_btn: Button
 var _debug_pop: PanelContainer
 var _debug_shadow: ColorRect
 var _debug_scrim: Control
@@ -154,6 +158,8 @@ var _icon_layout_h := -1.0
 var _cmds: CommandSystem
 var _pw_pop: PasswordPop = null
 var _pw_ctx: Dictionary = {}
+## G11：按节点记连续错误次数；关掉弹窗重开不清零，输对才清。
+var _pw_wrong: Dictionary = {}
 var _active_win: SysWindow = null     # A2：当前最上层的激活窗
 var _bag_win: StorageWin = null
 var _ledger_win: StorageWin = null
@@ -306,18 +312,24 @@ func _layout_root() -> void:
 	_clamp_windows_to_desk()
 
 
-## 窄窗口先收左半边：工具组固定 596px（670..1266），窗口宽到 1150 以下时
-## 证章会和工具组叠上。按右组左沿反推，逐级隐藏面包屑/副题，并把证章挪到品牌后。
+## 窄窗口先收左半边：按右侧「撤销 / 调试」的真实左沿反推目标条可用宽度，
+## 太窄时隐藏目标条与副题，并把证章挪到品牌后。
 func _layout_header_left(vw: float) -> void:
 	if _brand_sub == null or _inv_chip == null or _crumb == null:
 		return
 	if not is_instance_valid(_brand_sub) or not is_instance_valid(_inv_chip) \
 			or not is_instance_valid(_crumb):
 		return
-	var right_left := vw - (DESIGN_W - 670.0)
-	var show_crumb := right_left >= HDR_X_CRUMB + HDR_W_CRUMB + 12.0
-	var show_sub := right_left >= HDR_X_CHIP + HDR_W_CHIP + 12.0
-	_crumb.visible = show_crumb
+	## A1 之后右侧只剩「撤销 / 调试」122px；按它们的真实左沿算，
+	## 960 宽也能留下 290px 给目标条，不必再拿旧工具组的 670 做保守值。
+	var right_left := vw - (DESIGN_W - HDR_X_UNDO)
+	var strip_w := right_left - HDR_X_CRUMB - 12.0
+	var show_strip := strip_w >= 180.0 and not _tutorial_active
+	var show_sub := right_left >= HDR_X_CHIP + HDR_W_CHIP + 12.0 and not _tutorial_active
+	_goal.visible = show_strip
+	_crumb.visible = show_strip
+	_goal.size.x = maxf(120.0, strip_w)
+	_crumb.size.x = maxf(120.0, strip_w)
 	_brand_sub.visible = show_sub
 	_inv_chip.position.x = HDR_X_CHIP if show_sub else HDR_X_SUB
 
@@ -518,7 +530,6 @@ func _sdrag_cancel() -> void:
 ## 松手结算：另一个收纳窗 → 推演桌布 / 推演器图标 → 画布（落在松手那一点）→ 都不中：回去
 func _finish_sdrag(at: Vector2) -> void:
 	var key := _sdrag_key
-	var from := _sdrag_from
 	_sdrag_cancel()
 	if key == "" or graph == null or not graph.stored.has(key):
 		return
@@ -526,35 +537,22 @@ func _finish_sdrag(at: Vector2) -> void:
 	var before := _save.snapshot()
 	var target := _drop_target_at(at)
 	var tid := String(target.get("id", "")) if not target.is_empty() else ""
-	var to := ""
-	if tid == "bag-win" or tid == "bag-dock":
-		to = GraphState.BAG
-	elif tid == "clue-win" or tid == "clue-icon":
-		to = GraphState.LEDGER
-	if to != "" and to != from:
-		if to == GraphState.LEDGER and String(n["kind"]) != "clue":
-			_show_toast("只有线索能进线索册", true)
-			return
-		if to == GraphState.BAG and String(n["kind"]) != "item":
-			_show_toast("只有物品能进证物袋", true)
-			return
-		if graph.restash(key, from, to):
-			_refresh_storage_wins()
-			_apply_hidden()
-			_show_toast("「%s」搬到%s" % [String(n["label"]),
-				"证物袋" if to == GraphState.BAG else "线索册"])
-			_commit(before)
+	if tid != "":
+		_dispatch_drop(key, tid, at, "store")
 		return
-	if tid == "infer-icon" or tid == "mx-board":
-		_assign_to_matrix(key)
+	var blocked := _drop_blocker_at(at)
+	if blocked != "":
+		_reject_drop(blocked)
 		return
 	## 落在任何窗体上（含 TEC / 对话 / 推演标题栏）都交给当前窗，不再掉回下面画布。
-	if not target.is_empty() or _floating_window_at(at) != null:
+	if _floating_window_at(at) != null:
 		return
 	if not _stage.get_global_rect().has_point(at):
 		# 落在画布之外：什么都不做，东西留在原处（不吞节点）
 		return
 	var world := (at - _stage.get_global_position() - _view_pos) / maxf(_view_k, 0.01)
+	world.x = maxf(0.0, world.x)
+	world.y = maxf(0.0, world.y)
 	graph.take_back(key, world.x, world.y)
 	_apply_hidden()
 	_refresh_storage_wins()
@@ -738,14 +736,26 @@ func _build_header() -> void:
 	_inv_chip.pressed.connect(_open_cert_review)
 	head.add_child(_inv_chip)
 
-	# 面包屑：12px、超宽截断（Web 是 `overflow:hidden; text-overflow:ellipsis`）
+	## G6：页眉中间原本空着 490px。改成两行：上行「当前目标」，下行计数。
+	## 面包屑不再挤在 134px 里被裁到只剩开头。
+	_goal = TecTheme.label("", TecTheme.FS_BODY, TecTheme.LINE)
+	_goal.name = "goal"
+	_goal.position = Vector2(HDR_X_CRUMB, 8.0)
+	_goal.size = Vector2(HDR_GOAL_W, 18.0)
+	_goal.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_goal.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_goal.clip_text = true
+	_goal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_child(_goal)
+
 	_crumb = TecTheme.label("", TecTheme.FS_BODY, TecTheme.LINE2)
 	_crumb.name = "crumb"
-	_crumb.position = Vector2(HDR_X_CRUMB, 0.0)
-	_crumb.size = Vector2(HDR_W_CRUMB, HEADER_H)
+	_crumb.position = Vector2(HDR_X_CRUMB, 26.0)
+	_crumb.size = Vector2(HDR_GOAL_W, 18.0)
 	_crumb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_crumb.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_crumb.clip_text = true
+	_crumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_child(_crumb)
 
 	# A1：右侧只留正式操作。三个调试开关 + 适应窗口 / 重置 / 检查可达性
@@ -755,6 +765,7 @@ func _build_header() -> void:
 	head.add_child(undo)
 	_place_hdr(undo, Vector2(HDR_X_UNDO, HDR_BTN_Y), Vector2(HDR_W_UNDO, HDR_BTN_H), true)
 	undo.pressed.connect(_undo)
+	_undo_btn = undo
 
 	_debug_btn = TecTheme.header_button("调试")
 	_debug_btn.name = "btn_调试"
@@ -1000,6 +1011,52 @@ func _refresh_crumbs() -> void:
 	_crumb.text = "节点 %d/%d · 已探索场景 %d/%d · 已试组合 %d · 捕获线索 %d · 结局 %d/%d" % [
 		vis, total, graph.explored.size(), scene_n, graph.tried.size(),
 		graph.captured.size(), graph.endings.size(), ending_n]
+	_crumb.tooltip_text = _crumb.text
+	if _goal != null and is_instance_valid(_goal):
+		var goal := _goal_text()
+		_goal.text = goal
+		_goal.tooltip_text = goal
+	_refresh_undo_btn()
+
+
+## G6：可读的当前目标。普通结局后改成「已记录 X/Y，可继续找真名」。
+func _goal_text() -> String:
+	if graph == null or case_def == null:
+		return "当前目标：等待案件装载"
+	if _tutorial_active:
+		match _tutorial_step:
+			TutorialStep.DOUBLE_CLICK_OFFICE:
+				return "当前目标：双击「TEC办公室」，调出调查员证"
+			TutorialStep.DRAG_CERT:
+				return "当前目标：把调查员证拖给 TEC 核对"
+			TutorialStep.STORE_SUPPLIES:
+				return "当前目标：整理桌面（可选），然后双击推演器"
+			TutorialStep.INFER:
+				return "当前目标：把调查员证放到推演桌布，长按执行者"
+			TutorialStep.CERT_FORM:
+				return "当前目标：填完调查员证"
+			TutorialStep.CHOOSE_CASE:
+				return "当前目标：在案件地图里选择 A-001"
+			_:
+				return "登记完成"
+	var total := case_def.endings.size()
+	var got := graph.endings.size()
+	var has_true := false
+	for e in case_def.endings:
+		if e != null and e.is_true_capture and graph.endings.has(e.id):
+			has_true = true
+			break
+	if got > 0 and not has_true:
+		return "已记录 %d/%d 个结局 · 可以继续找「真名」" % [got, total]
+	if has_true:
+		if total > 0 and got >= total:
+			return "真名已记录 · 全部 %d 个结局已收齐" % total
+		return "真名已记录 · 还可回看其它结局（%d/%d）" % [got, total]
+	if graph.explored.is_empty():
+		return "当前目标：双击「%s」展开现场" % case_def.scene_title(SLICE_SCENE)
+	if graph.matrix_count() <= 0:
+		return "当前目标：把线索放到推演桌布，长按执行者"
+	return "当前目标：核对推演桌布的线索，长按执行者"
 
 
 ## 「适应窗口」：按内容包围盒重新缩放居中。**不跑布局** —— 那会把玩家摆的位置全收回去。
@@ -1298,7 +1355,7 @@ func _build_icons() -> void:
 			_people_btn = b
 		elif app == "log":
 			_log_btn = b
-		# 桌面图标：单击只选中，双击才打开（全桌一致，除播放器外 —— 见 Web attachIcon(onQuick)）
+		# 桌面图标：单击只选中，双击才打开（K9：播放器也并入同一条规则）。
 		b.clicked.connect(func(): _on_icon_pressed(app, b))
 		col.add_child(b)
 
@@ -1308,7 +1365,6 @@ func _build_icons() -> void:
 	_music_btn.set_bounds(Rect2(Vector2.ZERO, _desk.size))
 	_music_btn.tooltip_text = "打开音乐播放器（唱针已装上唱机）"
 	_music_btn.visible = false
-	# 播放器是唯一「单击即开」的图标（Web 里 onQuick），用户明确要求过
 	_music_btn.clicked.connect(func(): _on_icon_pressed("music", _music_btn))
 	col.add_child(_music_btn)
 
@@ -1492,10 +1548,7 @@ func _icon_by_app(app: String) -> Button:
 ## 桌面图标：单击 = 选中（`.desk-icon.sel`），双击 = 打开（对齐 Web `attachIcon`）。
 ## 播放器是唯一例外（Web 里传了 onQuick，单击即开）。
 func _on_icon_pressed(app: String, icon: DeskIcon) -> void:
-	if app == "music":
-		_toggle_music_win()
-		_clear_icon_selection()
-		return
+	## K9：音乐图标和其它图标同一条规则 —— 单击选中、双击打开。
 	var now := Time.get_ticks_msec()
 	if _icon_last_app == app and now - _icon_last_ms <= 300:
 		_icon_last_app = ""
@@ -1521,27 +1574,84 @@ func _clear_icon_selection() -> void:
 	_icon_sel = null
 
 
+## K3：图标双击 = 打开/提到最前，绝不因为「已经开着」就把它关掉。
+## 关闭只交给窗口 × / 最小化。
 func _open_icon_app(app: String) -> void:
 	match app:
 		"infer":
-			_toggle_matrix()
+			_open_matrix()
 		"goto":
-			_toggle_archive()
+			_open_archive()
 		"clue":
-			_toggle_storage(GraphState.LEDGER)
+			_open_storage(GraphState.LEDGER)
 		"people":
-			_toggle_people()
+			_open_people()
 		"bag":
-			_toggle_storage(GraphState.BAG)
+			_open_storage(GraphState.BAG)
 		"tec":
-			_toggle_tec()
+			_open_tec()
 		"log":
-			_toggle_log()
+			_open_log()
 		"map":
-			_toggle_case_map()
+			_open_case_map()
 		"garden":
 			_open_garden()
+		"music":
+			_open_music()
 	_clear_icon_selection()
+
+
+# ── K3：打开入口统一为幂等「open」；原地关闭只由窗口自己承担 ──────────────
+
+func _open_storage(kind: String) -> void:
+	var win: Control = null
+	if kind == GraphState.BAG:
+		win = _bag_win
+	else:
+		win = _ledger_win
+	if win != null and is_instance_valid(win):
+		(win as StorageWin).refresh_store()
+		_raise_to_front(win)
+		return
+	_toggle_storage(kind)
+
+
+func _open_people() -> void:
+	if _people_win != null and is_instance_valid(_people_win):
+		_refresh_people_win()
+		_raise_to_front(_people_win)
+		return
+	_toggle_people()
+
+
+func _open_log() -> void:
+	if _log_win != null and is_instance_valid(_log_win):
+		_refresh_log_win()
+		_raise_to_front(_log_win)
+		return
+	_toggle_log()
+
+
+func _open_archive() -> void:
+	if _archive_win != null and is_instance_valid(_archive_win):
+		_raise_to_front(_archive_win)
+		return
+	_toggle_archive()
+
+
+func _open_matrix() -> void:
+	if _matrix_win != null and is_instance_valid(_matrix_win):
+		_refresh_matrix_views()
+		_raise_to_front(_matrix_win)
+		return
+	_toggle_matrix()
+
+
+func _open_case_map() -> void:
+	if _map_win != null and is_instance_valid(_map_win):
+		_raise_to_front(_map_win)
+		return
+	_toggle_case_map()
 
 
 func _build_map_badge() -> void:
@@ -1634,19 +1744,6 @@ func _refresh_count_badges() -> void:
 	_set_badge(_bag_badge, ("%d 件" % bag) if bag > 0 else "")
 	_set_badge(_clue_badge, ("%d 条" % ledger) if ledger > 0 else "")
 	_set_badge(_log_badge, str(_log_unread) if _log_unread > 0 else "")
-
-
-func _toggle_music_win() -> void:
-	if _music_win == null or not is_instance_valid(_music_win):
-		_open_music()
-		return
-	if _music_win.visible:
-		_on_music_closed()
-		return
-	if _music_dock != null and is_instance_valid(_music_dock) and _music_dock.visible:
-		_restore_music()
-		return
-	_open_music()
 
 
 func _open_music() -> void:
@@ -1827,8 +1924,8 @@ func _open_garden() -> void:
 	if not GardenSystem.has_garden(graph):
 		return
 	if _garden_win != null and is_instance_valid(_garden_win):
-		_garden_win.queue_free()
-		_garden_win = null
+		_garden_win.refresh()
+		_raise_to_front(_garden_win)
 		return
 	GardenSystem.normalize(graph, case_def)
 	_garden_win = GardenWin.new()
@@ -1896,12 +1993,24 @@ func _on_ending_finished() -> void:
 	if _last_ending_id == "":
 		return
 	var e := case_def.ending_by_id(_last_ending_id)
-	if e == null or not e.is_true_capture:
+	if e == null:
+		return
+	## G6：普通结局也要给接续提示，不能演完就静场。
+	if not e.is_true_capture:
+		_autosave()
+		_refresh_crumbs()
+		var got := graph.endings.size()
+		var total := case_def.endings.size()
+		var name := e.name if e.name != "" else e.id
+		var msg := "已记录「%s」结局（%d/%d）· 可以继续调查，寻找「真名」" % [name, got, total]
+		_log(msg, "sys")
+		_show_toast(msg)
 		return
 	GardenSystem.normalize(graph, case_def)
 	if not GardenSystem.grant_seed(graph, e.message, case_def):
 		return
 	_autosave()
+	_refresh_crumbs()
 	if _matrix_win != null and is_instance_valid(_matrix_win):
 		_matrix_win.refresh_seed()
 	_refresh_app_icons()
@@ -2071,7 +2180,7 @@ func _enter_case(id: String) -> bool:
 		_show_toast("没有这个案件地址", true)
 		return false
 	if not _catalog.is_unlocked(id):
-		_show_toast("该案件地址尚未解密", true)
+		_show_toast("该案件地址尚未解锁", true)
 		return false
 	if id == _active_case:
 		if not _case_open:
@@ -2207,6 +2316,7 @@ func _new_runtime() -> void:
 		_pw_pop.queue_free()
 	_pw_pop = null
 	_pw_ctx = {}
+	_pw_wrong.clear()
 	if _narr != null and is_instance_valid(_narr):
 		_narr.queue_free()
 	_narr = null
@@ -2253,6 +2363,8 @@ func _new_runtime() -> void:
 	_log_unread = 0
 	_set_badge(_log_badge, "")
 	_refresh_app_icons()
+	_refresh_crumbs()
+	_refresh_undo_btn()
 
 
 ## 不可逆操作：默认先弹确认；测试 / 调试可传 force=true 直接重置。
@@ -2451,6 +2563,8 @@ func _hide_tutorial_chrome() -> void:
 		_brand_sub.visible = false
 	if _crumb != null:
 		_crumb.visible = false
+	if _goal != null:
+		_goal.visible = false
 	if _inv_chip != null:
 		_inv_chip.visible = false
 	for n in ["bar/close", "bar/min"]:
@@ -2625,7 +2739,7 @@ func _tutorial_begin_infer() -> void:
 		_tutorial_say("桌布已经打开了。把「调查员证」拖上去，长按执行者开始推演。")
 	else:
 		_tutorial_say("双击左边「推演器」打开桌布；如果 TEC 挡住，把我拖开或点「–」收起。"
-			+ "把「调查员证」拖上桌布，长按执行者开始推演。")
+			+ "把「调查员证」放到推演桌布，长按执行者开始推演。")
 
 
 func _tutorial_on_matrix_changed() -> void:
@@ -2637,7 +2751,7 @@ func _tutorial_on_matrix_changed() -> void:
 	if got >= 1:
 		_matrix_win.set_hint("TEC：线索齐了。长按执行者，开始推演。")
 	else:
-		_matrix_win.set_hint("TEC：还需要「调查员证」——把它拖上桌布，然后长按执行者。")
+		_matrix_win.set_hint("TEC：还需要「调查员证」——把它放到推演桌布，然后长按执行者。")
 
 
 func _tutorial_on_inference_success(hit: EndingDef) -> void:
@@ -2693,7 +2807,7 @@ func _on_tutorial_cert_completed(card: Dictionary) -> void:
 	elif _tec != null:
 		_tutorial_tec_icon_visible = true
 		_refresh_app_icons()
-	_toggle_case_map()
+	_open_case_map()
 	_arrange_tutorial_map_once()
 
 
@@ -2804,6 +2918,8 @@ func _restore_full_chrome() -> void:
 		_brand_sub.visible = true
 	if _crumb != null:
 		_crumb.visible = true
+	if _goal != null:
+		_goal.visible = true
 	if _inv_chip != null:
 		_inv_chip.visible = not _investigator.is_empty()
 	for n in ["bar/close", "bar/min"]:
@@ -3083,6 +3199,7 @@ func _commit(before: Dictionary) -> void:
 	_queue_autosave()
 	_refresh_app_icons()
 	_refresh_detail()
+	_refresh_crumbs()
 	_refresh_people_win()
 	_refresh_log_win()
 
@@ -3121,12 +3238,22 @@ func dbg_use_temp_save(p_path: String) -> void:
 	_save.clear_history()
 
 
+## K8：撤销按钮必须反映空栈；所有会改变历史的路径在提交后统一刷这里。
+func _refresh_undo_btn() -> void:
+	if _undo_btn == null or not is_instance_valid(_undo_btn):
+		return
+	var can := _save != null and _save.can_undo()
+	_undo_btn.disabled = not can
+	_undo_btn.tooltip_text = "撤销上一步" if can else "没有可撤销的操作"
+
+
 func _undo() -> bool:
 	if not _require_case():
 		return false
 	if _save == null or not _save.can_undo():
 		_log("没有可撤销的操作", "warn")
 		_show_toast("没有可撤销的操作", true)
+		_refresh_undo_btn()
 		return false
 	if not _save.undo():
 		_show_toast("撤销失败：" + _save.last_error, true)
@@ -3134,6 +3261,7 @@ func _undo() -> bool:
 	_rebuild_from_graph()
 	_autosave()
 	_show_toast("已撤销上一步")
+	_refresh_undo_btn()
 	return true
 
 
@@ -3616,8 +3744,10 @@ func _drop_targets() -> Array:
 	if _ledger_win != null and is_instance_valid(_ledger_win) and _ledger_win.is_visible_in_tree():
 		out.append({"id": "clue-win", "rect": _ledger_win.get_global_rect(), "inset": 10.0,
 			"depth": _target_depth(_ledger_win)})
+	## K5：「拖场景到档案图标 = 前往」是已废弃的场景前往，不再作为落点。
+	## 档案图标仍由 `_drop_blocker_at()` 拦截并给出说明，避免卡片穿透到画布。
 	for pair in [["bag-dock", "icon_bag"], ["clue-icon", "icon_clue"], ["tec-dock", "icon_tec"],
-			["infer-icon", "icon_infer"], ["goto-icon", "icon_goto"]]:
+			["infer-icon", "icon_infer"]]:
 		var ic: Control = _desk.get_node_or_null("icons/" + String(pair[1])) as Control
 		if ic != null and ic.is_visible_in_tree():
 			out.append({"id": String(pair[0]), "rect": ic.get_global_rect(), "inset": 0.0,
@@ -3711,12 +3841,33 @@ func _replay_talk(key: String) -> bool:
 	return _open_chat(d, [String(ch.id)])
 
 
+## W8/K4：收纳行拖拽时，只高亮松手真的会生效的落点。
+## 高亮 ≠ 命中会让玩家以为「拖到 TEC 也能分析收纳里的东西」，实际却只能先取回。
+func _drop_hover_allowed(target_id: String) -> bool:
+	if _sdrag_key == "" or graph == null:
+		return true
+	var n := graph.node(_sdrag_key)
+	if n.is_empty():
+		return true
+	var kind := String(n["kind"])
+	match target_id:
+		"tec-dock", "tec-avatar", "tec-chip", "chat-win":
+			return false
+		"bag-win", "bag-dock":
+			return kind == "item"
+		"clue-win", "clue-icon", "infer-icon", "mx-board":
+			return kind == "clue"
+	return true
+
+
 ## 拖动中用：命中的窗口 / 图标 / 卡片统一画一层虚线框
 func _update_drop_over(at_global: Vector2) -> void:
 	var hit_id := ""
 	var hit_rect := Rect2()
 	var hit_inset := 0.0
 	for t in _drop_targets():
+		if not _drop_hover_allowed(String(t["id"])):
+			continue
 		if (t["rect"] as Rect2).has_point(at_global):
 			hit_id = String(t["id"])
 			hit_rect = t["rect"]
@@ -3758,7 +3909,11 @@ func _on_card_spring_finished(_key: String) -> void:
 func _handle_card_drop(key: String, at_global: Vector2) -> bool:
 	var target := _drop_target_at(at_global)
 	if not target.is_empty():
-		_apply_drop(String(target["id"]), key)
+		_dispatch_drop(key, String(target["id"]), at_global, "canvas")
+		return true
+	var blocked := _drop_blocker_at(at_global)
+	if blocked != "":
+		_reject_drop(blocked)
 		return true
 	## 任何浮动窗都拦截卡片，哪怕它不是落点：松手弹回，不再穿透去和窗体下面的卡组合。
 	if _floating_window_at(at_global) != null:
@@ -3766,29 +3921,103 @@ func _handle_card_drop(key: String, at_global: Vector2) -> bool:
 	return false
 
 
-func _apply_drop(id: String, key: String) -> void:
+## K5：已退役的落点不再「生效」，但仍要挡住卡片并说清原因（不能穿透到画布）。
+func _drop_blocker_at(at_global: Vector2) -> String:
+	var goto_icon := _desk.get_node_or_null("icons/icon_goto") as Control \
+		if _desk != null and is_instance_valid(_desk) else null
+	if goto_icon != null and goto_icon.is_visible_in_tree() \
+			and goto_icon.get_global_rect().has_point(at_global):
+		return "档案只收时间点：场景请双击展开；时间点请从档案窗前往。"
+	return ""
+
+
+## K6：所有拒收统一「warning toast + 日志」，话术由调用方按目标分派。
+func _reject_drop(text: String) -> void:
+	if text == "":
+		return
+	_log(text, "warn")
+	_show_toast(text, true)
+
+
+func _source_name(source: String) -> String:
+	match source:
+		"store":
+			return "收纳"
+		"matrix":
+			return "推演桌布"
+	return "画布"
+
+
+## K4：三条拖放路径（画布卡片 / 收纳行 / 桌布线索引）共用的唯一分派器。
+## 返回 true = 已处理（包括明确拒收）；false = 未命中，交给来源自己的默认回弹。
+func _dispatch_drop(key: String, target_id: String, _at_global: Vector2, source: String) -> bool:
+	if target_id == "":
+		return false
+	if graph == null:
+		return true
 	var n := graph.node(key)
 	if n.is_empty():
-		return
-	match id:
-		"chat-win":
-			_chat_drop(key)
+		return true
+	var kind := String(n["kind"])
+	var label := String(n.get("label", key))
+	match target_id:
 		"bag-win", "bag-dock":
-			_store_into(GraphState.BAG, key)
+			if source == "canvas":
+				_store_into(GraphState.BAG, key)
+			else:
+				_restash_to(key, GraphState.BAG, label)
 		"clue-win", "clue-icon":
-			_store_into(GraphState.LEDGER, key)
+			if source == "canvas":
+				_store_into(GraphState.LEDGER, key)
+			else:
+				_restash_to(key, GraphState.LEDGER, label)
 		"tec-dock", "tec-avatar", "tec-chip":
-			_start_tec_analysis(key)
+			if source == "canvas":
+				_start_tec_analysis(key)
+			else:
+				_reject_drop("先从%s把「%s」取回画布，再拖给 TEC 分析。" % [_source_name(source), label])
 		"infer-icon", "mx-board":
-			if String(n["kind"]) == "clue":
+			if kind != "clue":
+				_reject_drop("只有线索能放到推演桌布。")
+			elif source != "matrix":
 				_assign_to_matrix(key)
+		"chat-win":
+			if source == "canvas":
+				_chat_drop(key)
 			else:
-				_show_toast("只有线索能进推演器" if id == "infer-icon" else "只有线索能上桌布", true)
-		"goto-icon":
-			if GraphState.is_scene_kind(String(n["kind"])):
-				_goto_scene(String(n["id"]))
-			else:
-				_show_toast("只有场景能进档案", true)
+				_reject_drop("对话窗只接画布上的节点；先从%s取回。" % _source_name(source))
+		_:
+			return false
+	return true
+
+
+## 兼容旧调用 / 测试：等价于「画布卡片落在某落点」。
+func _apply_drop(id: String, key: String) -> void:
+	_dispatch_drop(key, id, Vector2.ZERO, "canvas")
+
+
+## 收纳之间搬运（袋 ↔ 册 / 桌布 → 册）：类型不合就按目标回绝。
+func _restash_to(key: String, to: String, label: String) -> void:
+	if graph == null or not graph.stored.has(key):
+		return
+	var from := String(graph.stored.get(key, ""))
+	if from == to:
+		return
+	var kind := String(graph.node(key).get("kind", ""))
+	if to == GraphState.BAG and kind != "item":
+		_reject_drop("只有物品能进证物袋。")
+		return
+	if to == GraphState.LEDGER and kind != "clue":
+		_reject_drop("只有线索能进线索册。")
+		return
+	var before := _save.snapshot()
+	if not graph.restash(key, from, to):
+		return
+	_apply_hidden()
+	_refresh_matrix_views()
+	_show_toast("「%s」搬到%s" % [label,
+		"证物袋" if to == GraphState.BAG else "线索册"])
+	_commit(before)
 
 
 ## 收进证物袋 / 线索册（拒收时给一句人话，别让玩家以为是坏了）
@@ -3796,17 +4025,18 @@ func _store_into(where: String, key: String) -> void:
 	var n := graph.node(key)
 	if n.is_empty():
 		return
+	var target_name := "证物袋" if where == GraphState.BAG else "线索册"
 	if graph.stored.has(key):
-		_show_toast("它已经在收纳里了", true)
+		_reject_drop("「%s」已经在%s里了。" % [String(n.get("label", key)), target_name])
 		return
 	if graph.is_container_node(key):
-		_show_toast("场景与容器收不进收纳袋", true)
+		_reject_drop("场景与容器收不进%s。" % target_name)
 		return
 	if where == GraphState.BAG and String(n["kind"]) != "item":
-		_show_toast("只有物品能进证物袋", true)
+		_reject_drop("只有物品能进证物袋。")
 		return
 	if where == GraphState.LEDGER and String(n["kind"]) != "clue":
-		_show_toast("只有线索能进线索册", true)
+		_reject_drop("只有线索能进线索册。")
 		return
 	var before := _save.snapshot()
 	var ok := graph.bag_store(key) if where == GraphState.BAG else graph.ledger_store(key)
@@ -3814,8 +4044,7 @@ func _store_into(where: String, key: String) -> void:
 		return
 	_apply_hidden()
 	_refresh_storage_wins()
-	_show_toast("「%s」收进%s" % [String(n.get("label", "")),
-		"证物袋" if where == GraphState.BAG else "线索册"])
+	_show_toast("「%s」收进%s" % [String(n.get("label", "")), target_name])
 	_commit(before)
 
 
@@ -3832,6 +4061,7 @@ func _goto_scene(id: String) -> void:
 		return
 	var key := graph.scene_key(id)
 	var before := _save.snapshot()
+	var was_explored := graph.explored.has(id)
 	if not graph.nodes.has(key):
 		graph.add_node("loc", id)
 		_spawn_card(key)
@@ -3847,6 +4077,7 @@ func _goto_scene(id: String) -> void:
 	_refresh_crumbs()
 	_log("前往「%s」" % case_def.scene_title(id), "act")
 	_show_toast("前往「%s」" % case_def.scene_title(id))
+	_on_first_expand("loc", id, was_explored)
 	_commit(before)
 
 
@@ -3957,7 +4188,8 @@ func _capture_clue_node(key: String) -> void:
 ## 容器双重身份：第一次双击展开，已展开再双击收起（对齐 Web 的展开 / 折叠）
 func _toggle_container(kind: String, id: String) -> void:
 	var before := _save.snapshot()
-	if graph.explored.has(id) and not graph.is_collapsed(id):
+	var was_explored := graph.explored.has(id)
+	if was_explored and not graph.is_collapsed(id):
 		graph.collapse(id)
 		_apply_hidden()
 		var left := 0
@@ -3992,6 +4224,7 @@ func _toggle_container(kind: String, id: String) -> void:
 		_set_crumb(_case_label() + " // " + case_def.scene_title(id))
 	else:
 		_show_toast("展开了「%s」" % case_def.label_of(kind, id))
+	_on_first_expand(kind, id, was_explored)
 	_commit(before)
 
 
@@ -4035,6 +4268,9 @@ func _apply_outcome(res: Dictionary, node_key: String) -> void:
 			_show_toast(flavor)
 	if res.has("next_scene") and String(res.get("next_scene", "")) != "":
 		_set_crumb(_case_label() + " // " + case_def.scene_title(String(res["next_scene"])))
+	var first_scene := String(res.get("first_scene", ""))
+	if first_scene != "":
+		_on_first_expand("loc", first_scene, false)
 	_relayout()
 
 
@@ -4127,10 +4363,10 @@ func _on_people_row(id: String) -> void:
 	if not _require_case():
 		return
 	if id == "CHARS_TEC":
-		_toggle_tec()
+		_open_tec()
 		return
 	if id == "CHARS_EXEC":
-		_toggle_matrix()
+		_open_matrix()
 		return
 	_goto_char(id)
 
@@ -4290,6 +4526,7 @@ func _toggle_matrix() -> void:
 	_matrix_win.setup_matrix(graph, case_def)
 	_matrix_win.position = Vector2(336, 40)
 	_matrix_win.clue_taken.connect(_on_matrix_took)
+	_matrix_win.clue_shown.connect(_on_matrix_chip_shown)
 	_matrix_win.clue_dropped.connect(_on_matrix_dropped)
 	_matrix_win.inference_requested.connect(_run_inference)
 	_matrix_win.seed_dropped.connect(_on_seed_dropped)
@@ -4357,7 +4594,7 @@ func _assign_to_matrix(key: String) -> bool:
 		if _tutorial_active and _tutorial_step == TutorialStep.INFER:
 			_tutorial_say("推演桌布只收线索。")
 		else:
-			_show_toast("只有线索能归位到推演桌布", true)
+			_reject_drop("只有线索能放到推演桌布。")
 		return false
 	var cl := case_def.clue_of(String(n["id"]))
 	if cl == null:
@@ -4367,7 +4604,7 @@ func _assign_to_matrix(key: String) -> bool:
 		_tutorial_begin_infer()
 	var before := _save.snapshot()
 	if not graph.matrix_assign(key):
-		_show_toast("「%s」的感官类型是%s，归位失败" % [n.get("label", ""), GraphState.SENSE_NAMES.get(cl.sense, cl.sense)], true)
+		_reject_drop("「%s」的感官类型是%s，无法放到推演桌布。" % [n.get("label", ""), GraphState.SENSE_NAMES.get(cl.sense, cl.sense)])
 		return false
 	_apply_hidden()
 	_refresh_or_spawn_card(key)
@@ -4377,12 +4614,21 @@ func _assign_to_matrix(key: String) -> bool:
 	return true
 
 
+## K2：桌布线索引单击 = 看详情，和画布节点同一套语义（取回只走按钮 / 拖出）。
+func _on_matrix_chip_shown(key: String) -> void:
+	if graph == null or not graph.nodes.has(key):
+		return
+	_on_card_selected(key)
+
+
 func _on_matrix_took(key: String, at_global: Vector2 = Vector2(-1.0, -1.0)) -> void:
 	var before := _save.snapshot()
 	# 带坐标取回（Web `boardTake(cid, sense, cx, cy)`）：落在松手那一点。换算与 `_finish_sdrag` 同一条公式。
 	var world := Vector2(-1.0, -1.0)
 	if at_global.x >= 0.0:
 		world = (at_global - _stage.get_global_position() - _view_pos) / maxf(_view_k, 0.01)
+		world.x = maxf(0.0, world.x)
+		world.y = maxf(0.0, world.y)
 	if not graph.matrix_take(key, world.x, world.y):
 		return
 	_apply_hidden()
@@ -4403,15 +4649,18 @@ func _on_matrix_took(key: String, at_global: Vector2 = Vector2(-1.0, -1.0)) -> v
 func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
 	var target := _drop_target_at(at_global)
 	var tid := String(target.get("id", "")) if not target.is_empty() else ""
-	if tid == "clue-win" or tid == "clue-icon":
-		var before := _save.snapshot()
-		if graph.restash(key, GraphState.MATRIX, GraphState.LEDGER):
-			_apply_hidden()
-			_refresh_matrix_views()
-			_commit(before)
+	if tid != "":
+		_dispatch_drop(key, tid, at_global, "matrix")
+		return
+	var blocked := _drop_blocker_at(at_global)
+	if blocked != "":
+		_reject_drop(blocked)
 		return
 	## 桌布线索引拖到别的窗体（包括被推演窗盖住的 TEC）时留在桌布上，不要穿透掉落。
-	if not target.is_empty() or _floating_window_at(at_global) != null:
+	if _floating_window_at(at_global) != null:
+		return
+	## K4：拖到画布之外（顶栏 / 桌面空白）不写回负坐标，留在桌布原处。
+	if not _stage.get_global_rect().has_point(at_global):
 		return
 	_on_matrix_took(key, at_global)
 
@@ -4423,7 +4672,7 @@ func _on_ledger_to_matrix(key: String) -> void:
 		_refresh_matrix_views()
 		_commit(before)
 	else:
-		_show_toast("这条线索没有可用的感官槽位", true)
+		_reject_drop("这条线索没有可用的感官槽位。")
 
 
 func _refresh_matrix_views() -> void:
@@ -4457,7 +4706,7 @@ func _run_inference() -> void:
 		return
 	if hit == null:
 		## 失败要指向下一步：空桌布 vs 有线索但配方/数量不对。
-		var why := "桌布上还没有线索。先把线索拖上桌布。"
+		var why := "推演桌布上还没有线索。先把线索放到推演桌布。"
 		if graph.matrix_count() > 0:
 			why = "当前线索组合没有对应结局。检查配方与线索数量，取回多余线索再试。"
 		if _matrix_win != null and is_instance_valid(_matrix_win):
@@ -4580,16 +4829,29 @@ func _submit_password(text: String) -> void:
 	if _pw_ctx.is_empty():
 		return
 	var before := _save.snapshot()
-	var res := _cmds.submit_password(String(_pw_ctx["node_key"]), _pw_ctx["cmd"], text)
+	var pw_key := String(_pw_ctx.get("node_key", ""))
+	var res := _cmds.submit_password(pw_key, _pw_ctx["cmd"], text)
 	if bool(res.get("wrong_password", false)):
 		if _pw_pop != null and is_instance_valid(_pw_pop):
 			_pw_pop.reject_wrong()
-		var pw_key := String(_pw_ctx.get("node_key", ""))
 		var pw_lab := String(graph.node(pw_key).get("label", pw_key))
 		var pw_txt := String(text) if String(text) != "" else "(空)"
 		_log("「%s」密码 %s 不正确" % [pw_lab, pw_txt], "warn")
 		_show_toast(String(res.get("message", "")), true)
+		## G11：连续错两次，指向已有救济（TEC 分析木盒），而不是让玩家一直穷举。
+		var wrong := int(_pw_wrong.get(pw_key, 0)) + 1
+		_pw_wrong[pw_key] = wrong
+		if wrong == 2:
+			var hint := "连续错两次了。这个锁我可能有办法——把「%s」拖给 TEC 分析，看看有没有数字提示。" % pw_lab
+			var n := graph.node(pw_key)
+			if _tec_reaction_text("item", String(n.get("id", ""))) != "":
+				_tec_hint("「%s」的密码？把它拖给我，我看看能不能读出数字。" % pw_lab, false)
+				_show_toast(hint, true)
+				_log(hint, "warn")
+			else:
+				_show_toast("连续错两次了。去现场找带数字的纸片或记录，再回来试。", true)
 		return
+	_pw_wrong.erase(pw_key)
 	if _pw_pop != null and is_instance_valid(_pw_pop):
 		_pw_pop.queue_free()
 	_pw_pop = null
@@ -4682,17 +4944,7 @@ func _expand_scene(sid: String, show_narr: bool) -> void:
 	if show_narr:
 		_show_narr(sid)
 	_set_crumb(_case_label() + " // " + case_def.scene_title(sid))
-	# 首次展开的两条提示（Web 04-graph.js:118/120）：回忆锚点 / TEC 档案，两条互不替代
-	if not was_explored:
-		var title := case_def.scene_title(sid)
-		if case_def.is_time_id(sid):
-			_log("「%s」可以当一段回忆的锚点（把它拖到一个地点上，再拖一个人物上去）" % title, "sys")
-		var tec := case_def.char_of("CHARS_TEC")
-		if tec != null:
-			for st in tec.scene_talks:
-				if st != null and st.scene != null and st.scene.id == sid:
-					_log("「%s」似乎有可以解读的档案（把场景节点拖给 TEC 分析）" % title, "sys")
-					break
+	_on_first_expand("loc", sid, was_explored)
 
 
 func _show_narr(sid: String) -> void:
@@ -5361,10 +5613,17 @@ func _open_tec() -> void:
 func _close_tec() -> void:
 	if _tec == null:
 		return
+	## K7：等待任务只有两条路 —— 后台继续（最小化，有进度卡片）或关闭即取消。
+	## 关闭时把话说明白，不能让分析悄悄消失。
+	var was_analyzing := _tec.is_analyzing()
+	_tec.cancel_analysis()
 	_tec.visible = false
 	_tec_min = false
+	_tec_dot = false
 	if _tec_chip != null:
 		_tec_chip.visible = false
+	if was_analyzing:
+		_reject_drop("已取消当前 TEC 分析。想边看边等，请点「–」收成助手卡片。")
 	if _tutorial_active:
 		_tutorial_tec_icon_visible = true
 		_refresh_app_icons()
@@ -5541,24 +5800,69 @@ func _tec_talk_lines(sid: String) -> Array:
 	return []
 
 
+## 这条物品 / 线索在 TEC 那里有没有专属反应。首次展开救济与密码连错提示共用。
+func _tec_reaction_text(kind: String, id: String) -> String:
+	var tec := case_def.char_of("CHARS_TEC") if case_def != null else null
+	if tec == null:
+		return ""
+	var groups: Array = []
+	if kind == "item":
+		groups = [tec.item_reactions]
+	elif kind == "clue":
+		groups = [tec.clue_reactions]
+	else:
+		groups = [tec.item_reactions, tec.clue_reactions]
+	for group in groups:
+		for r in group:
+			if r == null or String(r.text) == "":
+				continue
+			if (r.item != null and r.item.id == id) or (r.clue != null and r.clue.id == id) \
+					or r.trigger_id == id:
+				return String(r.text)
+	return ""
+
+
+## G7：TEC 亲口留提示。默认只落进 TEC 对话（不污染「只记结果」的日志）；
+## 档案类提示可显式 log_it，窗关着时可显式 announce 用 toast 提醒。
+func _tec_hint(text: String, announce := false, log_it := false) -> void:
+	if text == "" or _tec == null or not is_instance_valid(_tec):
+		return
+	_tec.append_line(text, TecTheme.MUTED)
+	if log_it:
+		_log("TEC：" + text, "sys")
+	if not _tec.visible or _tec_min:
+		_tec_dot = true
+		if _tec_min:
+			_sync_tec_chip()
+		if announce and not _tec.visible:
+			_show_toast("TEC 留了条提示：" + text)
+
+
+## G7：所有「第一次展开」路径统一走这里（双击场景 / 容器、组合前往、命令产出场景）。
+## 有档案的场景指给 TEC 分析；有专属反应的物品指给 TEC；其余给一句看现场的方向提示。
+func _on_first_expand(kind: String, id: String, was_explored: bool) -> void:
+	if was_explored or _tutorial_active or graph == null or case_def == null:
+		return
+	var title := case_def.label_of(kind, id)
+	if GraphState.is_scene_kind(kind):
+		if case_def.is_time_id(id):
+			_log("「%s」可以当一段回忆的锚点（把它拖到一个地点上，再拖一个人物上去）" % title, "sys")
+		if not _tec_talk_lines(id).is_empty():
+			_tec_hint("「%s」的档案可以解读——把场景节点拖给我分析。" % title, false, true)
+		else:
+			_tec_hint("先看看「%s」里有什么；可疑的东西可以拖给我。" % title)
+	elif _tec_reaction_text(kind, id) != "" or _hidden_clue_of(kind, id) != null:
+		_tec_hint("「%s」可以拖给我看看。" % title)
+
+
 func _tec_reaction(key: String) -> bool:
 	var n := graph.node(key)
 	if n.is_empty() or _tec == null:
 		return false
-	var tec := case_def.char_of("CHARS_TEC")
-	if tec == null:
+	if case_def.char_of("CHARS_TEC") == null:
 		return false
 	var id := String(n["id"])
-	var raw := ""
-	for r in tec.item_reactions:
-		if r != null and ((r.item != null and r.item.id == id) or r.trigger_id == id):
-			raw = r.text
-			break
-	if raw == "":
-		for r in tec.clue_reactions:
-			if r != null and ((r.clue != null and r.clue.id == id) or r.trigger_id == id):
-				raw = r.text
-				break
+	var raw := _tec_reaction_text(String(n["kind"]), id)
 	if raw == "":
 		_tec.append_line("关于「%s」，我暂时没有更多线索。试试把它和别的节点组合。" % String(n["label"]))
 		_log("TEC 对「%s」没有特别的反应" % String(n["label"]), "warn")
@@ -5568,6 +5872,43 @@ func _tec_reaction(key: String) -> bool:
 	var got := _capture_text_clues(raw)
 	_refresh_clue_keys(got)
 	return true
+
+
+## G7：闲聊队列耗尽后不再静默。按当前进度给「方向 → 操作 → 明示」三档提示，
+## 每次点击换下一条；状态越具体，提示越接近可执行动作。
+func _tec_next_hint() -> String:
+	var hints: Array = []
+	if graph == null or case_def == null:
+		return "（把节点拖到我身上，我来分析）"
+	if graph.explored.is_empty():
+		hints.append("方向：先双击「%s」，把现场展开。" % case_def.scene_title(SLICE_SCENE))
+	else:
+		hints.append("方向：还有没展开的现场或容器；双击它们，再看看人物名册。")
+	if graph.matrix_count() <= 0:
+		hints.append("操作：双击「推演器」，把线索放到推演桌布上。")
+		hints.append("明示：桌布空着不会触发推演——先放至少一条线索，再长按执行者。")
+	else:
+		hints.append("操作：长按桌布中央的执行者推演；不对就把线索取回画布再换。")
+		hints.append("明示：配方要正好匹配——多一条、少一条都会失败；先在日志里核对已有线索。")
+	## G11：场上有带密码锁、且 TEC 有专属反应的东西时，直接把「拖给我」说明白。
+	for key in graph.nodes.keys():
+		var n := graph.node(String(key))
+		if n.is_empty() or String(n["kind"]) != "item":
+			continue
+		var it := case_def.item_of(String(n["id"]))
+		if it == null:
+			continue
+		var locked := false
+		for cmd in it.commands:
+			if cmd is PasswordCommandDef:
+				locked = true
+				break
+		if locked and _tec_reaction_text("item", String(n["id"])) != "":
+			hints.append("明示：带密码锁的「%s」可以拖给我，我能读出数字提示。" % String(n.get("label", "")))
+			break
+	var tier := int(graph.tec_prog.get("_hint", 0))
+	graph.tec_prog["_hint"] = tier + 1
+	return String(hints[tier % hints.size()])
 
 
 func _tec_talk() -> void:
@@ -5581,13 +5922,15 @@ func _tec_talk() -> void:
 	var tec := case_def.char_of("CHARS_TEC")
 	var queue: Array = tec.talk_queue if tec != null else []
 	if queue.is_empty():
-		_tec.append_line("（把节点拖到我身上，我来分析）", TecTheme.MUTED)
+		_tec_hint("（把节点拖到我身上，我来分析）")
 		return
 	var idx := int(graph.tec_prog.get("_def", 0))
-	if idx >= queue.size():
+	if idx < queue.size():
+		graph.tec_prog["_def"] = idx + 1
+		_tec.append_line(case_def.strip_tags(String(queue[idx])))
+		_autosave()
 		return
-	graph.tec_prog["_def"] = idx + 1
-	_tec.append_line(case_def.strip_tags(String(queue[idx])))
+	_tec_hint(_tec_next_hint())
 	_autosave()
 
 
@@ -6139,7 +6482,8 @@ func dbg_music_dock() -> MusicDock:
 
 
 func dbg_click_music_icon() -> void:
-	_toggle_music_win()
+	if _music_btn != null and is_instance_valid(_music_btn):
+		_on_icon_pressed("music", _music_btn)
 
 
 func dbg_open_music() -> MusicWin:

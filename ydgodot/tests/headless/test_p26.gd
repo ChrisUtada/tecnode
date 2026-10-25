@@ -267,7 +267,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	if lw == null:
 		scene.queue_free()
 		return
-	check("日志窗标题", lw.title == "因果追踪", lw.title)
+	check("K10 日志窗标题统一为「日志」", lw.title == "日志", lw.title)
 	check("开窗清未读", scene.dbg_log_unread() == 0)
 	check("开窗收角标", scene.dbg_badge_text("log") == "")
 	# 补两条已知 kind 的行，样式断言才有靶子
@@ -359,9 +359,17 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("名册 = met_char_ids", rows == scene.graph.met_char_ids(), str(rows))
 	check("常驻两人在册", rows.has("CHARS_TEC") and rows.has("CHARS_EXEC"), str(rows))
 	check("到过 7/4 ⇒ 陆珩松在册", rows.has("CHARS_luhengs"), str(rows))
-	check("常驻行状态词", pw.row_state("CHARS_TEC") == "助手窗"
-		and pw.row_state("CHARS_EXEC") == "逻辑阵列",
+	check("K10 常驻行状态词统一", pw.row_state("CHARS_TEC") == "助手窗"
+		and pw.row_state("CHARS_EXEC") == "推演器",
 		pw.row_state("CHARS_TEC") + " / " + pw.row_state("CHARS_EXEC"))
+	# K3：再次打开名册仍是同一扇窗；点常驻行只提层，不把窗关掉。
+	scene._open_icon_app("people")
+	check("K3 再次打开名册不关窗", scene._people_win != null and scene._people_win.visible)
+	scene._on_people_row("CHARS_TEC")
+	scene._on_people_row("CHARS_TEC")
+	check("K3 名册点 TEC 两次仍保持打开",
+		scene._tec.visible and scene._people_win != null and scene._people_win.visible)
+	scene.dbg_tec_close()
 	check("状态词不带计数", not pw.row_state("CHARS_luhengs").contains("/"),
 		pw.row_state("CHARS_luhengs"))
 	var av := pw.find_child("av", true, false) as PanelContainer

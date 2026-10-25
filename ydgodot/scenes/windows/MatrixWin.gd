@@ -8,6 +8,8 @@ extends SysWindow
 
 signal clue_dropped(key: String, at_global: Vector2)
 signal clue_taken(key: String)
+## K2：单击线索卡 = 看详情（与画布双击语义对齐），取回改由卡上的「取回」按钮承担。
+signal clue_shown(key: String)
 signal inference_requested
 signal seed_dropped(at_global: Vector2)
 
@@ -63,7 +65,7 @@ func setup_matrix(p_graph: GraphState, p_case: CaseLoader) -> void:
 	graph = p_graph
 	case_def = p_case
 	var fast := OS.get_cmdline_args().has("--fast") or OS.get_cmdline_user_args().has("--fast")
-	setup("逻辑阵列", 580, 476)
+	setup("推演器", 580, 476)
 	_rite_duration = 0.08 if fast else RITE_SEC
 	body.clip_contents = true
 
@@ -85,7 +87,7 @@ func setup_matrix(p_graph: GraphState, p_case: CaseLoader) -> void:
 	_build_executor()
 	_build_seed_pop()
 
-	_hint = TecTheme.label("长按执行者蓄力推演 · 双击 / 拖出桌布取回线索", TecTheme.FS_BODY, TecTheme.MUTED)
+	_hint = TecTheme.label("长按执行者推演 · 单击线索看详情，点「取回」或拖出桌布放回画布", TecTheme.FS_BODY, TecTheme.MUTED)
 	_hint.position = Vector2(12, BOARD_H - 20)
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_board.add_child(_hint)
@@ -230,7 +232,7 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	chip.size = Vector2(CHIP_W, CHIP_H)
 	chip.custom_minimum_size = Vector2(CHIP_W, CHIP_H)
 	chip.mouse_filter = Control.MOUSE_FILTER_STOP
-	chip.tooltip_text = "双击 = 取回画布；拖出桌布 = 取回；拖到线索册 = 收进册子"
+	chip.tooltip_text = "单击 = 查看详情；点「取回」或拖出桌布 = 放回画布；拖到线索册 = 收进册子"
 	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE, 1)
 	chip.add_theme_stylebox_override("panel", sb)
 
@@ -247,12 +249,37 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(title)
 
-	var sub := TecTheme.label("线索 · 已归位", TecTheme.FS_BODY, TecTheme.MUTED)
+	## K2：底行 = 状态 + 明确的「取回」按钮。双击不再承担取回语义。
+	var foot := HBoxContainer.new()
+	foot.add_theme_constant_override("separation", 2)
+	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(foot)
+
+	var sub := TecTheme.label("推演桌布", TecTheme.FS_BODY, TecTheme.MUTED)
 	if not bool(n.get("captured", false)):
 		sub.text = "线索"
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sub.clip_text = true
+	sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(sub)
+	foot.add_child(sub)
+
+	var take := TecTheme.button("取回")
+	take.name = "take"
+	take.tooltip_text = "把这条线索放回画布"
+	take.custom_minimum_size = Vector2(34, 16)
+	take.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		var sb2 := TecTheme.button_style(state == "hover" or state == "hover_pressed",
+			state == "pressed" or state == "hover_pressed")
+		sb2.content_margin_left = 4
+		sb2.content_margin_right = 4
+		sb2.content_margin_top = 0
+		sb2.content_margin_bottom = 0
+		take.add_theme_stylebox_override(state, sb2)
+	take.pressed.connect(func(): clue_taken.emit(key))
+	foot.add_child(take)
 
 	chip.gui_input.connect(_on_chip_input.bind(key, chip))
 	return chip
@@ -343,19 +370,19 @@ func _draw_rite(center: Vector2, pts: Array) -> void:
 func _on_chip_input(event: InputEvent, key: String, chip: PanelContainer) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			if event.double_click:
-				clue_taken.emit(key)
-				_pressed_chip = ""
-				return
 			_pressed_chip = key
 			_chip_press = event.global_position
 			_chip_moved = false
 			accept_event()
 		else:
+			var clicked := _pressed_chip == key and not _chip_moved
 			if _pressed_chip == key:
 				_finish_chip_drag(event.global_position)
 			_pressed_chip = ""
 			_chip_moved = false
+			if clicked:
+				## 单击 = 看详情（与画布节点一致）；双击也只是重复看详情，不再偷偷取回。
+				clue_shown.emit(key)
 			accept_event()
 	elif event is InputEventMouseMotion and _pressed_chip == key:
 		if (event.button_mask & MOUSE_BUTTON_MASK_LEFT) == 0:

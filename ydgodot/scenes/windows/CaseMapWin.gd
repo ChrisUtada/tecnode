@@ -23,7 +23,7 @@ func setup_map(p_catalog: CaseCatalog, p_current: String, p_open: bool, p_only_i
 
 func _build_map() -> void:
 	var tip := TecTheme.label(
-		"每个地址对应一宗案件；捕获「真名」后下一案才会点亮。\n"
+		"每个地址对应一宗案件；捕获「真名」后下一案才会解锁。\n"
 		+ "「–」收进右下角卡片，「×」收进本图标，点本案那行展开。",
 		TecTheme.FS_BODY, TecTheme.MUTED)
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
