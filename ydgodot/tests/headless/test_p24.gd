@@ -203,6 +203,13 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("打字机 45ms/字", ChatWindow.CHAR_MS == 45.0, str(ChatWindow.CHAR_MS))
 	check("W9 对话窗有滚动区", not chat.find_children("*", "ScrollContainer", true, false).is_empty())
 	check("对话窗预排全文行", chat._rows.size() == int(state["total"]), str(chat._rows.size()))
+	var chat_rule := chat.find_child("chat_rule", true, false) as MarginContainer
+	check("对话分割线与头像留 6px 间距",
+		chat_rule != null
+			and chat_rule.get_theme_constant("margin_top") >= 6
+			and chat_rule.get_theme_constant("margin_bottom") >= 6,
+		"null" if chat_rule == null else "%d/%d" % [
+			chat_rule.get_theme_constant("margin_top"), chat_rule.get_theme_constant("margin_bottom")])
 	var chat_avatars: Array = []
 	for node in chat.find_children("chat_av", "", true, false):
 		var art := node.find_child("art", true, false) as TextureRect

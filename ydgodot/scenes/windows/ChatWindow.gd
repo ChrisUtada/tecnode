@@ -157,11 +157,19 @@ func _build_rows() -> void:
 		root.add_theme_constant_override("separation", 0)
 		root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if not first:
+			## 分割线不能贴着下一行头像：上下各留 6px，和旁白行的呼吸一致。
+			var rule := MarginContainer.new()
+			rule.name = "chat_rule"
+			rule.add_theme_constant_override("margin_top", 6)
+			rule.add_theme_constant_override("margin_bottom", 6)
+			rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			var sep := ColorRect.new()
+			sep.name = "chat_sep"
 			sep.color = TecTheme.LINE2
 			sep.custom_minimum_size = Vector2(0, 1)
 			sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			root.add_child(sep)
+			rule.add_child(sep)
+			root.add_child(rule)
 		root.add_child(built[0] as Control)
 		root.modulate.a = 0.0
 		_line_box.add_child(root)
