@@ -524,6 +524,9 @@ func _process(_dt: float) -> void:
 			str((_sdrag_ghost as Control).global_position) if _sdrag_ghost != null else "无幽灵"])
 		_dbg_storage_flow("拖拽幽灵生成 global=%s size=%s cursor=%s" % [
 			str((_sdrag_ghost as Control).global_position), str((_sdrag_ghost as Control).size), at])
+		_dbg_storage_flow("鼠标坐标对照 os=%s win=%s viewport=%s desk=%s" % [
+			DisplayServer.mouse_get_position(), get_window().position,
+			get_viewport().get_mouse_position(), _desk.get_global_mouse_position()])
 	else:
 		_sdrag_ghost.position = _sdrag_ghost_position(at)
 		if _dbg_trace_key != "":
