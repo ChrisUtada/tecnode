@@ -506,7 +506,7 @@ func _process(_dt: float) -> void:
 	if _card_mirror != null and is_instance_valid(_card_mirror):
 		_dbg_storage_flow("行拖拽期间发现残留卡片镜像，强制移除")
 		_drop_card_mirror(null)
-	var at := _desk.get_global_mouse_position()
+	var at := _cursor_viewport_pos()
 	if not _sdrag_started:
 		if at.distance_to(_sdrag_origin) < 5.0:
 			if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
@@ -541,6 +541,8 @@ func _process(_dt: float) -> void:
 		var mapped := st.affine_inverse() * Vector2(DisplayServer.mouse_get_position())
 		_dbg_storage_flow("屏幕变换 st=%s os=%s mapped=%s viewport_mouse=%s" % [
 			st, DisplayServer.mouse_get_position(), mapped, vp.get_mouse_position() if vp != null else "no-vp"])
+		_dbg_storage_flow("光标映射 normal=%s corrected=%s" % [
+			_desk.get_global_mouse_position(), at])
 	else:
 		if _sdrag_ghost != null and is_instance_valid(_sdrag_ghost):
 			_sdrag_ghost.position = _sdrag_ghost_position(at)
@@ -571,6 +573,21 @@ func _dbg_storage_flow(text: String) -> void:
 		_log(line, "sys")
 
 
+## 光标在视口内的位置；优先用 OS 光标 + 视口→屏幕变换校准。
+## 独立窗口通常两者一致；嵌入运行 / 窗口缩放时可能不一致，后者会导致
+## 「Godot 鼠标坐标等于幽灵坐标，但屏幕上幽灵离真实光标很远」。
+func _cursor_viewport_pos() -> Vector2:
+	var normal := _desk.get_global_mouse_position() if _desk != null else get_viewport().get_mouse_position()
+	if DisplayServer.get_name() == "headless":
+		return normal
+	var vp := get_viewport()
+	if vp == null or not vp.has_method("get_screen_transform"):
+		return normal
+	var st: Transform2D = vp.get_screen_transform()
+	var mapped := st.affine_inverse() * Vector2(DisplayServer.mouse_get_position())
+	return mapped if mapped.distance_to(normal) > 2.0 else normal
+
+
 func _storage_win_of(key: String) -> Control:
 	if _bag_win != null and is_instance_valid(_bag_win) and (_bag_win as StorageWin).items().has(key):
 		return _bag_win
@@ -592,6 +609,7 @@ func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void
 		_drop_card_mirror(null)
 	_drop_sdrag_card_mirror()
 	_sdrag_key = key
+	at_global = _cursor_viewport_pos()
 	_sdrag_from = from_kind
 	_sdrag_origin = at_global
 	_sdrag_started = false
