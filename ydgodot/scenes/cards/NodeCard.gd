@@ -649,6 +649,8 @@ func set_over(on: bool) -> void:
 ## 直接把卡片放到某处（收纳取回 / 布局）。**必须掐掉还在跑的弹回补间** ——
 ## 否则补间每帧继续往旧 `_home` 写位置，刚摆好的落点当场被拽回去（实测差 60×27px）。
 func set_home(p: Vector2) -> void:
+	_debug_event("set_home key=%s p=%s old_home=%s spring=%s pos=%s" % [
+		card_key, p, _home, str(_spring != null and _spring.is_valid()), position])
 	if _spring != null and _spring.is_valid():
 		_spring.kill()
 	_spring = null
@@ -789,12 +791,24 @@ func _clamp_pos(p: Vector2) -> Vector2:
 		clampf(q.y, 0.0, maxf(lim_y, 0.0)))
 
 
+## 临时诊断：同时写 Godot 输出面板；Desktop 会把它接到游戏日志（只跟当前诊断节点）。
+var debug_event := Callable()
+
+
+func _debug_event(text: String) -> void:
+	print("DBG 卡片：" + text)
+	if debug_event.is_valid():
+		debug_event.call(text)
+
+
 ## 弹回按下时的位置（三次缓出 300ms，对齐 Web 的 springBack）
 func spring_back() -> void:
+	_debug_event("spring_back key=%s target=%s pos=%s" % [card_key, _home, position])
 	_spring_to(_home)
 
 
 func _spring_to(target: Vector2) -> void:
+	_debug_event("spring_start key=%s from=%s target=%s" % [card_key, position, target])
 	if _spring != null and _spring.is_valid():
 		_spring.kill()
 	if position.is_equal_approx(target):
@@ -806,6 +820,7 @@ func _spring_to(target: Vector2) -> void:
 	_spring.finished.connect(func():
 		position = target
 		_home = target
+		_debug_event("spring_end key=%s target=%s" % [card_key, target])
 		spring_finished.emit(card_key))
 
 

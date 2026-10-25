@@ -475,8 +475,8 @@ func _process(_dt: float) -> void:
 		_dbg_trace_frames -= 1
 		var tc := _cards.get(_dbg_trace_key, null) as NodeCard
 		if tc != null:
-			var tsig := "pos=%s global=%s view=%s k=%.3f job=%s tween=%s scale=%s popping=%s stored=%s" % [
-				tc.position, tc.global_position, _view_pos, _view_k, str(_layout_job != null),
+			var tsig := "pos=%s global=%s home=%s view=%s k=%.3f job=%s tween=%s scale=%s popping=%s stored=%s" % [
+				tc.position, tc.global_position, tc._home, _view_pos, _view_k, str(_layout_job != null),
 				str(_move_twens.has(_dbg_trace_key)), str(tc.scale), str(tc.is_popping()),
 				str(graph != null and graph.stored.has(_dbg_trace_key))]
 			if tsig != _dbg_trace_last:
@@ -3598,6 +3598,9 @@ func _rebuild_from_graph(fit_camera := false) -> void:
 		if card != null and is_instance_valid(card):
 			card.node_data = n
 			card.visible = graph.visible_node(n)
+			if String(key) == _dbg_trace_key:
+				_dbg_storage_flow("重建写位 key=%s before=%s -> %s" % [
+					key, card.position, Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))])
 			card.position = Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
 			card.set_home_silent(card.position)
 			card.set_lod(_view_k)
@@ -3860,6 +3863,9 @@ func _spawn_card(key: String) -> NodeCard:
 	card.spring_finished.connect(_on_card_spring_finished)
 	_card_layer.add_child(card)
 	_cards[key] = card
+	card.debug_event = func(text: String) -> void:
+		if _dbg_trace_key == card.card_key:
+			_dbg_storage_flow("卡片 " + text)
 	_fresh_spawns.append(key)
 	## 新卡上画布时立刻对齐当前倍率，否则缩小状态下新出现的卡会带着「完整两行」出现
 	card.set_lod(_view_k)
@@ -3909,6 +3915,8 @@ func _seed_one(key: String) -> void:
 
 
 func _on_card_selected(key: String) -> void:
+	if _dbg_trace_key != "":
+		_dbg_storage_flow("上下文：选中 %s（诊断 %s）" % [key, _dbg_trace_key])
 	_selected = key
 	graph.selected = key
 	if graph.has_unread(key):
@@ -4666,6 +4674,8 @@ func _on_card_activated(key: String) -> void:
 	var n := graph.node(key)
 	if n.is_empty():
 		return
+	if _dbg_trace_key != "":
+		_dbg_storage_flow("上下文：激活 %s（诊断 %s）" % [key, _dbg_trace_key])
 	if _tutorial_active and _tutorial_on_activate(key):
 		return
 	var id := String(n["id"])
@@ -6462,6 +6472,9 @@ func _layout_signature() -> String:
 ## `force` = 用户显式要求「现在就按当前结构重排」（页眉开关）；测试伪造数据位时也用它。
 func _relayout(animated := false, force := false) -> void:
 	var sig := _layout_signature()
+	if _dbg_trace_key != "":
+		_dbg_storage_flow("重排调用 animated=%s force=%s sig_changed=%s trace=%s" % [
+			str(animated), str(force), str(sig != _layout_sig), _dbg_trace_key])
 	var new_keys := _fresh_spawns.duplicate()
 	_fresh_spawns.clear()
 	if force or sig != _layout_sig:
@@ -6571,6 +6584,9 @@ func _place_new_cards(keys: Array) -> void:
 			if clash:
 				continue
 			_kill_move(String(key))
+			if String(key) == _dbg_trace_key:
+				_dbg_storage_flow("重排落位 key=%s card_before=%s -> %s" % [
+					key, card.position, p])
 			n["x"] = p.x
 			n["y"] = p.y
 			card.set_home_silent(p)
@@ -6691,6 +6707,9 @@ func _apply_layout_job(animated: bool, progressive: bool) -> void:
 			continue
 		var before_pos: Vector2 = card.position
 		card.set_home_silent(p)
+		if String(key) == _dbg_trace_key and before_pos.distance_to(p) > 0.5:
+			_dbg_storage_flow("布局任务写位 key=%s before=%s -> %s progressive=%s animated=%s" % [
+				key, before_pos, p, str(progressive), str(animated)])
 		var fp: bool = bool(_layout_job.first_place.get(String(key), false))
 		if progressive or fp or not animated or _shot_mode() or before_pos.distance_to(p) < 2.0:
 			card.position = p
@@ -6707,6 +6726,8 @@ var _dbg_trace_last := ""
 
 
 func _start_move_tween(key: String, card: NodeCard, p: Vector2) -> void:
+	if key == _dbg_trace_key:
+		_dbg_storage_flow("启动位移补间 key=%s from=%s -> %s" % [key, card.position, p])
 	_kill_move(key)
 	var tw := card.create_tween()
 	tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
