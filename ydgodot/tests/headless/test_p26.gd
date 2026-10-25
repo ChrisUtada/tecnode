@@ -290,6 +290,25 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("sys 行正常字重 + ▍ 前缀", sys_row.begins_with("▍ ") and not sys_row.contains("[b]"), sys_row)
 	check("warn 行 ※ 前缀", warn_row.begins_with("※ "), warn_row)
 
+	# F7：日志窗打字机同一整数档位不重复写、不重复排队滚动；基准开关复现旧行为。
+	var log_lab := lw._rows[-1].get_node_or_null("log_text") as RichTextLabel
+	lw.set_process(false)
+	lw._start_typing(log_lab)
+	lw.set_process(false)
+	lw._process(0.0)
+	lw._process(0.0)
+	check("F7 日志窗同一档位不重复写", lw.dbg_typing_writes() == 0,
+		str(lw.dbg_typing_writes()))
+	lw.dbg_set_legacy_writes(true)
+	lw._start_typing(log_lab)
+	lw.set_process(false)
+	lw._process(0.0)
+	lw._process(0.0)
+	check("F7 日志窗基准开关复现逐帧写", lw.dbg_typing_writes() == 2,
+		str(lw.dbg_typing_writes()))
+	lw.dbg_set_legacy_writes(false)
+	lw._stop_typing()
+
 	# 5) 日志口径：只记结果，不记操作流水
 	# 展开一个「既不是时间锚点、TEC 也没有档案」的场景：一条都不该记
 	var n0: int = scene.graph.log_count()

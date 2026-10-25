@@ -3681,6 +3681,7 @@ func _repaint_edges() -> void:
 		if not _edge_card_shown(ca, a) or not _edge_card_shown(cb, b):
 			continue
 		segs.append({
+			"id": "e:" + a + ">" + b + "|" + String(e.get("rel", "entity")),
 			"a": ca.visual_center(), "b": cb.visual_center(),
 			"kind": String(e.get("rel", "entity")),
 			"dim": focus_sel != "" and a != focus_sel and b != focus_sel,
@@ -3697,6 +3698,7 @@ func _repaint_edges() -> void:
 		if not _edge_card_shown(ca, pair[0]) or not _edge_card_shown(cb, pair[1]):
 			continue
 		segs.append({
+			"id": "t:" + raw,
 			"a": ca.visual_center(), "b": cb.visual_center(), "kind": "tried",
 			"dim": focus_sel != "" and pair[0] != focus_sel and pair[1] != focus_sel,
 		})

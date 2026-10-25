@@ -26,8 +26,15 @@ const STYLE := {
 	"tried": {"color": TecTheme.EDGE_TRIED, "width": 1.0, "dash": 4.0, "gap": 4.0, "alpha": 1.0},
 }
 
-## [{a: Vector2, b: Vector2, kind: String, dim: bool}]
+## [{a: Vector2, b: Vector2, kind: String, dim: bool, id: String}]
 var _segments: Array = []
+## F2：按「边身份」缓存贝塞尔采样点。拖动时只有和被拖卡相连的几条边端点会变，
+## 其余静态边直接复用上一帧的 24 点折线，不再每帧全量重采样。
+## `_items` 是带 `pts` 的绘制项；`_segments` 保留原始输入供 segment_count / 调试。
+var _items: Array = []
+var _curve_cache: Dictionary = {}     # id -> {a, b, pts}
+var _curve_cache_on := true
+var _curve_builds := 0
 ## 拖动幽灵线（Web `08-interact.js:63`）：`{a, b}` 或空。从被拖节点的中心直连指针，
 ## C2 改为 2px 实线 + 末端箭头 —— 直线（不走贝塞尔）。
 var _ghost := {}
@@ -47,7 +54,59 @@ func _ready() -> void:
 
 func set_segments(segs: Array) -> void:
 	_segments = segs
+	var alive := {}
+	var next_items: Array = []
+	for raw in segs:
+		var s: Dictionary = raw
+		var a: Vector2 = s["a"]
+		var b: Vector2 = s["b"]
+		var sid := String(s.get("id", ""))
+		if sid == "":
+			sid = _fallback_id(a, b, String(s.get("kind", "entity")))
+		alive[sid] = true
+		var pts: PackedVector2Array
+		var cached: Dictionary = _curve_cache.get(sid, {})
+		if _curve_cache_on and not cached.is_empty() \
+				and (cached["a"] as Vector2).is_equal_approx(a) \
+				and (cached["b"] as Vector2).is_equal_approx(b):
+			pts = cached["pts"]
+		else:
+			pts = _curve(a, b)
+			_curve_builds += 1
+			_curve_cache[sid] = {"a": a, "b": b, "pts": pts}
+		## 直接写回本次新建的 segment 字典，避免每帧再 duplicate 一份。
+		s["pts"] = pts
+		next_items.append(s)
+	# 结构收缩时把旧边从缓存里清掉（60 条边规模，线性扫描足够便宜）。
+	for sid in _curve_cache.keys():
+		if not alive.has(sid):
+			_curve_cache.erase(sid)
+	_items = next_items
 	queue_redraw()
+
+
+func _fallback_id(a: Vector2, b: Vector2, kind: String) -> String:
+	return "%s|%s|%s" % [str(a), str(b), kind]
+
+
+## 基准 / 回归：临时关掉缓存等于回到 F2 之前的「每帧全量采样」。
+func dbg_set_curve_cache(on: bool) -> void:
+	_curve_cache_on = on
+	if not on:
+		_curve_cache.clear()
+	queue_redraw()
+
+
+func dbg_curve_builds() -> int:
+	return _curve_builds
+
+
+func dbg_reset_curve_builds() -> void:
+	_curve_builds = 0
+
+
+func dbg_curve_cache_size() -> int:
+	return _curve_cache.size()
 
 
 ## 相机倍率回灌（Desktop `_apply_view`）。只影响下一次重绘，不动几何。
@@ -90,13 +149,13 @@ func ghost_points() -> Dictionary:
 
 
 func _draw() -> void:
-	for raw in _segments:
+	for raw in _items:
 		var s: Dictionary = raw
 		var kind := String(s.get("kind", "entity"))
 		if not STYLE.has(kind):
 			kind = "entity"
 		var st: Dictionary = STYLE[kind]
-		var pts := _curve(s["a"], s["b"])
+		var pts: PackedVector2Array = s["pts"]
 		var col: Color = st["color"]
 		var alpha: float = float(st["alpha"]) * (0.12 if bool(s.get("dim", false)) else 1.0)
 		col.a = alpha

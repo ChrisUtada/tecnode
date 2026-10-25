@@ -442,5 +442,42 @@ func _test_desktop(c: CaseLoader) -> void:
 		check("A7 关闭矩阵后覆盖卡恢复", probe.modulate.a == 1.0, str(probe.modulate.a))
 		probe.global_position = saved_global
 
+	# F2：EdgeLayer 按边身份缓存贝塞尔采样点，只重采样端点真的变了的边。
+	var el := EdgeLayer.new()
+	el.size = Vector2(1000.0, 800.0)
+	root.add_child(el)
+	var fsegs: Array = []
+	for i in 10:
+		fsegs.append({
+			"id": "e:%d" % i,
+			"a": Vector2(20.0 + i * 10.0, 30.0 + i * 6.0),
+			"b": Vector2(300.0 + i * 10.0, 120.0 + i * 6.0),
+			"kind": "entity", "dim": false,
+		})
+	el.dbg_set_curve_cache(true)
+	el.set_segments(fsegs)
+	check("F2 首帧建满 10 条曲线", el.dbg_curve_builds() == 10, str(el.dbg_curve_builds()))
+	el.dbg_reset_curve_builds()
+	el.set_segments(fsegs)
+	check("F2 端点没变：0 次重采样", el.dbg_curve_builds() == 0, str(el.dbg_curve_builds()))
+	fsegs[0]["dim"] = true
+	el.set_segments(fsegs)
+	check("F2 只改 dim 不重采样", el.dbg_curve_builds() == 0, str(el.dbg_curve_builds()))
+	fsegs[0]["a"] = Vector2(25.0, 35.0)
+	el.set_segments(fsegs)
+	check("F2 只有移动的 1 条边重采样", el.dbg_curve_builds() == 1,
+		str(el.dbg_curve_builds()))
+	fsegs.remove_at(1)
+	el.set_segments(fsegs)
+	check("F2 删边后缓存收缩", el.dbg_curve_cache_size() == 9,
+		str(el.dbg_curve_cache_size()))
+	check("F2 segment_count 跟随输入", el.segment_count() == 9, str(el.segment_count()))
+	el.dbg_set_curve_cache(false)
+	el.dbg_reset_curve_builds()
+	el.set_segments(fsegs)
+	check("F2 关缓存复现旧版全量采样", el.dbg_curve_builds() == 9,
+		str(el.dbg_curve_builds()))
+	el.queue_free()
+
 	scene.queue_free()
 	await process_frame

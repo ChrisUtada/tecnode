@@ -696,6 +696,24 @@ func _initialize() -> void:
 		absf(tw.get_combined_minimum_size().y - ref.get_combined_minimum_size().y) < 0.5,
 		"打字 %.1f / 全文 %.1f（宽 %.0f）" % [tw.get_combined_minimum_size().y,
 			ref.get_combined_minimum_size().y, tw.size.x])
+	# F7：同一整数档位不重复写 visible_characters；基准开关能复现旧行为。
+	tw.set_process(false)
+	tw.start_typing()
+	tw.set_process(false)
+	tw.dbg_reset_visible_writes()
+	tw._process(0.0)
+	tw._process(0.0)
+	check("F7 打字机同一档位不重复写", tw.dbg_visible_writes() == 0,
+		str(tw.dbg_visible_writes()))
+	tw.dbg_set_legacy_writes(true)
+	tw.start_typing()
+	tw.set_process(false)
+	tw.dbg_reset_visible_writes()
+	tw._process(0.0)
+	tw._process(0.0)
+	check("F7 基准开关复现旧版逐帧写", tw.dbg_visible_writes() == 2,
+		str(tw.dbg_visible_writes()))
+	tw.dbg_set_legacy_writes(false)
 	tbox.queue_free()
 
 	## 7c1e) 叙事卡：底板盖满整窗 + 按全文增高。长文打字期间若只长一点，

@@ -7,6 +7,12 @@ const CHAR_MS := 45.0
 
 var _typing := false
 var _shown := 0.0
+## F7：整数档位。45ms/字在 60fps 下约 2.7 帧才进一格，
+## 旧版每帧都写 `visible_characters`，约 63% 的写入是同一个值（白白触发 Label 重排）。
+var _shown_n := -1
+var _visible_writes := 0
+## 基准用：强制回到 F7 之前的「每帧写同一个整数档位」。
+var _legacy_writes := false
 var _reserve_h := 0.0
 ## 单字耗时（毫秒）。开始界面标题这类「缓进」场合调慢，其余默认 45ms。
 var char_ms := CHAR_MS
@@ -24,6 +30,8 @@ func configure(p_text: String, p_size: int = 12, p_color: Color = Color.BLACK) -
 	visible_characters = -1
 	_typing = false
 	_shown = 0.0
+	_shown_n = -1
+	_visible_writes = 0
 	set_process(false)
 	_update_reserve()
 
@@ -36,6 +44,7 @@ func start_typing(p_text: String = "") -> void:
 		return
 	_update_reserve()
 	_shown = 0.0
+	_shown_n = 0
 	visible_characters = 0
 	_typing = true
 	set_process(true)
@@ -43,6 +52,7 @@ func start_typing(p_text: String = "") -> void:
 
 func finish_typing() -> void:
 	visible_characters = -1
+	_shown_n = -1
 	if not _typing:
 		return
 	_typing = false
@@ -114,5 +124,20 @@ func _process(delta: float) -> void:
 	var n := int(_shown)
 	if n >= text.length():
 		finish_typing()
-	else:
+	elif _legacy_writes or n != _shown_n:
+		_shown_n = n
+		_visible_writes += 1
 		visible_characters = n
+
+
+## 测试 / 基准：实际写入 `visible_characters` 的次数（F7 的冗余写入指标）。
+func dbg_visible_writes() -> int:
+	return _visible_writes
+
+
+func dbg_reset_visible_writes() -> void:
+	_visible_writes = 0
+
+
+func dbg_set_legacy_writes(on: bool) -> void:
+	_legacy_writes = on

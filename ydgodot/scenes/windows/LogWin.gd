@@ -23,6 +23,12 @@ var _log_sig := ""
 var _typing_lab: RichTextLabel
 var _typing_total := 0
 var _typing_shown := 0.0
+## F7：整数档位缓存。旧版每帧写 `visible_characters` 并 deferred 滚到底；
+## 60fps 下同一个字会被重复写约 2.7 次，滚动指令也会重复排队。
+var _typing_n := -1
+var _typing_writes := 0
+## 基准用：强制回到 F7 之前的「每帧写 + 每帧滚动」。
+var _legacy_writes := false
 
 
 ## h 是 **body 高**。Web `.log-win .log-body{max-height:340px}`，body 还要扣掉标题栏 23
@@ -84,6 +90,8 @@ func _start_typing(lab: RichTextLabel) -> void:
 		return
 	_typing_lab = lab
 	_typing_shown = 0.0
+	_typing_n = 0
+	_typing_writes = 0
 	lab.visible_characters = 0
 	set_process(true)
 
@@ -94,6 +102,7 @@ func _stop_typing() -> void:
 	_typing_lab = null
 	_typing_total = 0
 	_typing_shown = 0.0
+	_typing_n = -1
 	set_process(false)
 
 
@@ -106,6 +115,10 @@ func _process(delta: float) -> void:
 	if n >= _typing_total:
 		_stop_typing()
 		return
+	if not _legacy_writes and n == _typing_n:
+		return
+	_typing_n = n
+	_typing_writes += 1
 	_typing_lab.visible_characters = n
 	_scroll_to_end()
 
@@ -168,6 +181,23 @@ func _scroll_to_end() -> void:
 
 
 ## ── 测试钩子 ──────────────────────────────────────────────────────────
+## F7：`visible_characters` 实际写入次数 / 当前整数档位。
+func dbg_typing_writes() -> int:
+	return _typing_writes
+
+
+func dbg_typing_n() -> int:
+	return _typing_n
+
+
+func dbg_set_legacy_writes(on: bool) -> void:
+	_legacy_writes = on
+
+
+func dbg_is_typing() -> bool:
+	return _typing_lab != null and is_instance_valid(_typing_lab)
+
+
 func entry_count() -> int:
 	return _rows.size()
 
