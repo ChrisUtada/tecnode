@@ -155,6 +155,16 @@ func _test_migration(c: CaseLoader) -> void:
 	GardenSystem.normalize(g2, c)
 	check("旧档有株回填 narr", String(g2.garden.get("narr", "")) == GardenSystem.true_ending_message(c))
 
+	# S5：旧版「遮罩期间退出」留下的档——结局在、garden 字段在但 seed=false 且无株。
+	var g3 := GraphState.new(c)
+	g3.endings["TRUE_E"] = true
+	g3.garden = {"seed": false, "plots": []}
+	var g3n := GardenSystem.normalize(g3, c)
+	check("S5 旧档补回丢失的真名种子", bool(g3n.get("seed", false)), str(g3n))
+	check("S5 旧档补种同时补 narr",
+		String(g3n.get("narr", "")) == GardenSystem.true_ending_message(c),
+		String(g3n.get("narr", "")))
+
 
 func _test_desktop(c: CaseLoader) -> void:
 	print("--- P2.5 播放器 / 花园窗 / 存档 ---")
@@ -286,10 +296,28 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("停止清空曲目", String(st["current"]) == "" and not bool(st["playing"])
 		and not bool(st["paused"]), str(st))
 
+	# S4：先撤销一个和音乐无关的动作，播放器与音频必须原样保留。
+	check("S4 前置：重新播放", scene.dbg_music_play("Air_Bach"))
+	await process_frame
+	var torch_key: String = scene.dbg_ensure("item", "ITEM_shoudiantong")
+	await process_frame
+	scene.dbg_activate(torch_key)
+	await process_frame
+	check("S4 前置：无关操作进入撤销栈", scene.dbg_history_size() >= 1,
+		str(scene.dbg_history_size()))
+	check("S4 撤销无关操作", scene.dbg_undo())
+	await process_frame
+	st = scene.dbg_music_state()
+	check("S4 撤销无关操作后播放器还在", scene.dbg_music_win() != null)
+	check("S4 撤销无关操作不掐音乐",
+		bool(st["win_visible"]) and bool(st["playing"]), str(st))
+
+	# 撤销「装针」本身会让音乐重新锁定，此时收起播放器是正确语义；
+	# S4 只保证无关撤销不误伤正在播的歌。
 	check("撤销装针", scene.dbg_undo())
 	await process_frame
-	check("撤销后音乐图标隐藏", not scene.dbg_music_icon_visible())
-	check("撤销后播放器释放", scene.dbg_music_win() == null)
+	check("撤销装针后音乐图标隐藏", not scene.dbg_music_icon_visible())
+	check("撤销装针后播放器按锁定态释放", scene.dbg_music_win() == null)
 
 	check("真名结局可播", scene.dbg_ending() != null)
 	scene._hide_toast()

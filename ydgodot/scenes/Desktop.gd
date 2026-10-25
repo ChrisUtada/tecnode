@@ -2006,8 +2006,10 @@ func _on_ending_finished() -> void:
 		_log(msg, "sys")
 		_show_toast(msg)
 		return
-	GardenSystem.normalize(graph, case_def)
-	if not GardenSystem.grant_seed(graph, e.message, case_def):
+	## S5：正常路径的种子在 `_run_inference()` 已经发好；这里只做收幕后的展示。
+	## 保留 normalize / grant_seed 兜底（截图与调试钩子会直接播遮罩、不经过推演）。
+	var garden := GardenSystem.normalize(graph, case_def)
+	if not bool(garden.get("seed", false)) and not GardenSystem.grant_seed(graph, e.message, case_def):
 		return
 	_autosave()
 	_refresh_crumbs()
@@ -3280,12 +3282,9 @@ func _rebuild_from_graph() -> void:
 	GardenSystem.normalize(graph, case_def)
 	_refresh_people_win()
 	_refresh_log_win()
-	if _music_win != null and is_instance_valid(_music_win):
-		_music_win.queue_free()
-	_music_win = null
-	if _music_dock != null and is_instance_valid(_music_dock):
-		_music_dock.queue_free()
-	_music_dock = null
+	## S4：撤销 / 读档只重建画布，不碰音乐播放器。正在播的歌属于「玩家现场」，
+	## 不该因为撤销一个无关操作（点亮手电、收纳一件物品）被掐断。
+	## 真换案仍走 `_new_runtime()`，那里会正常释放播放器。
 	if _garden_win != null and is_instance_valid(_garden_win):
 		_garden_win.queue_free()
 	_garden_win = null
@@ -4720,6 +4719,10 @@ func _run_inference() -> void:
 	var before := _save.snapshot()
 	graph.mark_ending(hit.id)
 	_last_ending_id = hit.id
+	## S5：真名种子在「结局触发」这一刻就落进图与存档，收幕只是演出。
+	## 玩家在遮罩亮着时直接退出，下次读档也不会丢种子。
+	if hit.is_true_capture:
+		GardenSystem.normalize(graph, case_def)
 	if hit.is_true_capture and not _progress_read_only:
 		_catalog.mark_completed(_active_case)
 		if _catalog.unlock_next(_active_case):
@@ -4730,6 +4733,9 @@ func _run_inference() -> void:
 	_log("结局达成：%s" % hit.name, "cap")
 	_ending.play(hit)
 	_commit(before)
+	if hit.is_true_capture:
+		## 不等 180ms 合并窗：结局触发即落盘，遮罩期间退出也不丢种子。
+		_autosave()
 
 
 func _refresh_or_spawn_card(key: String) -> void:

@@ -41,8 +41,21 @@ static func normalize(graph: GraphState, case_def: CaseLoader = null) -> Diction
 	if not (g.get("plots", []) is Array):
 		g["plots"] = []
 	g["seed"] = bool(g.get("seed", false))
-	if missing and graph.endings.has("TRUE_E"):
+	## S5：真名结局一旦入账，种子就属于进度，不该等收幕按钮才发。
+	## 旧档（有结尾、garden 里 seed=false 且没有已种下的株）也在这里补发；
+	## 已种下的株（plots 非空）说明种子已经被消费，不再重复补。
+	var true_done := false
+	if case_def != null:
+		for e in case_def.endings:
+			if e != null and e.is_true_capture and graph.endings.has(e.id):
+				true_done = true
+				break
+	else:
+		true_done = graph.endings.has("TRUE_E")
+	if true_done and not bool(g["seed"]) and (g["plots"] as Array).is_empty():
 		g["seed"] = true
+		if String(g.get("narr", "")).strip_edges() == "" and case_def != null:
+			g["narr"] = true_ending_message(case_def)
 	var kept: Array = []
 	for raw in (g["plots"] as Array):
 		if not (raw is Dictionary):

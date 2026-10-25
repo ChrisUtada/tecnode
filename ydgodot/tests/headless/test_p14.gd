@@ -193,6 +193,15 @@ func _test_desktop_flow() -> void:
 	check("推演命中：结局开演", bool(st2["ending_visible"]))
 	check("推演命中：记录结局 TRUE_E", st2["ending_id"] == "TRUE_E" and (st2["endings"] as Array).has("TRUE_E"))
 	check("推演命中：真名镜头先震动", mw != null)
+	# S5：种子在结局触发时就要进图与快照，不能等收幕按钮。
+	check("S5 结局触发即发种子", bool(scene.graph.garden.get("seed", false)),
+		str(scene.graph.garden))
+	check("S5 种子的真名旁白同时写好",
+		String(scene.graph.garden.get("narr", "")) == GardenSystem.true_ending_message(c),
+		String(scene.graph.garden.get("narr", "")))
+	check("S5 快照里已带种子（遮罩期退出不丢）",
+		bool((scene._save.snapshot()["garden"] as Dictionary).get("seed", false)),
+		str(scene._save.snapshot()["garden"]))
 
 	var ending: EndingOverlay = scene.dbg_ending()
 	check("结局分幕共 4 幕", ending.total_lines() == 4, str(ending.total_lines()))

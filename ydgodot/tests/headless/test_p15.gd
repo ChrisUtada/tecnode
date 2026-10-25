@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_snapshot_roundtrip()
 	_test_restore_in_place()
 	_test_history()
+	_test_undo_knowledge()
 	_test_json_and_disk()
 	await _test_desktop()
 	_cleanup()
@@ -159,6 +160,50 @@ func _test_history() -> void:
 	check("撤销：挤掉最老的一步", int(ss.history[0]["step"]) == 5)
 	ss.clear_history()
 	check("撤销：清空历史", not ss.can_undo())
+
+
+# ── 3b. S8：撤销不把玩家知识退回快照 ───────────────────────────────────
+func _test_undo_knowledge() -> void:
+	var g := GraphState.new(c)
+	g.reveal_scene("SCENES_garden")
+	var key := g.scene_key("SCENES_garden")
+	g.node(key)["unread"] = true
+	g.card_seen["SCENES_0602"] = true
+	g.debuted["NPC_FB"] = true
+	var ss := SaveSystem.new(g, "a001")
+	var before := ss.snapshot()
+
+	# 玩家在快照之后：点掉新角标、认识新人物，同时给撤销一点图结构可回滚。
+	g.node(key)["unread"] = false
+	g.card_seen["SCENES_0602"] = false
+	g.card_seen["SCENES_0704"] = true
+	g.debuted["NPC_FB"] = false
+	g.debuted["CHARS_zs"] = true
+	g.add_node("item", "ITEMS_bd")
+	ss.push_history_snapshot(before)
+	check("S8 撤销成功", ss.undo())
+	check("S8 撤销保留「已读」：unread 不被快照复活",
+		not bool(g.node(key).get("unread", true)))
+	check("S8 撤销保留 cardSeen 当前值（true 与 false）",
+		not bool(g.card_seen.get("SCENES_0602", true))
+			and bool(g.card_seen.get("SCENES_0704", false)),
+		str(g.card_seen))
+	check("S8 撤销保留 debuted 当前值（true 与 false）",
+		not bool(g.debuted.get("NPC_FB", true))
+			and bool(g.debuted.get("CHARS_zs", false)),
+		str(g.debuted))
+	check("S8 图结构仍按快照回滚", not g.has("item", "ITEMS_bd"))
+
+	# 普通读档（非撤销）不能把当前知识并进旧档。
+	var g2 := GraphState.new(c)
+	g2.card_seen["SCENES_extra"] = true
+	g2.debuted["CHARS_extra"] = true
+	var ss2 := SaveSystem.new(g2, "a001")
+	check("S8 读档恢复成功", ss2.restore(before))
+	check("S8 读档按存档知识：不保留当前额外的 cardSeen/debuted",
+		not g2.card_seen.has("SCENES_extra") and not g2.debuted.has("CHARS_extra"),
+		str(g2.card_seen) + " / " + str(g2.debuted))
+	check("S8 读档恢复存档里的 unread", bool(g2.node(key).get("unread", false)))
 
 
 # ── 4. JSON / 磁盘存档往返 ──────────────────────────────────────────────

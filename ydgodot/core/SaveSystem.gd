@@ -72,12 +72,21 @@ func snapshot_json() -> String:
 	return JSON.stringify(snapshot())
 
 
-## 把快照写回当前 GraphState（原地恢复，外部持有的 graph 引用继续有效）
-func restore(s: Dictionary) -> bool:
+## 把快照写回当前 GraphState（原地恢复，外部持有的 graph 引用继续有效）。
+## `keep_knowledge` 只给撤销用：玩家知识（unread / cardSeen / debuted）以**当前值**为准，
+## 不让撤销把「已经看过 / 已经认识」退回旧档（S8）。普通读档仍按存档里的知识恢复。
+func restore(s: Dictionary, keep_knowledge := false) -> bool:
 	last_error = ""
 	if s.is_empty() or not (s.get("nodes") is Dictionary):
 		last_error = "快照缺少 nodes"
 		return false
+	var now_card_seen := graph.card_seen.duplicate(true) if keep_knowledge else {}
+	var now_debuted := graph.debuted.duplicate(true) if keep_knowledge else {}
+	var now_unread := {}
+	if keep_knowledge:
+		for raw_key in graph.nodes.keys():
+			var k := String(raw_key)
+			now_unread[k] = bool((graph.nodes[raw_key] as Dictionary).get("unread", false))
 	graph.nodes.clear()
 	graph.edges.clear()
 	graph.explored.clear()
@@ -177,6 +186,17 @@ func restore(s: Dictionary) -> bool:
 	for id in _as_array(s.get("endings", [])):
 		graph.endings[String(id)] = true
 
+	## S8：撤销时用**当前值**合并知识，而不是让快照覆盖；
+	## 当前值里显式 false 的条目也照样覆盖（与 Web 的 Object.assign 同口径）。
+	if keep_knowledge:
+		for key in now_card_seen.keys():
+			graph.card_seen[String(key)] = bool(now_card_seen[key])
+		for key in now_debuted.keys():
+			graph.debuted[String(key)] = bool(now_debuted[key])
+		for key in now_unread.keys():
+			if graph.nodes.has(key):
+				graph.nodes[key]["unread"] = bool(now_unread[key])
+
 	graph.recompute_hidden()
 	return true
 
@@ -224,7 +244,7 @@ func can_undo() -> bool:
 func undo() -> bool:
 	if history.is_empty():
 		return false
-	return restore(history.pop_back() as Dictionary)
+	return restore(history.pop_back() as Dictionary, true)
 
 
 func clear_history() -> void:
