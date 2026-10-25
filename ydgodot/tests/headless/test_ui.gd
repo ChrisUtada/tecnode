@@ -31,6 +31,15 @@ func _initialize() -> void:
 	check("桌面建起来了", scene != null and scene.dbg_state()["cards"] == 1, str(scene.dbg_state()))
 	check("开局只有一张卡：未探索的起始场景（Web `17-boot.js` 同口径）",
 		_cards().size() == 1 and _cards().has("loc:SCENES_garden"), str(_cards().keys()))
+	var initial_card: NodeCard = _cards()["loc:SCENES_garden"]
+	var initial_global := initial_card.global_position
+	await process_frame
+	await process_frame
+	check("初始卡不播 pop、不上下偏移",
+		not initial_card.is_popping()
+			and initial_card.global_position.is_equal_approx(initial_global),
+		"pop=%s global=%s -> %s" % [initial_card.is_popping(),
+			initial_global, initial_card.global_position])
 
 	# 相机钉在 1x 原生格：本文件所有点击/坐标断言都是按「世界坐标 → 屏幕」1:1 写的。
 	# `_view_user = true` 同时关掉 `_relayout` 的自动 fit，否则每加一个节点镜头都会重缩。

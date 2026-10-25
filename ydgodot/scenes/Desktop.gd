@@ -3812,7 +3812,9 @@ func _spawn_card(key: String) -> NodeCard:
 	if bool(n.get("fresh", false)):
 		graph.consume_fresh(key)
 		## 教学期新节点不做 0.2s 的 pop 淡入：卡片和连线要同帧出现，避免「线慢一拍」。
-		if not _shot_mode() and not _tutorial_active:
+		## 首次铺场（`_layout_sig` 仍为空）也不弹：花园卡会先 pop 再被布局推一下，
+		## 视觉上就是上下偏移；初始画面应当直接静止在最终位置。
+		if not _shot_mode() and not _tutorial_active and _layout_sig != "":
 			card.pivot_offset = card.size * 0.5
 			card.play_pop()
 			## pop 期间连线不能停在旧端点；接下来半秒逐帧重画。
@@ -6418,7 +6420,9 @@ func _relayout(animated := false, force := false) -> void:
 					moving.append(k)
 			_place_new_cards(moving)
 		else:
-			_layout_force(animated, force)
+			## 首次铺场 / 重置：一次算完并落位，不要分帧「飘过去」。
+			## 否则花园卡会先被 pop 缩放、再被力导向逐帧推几像素，看起来像上下抖。
+			_layout_force(animated, force or initial)
 			## 自动档才重框；玩家自己调过镜头（滚轮 / 拖空白 / 定位某张卡）就别动他的视野，
 			## 否则每加一个节点、镜头就被拉开一次 —— 刚放大到某张卡细看时会像「被抢走」。
 			if _opt_reveal and not _view_user:
