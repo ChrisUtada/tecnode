@@ -2174,6 +2174,13 @@ func _initialize() -> void:
 			"%d / %d" % [new_titles, new_cards])
 		check("展开容器：连线立即出现", scene._edge_layer.segment_count() > 0,
 			str(scene._edge_layer.segment_count()))
+		var edge_fades := false
+		for raw in scene._edge_layer._segments:
+			var seg: Dictionary = raw
+			if float(seg.get("alpha", 1.0)) < 0.95:
+				edge_fades = true
+				break
+		check("展开容器：连线随节点同步淡入（不先出线）", edge_fades)
 		var stage_r: Rect2 = scene._stage.get_global_rect()
 		var all_visible := true
 		for key in _cards().keys():

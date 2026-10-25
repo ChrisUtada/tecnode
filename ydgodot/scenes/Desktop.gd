@@ -3979,6 +3979,15 @@ func _edge_card_shown(card: NodeCard, key: String) -> bool:
 	return shown and (card.modulate.a > 0.0 or card.is_popping())
 
 
+## 边的可见度跟随端点卡片的 pop alpha；普通卡恒为 1。
+func _edge_card_alpha(card: NodeCard) -> float:
+	if card == null or not is_instance_valid(card):
+		return 0.0
+	if card.is_popping():
+		return clampf(card.modulate.a, 0.0, 1.0)
+	return 1.0
+
+
 func _repaint_edges() -> void:
 	_edges_dirty = false
 	if _edge_layer == null or graph == null:
@@ -4000,6 +4009,7 @@ func _repaint_edges() -> void:
 			"a": ca.visual_center(), "b": cb.visual_center(),
 			"kind": String(e.get("rel", "entity")),
 			"dim": focus_sel != "" and a != focus_sel and b != focus_sel,
+			"alpha": minf(_edge_card_alpha(ca), _edge_card_alpha(cb)),
 		})
 	# 「试过但没成」的边：Web 把它们当 kind=tried 的边画（`graph.tried` 里是 a>b 的字符串键）
 	for raw in graph.tried.keys():
@@ -4016,6 +4026,7 @@ func _repaint_edges() -> void:
 			"id": "t:" + raw,
 			"a": ca.visual_center(), "b": cb.visual_center(), "kind": "tried",
 			"dim": focus_sel != "" and pair[0] != focus_sel and pair[1] != focus_sel,
+			"alpha": minf(_edge_card_alpha(ca), _edge_card_alpha(cb)),
 		})
 	_edge_layer.set_segments(segs)
 

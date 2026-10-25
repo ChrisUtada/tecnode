@@ -158,6 +158,8 @@ func _draw() -> void:
 		var pts: PackedVector2Array = s["pts"]
 		var col: Color = st["color"]
 		var alpha: float = float(st["alpha"]) * (0.12 if bool(s.get("dim", false)) else 1.0)
+		## 入场 pop 期间按两端卡片的最低不透明度淡入：避免「线先出现、节点后出现」。
+		alpha *= clampf(float(s.get("alpha", 1.0)), 0.0, 1.0)
 		col.a = alpha
 		if float(st["dash"]) > 0.0:
 			_draw_dashed(pts, col, _w(float(st["width"])), _w(float(st["dash"])), _w(float(st["gap"])))
