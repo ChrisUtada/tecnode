@@ -157,7 +157,6 @@ var _sdrag_from := ""
 var _sdrag_origin := Vector2.ZERO
 var _sdrag_started := false
 var _sdrag_ghost: PanelContainer = null
-var _sdrag_card_mirror: NodeCard = null
 var _sdrag_label := ""
 ## 桌面图标的单击/双击（双击才开窗）
 var _icon_sel: DeskIcon = null
@@ -519,17 +518,24 @@ func _process(_dt: float) -> void:
 				_take_from_store(clicked, "")
 			return
 		_sdrag_started = true
-		_make_sdrag_card_mirror(at)
-		_dbg_storage_flow("拖拽开始 key=%s origin=%s at=%s card_mirror=%s size=%s" % [
+		_sdrag_ghost = _make_drag_ghost(_sdrag_label)
+		if _sdrag_ghost != null:
+			_sdrag_ghost.position = _sdrag_ghost_position(at)
+		_dbg_storage_flow("拖拽开始 key=%s origin=%s at=%s ghost=%s size=%s" % [
 			_sdrag_key, _sdrag_origin, at,
-			str(_sdrag_card_mirror.global_position) if _sdrag_card_mirror != null else "无镜像",
-			str(_sdrag_card_mirror.size) if _sdrag_card_mirror != null else "-"])
+			str(_sdrag_ghost.global_position) if _sdrag_ghost != null else "无幽灵",
+			str(_sdrag_ghost.size) if _sdrag_ghost != null else "-"])
 		_dbg_storage_flow("鼠标坐标对照 os=%s win=%s viewport=%s desk=%s scale=%s window=%s" % [
 			DisplayServer.mouse_get_position(), get_window().position,
 			get_viewport().get_mouse_position(), _desk.get_global_mouse_position(),
 			str(DisplayServer.screen_get_scale()), str(get_window().size)])
 	else:
-		_sync_sdrag_card_mirror(at)
+		if _sdrag_ghost != null and is_instance_valid(_sdrag_ghost):
+			_sdrag_ghost.position = _sdrag_ghost_position(at)
+			var gd := (_sdrag_ghost.global_position - at).length()
+			if _dbg_trace_key != "" and gd > 4.0:
+				_dbg_storage_flow("幽灵偏移 global=%s cursor=%s delta=%.1f" % [
+					_sdrag_ghost.global_position, at, gd])
 	_update_drop_over(at)
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_dbg_storage_flow("松手 key=%s at=%s started=%s" % [_sdrag_key, at, _sdrag_started])
@@ -621,7 +627,6 @@ func _sdrag_cancel() -> void:
 	_sdrag_from = ""
 	_sdrag_started = false
 	_sdrag_label = ""
-	_drop_sdrag_card_mirror()
 	if _sdrag_ghost != null and is_instance_valid(_sdrag_ghost):
 		_sdrag_ghost.queue_free()
 	_sdrag_ghost = null
@@ -629,8 +634,8 @@ func _sdrag_cancel() -> void:
 
 
 ## 行拖拽时用整张卡片的镜像跟着光标走：玩家看到的是「节点」而不是一个小标签。
+## （当前已改回小标签；保留函数便于以后切换视觉，不再参与主路径。）
 func _make_sdrag_card_mirror(at: Vector2) -> void:
-	_drop_sdrag_card_mirror()
 	var src := _cards.get(_sdrag_key, null) as NodeCard
 	if src == null or _desk == null:
 		return
@@ -639,35 +644,27 @@ func _make_sdrag_card_mirror(at: Vector2) -> void:
 		return
 	_desk.add_child(mirror)
 	_place_z(mirror, ZR_MIRROR)
-	_sdrag_card_mirror = mirror
 	_sync_sdrag_card_mirror(at)
 
 
-func _sync_sdrag_card_mirror(at: Vector2) -> void:
-	if _sdrag_card_mirror == null or not is_instance_valid(_sdrag_card_mirror):
-		return
-	var sc := maxf(_view_k, 0.01)
-	_sdrag_card_mirror.scale = Vector2(sc, sc)
-	_sdrag_card_mirror.global_position = at - _sdrag_card_mirror.size * sc * 0.5
+func _sync_sdrag_card_mirror(_at: Vector2) -> void:
+	pass
 
 
 func _drop_sdrag_card_mirror() -> void:
-	if _sdrag_card_mirror != null and is_instance_valid(_sdrag_card_mirror):
-		_sdrag_card_mirror.queue_free()
-	_sdrag_card_mirror = null
+	pass
 
 
 ## 松手结算：另一个收纳窗 → 推演桌布 / 推演器图标 → 画布（落在松手那一点）→ 都不中：回去
 func _finish_sdrag(at: Vector2) -> void:
 	var key := _sdrag_key
 	var card0 := _cards.get(key, null) as NodeCard
-	var mirror0 := _sdrag_card_mirror
-	## 行拖结算前再清一次镜像：绝不能让它和真实卡片同时出现在画布层。
-	_dbg_storage_flow("松手结算 key=%s at=%s stored=%s card=%s visible=%s mirror=%s" % [
+	var ghost0 := _sdrag_ghost
+	_dbg_storage_flow("松手结算 key=%s at=%s stored=%s card=%s visible=%s ghost=%s" % [
 		key, at, str(graph != null and graph.stored.has(key)) if graph != null else "no-graph",
 		str(card0.position) if card0 != null else "无卡",
 		str(card0.visible) if card0 != null else "-",
-		str((mirror0 as Control).global_position) if mirror0 != null and is_instance_valid(mirror0) else "无镜像"])
+		str((ghost0 as Control).global_position) if ghost0 != null and is_instance_valid(ghost0) else "无幽灵"])
 	_sdrag_cancel()
 	if key == "" or graph == null or not graph.stored.has(key):
 		_dbg_storage_flow("放弃：key 为空 / 已不在袋中")
@@ -700,10 +697,9 @@ func _finish_sdrag(at: Vector2) -> void:
 	var world := (at - _stage.get_global_position() - _view_pos) / maxf(_view_k, 0.01)
 	world.x = maxf(0.0, world.x)
 	world.y = maxf(0.0, world.y)
-	## 行拖拽的视觉预览是整张卡片镜像，光标在卡片中心；落位也用中心对齐。
+	## 行拖拽的视觉预览是小标签，左上角贴光标；落位也用左上角对齐，保证视觉连续。
 	var place := world
 	if card0 != null:
-		place -= card0.size * 0.5
 		place.x = clampf(place.x, 0.0, maxf(0.0, WORLD_W - card0.size.x))
 		place.y = clampf(place.y, 0.0, maxf(0.0, WORLD_H - card0.size.y))
 	_dbg_storage_flow("画布落点 world=%s place=%s view=%s k=%.3f node_before=(%.1f,%.1f) card_before=%s" % [
