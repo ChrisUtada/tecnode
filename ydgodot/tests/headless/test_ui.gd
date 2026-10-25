@@ -442,7 +442,7 @@ func _initialize() -> void:
 				continue
 			if String(scene.graph.node(raw_key).get("kind", "")) != "item":
 				continue
-			if scene.graph.is_container_node(raw_key):
+			if scene.graph.is_container_node(raw_key) or not scene.graph.can_bag(raw_key):
 				continue
 			drop_card = c
 			break
@@ -1017,6 +1017,11 @@ func _initialize() -> void:
 	check("已探索的花园不挂药丸", (_cards()["loc:SCENES_garden"] as NodeCard)._warn == false)
 
 	# 15) V4 pop：fresh 节点初生 0.4→1.12→1（0.45s）；fresh 一次性消费、「新」角标保留
+	## 推演窗还开着时，新卡可能被遮挡层冻结 process；先收掉再验入场动画。
+	if scene._matrix_win != null and is_instance_valid(scene._matrix_win):
+		scene._toggle_matrix()
+		await process_frame
+	scene._hide_toast()
 	var pop_key: String = scene.dbg_ensure("clue", "CLUES_wmhj")
 	await process_frame
 	var pop_card: NodeCard = _cards().get(pop_key, null)
@@ -1108,18 +1113,27 @@ func _initialize() -> void:
 		mir != null and mir.global_position.is_equal_approx(torch4.get_global_position()),
 		str(mir.global_position if mir != null else Vector2.ZERO))
 	check("拖起：被拖卡的连线照常画", edges4.segment_count() > 0, str(edges4.segment_count()))
+	check("拖起：幽灵线提升到窗体之上",
+		scene._drag_line != null and scene._drag_line.has_ghost()
+			and int(scene._drag_line.get_meta("zrank", 0)) > 25,
+		str(scene._drag_line.get_meta("zrank", 0)) if scene._drag_line != null else "null")
 	_release(torch4, m_blank)
 	await process_frame
 	check("松手：镜像退场", scene._card_mirror == null)
+	check("松手：顶层幽灵线退场",
+		scene._drag_line == null or not scene._drag_line.has_ghost())
 	check("松手：原卡复位可见", torch4.visible)
 	check("松手：坐标写回数据（同第 12-18 节口径）",
 		absf(float(scene.graph.node(TORCH)["x"]) - torch4.position.x) < 0.5,
 		str(scene.graph.node(TORCH)["x"]) + " / " + str(torch4.position.x))
 	# 收掉推演窗与两扇收纳窗（S6/S7 起开着）：后面的交互章节要用整块画布，
 	# 别让 mx-board / bag-win / clue-win 拦走 _drop_targets 里的落点
-	scene._toggle_matrix()
-	scene._toggle_storage(GraphState.BAG)
-	scene._toggle_storage(GraphState.LEDGER)
+	if scene._matrix_win != null and is_instance_valid(scene._matrix_win):
+		scene._toggle_matrix()
+	if scene._bag_win != null and is_instance_valid(scene._bag_win):
+		scene._toggle_storage(GraphState.BAG)
+	if scene._ledger_win != null and is_instance_valid(scene._ledger_win):
+		scene._toggle_storage(GraphState.LEDGER)
 	mw = null
 	await process_frame
 
@@ -2115,6 +2129,53 @@ func _initialize() -> void:
 	check("G6 照片写进证件", scene._investigator.get("avatarId", "") == "CHARS_ANON")
 	Investigator.clear(scene._inv_path)
 
+	# 展开容器：旧卡不整体漂移、镜头不自动缩小，新卡保持完整标题。
+	var stable_sid := ""
+	for s in scene.case_def.scenes.values():
+		if not scene.graph.explored.has(s.id) and scene.case_def.nodes_of_scene(s).size() > 0:
+			stable_sid = s.id
+			break
+	if stable_sid != "":
+		scene.dbg_ensure("loc", stable_sid)
+		await process_frame
+		scene._view_k = 1.0
+		scene._view_user = true
+		scene._apply_view()
+		var stable_before: Dictionary = {}
+		for key in _cards().keys():
+			var c := _cards()[key] as NodeCard
+			if c != null and c.visible:
+				stable_before[String(key)] = c.position
+		var stable_k: float = scene._view_k
+		scene._toggle_container("loc", stable_sid)
+		await process_frame
+		await process_frame
+		var moved_cards: int = 0
+		for key in stable_before.keys():
+			var c := _cards().get(key, null) as NodeCard
+			if c != null and is_instance_valid(c) and c.visible \
+					and c.position.distance_to(stable_before[key]) > 0.5:
+				moved_cards += 1
+		check("展开容器：已有卡片不整体漂移", moved_cards == 0, str(moved_cards))
+		check("展开容器：镜头不自动缩放", absf(scene._view_k - stable_k) < 0.001,
+			"%f / %f" % [scene._view_k, stable_k])
+		var new_titles: int = 0
+		var new_cards: int = 0
+		for key in _cards().keys():
+			if stable_before.has(String(key)):
+				continue
+			var c := _cards()[key] as NodeCard
+			if c != null and c.visible:
+				new_cards += 1
+				if c._title.visible:
+					new_titles += 1
+		check("展开容器：新卡先显示完整文字", new_cards > 0 and new_titles == new_cards,
+			"%d / %d" % [new_titles, new_cards])
+		if scene._narr != null and is_instance_valid(scene._narr):
+			scene._narr.queue_free()
+			scene._narr = null
+			await process_frame
+
 	# ── W 组收口：图标边界 / 重叠命中 / 键盘 / 平移边界 / 镜像 LOD / G14 ──
 	# W7：窗口尺寸变化只同步拖动边界，不把玩家摆好的图标归位。
 	var w7_icon := scene._icon_by_app("tec") as DeskIcon
@@ -2145,6 +2206,11 @@ func _initialize() -> void:
 		w8_b.position = w8_a.position
 		w8_b.move_to_front()
 		var w8_pt: Vector2 = w8_b.get_global_rect().get_center()
+		for _i8 in 6:
+			if scene._floating_window_at(w8_pt) == null:
+				break
+			scene._close_top_window()
+		await process_frame
 		check("W8 重叠命中与高亮同为最上层卡",
 			w8_a._card_under(w8_pt) == w8_b.card_key
 				and scene._card_key_at(w8_pt) == w8_b.card_key,

@@ -6,6 +6,7 @@
 
 [resource]
 script = ExtResource("3_mddqt")
+baggable = false
 id = "ITEMS_ljt"
 label = "垃圾桶"
 desc = "书桌边的垃圾桶中堆积着不知从何而来的灰烬。"

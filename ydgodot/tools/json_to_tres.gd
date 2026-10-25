@@ -225,6 +225,7 @@ func _fill_item(r: Resource, d: Dictionary) -> void:
 	r.set("desc", String(d.get("desc", "")))
 	r.set("content", String(d.get("content", "")))
 	r.set("can_be_picked", bool(d.get("canBePicked", false)))
+	r.set("baggable", bool(d.get("baggable", true)))
 	r.set("toggle_light", bool(d.get("toggleLight", false)))
 	r.set("needs_lit_to_use", bool(d.get("needsLitToUse", false)))
 	r.set("lit_on_message", String(d.get("litOnMessage", "")))

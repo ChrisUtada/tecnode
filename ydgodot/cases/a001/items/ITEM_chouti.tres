@@ -37,6 +37,7 @@ label = "打开抽屉"
 
 [resource]
 script = ExtResource("3_moej5")
+baggable = false
 id = "ITEM_chouti"
 label = "抽屉"
 desc = "书桌的两个抽屉紧闭着，但没有上锁。"

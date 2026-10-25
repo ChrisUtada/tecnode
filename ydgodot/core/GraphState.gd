@@ -595,11 +595,24 @@ func is_container_node(key: String) -> bool:
 	return is_container(String(n["kind"]), String(n["id"]))
 
 
-## 收进证物袋：什么都收（容器除外）。记下来源，供袋清单标注「来自 ×××」。
-func bag_store(key: String) -> bool:
+## 证物袋准入：物品必须显式允许（ItemDef.baggable）。
+## 容器是否可收也走同一属性，不再靠「有没有子节点」隐式决定。
+func can_bag(key: String) -> bool:
 	var n := node(key)
-	if n.is_empty() or is_container_node(key) or stored.has(key):
+	if n.is_empty() or stored.has(key):
 		return false
+	## 旧版证物袋也收线索（再由 restash 搬去线索册）；非物品保持这条兼容路径。
+	if String(n.get("kind", "")) != "item":
+		return true
+	var it := case_def.item_of(String(n.get("id", "")))
+	return it != null and it.baggable
+
+
+## 收进证物袋：记下来源，供袋清单标注「来自 ×××」。
+func bag_store(key: String) -> bool:
+	if not can_bag(key):
+		return false
+	var n := node(key)
 	n["bag_from"] = String(n.get("home_scene", ""))
 	n["pinned"] = false
 	stored[key] = BAG

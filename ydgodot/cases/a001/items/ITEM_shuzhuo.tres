@@ -12,6 +12,7 @@ text = "书桌、台灯、笔记……所有的一切都覆盖着一层薄薄的
 
 [resource]
 script = ExtResource("5_cjx5b")
+baggable = false
 id = "ITEM_shuzhuo"
 label = "书桌"
 desc = "木制的书桌上堆放着大量手写笔记，在靠近桌子的边缘，有一盏老式台灯，从灯罩中伸出一条黄铜的链子，拉动它似乎可以点亮台灯。书桌的两个抽屉闭合着，没有上锁。桌脚处摆着一个堆满灰烬的垃圾桶。

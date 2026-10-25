@@ -30,6 +30,7 @@ label = "拉开帘幕"
 
 [resource]
 script = ExtResource("4_sd5m1")
+baggable = false
 id = "ITEM_lianmu"
 label = "黑色帘幕"
 desc = "遮住整个花园的帘幕，透不进一丝阳光。"

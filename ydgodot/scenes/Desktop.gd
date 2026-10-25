@@ -87,6 +87,8 @@ var _ui_built := false
 var _stage: Control
 var _card_layer: Control
 var _edge_layer: EdgeLayer
+## 拖动时的幽灵连线提升层：画在桌布根、所有系统窗之上（画布内的边仍留在 stage）。
+var _drag_line: EdgeLayer
 var _view_k := 1.0
 var _view_pos := Vector2.ZERO
 ## ── 相机倍率 ───────────────────────────────────────────────────────────────
@@ -101,6 +103,9 @@ const ZOOM_STEP := 1.12
 ## U1/W10：自动「适应窗口」只缩小不放大。1x 是点阵字唯一原生格倍率，
 ## 单卡开局顶到 1.3 会让玩家第一眼看到糊字。
 const FIT_MAX := 1.0
+## 自动 fit 的文字底线：0.95 = LOD_TITLE。自动构图只缩到这里，先保证卡片有完整标题；
+## 想看全局总览时玩家仍可滚轮手动缩小，或点调试面板的「适应窗口」。
+const FIT_TEXT_MIN := 0.95
 ## 吸附带：|k−1| < 6% 直接落到 1.0 —— 100% 是点阵字唯一绝对对齐原生格的倍率，
 ## 玩家从任意起点滚回来看上去「停在整」的位置，顺手就能拿到最锐利的那一档。
 const ZOOM_SNAP := 0.06
@@ -316,6 +321,8 @@ func _layout_root() -> void:
 	if _desk != null and is_instance_valid(_desk):
 		_desk.position = Vector2(0, HEADER_H)
 		_desk.size = Vector2(vw, vh - HEADER_H)
+	if _drag_line != null and is_instance_valid(_drag_line):
+		_drag_line.size = _desk.size
 	_resize_case_window(vw, vh)
 	if _detail_win != null and is_instance_valid(_detail_win):
 		_detail_win.place_right(vw)
@@ -1093,7 +1100,7 @@ func _goal_text() -> String:
 
 ## 「适应窗口」：按内容包围盒重新缩放居中。**不跑布局** —— 那会把玩家摆的位置全收回去。
 func _fit_view() -> void:
-	_fit_cards()
+	_fit_cards(false)
 
 
 ## 「检查可达性」：从当前切片场景出发沿连线走一遍，把走不到的画布节点报出来。
@@ -1188,6 +1195,10 @@ func _build_case_window() -> void:
 	_edge_layer = EdgeLayer.new()
 	_edge_layer.name = "edges"
 	_card_layer.add_child(_edge_layer)
+	_drag_line = EdgeLayer.new()
+	_drag_line.name = "drag_edges"
+	_desk.add_child(_drag_line)
+	_place_z(_drag_line, ZR_MIRROR - 1)
 
 
 ## 桌面图标栏（对齐 Web `ICON_LAYOUT`）：8 个常驻，左侧竖排、**可自由拖动**。
@@ -2475,6 +2486,7 @@ func _new_runtime() -> void:
 			_card_layer.remove_child(c)
 			c.queue_free()
 	_cards.clear()
+	_fresh_spawns.clear()
 	_layout_sig = ""            # 换案子 / 重开一局：卡片表清空，下次 `_relayout()` 必须真跑一次
 	graph = GraphState.new(case_def)
 	combos = ComboSystem.new(case_def, graph)
@@ -3534,9 +3546,11 @@ func _rebuild_from_graph(fit_camera := false) -> void:
 	_replay_unread_pops(fresh_before)
 	## S10：卡片全部重建后，推演桌布的遮挡淡出必须重算。
 	if _matrix_win != null and is_instance_valid(_matrix_win) and _matrix_win.visible:
-		_matrix_faded.clear()
+		## F3 之后卡片是复用的：先把旧遮罩恢复，再让 sync 重新淡出。
+		## 只 clear 不 restore 会把 process_mode=DISABLED 永久留在卡上。
 		_sync_matrix_occlusion.call_deferred()
 	# 读档 / 撤销后摆位是存档里那一份，不能被下一次互动的重排顺手推走 —— 签名就地认下来。
+	_fresh_spawns.clear()
 	_layout_sig = _layout_signature()
 	_refresh_matrix_views()
 	_last_ending_id = String(graph.endings.keys()[0]) if not graph.endings.is_empty() else ""
@@ -3649,6 +3663,8 @@ func _abort_card_drag() -> void:
 		_clear_drop_over()
 		if _edge_layer != null:
 			_edge_layer.clear_ghost()
+		if _drag_line != null and is_instance_valid(_drag_line):
+			_drag_line.clear_ghost()
 
 
 func _reset_camera() -> void:
@@ -3716,6 +3732,7 @@ func _despawn_card(key: String) -> void:
 	if card != null and is_instance_valid(card):
 		card.queue_free()
 	_cards.erase(key)
+	_fresh_spawns.erase(key)
 	if _selected == key:
 		_selected = ""
 		if graph != null:
@@ -3771,6 +3788,7 @@ func _spawn_card(key: String) -> NodeCard:
 	card.spring_finished.connect(_on_card_spring_finished)
 	_card_layer.add_child(card)
 	_cards[key] = card
+	_fresh_spawns.append(key)
 	## 新卡上画布时立刻对齐当前倍率，否则缩小状态下新出现的卡会带着「完整两行」出现
 	card.set_lod(_view_k)
 	# Web 的入场 pop：fresh 的节点初次上画布闪一下（`n.fresh` 渲染一次即被摘掉；
@@ -3846,6 +3864,8 @@ func _on_card_dragged(key: String) -> void:
 	# Godot 里用镜像卡承载「浮层」那份视觉，原件隐藏（连线仍然用它的 world 坐标）。
 	_drag_key = key
 	var card: NodeCard = _cards.get(key, null)
+	if _drag_line != null:
+		_drag_line.clear_ghost()
 	if card != null:
 		_mount_card_mirror(card)
 
@@ -3857,6 +3877,11 @@ func _on_card_drag_moved(key: String, at_global: Vector2) -> void:
 	if card != null and _edge_layer != null and _card_layer != null:
 		var world_at: Vector2 = _card_layer.get_global_transform().affine_inverse() * at_global
 		_edge_layer.set_ghost(card.visual_center(), world_at)
+		if _drag_line != null and is_instance_valid(_drag_line):
+			## 同一根幽灵线在桌布根再画一次：拖动时线要压在窗口/图标上，而不是被窗框盖住。
+			var inv := _drag_line.get_global_transform().affine_inverse()
+			var from_global: Vector2 = _card_layer.get_global_transform() * card.visual_center()
+			_drag_line.set_ghost(inv * from_global, inv * at_global)
 	_sync_card_mirror(card)
 	_update_drop_over(at_global)
 	_edges_dirty = true
@@ -3922,6 +3947,8 @@ func _on_card_drag_finished(key: String, pos: Vector2, handled: bool) -> void:
 	_clear_drop_over()
 	if _edge_layer != null:
 		_edge_layer.clear_ghost()
+	if _drag_line != null and is_instance_valid(_drag_line):
+		_drag_line.clear_ghost()
 	_repaint_edges()
 	var n := graph.node(key)
 	if n.is_empty():
@@ -4396,17 +4423,17 @@ func _store_into(where: String, key: String) -> void:
 		if not _tutorial_correct(already):
 			_reject_drop(already)
 		return
-	if graph.is_container_node(key):
-		var container_msg := "场景与容器收不进%s。" % target_name
-		if String(n["kind"]) == "item":
-			container_msg = "「%s」是现场的一部分，收不走；它装着的东西可以单独收。" \
-				% String(n.get("label", key))
-		if not _tutorial_correct(container_msg):
-			_reject_drop(container_msg)
-		return
 	if where == GraphState.BAG and String(n["kind"]) != "item":
 		if not _tutorial_correct("只有物品能进证物袋。"):
 			_reject_drop("只有物品能进证物袋。")
+		return
+	if where == GraphState.BAG and not graph.can_bag(key):
+		var bag_msg := "「%s」不能放进证物袋。" % String(n.get("label", key))
+		if graph.is_container_node(key):
+			bag_msg = "「%s」是现场的一部分，收不走；它装着的东西可以单独收。" \
+				% String(n.get("label", key))
+		if not _tutorial_correct(bag_msg):
+			_reject_drop(bag_msg)
 		return
 	if where == GraphState.LEDGER and String(n["kind"]) != "clue":
 		if not _tutorial_correct("只有线索能进线索册。"):
@@ -5923,6 +5950,9 @@ func _clear_archive_new() -> void:
 ## 对齐 Web `09-commands.js`：「开关灯只重绘（重排会让灯自己跳位置）」—— 那边只有真长出
 ## 新节点的分支才 `layout()`。
 var _layout_sig := ""
+## 本次重排新上画的 card_key。常规展开只给这些新卡找位置，不推动已有卡片、不自动缩镜头，
+## 保证玩家点开容器时先看到完整标题，而不是整屏缩成符号。
+var _fresh_spawns: Array = []
 ## F1：分帧力导向作业。非空时 _process 每帧推进几轮；无头 / 截图 / 手动重排仍一次跑完。
 ## 用 preload 而不是依赖全局 class_name，避免新脚本还没进 global_script_class_cache 时无头装载失败。
 const ForceLayoutScript = preload("res://core/ForceLayout.gd")
@@ -5954,21 +5984,133 @@ func _layout_signature() -> String:
 ## `force` = 用户显式要求「现在就按当前结构重排」（页眉开关）；测试伪造数据位时也用它。
 func _relayout(animated := false, force := false) -> void:
 	var sig := _layout_signature()
+	var new_keys := _fresh_spawns.duplicate()
+	_fresh_spawns.clear()
 	if force or sig != _layout_sig:
+		var initial := _layout_sig == ""
+		# 这次从隐藏变可见的旧卡（折叠容器重新展开）：它们也要按新卡处理，
+		# 否则 sig 变了但 new_keys 为空，会退回全量力导向把整屏推走。
+		var prev_visible := {}
+		for k in _layout_sig.split("|", false):
+			prev_visible[String(k)] = true
+		var shown_keys: Array = []
+		for key in _cards.keys():
+			var c: NodeCard = _cards[key]
+			if c != null and is_instance_valid(c) and c.visible and not prev_visible.has(String(key)):
+				shown_keys.append(String(key))
 		_layout_sig = sig
 		if _tutorial_active:
 			_layout_tutorial()
+		elif not force and not initial:
+			## 常规展开 / 折叠：现有卡片一张都不动，只把新出现 / 新上画的节点摆在触发卡周围。
+			## 不跑力导向、不 fit 镜头，标题保持 LOD 文字档。
+			var moving := new_keys.duplicate()
+			for k in shown_keys:
+				if not moving.has(k):
+					moving.append(k)
+			_place_new_cards(moving)
 		else:
 			_layout_force(animated, force)
-		## 自动档才重框；玩家自己调过镜头（滚轮 / 拖空白 / 定位某张卡）就别动他的视野，
-		## 否则每加一个节点、镜头就被拉开一次 —— 刚放大到某张卡细看时会像「被抢走」。
-		if _opt_reveal and not _view_user:
-			_fit_cards()
+			## 自动档才重框；玩家自己调过镜头（滚轮 / 拖空白 / 定位某张卡）就别动他的视野，
+			## 否则每加一个节点、镜头就被拉开一次 —— 刚放大到某张卡细看时会像「被抢走」。
+			if _opt_reveal and not _view_user:
+				_fit_cards()
 	_refresh_crumbs()
 	_sync_header_sizes()
 	_repaint_edges()
 	_reanchor_mem_card()
 	_sync_matrix_occlusion()
+
+
+## 常规展开的稳定落位：以触发卡为锚，把新卡摆在外圈，避开已经可见的卡片。
+## 不移动旧卡、不跑力导向、不自动 fit —— 点开容器时玩家先看到完整标题。
+func _place_new_cards(keys: Array) -> void:
+	if keys.is_empty() or _cards.is_empty():
+		return
+	var fresh := {}
+	for k in keys:
+		fresh[String(k)] = true
+	var anchor_key := ""
+	for key in fresh.keys():
+		for e in graph.edges:
+			var other := ""
+			if String(e.get("a", "")) == String(key):
+				other = String(e.get("b", ""))
+			elif String(e.get("b", "")) == String(key):
+				other = String(e.get("a", ""))
+			if other == "" or fresh.has(other):
+				continue
+			var c: NodeCard = _cards.get(other, null)
+			if c != null and is_instance_valid(c) and c.visible:
+				anchor_key = other
+				break
+		if anchor_key != "":
+			break
+	if anchor_key == "" and fresh.has(_selected):
+		anchor_key = _selected
+	var anchor_center := Vector2.ZERO
+	if anchor_key != "" and _cards.has(anchor_key):
+		anchor_center = (_cards[anchor_key] as NodeCard).visual_center()
+	else:
+		anchor_center = (_stage.size * 0.5 - _view_pos) / maxf(_view_k, 0.01)
+	var occupied: Array[Rect2] = []
+	for k in _cards.keys():
+		var c: NodeCard = _cards[k]
+		if c == null or not is_instance_valid(c) or not c.visible or fresh.has(String(k)):
+			continue
+		occupied.append(c.visual_rect())
+	var slots: Array[Vector2] = []
+	for ring in 3:
+		var radius := 230.0 + float(ring) * 150.0
+		for i in 8:
+			var ang := TAU * float(i) / 8.0 + float(ring) * 0.35
+			slots.append(Vector2(cos(ang), sin(ang)) * radius)
+	var slot_i := 0
+	for key in fresh.keys():
+		var card: NodeCard = _cards.get(String(key), null)
+		if card == null or not is_instance_valid(card):
+			continue
+		var n := graph.node(String(key))
+		if n.is_empty():
+			continue
+		var placed := false
+		for _try in slots.size():
+			var p: Vector2 = anchor_center + slots[slot_i % slots.size()]
+			slot_i += 1
+			p -= card.size * 0.5
+			p = Vector2(clampf(p.x, 64.0, WORLD_W - 224.0),
+				clampf(p.y, 56.0, WORLD_H - 120.0))
+			p = p.snapped(Vector2(8, 8))
+			var box := Rect2(p + Vector2(NodeCard.PAD, NodeCard.PAD),
+				card.size - Vector2(NodeCard.PAD * 2.0, NodeCard.PAD * 2.0))
+			var clash := false
+			for r in occupied:
+				if r.grow(10.0).intersects(box):
+					clash = true
+					break
+			if clash:
+				continue
+			_kill_move(String(key))
+			n["x"] = p.x
+			n["y"] = p.y
+			card.set_home_silent(p)
+			card.position = p
+			card.set_lod(_view_k)
+			occupied.append(card.visual_rect())
+			placed = true
+			break
+		if not placed:
+			# 极端拥挤：仍然落在锚点旁边，但不改旧卡位置。
+			var p: Vector2 = anchor_center + Vector2(230.0, 230.0) - card.size * 0.5
+			p = Vector2(clampf(p.x, 64.0, WORLD_W - 224.0),
+				clampf(p.y, 56.0, WORLD_H - 120.0)).snapped(Vector2(8, 8))
+			_kill_move(String(key))
+			n["x"] = p.x
+			n["y"] = p.y
+			card.set_home_silent(p)
+			card.position = p
+			card.set_lod(_view_k)
+	_repaint_edges()
 
 
 ## 教学桌面不做力导向：三张卡是 TEC 亲手摆的教学道具，位置必须稳定可预期，
@@ -6069,7 +6211,7 @@ func _kill_move(key: String) -> void:
 		_move_twens.erase(key)
 
 
-func _fit_cards() -> void:
+func _fit_cards(keep_titles := true) -> void:
 	if _card_layer == null:
 		return
 	var bounds := Rect2()
@@ -6100,7 +6242,8 @@ func _fit_cards() -> void:
 	var pad := 60.0
 	var k := minf((_stage.size.x - pad * 2.0) / bounds.size.x,
 		(_stage.size.y - pad * 2.0) / bounds.size.y)
-	_view_k = clampf(k, ZOOM_MIN, FIT_MAX)
+	var floor_k := FIT_TEXT_MIN if keep_titles else ZOOM_MIN
+	_view_k = clampf(k, floor_k, FIT_MAX)
 	## U1：fit 结果也过一遍 1.0 吸附带，别让「适应窗口」停在 0.97 这种非原生倍率。
 	if absf(_view_k - 1.0) < ZOOM_SNAP:
 		_view_k = 1.0

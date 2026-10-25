@@ -9,6 +9,9 @@ extends Resource
 @export_multiline var desc: String = ""
 @export_multiline var content: String = ""
 @export var can_be_picked: bool = false
+## 是否可以放进证物袋。与「能否从现场拾起」解耦：有些东西能捡但不能收纳，
+## 容器则应显式关掉（默认开，普通物品不用逐条勾）。
+@export var baggable: bool = true
 
 # ── 光照 ──
 @export var toggle_light: bool = false

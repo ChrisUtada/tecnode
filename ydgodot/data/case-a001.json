@@ -219,6 +219,7 @@
       "nodeClues": []
     },
     "ITEM_chouti": {
+      "baggable": false,
       "label": "抽屉",
       "desc": "书桌的两个抽屉紧闭着，但没有上锁。",
       "commands": [
@@ -292,6 +293,7 @@
       "nodeClues": []
     },
     "ITEM_lianmu": {
+      "baggable": false,
       "label": "黑色帘幕",
       "desc": "遮住整个花园的帘幕，透不进一丝阳光。",
       "commands": [
@@ -812,6 +814,7 @@
       "nodeClues": []
     },
     "ITEM_shuzhuo": {
+      "baggable": false,
       "label": "书桌",
       "desc": "木制的书桌上堆放着大量手写笔记，在靠近桌子的边缘，有一盏老式台灯，从灯罩中伸出一条黄铜的链子，拉动它似乎可以点亮台灯。书桌的两个抽屉闭合着，没有上锁。桌脚处摆着一个堆满灰烬的垃圾桶。\n",
       "content": "木制的书桌上堆放着大量手写笔记，在靠近桌子的边缘，有一盏老式台灯，从灯罩中伸出一条黄铜的链子，拉动它似乎可以点亮台灯。\n书桌的两个抽屉闭合着，没有上锁。桌脚处摆着一个堆满灰烬的垃圾桶。\n\n返回 植物学家的花园",
@@ -832,6 +835,7 @@
       "nodeClues": []
     },
     "ITEMS_ljt": {
+      "baggable": false,
       "label": "垃圾桶",
       "desc": "书桌边的垃圾桶中堆积着不知从何而来的灰烬。",
       "content": "书桌边的垃圾桶中堆积着不知从何而来的灰烬，像是焚烧什么留下的。数量多得让人不解。\n在灰烬之中，有一片未被焚烧干净的纸片。",
@@ -846,6 +850,9 @@
   },
   "chars": {
     "CHARS_JS": {
+      "role": "植物学家",
+      "fate": "存活",
+      "relation": "抑制素研究的参与者",
       "debut": "SCENES_0602",
       "name": "槿杉",
       "desc": "在植物领域颇有造诣的年轻植物学家。",
@@ -883,6 +890,9 @@
       "relation": "抑制素研究的参与者"
     },
     "CHARS_luhengs": {
+      "role": "植物学家",
+      "fate": "死亡 · 吊颈",
+      "relation": "本案死者",
       "debut": "SCENES_lhsdst",
       "name": "陆珩松",
       "desc": "年轻有为的植物学家。",
@@ -996,6 +1006,9 @@
       "relation": "本案死者"
     },
     "NPC_FB": {
+      "role": "植物研究所所长",
+      "fate": "存活",
+      "relation": "研究项目的知情者",
       "debut": "SCENES_0602",
       "name": "傅柏",
       "desc": "植物研究所所长",
@@ -1031,6 +1044,9 @@
       "relation": "研究项目的知情者"
     },
     "CHARS_zs": {
+      "role": "助手",
+      "fate": "存活",
+      "relation": "陆珩松与槿杉的助手",
       "debut": "SCENES_0704",
       "name": "朱穗",
       "desc": "陆珩松和槿杉的助手。",
@@ -1115,6 +1131,9 @@
       "relation": "陆珩松与槿杉的助手"
     },
     "CHARS_TEC": {
+      "role": "AI 助手",
+      "fate": "在线",
+      "relation": "你的助手",
       "name": "TEC",
       "desc": "您忠实的AI助手！",
       "talkQueue": [
