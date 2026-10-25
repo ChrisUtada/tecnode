@@ -1926,9 +1926,8 @@ func _initialize() -> void:
 	scene._update_drop_over(Vector2(8.0, 8.0))
 	check("G3 移出落点虚线框收起", not scene._drop_outline.visible)
 	var ghost_at := Vector2(520.0, 330.0)
-	var ghost_expect: Vector2 = scene._desk.get_global_transform().affine_inverse() * ghost_at
-	check("G3 收纳拖拽幽灵使用 desk 局部坐标",
-		scene._sdrag_ghost_position(ghost_at) == ghost_expect)
+	check("G3 收纳拖拽幽灵使用视口坐标",
+		scene._sdrag_ghost_position(ghost_at) == ghost_at)
 	check("G3 地图 / 档案未出，TEC 图标按普通 app 常驻",
 		not scene._icon_by_app("map").visible and scene._icon_by_app("tec").visible
 			and not scene._icon_by_app("goto").visible)

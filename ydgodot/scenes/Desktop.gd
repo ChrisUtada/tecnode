@@ -157,6 +157,8 @@ var _sdrag_from := ""
 var _sdrag_origin := Vector2.ZERO
 var _sdrag_started := false
 var _sdrag_ghost: PanelContainer = null
+## 行拖拽小标签放在 CanvasLayer 上：直接用视口坐标跟随光标，不经过 desk / card_layer 变换。
+var _sdrag_layer: CanvasLayer = null
 var _sdrag_label := ""
 ## 桌面图标的单击/双击（双击才开窗）
 var _icon_sel: DeskIcon = null
@@ -637,7 +639,11 @@ func _make_drag_ghost(text: String) -> PanelContainer:
 	var l := TecTheme.label(text, TecTheme.FS_BODY, TecTheme.CARD)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(l)
-	_desk.add_child(p)
+	if _sdrag_layer == null or not is_instance_valid(_sdrag_layer):
+		_sdrag_layer = CanvasLayer.new()
+		_sdrag_layer.layer = 100
+		add_child(_sdrag_layer)
+	_sdrag_layer.add_child(p)
 	p.z_index = 40
 	p.position = _sdrag_ghost_position(_sdrag_origin)
 	return p
@@ -646,10 +652,8 @@ func _make_drag_ghost(text: String) -> PanelContainer:
 ## 收纳清单拖拽幽灵挂在 `_desk` 下，位置必须用 desk 局部坐标；
 ## 指针是屏幕/全局坐标，直接赋值会整整偏一个顶栏高度。
 func _sdrag_ghost_position(at_global: Vector2) -> Vector2:
-	if _desk == null or not is_instance_valid(_desk):
-		return at_global
-	## 行拖拽没有抓取点：幽灵左上角直接贴光标，松手后卡片也按左上角落位。
-	return _desk.get_global_transform().affine_inverse() * at_global
+	## 幽灵在 CanvasLayer 上，坐标直接就是视口坐标；不再做 desk 局部换算。
+	return at_global
 
 
 func _sdrag_cancel() -> void:
