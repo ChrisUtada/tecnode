@@ -454,6 +454,14 @@ func _test_desktop(c: CaseLoader) -> void:
 		String(lhs_payload.get("state", "")))
 	check("死者卡关联", " ".join(lhs_payload.get("meta_lines", [])).contains("本案死者"),
 		str(lhs_payload.get("meta_lines", [])))
+	check("死者卡头像 = lu.png",
+		String(lhs_payload.get("photo", "")) == "res://assets/raw/lu.png",
+		String(lhs_payload.get("photo", "")))
+	var lhs_row := pw.find_child("row_CHARS_luhengs", true, false) as Control
+	var lhs_av := lhs_row.find_child("av", true, false) as PanelContainer if lhs_row != null else null
+	var lhs_art := lhs_av.find_child("art", true, false) as TextureRect if lhs_av != null else null
+	var lhs_path := lhs_art.texture.resource_path if lhs_art != null and lhs_art.texture != null else ""
+	check("名册头像走 CharDef（陆珩松 → lu.png）", lhs_path == "res://assets/raw/lu.png", lhs_path)
 	var card = scene.dbg_person_card()
 	check("档案卡 260×360 量级", card != null and card.size.x >= 260.0 and card.size.y >= 360.0,
 		str(card.size) if card != null else "null")

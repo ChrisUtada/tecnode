@@ -65,6 +65,19 @@ func _test_data(c: CaseLoader) -> void:
 		and c.memory_for("SCENES_0602", "CHARS_zs", "SCENES_garden").id != c.memory_for("SCENES_0704", "CHARS_zs", "SCENES_garden").id)
 	check("回忆地点 = 花园", c.mem_place_of("SCENES_0602") != null and c.mem_place_of("SCENES_0602").id == "SCENES_garden")
 
+	# 头像按拼音落到具体角色：槿杉 jin / 陆珩松 lu / 朱穗 zhu / 傅柏 fu。
+	var avatar_expect := {
+		"CHARS_JS": "res://assets/raw/jin.png",
+		"CHARS_luhengs": "res://assets/raw/lu.png",
+		"CHARS_zs": "res://assets/raw/zhu.png",
+		"NPC_FB": "res://assets/raw/fu.png",
+	}
+	for cid in avatar_expect.keys():
+		var want := String(avatar_expect[cid])
+		check("%s 头像 = %s" % [cid, want],
+			c.avatar_path_of(cid) == want and ResourceLoader.exists(want),
+			c.avatar_path_of(cid))
+
 	var brief := c.time_brief_of("SCENES_0602")
 	check("档案简介地点", String(brief["where"]) == "植物学家的花园", String(brief["where"]))
 	check("档案简介人物含四人", String(brief["who"]).contains("陆珩松") and String(brief["who"]).contains("朱穗")
@@ -387,6 +400,10 @@ func _test_ui() -> void:
 		str(play.say_count()) if play != null else "null")
 	check("台词文本完整", play != null and play.line_at(1).contains("第三次"),
 		play.line_at(1) if play != null and play.line_count() > 1 else "")
+	var mem_av := play.find_child("mem_say_avatar", true, false) as PanelContainer if play != null else null
+	var mem_art := mem_av.find_child("art", true, false) as TextureRect if mem_av != null else null
+	var mem_path := mem_art.texture.resource_path if mem_art != null and mem_art.texture != null else ""
+	check("小剧场头像走 CharDef（傅柏 → fu.png）", mem_path == "res://assets/raw/fu.png", mem_path)
 	check("小剧场有 tried 痕迹",
 		bool(scene.graph.tried.get("char:NPC_FB>loc:SCENES_garden", false)))
 	var play_garden: Rect2 = scene.dbg_card_global("loc:SCENES_garden")

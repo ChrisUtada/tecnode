@@ -10,11 +10,6 @@ extends SysWindow
 
 signal row_clicked(id: String)
 
-## 与 ChatWindow / IntroWin 同一份素材（同一角色在哪儿都是这张脸）
-const AVATAR := {
-	"CHARS_TEC": "res://assets/raw/tec-avatar.png",
-	"CHARS_EXEC": "res://assets/raw/executor-avatar.png",
-}
 const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var graph: GraphState
@@ -192,21 +187,10 @@ func _make_avatar(id: String, name_text: String) -> Control:
 
 
 func _avatar_path(id: String) -> String:
+	var avatar_id := id
 	if id == GraphState.INVESTIGATOR_ID:
-		return String(AVATAR.get(String(_investigator.get("avatarId", "")), ""))
-	if AVATAR.has(id):
-		return String(AVATAR[id])
-	var ch := case_def.char_of(id) if case_def != null else null
-	if ch == null or String(ch.avatar).strip_edges() == "":
-		return ""
-	var raw := String(ch.avatar)
-	if raw.begins_with("res://") and ResourceLoader.exists(raw):
-		return raw
-	var base := raw.get_file()
-	for root in ["res://assets/raw/", "res://assets/images/", "res://images/"]:
-		if ResourceLoader.exists(root + base):
-			return root + base
-	return ""
+		avatar_id = String(_investigator.get("avatarId", ""))
+	return case_def.avatar_path_of(avatar_id) if case_def != null else ""
 
 
 func _on_row_input(ev: InputEvent, id: String) -> void:

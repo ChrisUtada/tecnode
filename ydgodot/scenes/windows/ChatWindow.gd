@@ -4,10 +4,6 @@ extends SysWindow
 ## 390 宽、右上角、逐行打字；有台词的人不在场时停下等，拖人物进来续播。
 
 const CHAR_MS := 45.0
-const AVATAR_ART := {
-	"CHARS_TEC": "res://assets/raw/tec-avatar.png",
-	"CHARS_EXEC": "res://assets/raw/executor-avatar.png",
-}
 const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
 var session: DialogueSession
@@ -212,7 +208,7 @@ func _say_avatar(who_id: String, who_name: String) -> Control:
 	var frame := AvatarFrameScript.new()
 	frame.name = "chat_av"
 	frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	frame.setup(String(AVATAR_ART.get(who_id, "")), 30.0,
+	frame.setup(case_def.avatar_path_of(who_id) if case_def != null else "", 30.0,
 		who_name.substr(0, 1) if who_name != "" else "?")
 	return frame
 

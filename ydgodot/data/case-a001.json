@@ -884,7 +884,7 @@
           "CLUES_JS"
         ]
       },
-      "avatar": "images/avatar_CHARS_JS.png",
+      "avatar": "res://assets/raw/jin.png",
       "role": "植物学家",
       "fate": "存活",
       "relation": "抑制素研究的参与者"
@@ -1000,7 +1000,7 @@
           "CLUES_V_luheng"
         ]
       },
-      "avatar": "images/avatar_CHARS_luhengs.png",
+      "avatar": "res://assets/raw/lu.png",
       "role": "植物学家",
       "fate": "死亡 · 吊颈",
       "relation": "本案死者"
@@ -1038,7 +1038,7 @@
           }
         ]
       },
-      "avatar": "images/avatar_NPC_FB.png",
+      "avatar": "res://assets/raw/fu.png",
       "role": "植物研究所所长",
       "fate": "存活",
       "relation": "研究项目的知情者"
@@ -1125,7 +1125,7 @@
           }
         ]
       },
-      "avatar": "images/avatar_CHARS_zs.png",
+      "avatar": "res://assets/raw/zhu.png",
       "role": "助手",
       "fate": "存活",
       "relation": "陆珩松与槿杉的助手"

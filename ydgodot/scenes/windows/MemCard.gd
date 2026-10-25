@@ -13,6 +13,7 @@ const AVATAR_ART := {
 }
 const AvatarFrameScript = preload("res://ui/AvatarFrame.gd")
 
+var case_def: CaseLoader
 var _line_box: VBoxContainer
 var _lines: Array = []
 var _rows: Array = []
@@ -224,7 +225,10 @@ func _say_avatar(who: String, name: String) -> Control:
 	var frame := AvatarFrameScript.new()
 	frame.name = "mem_say_avatar"
 	frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	frame.setup(String(AVATAR_ART.get(who, "")), 40.0,
+	var path := case_def.avatar_path_of(who) if case_def != null else ""
+	if path == "":
+		path = String(AVATAR_ART.get(who, ""))
+	frame.setup(path, 40.0,
 		name.substr(0, 1) if name != "" else "?", TALK_COLOR)
 	return frame
 

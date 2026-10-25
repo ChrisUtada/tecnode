@@ -203,6 +203,14 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("打字机 45ms/字", ChatWindow.CHAR_MS == 45.0, str(ChatWindow.CHAR_MS))
 	check("W9 对话窗有滚动区", not chat.find_children("*", "ScrollContainer", true, false).is_empty())
 	check("对话窗预排全文行", chat._rows.size() == int(state["total"]), str(chat._rows.size()))
+	var chat_avatars: Array = []
+	for node in chat.find_children("chat_av", "", true, false):
+		var art := node.find_child("art", true, false) as TextureRect
+		if art != null and art.texture != null:
+			chat_avatars.append(art.texture.resource_path)
+	check("对话窗头像走 CharDef（朱穗 / 陆珩松）",
+		chat_avatars.has("res://assets/raw/zhu.png") and chat_avatars.has("res://assets/raw/lu.png"),
+		str(chat_avatars))
 	var first_text := String(scene.dbg_dialogues().by_id("DLG_0704_zs_lhs").script_lines[0].text)
 	check("首行是旁白原文", chat.current_text() == first_text, chat.current_text())
 	check("补全本句", scene.dbg_chat_advance())

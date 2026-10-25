@@ -10,6 +10,11 @@ extends RefCounted
 
 const CASE_PATH := "res://cases/a001/case.tres"
 const DEFAULT_MEMORY_SCENES := ["SCENES_0602", "SCENES_0704"]
+## TEC / 执行者不是普通角色卡，素材固定放在 raw 下；其余角色一律读 CharDef.avatar。
+const AVATAR_SPECIAL := {
+	"CHARS_TEC": "res://assets/raw/tec-avatar.png",
+	"CHARS_EXEC": "res://assets/raw/executor-avatar.png",
+}
 
 var path: String
 var case_def: CaseDef = null
@@ -153,6 +158,30 @@ func item_of(id: String) -> ItemDef:
 
 func char_of(id: String) -> CharDef:
 	return chars.get(id, null)
+
+
+## 统一头像解析入口：名册 / 档案卡 / 对话窗 / 记忆放映卡都走这里。
+func avatar_path_of(id: String) -> String:
+	if AVATAR_SPECIAL.has(id):
+		return String(AVATAR_SPECIAL[id])
+	return avatar_path_of_def(char_of(id))
+
+
+## 头像字段兼容两种写法：`res://...` 直接加载；旧的 Web 相对路径只取文件名，
+## 依次在 raw / images / 旧 images 下找。找不到返回空串，让 UI 落回首字占位。
+static func avatar_path_of_def(ch: CharDef) -> String:
+	if ch == null:
+		return ""
+	var raw := String(ch.avatar).strip_edges()
+	if raw == "":
+		return ""
+	if raw.begins_with("res://") and ResourceLoader.exists(raw):
+		return raw
+	var base := raw.get_file()
+	for root in ["res://assets/raw/", "res://assets/images/", "res://images/"]:
+		if ResourceLoader.exists(root + base):
+			return root + base
+	return ""
 
 
 func clue_of(id: String) -> ClueDef:

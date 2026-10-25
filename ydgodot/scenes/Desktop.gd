@@ -4883,7 +4883,7 @@ func _person_payload(id: String) -> Dictionary:
 			"name": iname,
 			"role": "调查员",
 			"state": "在册",
-			"photo": String(PeopleWin.AVATAR.get(avatar_id, "")),
+			"photo": case_def.avatar_path_of(avatar_id) if case_def != null else "",
 			"initial": iname.substr(0, 1) if iname != "" else "?",
 			"meta_lines": [
 				"编号 · " + String(_investigator.get("id", "")),
@@ -4948,20 +4948,11 @@ func _person_payload(id: String) -> Dictionary:
 
 
 func _person_photo(id: String, ch: CharDef) -> String:
-	if id == "CHARS_TEC":
-		return "res://assets/raw/tec-avatar.png"
-	if id == "CHARS_EXEC":
-		return "res://assets/raw/executor-avatar.png"
-	if ch == null or String(ch.avatar).strip_edges() == "":
-		return ""
-	var raw := String(ch.avatar)
-	if raw.begins_with("res://") and ResourceLoader.exists(raw):
-		return raw
-	var base := raw.get_file()
-	for root in ["res://assets/raw/", "res://assets/images/", "res://images/"]:
-		if ResourceLoader.exists(root + base):
-			return root + base
-	return ""
+	if case_def != null:
+		var path := case_def.avatar_path_of(id)
+		if path != "":
+			return path
+	return CaseLoader.avatar_path_of_def(ch)
 
 
 func _first_sentence(text: String) -> String:
@@ -5751,6 +5742,7 @@ func _open_time_card(tid: String) -> void:
 	_close_mem_card()
 	_mem_card = MemCard.new()
 	_mem_card.name = "mem_card"
+	_mem_card.case_def = case_def
 	_mem_card.setup_memory("记忆 · " + case_def.time_label_of(tid), _memory_lines(tid))
 	_mem_card.closed.connect(_on_mem_closed)
 	_desk.add_child(_mem_card)
@@ -5807,6 +5799,7 @@ func _open_memory_play(mem: MemoryDef, where_key: String) -> void:
 	_close_mem_card()
 	_mem_card = MemCard.new()
 	_mem_card.name = "mem_card"
+	_mem_card.case_def = case_def
 	var title := mem.title if mem.title != "" else mem.id
 	_log("想起了一段回忆：%s" % title, "sys")
 	_mem_card.setup_play("记忆 · " + title, _memory_play_lines(mem), 420, 300)
