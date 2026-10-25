@@ -471,6 +471,20 @@ func _process(_dt: float) -> void:
 			_layout_job = null
 			if _opt_reveal and not _view_user:
 				_fit_cards()
+	if _dbg_trace_frames > 0:
+		_dbg_trace_frames -= 1
+		var tc := _cards.get(_dbg_trace_key, null) as NodeCard
+		if tc != null:
+			var tsig := "pos=%s global=%s view=%s k=%.3f job=%s tween=%s scale=%s popping=%s stored=%s" % [
+				tc.position, tc.global_position, _view_pos, _view_k, str(_layout_job != null),
+				str(_move_twens.has(_dbg_trace_key)), str(tc.scale), str(tc.is_popping()),
+				str(graph != null and graph.stored.has(_dbg_trace_key))]
+			if tsig != _dbg_trace_last:
+				_dbg_storage_flow("跟踪 key=%s %s" % [_dbg_trace_key, tsig])
+				_dbg_trace_last = tsig
+		if _dbg_trace_frames == 0:
+			_dbg_trace_key = ""
+			_dbg_trace_last = ""
 	var edges_due := _edges_dirty
 	if _follow_frames > 0:
 		_follow_frames -= 1
@@ -631,10 +645,10 @@ func _finish_sdrag(at: Vector2) -> void:
 	if card != null:
 		card.position = world
 		card.set_home(world)
-		_dbg_storage_flow("放置完成 card=%s global=%s graph=(%.1f,%.1f) scale=%s popping=%s move_tween=%s" % [
+		_dbg_storage_flow("放置完成 card=%s global=%s graph=(%.1f,%.1f) scale=%s popping=%s move_tween=%s layout_job=%s" % [
 			card.position, card.global_position, float(graph.node(key).get("x", -1.0)),
 			float(graph.node(key).get("y", -1.0)), str(card.scale), str(card.is_popping()),
-			str(_move_twens.has(key))])
+			str(_move_twens.has(key)), str(_layout_job != null)])
 	else:
 		_dbg_storage_flow("放置完成但找不到卡片：graph=(%.1f,%.1f)" % [
 			float(graph.node(key).get("x", -1.0)), float(graph.node(key).get("y", -1.0))])
@@ -644,6 +658,10 @@ func _finish_sdrag(at: Vector2) -> void:
 	_refresh_detail()
 	_repaint_edges()
 	_commit(before)
+	_dbg_trace_key = key
+	_dbg_trace_frames = 120
+	_dbg_trace_last = ""
+	_dbg_storage_flow("跟踪开始 key=%s（120 帧）" % key)
 
 
 
@@ -6682,6 +6700,10 @@ func _apply_layout_job(animated: bool, progressive: bool) -> void:
 
 var _move_twens: Dictionary = {}      # key -> 卡片落位补间（下一次重排前先杀）
 var _follow_frames := 0               # >0 时每帧重画连线（过渡期间连线跟着节点走）
+## 临时诊断：拖出收纳后跟踪该卡片 2 秒，记录坐标 / 镜头 / 布局任务变化。
+var _dbg_trace_key := ""
+var _dbg_trace_frames := 0
+var _dbg_trace_last := ""
 
 
 func _start_move_tween(key: String, card: NodeCard, p: Vector2) -> void:
