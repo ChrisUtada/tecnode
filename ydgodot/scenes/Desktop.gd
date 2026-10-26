@@ -153,6 +153,9 @@ var _drag_key := ""
 var _edges_dirty := false
 ## 收纳行拖拽会话（见 _process）
 var _sdrag_key := ""
+## 事件流鼠标状态（见 `_input`）：拖拽会话的可信坐标/按键来源
+var _mouse_pos := Vector2.ZERO
+var _mouse_left_down := false
 var _sdrag_from := ""
 var _sdrag_origin := Vector2.ZERO
 var _sdrag_started := false
@@ -492,12 +495,11 @@ func _process(_dt: float) -> void:
 		return
 	if _card_mirror != null and is_instance_valid(_card_mirror):
 		_drop_card_mirror(null)
-	## 光标位置一律取视口坐标——事件本来就工作在这个坐标系里，混用 OS 屏幕坐标
-	## 会在窗口不在 (0,0) 时让幽灵标签偏出一个窗口位置（实测窗口在 (500,300) 时偏 (500,300)）。
-	var at := get_viewport().get_mouse_position()
+	## 光标用事件流坐标（`_input` 里持续更新），不用轮询——见 `_input` 注释。
+	var at := _mouse_pos
 	if not _sdrag_started:
 		if at.distance_to(_sdrag_origin) < 5.0:
-			if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			if not _mouse_left_down:
 				var clicked := _sdrag_key
 				_sdrag_cancel()
 				# 没移动就松手 = 单击这一行 = 取回（Web 的行单击口径）
@@ -511,7 +513,7 @@ func _process(_dt: float) -> void:
 		if _sdrag_ghost != null and is_instance_valid(_sdrag_ghost):
 			_sdrag_ghost.position = _sdrag_ghost_position(at)
 	_update_drop_over(at)
-	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+	if not _mouse_left_down:
 		_finish_sdrag(at)
 
 
@@ -544,8 +546,7 @@ func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void
 		_drop_card_mirror(null)
 	_drop_sdrag_card_mirror()
 	_sdrag_key = key
-	## 起点以实时视口光标为准（行事件坐标在按下帧可能与拖动起始帧不同）
-	at_global = get_viewport().get_mouse_position()
+	## 起点直接用行事件的坐标——事件流与点击命中同流，任何窗口模式下都不会错位
 	_sdrag_from = from_kind
 	_sdrag_origin = at_global
 	_sdrag_started = false
@@ -1390,6 +1391,14 @@ func _raise_window_at(at_global: Vector2) -> bool:
 
 
 func _input(event: InputEvent) -> void:
+	## 事件流是唯一可信的鼠标来源：轮询（get_mouse_position）在嵌入运行/非常规窗口下
+	## 可能拿到带窗口偏移的绝对坐标（实测偏出正好一个窗口位置），而事件坐标与点击命中同流。
+	if event is InputEventMouseMotion:
+		_mouse_pos = (event as InputEventMouseMotion).global_position
+	elif event is InputEventMouseButton:
+		var b := event as InputEventMouseButton
+		if b.button_index == MOUSE_BUTTON_LEFT:
+			_mouse_left_down = b.pressed
 	if not (event is InputEventMouseButton):
 		return
 	var mb := event as InputEventMouseButton
