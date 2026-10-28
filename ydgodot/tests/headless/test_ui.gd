@@ -369,12 +369,12 @@ func _initialize() -> void:
 	torch._gui_input(rev)
 	await process_frame
 	check("K11 右键打开上下文菜单", scene.debug.dbg_card_ctx() != null)
-	check("K11 菜单出现前不改钉住态", not bool(scene.graph.node(TORCH).get("pinned", false)))
+	check("K11 菜单出现前不改钉住态", not bool(scene.graph.node(TORCH).pinned))
 	var ctx_pin := scene.debug.dbg_card_ctx().find_child("ctx_pin", true, false) as Button
 	check("K11 菜单有钉住项", ctx_pin != null and ctx_pin.text == "钉住")
 	ctx_pin.pressed.emit()
 	await process_frame
-	check("K11 点菜单项后钉住", bool(scene.graph.node(TORCH).get("pinned", false)))
+	check("K11 点菜单项后钉住", bool(scene.graph.node(TORCH).pinned))
 	check("钉住挂「已固定」角标", (torch.get_node("pin") as Label).visible)
 	torch._gui_input(rev)
 	await process_frame
@@ -382,7 +382,7 @@ func _initialize() -> void:
 	check("K11 再开菜单显示取消钉住", ctx_unpin != null and ctx_unpin.text == "取消钉住")
 	ctx_unpin.pressed.emit()
 	await process_frame
-	check("再右键取消钉住", not bool(scene.graph.node(TORCH).get("pinned", false)))
+	check("再右键取消钉住", not bool(scene.graph.node(TORCH).pinned))
 
 	# 3) 拖到空白 = 停在原地并**写回数据**（旧版从不写回，下一次重排必然推翻）
 	var drop_blank := _blank_point_near(scene, torch)
@@ -391,9 +391,9 @@ func _initialize() -> void:
 	_release(torch, drop_blank)
 	await process_frame
 	check("拖到空白：坐标写回数据",
-		absf(float(scene.graph.node(TORCH)["x"]) - torch.position.x) < 0.5
-		and absf(float(scene.graph.node(TORCH)["y"]) - torch.position.y) < 0.5,
-		str(torch.position) + " / " + str(scene.graph.node(TORCH).get("x")))
+		absf(float(scene.graph.node(TORCH).x) - torch.position.x) < 0.5
+		and absf(float(scene.graph.node(TORCH).y) - torch.position.y) < 0.5,
+		str(torch.position) + " / " + str(scene.graph.node(TORCH).x))
 	check("C3 手动拖卡落 8px 网格",
 		absf(torch.position.x - roundf(torch.position.x / 8.0) * 8.0) < 0.01
 		and absf(torch.position.y - roundf(torch.position.y / 8.0) * 8.0) < 0.01,
@@ -441,7 +441,7 @@ func _initialize() -> void:
 			var other := _cards().get(other_key) as NodeCard
 			if c == null or other == null or c == torch or not c.visible or not other.visible:
 				continue
-			if String(scene.graph.node(raw_key).get("kind", "")) != "item":
+			if String(scene.graph.node(raw_key).kind) != "item":
 				continue
 			if scene.graph.is_container_node(raw_key) or not scene.graph.can_bag(raw_key):
 				continue
@@ -521,7 +521,7 @@ func _initialize() -> void:
 	var clue_card: NodeCard = null
 	for key in _cards().keys():
 		var c: NodeCard = _cards()[key]
-		if String(scene.graph.node(String(key)).get("kind", "")) == "evidence" and c.visible:
+		if scene.graph.node(String(key)).kind == "evidence" and c.visible:
 			clue_card = c
 			break
 	if clue_card != null:
@@ -633,7 +633,9 @@ func _initialize() -> void:
 	## 7c1) 符号必须**贴着首字**（不是钉在卡沿）：用一张短标题的合成卡做定值检验。
 	## 旧版把符号固定在 `PAD+5`、标题另外居中，两字标题时符号离文字一大截、又压着卡边。
 	var demo: NodeCard = NodeCard.new()
-	demo.setup("loc:demo", "loc", {"label": "门锁"}, 152.0, 54.0)
+	demo.setup("loc:demo", "loc",
+		NodeState.from_dict({"key": "loc:demo", "kind": "loc", "id": "demo", "label": "门锁"}),
+		152.0, 54.0)
 	root.add_child(demo)
 	await process_frame
 	var g: Control = demo._glyph
@@ -994,13 +996,13 @@ func _initialize() -> void:
 	check("chip 回到画布：落在松手那一点", back2 != null and back2.visible
 		and back2.get_global_rect().has_point(blank_pt),
 		str(back2.get_global_rect()) if back2 != null else "null")
-	var n2: Dictionary = scene.graph.node(clue_key)
+	var n2: NodeState = scene.graph.node(clue_key)
 	var want2: Vector2 = (blank_pt - stage3.get_global_position() - scene.debug.dbg_view_pos()) / scene.debug.dbg_view_k()
 	check("chip 回画布：坐标写回数据",
-		absf(float(n2["x"]) - back2.position.x) < 0.5
-		and absf(float(n2["x"]) - want2.x) < 0.5
-		and absf(float(n2["y"]) - want2.y) < 0.5,
-		str(n2["x"]) + " / " + str(n2["y"]) + " want " + str(want2))
+		absf(n2.x - back2.position.x) < 0.5
+		and absf(n2.x - want2.x) < 0.5
+		and absf(n2.y - want2.y) < 0.5,
+		str(n2.x) + " / " + str(n2.y) + " want " + str(want2))
 
 	# chip 拖到证据图标 = 收进证据（Web overLedgerDrop：窗或图标都算）
 	scene.debug.dbg_matrix_assign(clue_key)
@@ -1041,7 +1043,7 @@ func _initialize() -> void:
 	var pop_card: NodeCard = _cards().get(pop_key, null)
 	check("前提：dbg_ensure 不标记 fresh（首次出生不弹）",
 		pop_card != null and pop_card.scale.is_equal_approx(Vector2.ONE)
-		and not bool(scene.graph.node(pop_key).get("fresh", false)))
+		and not bool(scene.graph.node(pop_key).fresh))
 	scene.graph.mark_fresh(pop_key)
 	var old_pop: NodeCard = _cards().get(pop_key, null)
 	if old_pop != null:
@@ -1052,7 +1054,7 @@ func _initialize() -> void:
 	var reborn: NodeCard = _cards().get(pop_key, null)
 	check("pop 初生：0.4", reborn != null and reborn.scale.is_equal_approx(Vector2(0.4, 0.4)),
 		str(reborn.scale if reborn != null else Vector2.ZERO))
-	check("fresh 已被消费", not bool(scene.graph.node(pop_key).get("fresh", false)))
+	check("fresh 已被消费", not bool(scene.graph.node(pop_key).fresh))
 	await create_timer(0.6).timeout
 	check("pop 收尾：1.0", reborn.scale.is_equal_approx(Vector2.ONE), str(reborn.scale))
 	check("pop 收尾：不透明", absf(reborn.modulate.a - 1.0) < 0.02,
@@ -1138,8 +1140,8 @@ func _initialize() -> void:
 		scene.debug.dbg_drag_line() == null or not scene.debug.dbg_drag_line().has_ghost())
 	check("松手：原卡复位可见", torch4.visible)
 	check("松手：坐标写回数据（同第 12-18 节口径）",
-		absf(float(scene.graph.node(TORCH)["x"]) - torch4.position.x) < 0.5,
-		str(scene.graph.node(TORCH)["x"]) + " / " + str(torch4.position.x))
+		absf(float(scene.graph.node(TORCH).x) - torch4.position.x) < 0.5,
+		str(scene.graph.node(TORCH).x) + " / " + str(torch4.position.x))
 	# 收掉推演窗与两扇收纳窗（S6/S7 起开着）：后面的交互章节要用整块画布，
 	# 别让 mx-board / bag-win / clue-win 拦走 _drop_targets 里的落点
 	if scene.debug.dbg_matrix_win() != null and is_instance_valid(scene.debug.dbg_matrix_win()):
@@ -1158,10 +1160,10 @@ func _initialize() -> void:
 	var start20: Vector2 = tk20.position
 	# 只改数据（Web render() 前必改 n.x/n.y），卡片留在原地 → relayout 计算的目标在别处，必然要搬它
 	var far20: Vector2 = start20 + Vector2(480.0, -260.0)
-	scene.graph.node(TORCH)["x"] = far20.x
-	scene.graph.node(TORCH)["y"] = far20.y
+	scene.graph.node(TORCH).x = far20.x
+	scene.graph.node(TORCH).y = far20.y
 	scene.debug.dbg_relayout(true, true)
-	var target20: Vector2 = Vector2(float(scene.graph.node(TORCH)["x"]), float(scene.graph.node(TORCH)["y"]))
+	var target20: Vector2 = Vector2(float(scene.graph.node(TORCH).x), float(scene.graph.node(TORCH).y))
 	check("重排：搬家目标离原位很远", target20.distance_to(start20) > 2.0,
 		str(target20) + " / " + str(start20))
 	await process_frame
@@ -1182,7 +1184,7 @@ func _initialize() -> void:
 	var new_card20: NodeCard = _cards().get(new_key20, null)
 	check("新节点：直接落位（不播过渡）",
 		new_card20 != null and new_card20.position.is_equal_approx(
-			Vector2(float(scene.graph.node(new_key20)["x"]), float(scene.graph.node(new_key20)["y"])))
+			Vector2(float(scene.graph.node(new_key20).x), float(scene.graph.node(new_key20).y)))
 		and not scene.debug.dbg_move_twens().has(new_key20))
 
 	# 21) 反应表三条产出来源（Web 05-combine.js:112-123，A-001 反应表全是纯文本 —— 注入验证接线）：
@@ -1228,7 +1230,7 @@ func _initialize() -> void:
 	if not scene.graph.logs.is_empty():
 		last_log = String((scene.graph.logs[scene.graph.logs.size() - 1] as Dictionary).get("text", ""))
 	check("桌面：获得清单进案卷", last_log.contains("获得")
-		and last_log.contains(String(scene.graph.node("char:CHARS_luhengs").get("label", ""))), last_log)
+		and last_log.contains(String(scene.graph.node("char:CHARS_luhengs").label)), last_log)
 	# B) 数据层：再注入一条（换 trigger），直调数据层验证 fresh / cond / spawnItems 偏移公式
 	var scene_pick2 := ""
 	for sid21b in ["SCENES_lhsdst", "SCENES_cjag"]:
@@ -1252,21 +1254,21 @@ func _initialize() -> void:
 	var r21b: Dictionary = scene.combos.use_item("item:ITEMS_htys", "char:CHARS_luhengs")
 	check("数据层：反应表命中", bool(r21b.get("ok", false)), str(r21b))
 	var sk21b: String = scene.graph.key_of("loc", scene_pick2)
-	var snode21b: Dictionary = scene.graph.node(sk21b)
+	var snode21b: NodeState = scene.graph.node(sk21b)
 	check("数据层：新场景 fresh/unread 已挂",
-		bool(snode21b.get("fresh", false)) and bool(snode21b.get("unread", false)), str(snode21b.get("fresh")))
+		snode21b.fresh and snode21b.unread, str(snode21b.fresh))
 	check("数据层：cond 边连向反应表主人",
 		scene.graph.has_edge("char:CHARS_luhengs", sk21b, "cond"),
 		str(scene.graph.has_edge("char:CHARS_luhengs", sk21b, "cond")))
-	var src21b: Vector2 = Vector2(float(scene.graph.node("char:CHARS_luhengs")["x"]),
-		float(scene.graph.node("char:CHARS_luhengs")["y"]))
+	var src21b: Vector2 = Vector2(float(scene.graph.node("char:CHARS_luhengs").x),
+		float(scene.graph.node("char:CHARS_luhengs").y))
 	for i21b in item_picks2.size():
 		var ik21b: String = scene.graph.key_of("item", String(item_picks2[i21b]))
 		check("数据层：物品 %s fresh 已挂" % String(item_picks2[i21b]),
 			scene.graph.has("item", String(item_picks2[i21b]))
-			and bool(scene.graph.node(ik21b).get("fresh", false)))
+			and bool(scene.graph.node(ik21b).fresh))
 		check("数据层：位置 = 主人右下 60 + %d*26" % i21b,
-			Vector2(float(scene.graph.node(ik21b)["x"]), float(scene.graph.node(ik21b)["y"]))
+			Vector2(float(scene.graph.node(ik21b).x), float(scene.graph.node(ik21b).y))
 				.is_equal_approx(src21b + Vector2(60.0 + 26.0 * float(i21b), 60.0 + 26.0 * float(i21b))),
 			str(scene.graph.node(ik21b)))
 	check("§7-2 结构化反应产出证据建卡（回归）", scene.graph.has("evidence", "CLUES_qsan"))
@@ -1344,8 +1346,8 @@ func _initialize() -> void:
 		bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false)) != lit23)
 	# 按下冻结：折牌式重排飞着的卡，一按就停在指针下（补间被杀、位置不再漂）
 	var far23: Vector2 = tk23.position + Vector2(420.0, -240.0)
-	scene.graph.node(TORCH)["x"] = far23.x
-	scene.graph.node(TORCH)["y"] = far23.y
+	scene.graph.node(TORCH).x = far23.x
+	scene.graph.node(TORCH).y = far23.y
 	scene.debug.dbg_relayout(true, true)
 	await process_frame
 	check("前提：卡正处在飞行补间里", scene.debug.dbg_move_twens().has(TORCH))
@@ -1474,9 +1476,9 @@ func _initialize() -> void:
 		check("真实路由：松手镜像退场", scene.debug.dbg_card_mirror() == null)
 		check("真实路由：松手透明度复原", is_equal_approx(c24.modulate.a, 1.0), str(c24.modulate.a))
 		check("真实路由：松手坐标写回数据",
-			absf(float(scene.graph.node(k24)["x"]) - c24.position.x) < 0.5
-			and absf(float(scene.graph.node(k24)["y"]) - c24.position.y) < 0.5,
-			str(scene.graph.node(k24)["x"]) + " / " + str(c24.position.x))
+			absf(float(scene.graph.node(k24).x) - c24.position.x) < 0.5
+			and absf(float(scene.graph.node(k24).y) - c24.position.y) < 0.5,
+			str(scene.graph.node(k24).x) + " / " + str(c24.position.x))
 		# 残留会话的兜底：假装上一轮松手丢了，下一次按下应先把卡落地、不进入平移
 		scene.debug.dbg_set_drag_key(k24)
 		var world24: Vector2 = scene.debug.dbg_card_layer().position
@@ -1832,9 +1834,9 @@ func _initialize() -> void:
 	check("G2 松手后虚线框收起", not scene.debug.dbg_drop_outline().visible)
 	check("G2 TEC办公室拖给 TEC 开始分析", scene.debug.dbg_tec_win().is_analyzing())
 	check("G2 拖给 TEC 后办公室节点仍在", tut_office_card.visible)
-	var office_node: Dictionary = scene.graph.node(tut_office_key)
+	var office_node: NodeState = scene.graph.node(tut_office_key)
 	check("G2 办公室拖拽回位锚点正确",
-		tut_office_card._home == Vector2(float(office_node["x"]), float(office_node["y"])))
+		tut_office_card._home == Vector2(office_node.x, office_node.y))
 	scene.debug.dbg_tec_complete()
 	for i in 6:
 		await process_frame
@@ -2261,7 +2263,7 @@ func _initialize() -> void:
 	var w11_card: NodeCard = w8_cards[0] if not w8_cards.is_empty() else null
 	if w11_card != null:
 		var w11_key: String = w11_card.card_key
-		var w11_pin_before: bool = bool(scene.graph.node(w11_key).get("pinned", false))
+		var w11_pin_before: bool = bool(scene.graph.node(w11_key).pinned)
 		var w11_hist: int = scene.debug.dbg_history_size()
 		scene.debug.dbg_card_pin_toggled(w11_key)
 		check("W11 前置：置钉进入撤销栈", scene.debug.dbg_history_size() > w11_hist)
@@ -2271,7 +2273,7 @@ func _initialize() -> void:
 		w11_undo.pressed = true
 		scene.debug.dbg_unhandled_input(w11_undo)
 		check("W11 Ctrl+Z 撤销置钉",
-			bool(scene.graph.node(w11_key).get("pinned", false)) == w11_pin_before)
+			bool(scene.graph.node(w11_key).pinned) == w11_pin_before)
 
 	# W12：平移边界至少留 80px 世界可见，且按下载入拖动光标。
 	var w12_stage := scene.get_node("desk/case_win/body/stage") as Control

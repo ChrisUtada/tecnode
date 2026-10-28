@@ -169,7 +169,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("唱机已在画布", not scene.graph.node(changji_key).is_empty())
 	scene.debug.dbg_combo_ui("ITEMS_cz", "ITEMS_changji")
 	await process_frame
-	var ins: Dictionary = scene.graph.node(changji_key).get("installed", {})
+	var ins: Dictionary = scene.graph.node(changji_key).installed
 	check("唱针装上唱机", bool(ins.get("ITEMS_cz", false)), str(ins))
 	check("装针后音乐图标出现", scene.debug.dbg_music_icon_visible())
 	check("装针后花园仍隐藏", not scene.debug.dbg_garden_icon_visible())

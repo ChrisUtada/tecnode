@@ -96,8 +96,8 @@ func _test_time_nodes(c: CaseLoader) -> void:
 	check("6/2 画布键是 time:", g.nodes.has("time:SCENES_0602"), str(g.nodes.keys()))
 	check("7/4 画布键是 time:", g.nodes.has("time:SCENES_0704"))
 	check("不会分裂出 loc: 时间节点", not g.nodes.has("loc:SCENES_0602") and not g.nodes.has("loc:SCENES_0704"))
-	check("引用 loc: 自动收敛到 time:", g.has("loc", "SCENES_0602") and g.node("time:SCENES_0602")["kind"] == "time")
-	check("时间节点有标题", String(g.node("time:SCENES_0602")["label"]) == "6月2日")
+	check("引用 loc: 自动收敛到 time:", g.has("loc", "SCENES_0602") and g.node("time:SCENES_0602").kind == "time")
+	check("时间节点有标题", String(g.node("time:SCENES_0602").label) == "6月2日")
 	check("时间节点带「新」角标", g.has_unread("time:SCENES_0602"))
 	check("已知时刻按配置顺序", g.timeline_known() == ["SCENES_0602", "SCENES_0704"], str(g.timeline_known()))
 	check("重复展开不重复建节点", g.reveal_scene("SCENES_fkjl").size() == 0)
@@ -166,7 +166,7 @@ func _test_spawn(c: CaseLoader) -> void:
 	check("人物挂 entity 边到花园",
 		g.has_edge("loc:SCENES_garden", "char:NPC_FB", "entity") and g.has_edge("loc:SCENES_garden", "char:CHARS_JS", "entity"))
 	check("重复进入不再带人", g.spawn_mem_cast("SCENES_0602") == 0)
-	check("位置不落在花园正上方", Vector2(float(g.node("char:NPC_FB")["x"]), float(g.node("char:NPC_FB")["y"])) != Vector2.ZERO)
+	check("位置不落在花园正上方", Vector2(float(g.node("char:NPC_FB").x), float(g.node("char:NPC_FB").y)) != Vector2.ZERO)
 	g.clear_fresh("char:NPC_FB")
 	check("点过摘角标", not g.has_unread("char:NPC_FB"))
 
@@ -200,7 +200,7 @@ func _test_save(c: CaseLoader) -> void:
 	check("恢复当前时刻", g2.time == "SCENES_0602")
 	check("恢复卡已读", g2.card_seen.has("SCENES_0602"))
 	check("恢复登场位", g2.debuted.has("NPC_FB"))
-	check("恢复时间节点 kind", String(g2.node("time:SCENES_0602").get("kind", "")) == "time")
+	check("恢复时间节点 kind", String(g2.node("time:SCENES_0602").kind) == "time")
 	check("恢复「新」角标状态", g2.has_unread("char:CHARS_JS") and not g2.has_unread("char:NPC_FB"))
 	check("恢复后时刻可见性可算", g2.visible_node(g2.node("loc:SCENES_garden")))
 

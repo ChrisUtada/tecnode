@@ -140,12 +140,12 @@ func _hide_tutorial_chrome() -> void:
 
 func _spawn_tutorial_office() -> void:
 	var n := desk.graph.add_node("loc", Desktop.TUT_OFFICE_ID)
-	n["label"] = "TEC办公室"
-	n["always_visible"] = true
+	n.label = "TEC办公室"
+	n.always_visible = true
 	var pos := _tutorial_card_pos(0)
-	n["x"] = pos.x
-	n["y"] = pos.y
-	desk._tutorial_office_key = String(n["key"])
+	n.x = pos.x
+	n.y = pos.y
+	desk._tutorial_office_key = n.key
 	var card: NodeCard = desk.canvas._spawn_card(desk._tutorial_office_key)
 	if card != null:
 		card.visible = true
@@ -175,9 +175,9 @@ func _tutorial_card_pos(layer: int) -> Vector2:
 func _tutorial_spawn_node(kind: String, id: String, layer: int) -> String:
 	var n := desk.graph.add_node(kind, id)
 	var pos := _tutorial_card_pos(layer)
-	n["x"] = pos.x
-	n["y"] = pos.y
-	var key := String(n["key"])
+	n.x = pos.x
+	n.y = pos.y
+	var key := n.key
 	desk.graph.mark_fresh(key)
 	desk.canvas._refresh_or_spawn_card(key)
 	desk.canvas._relayout()
@@ -188,8 +188,8 @@ func _tutorial_spawn_clue(id: String, from_key: String, layer: int) -> String:
 	var key := desk.graph.capture_evidence(id, from_key, -1.0, -1.0, "deduce")
 	var n := desk.graph.node(key)
 	var pos := _tutorial_card_pos(layer)
-	n["x"] = pos.x
-	n["y"] = pos.y
+	n.x = pos.x
+	n.y = pos.y
 	desk.graph.mark_fresh(key)
 	desk.canvas._refresh_or_spawn_card(key)
 	desk.canvas._relayout()
@@ -517,6 +517,6 @@ func _layout_tutorial() -> void:
 			continue
 		desk.canvas._kill_move(String(key))
 		var n := desk.graph.node(String(key))
-		var p := Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
+		var p := Vector2(n.x, n.y)
 		card.set_home_silent(p)
 		card.position = p

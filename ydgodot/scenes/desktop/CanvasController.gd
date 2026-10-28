@@ -26,7 +26,7 @@ func _rebuild_from_graph(fit_camera := false) -> void:
 	var was_analyzing := desk._tec != null and desk._tec.is_analyzing()
 	var fresh_before := {}
 	for raw_key in desk.graph.nodes.keys():
-		if bool((desk.graph.nodes[raw_key] as Dictionary).get("fresh", false)):
+		if desk.graph.node(String(raw_key)).fresh:
 			fresh_before[String(raw_key)] = true
 	## F3：按 card_key 增量 reconcile。读档 / 撤销时大多数节点还是同一张卡，
 	## 不销毁重建 500+ 子控件；只更新数据、显隐与坐标，缺的才 spawn，多的才 despawn。
@@ -69,13 +69,13 @@ func _rebuild_from_graph(fit_camera := false) -> void:
 	_last_rebuild_stats = {"reused": 0, "spawned": 0, "despawned": 0}
 	for raw_key in desk.graph.nodes.keys():
 		var key := String(raw_key)
-		var n: Dictionary = desk.graph.nodes[raw_key]
+		var n := desk.graph.node(key)
 		alive[key] = true
 		var card: NodeCard = desk._cards.get(key, null)
 		if card != null and is_instance_valid(card):
 			card.node_data = n
 			card.visible = desk.graph.visible_node(n)
-			card.position = Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
+			card.position = Vector2(n.x, n.y)
 			card.set_home_silent(card.position)
 			card.set_lod(desk._view_k)
 			_sync_card_shell(card)
@@ -116,8 +116,8 @@ func _rebuild_from_graph(fit_camera := false) -> void:
 func _refresh_archive_new_from_graph() -> void:
 	desk.narrative._clear_archive_new()
 	for raw_key in desk.graph.nodes.keys():
-		var n: Dictionary = desk.graph.nodes[raw_key]
-		if String(n.get("kind", "")) == "time" and desk.graph.has_unread(String(raw_key)):
+		var n := desk.graph.node(String(raw_key))
+		if n.kind == "time" and desk.graph.has_unread(String(raw_key)):
 			desk.narrative._mark_archive_new()
 			return
 
@@ -294,18 +294,18 @@ func _spawn_card(key: String) -> NodeCard:
 	var n := desk.graph.node(key)
 	if n.is_empty():
 		return null
-	if String(n["kind"]) == "time":
+	if n.kind == "time":
 		if not desk._suppress_archive_new and desk.graph.has_unread(key):
 			desk.narrative._mark_archive_new()
 		return null                       # 时间节点不上画布（入口在档案窗）
-	var w := GraphState.SCENE_W if GraphState.is_scene_kind(String(n["kind"])) else GraphState.ENT_W
-	var h := GraphState.SCENE_H if GraphState.is_scene_kind(String(n["kind"])) else GraphState.ENT_H
+	var w := GraphState.SCENE_W if GraphState.is_scene_kind(n.kind) else GraphState.ENT_W
+	var h := GraphState.SCENE_H if GraphState.is_scene_kind(n.kind) else GraphState.ENT_H
 	var card := NodeCard.new()
 	card.name = "card_" + key.replace(":", "_")
-	card.setup(key, String(n["kind"]), n, w, h)
+	card.setup(key, n.kind, n, w, h)
 	_sync_card_shell(card)
 	_seed_one(key)
-	card.position = Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
+	card.position = Vector2(n.x, n.y)
 	card.drop_sink = Callable(desk.drag, "_handle_card_drop")
 	card.world_rect = Rect2(Vector2.ZERO, Vector2(Desktop.WORLD_W, Desktop.WORLD_H))
 	card.selected.connect(desk.card_ui._on_card_selected)
@@ -326,7 +326,7 @@ func _spawn_card(key: String) -> NodeCard:
 	# Web 的入场 pop：fresh 的节点初次上画布闪一下（`n.fresh` 渲染一次即被摘掉；
 	# `unread`「新」角标继续保留，直到玩家点过卡片）。截图模式里不弹（像素对拍要稳），
 	# 但 fresh 照样消费掉（两次截图的 fresh 状态必须收敛）。
-	if bool(n.get("fresh", false)):
+	if n.fresh:
 		desk.graph.consume_fresh(key)
 		## 教学期新节点不做 0.2s 的 pop 淡入：卡片和连线要同帧出现，避免「线慢一拍」。
 		## 首次铺场（`_layout_sig` 仍为空）也不弹：花园卡会先 pop 再被布局推一下，
@@ -347,7 +347,7 @@ func _spawn_card(key: String) -> NodeCard:
 ## 容器（场景 / 书桌）按 5 列网格，实体围在画布中央 —— 与 Web `layout()` 的 seed 同口径。
 func _seed_one(key: String) -> void:
 	var n := desk.graph.node(key)
-	if n.is_empty() or (float(n.get("x", -1.0)) >= 0.0 and float(n.get("y", -1.0)) >= 0.0):
+	if n.is_empty() or (n.x >= 0.0 and n.y >= 0.0):
 		return
 	var cidx := 0
 	for k in desk.graph.nodes.keys():
@@ -355,18 +355,18 @@ func _seed_one(key: String) -> void:
 		if not desk.graph.is_container_node(kk):
 			continue
 		var m := desk.graph.node(kk)
-		if kk == key or float(m.get("x", -1.0)) < 0.0:
+		if kk == key or m.x < 0.0:
 			cidx += 1
 	if desk.graph.is_container_node(key):
 		var i := maxi(cidx - 1, 0)
-		n["x"] = 200.0 + float(i % 5) * 380.0
-		n["y"] = 160.0 + float(i / 5) * 300.0
+		n.x = 200.0 + float(i % 5) * 380.0
+		n.y = 160.0 + float(i / 5) * 300.0
 	else:
 		# 实体：按 key 哈希撒在中央（确定性 —— 同一份存档每次开都落在同一处）
 		var h := float(abs(key.hash()) % 1000) / 1000.0
 		var h2 := float(abs(key.hash() * 31) % 1000) / 1000.0
-		n["x"] = 700.0 + (h - 0.5) * 420.0
-		n["y"] = 560.0 + (h2 - 0.5) * 420.0
+		n.x = 700.0 + (h - 0.5) * 420.0
+		n.y = 560.0 + (h2 - 0.5) * 420.0
 
 
 ## 重画连线（Web `paintEdges()`）：端点取 `visual_center()`，四种边各自配色 / 线宽 / 虚线。
@@ -513,8 +513,8 @@ func _goto_char(id: String) -> bool:
 	var spawn := false
 	if not desk.graph.nodes.has(key):
 		var n := desk.graph.add_node("char", id)
-		if String(n.get("home_scene", "")) == "":
-			n["home_scene"] = desk.graph.last_scene
+		if n.home_scene == "":
+			n.home_scene = desk.graph.last_scene
 		spawn = true
 	if desk.graph.stored.has(key):
 		desk.graph.take_back(key)
@@ -556,10 +556,10 @@ func _sync_card_shell(card: NodeCard) -> void:
 	if card == null or desk.graph == null:
 		return
 	var n := desk.graph.node(card.card_key)
-	var id := String(n.get("id", ""))
+	var id := n.id
 	card.set_shell_state(desk.graph.is_container_node(card.card_key),
-		desk.graph.explored.has(id), desk.graph.is_collapsed(id), bool(n.get("unread", false)),
-		desk.graph.is_hub(String(n.get("kind", "")), id))
+		desk.graph.explored.has(id), desk.graph.is_collapsed(id), n.unread,
+		desk.graph.is_hub(n.kind, id))
 	## 教学是线性引导，不挂「无文本入口」警告；TEC办公室尤其不该因为不需要叙事而被标红。
 	card.set_warn(not desk._tutorial_active and desk.graph.is_no_entry(card.card_key))
 
@@ -694,8 +694,8 @@ func _place_new_cards(keys: Array) -> void:
 			if clash:
 				continue
 			_kill_move(String(key))
-			n["x"] = p.x
-			n["y"] = p.y
+			n.x = p.x
+			n.y = p.y
 			card.set_home_silent(p)
 			card.position = p
 			card.set_lod(desk._view_k)
@@ -708,8 +708,8 @@ func _place_new_cards(keys: Array) -> void:
 			p = Vector2(clampf(p.x, 64.0, Desktop.WORLD_W - 224.0),
 				clampf(p.y, 56.0, Desktop.WORLD_H - 120.0)).snapped(Vector2(8, 8))
 			_kill_move(String(key))
-			n["x"] = p.x
-			n["y"] = p.y
+			n.x = p.x
+			n.y = p.y
 			card.set_home_silent(p)
 			card.position = p
 			card.set_lod(desk._view_k)
@@ -787,16 +787,16 @@ func _apply_layout_job(animated: bool, progressive: bool) -> void:
 		var card: NodeCard = desk._cards.get(String(key), null)
 		var p: Vector2 = _layout_job.pos[key]
 		if not bool(_layout_job.free[key]):
-			n["x"] = p.x
-			n["y"] = p.y
+			n.x = p.x
+			n.y = p.y
 			continue
 		## P2：自动摆卡落 8px 网格。边界也取 8 的倍数，保证靠边时仍对齐；
 		## 手动拖动的落点由 `NodeCard._clamp_pos()` 同样吸到 8px 网格（C3）。
 		p = Vector2(clampf(p.x, 64.0, Desktop.WORLD_W - 224.0),
 			clampf(p.y, 56.0, Desktop.WORLD_H - 120.0))
 		p = p.snapped(Vector2(8, 8))
-		n["x"] = p.x
-		n["y"] = p.y
+		n.x = p.x
+		n.y = p.y
 		if card == null or not is_instance_valid(card):
 			continue
 		var before_pos: Vector2 = card.position
@@ -841,7 +841,7 @@ func _fit_cards(keep_titles := true) -> void:
 			continue
 		# 用数据里的最终位（过渡动画期间 card.position 还在路上，镜头该框的是终点）
 		var n := desk.graph.node(card.card_key)
-		var at := Vector2(float(n.get("x", card.position.x)), float(n.get("y", card.position.y)))
+		var at := Vector2(n.x if n.x >= 0.0 else card.position.x, n.y if n.y >= 0.0 else card.position.y)
 		var r := Rect2(at + Vector2(NodeCard.PAD, NodeCard.PAD),
 			card.size - Vector2(NodeCard.PAD * 2.0, NodeCard.PAD * 2.0))
 		if has_card:

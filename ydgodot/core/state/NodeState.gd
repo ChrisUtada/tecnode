@@ -1,12 +1,12 @@
 class_name NodeState
 extends RefCounted
-## 节点运行时态的强类型视图。
+## 节点运行时态的强类型实体。
 ##
-## 内存里的 `GraphState.nodes` 与磁盘存档仍保持 Dictionary（`format: 1` 不变），
-## NodeState 是**字段名 / 类型 / 默认值**的唯一来源：
-##   · `GraphState.add_node()` 用它建节点；
-##   · `SaveSystem.restore()` 用它归一化旧档（缺字段补默认、类型纠偏）；
-##   · 读代码可用 `NodeState.from_value(n)` 做类型化读取，逐步替换 `n["x"]`。
+## `GraphState.nodes` 的值就是 NodeState；磁盘存档仍由 `to_dict()` 输出
+## Dictionary（`format: 1` 不变）。NodeState 是**字段名 / 类型 / 默认值**的唯一来源：
+##   · `GraphState.add_node()` 直接建实体，读写都走属性；
+##   · `SaveSystem.restore()` 用 `from_dict()` 归一化旧档（缺字段补默认、类型纠偏）；
+##   · 旧调用若仍把 Dictionary 塞进 `nodes`，`GraphState.node()` 会在首次读取时就地升级。
 ##
 ## 未识别的字段收进 `_extra`，`to_dict()` 原样带回 —— 旧档 / 前瞻字段都不会丢。
 
@@ -73,6 +73,11 @@ static func make_new(p_kind: String, p_id: String, p_key: String, p_label: Strin
 	s.x = -1.0
 	s.y = -1.0
 	return s
+
+
+## 空节点判定（替代旧 Dictionary.is_empty()）。
+func is_empty() -> bool:
+	return key == "" and kind == "" and id == ""
 
 
 ## 任意来源 → NodeState（Dictionary / NodeState / 其他 → 空节点）。

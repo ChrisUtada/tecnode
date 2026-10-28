@@ -73,7 +73,7 @@ func _test_reveal_light_gate() -> void:
 	check("被拦下时没有摊出笔记内容", not g.has("item", "ITEMS_dlh"))
 
 	g.add_node("item", "ITEM_taideng")
-	g.node("item:ITEM_taideng")["lit"] = true
+	g.node("item:ITEM_taideng").lit = true
 	var lit := cs.execute(g.key_of("item", "ITEM_sxbj"), cmd)
 	check("点亮台灯后：reveal 成功", bool(lit.get("ok", false)))
 	check("摊出笔记里的 5 件东西", (lit.get("spawn", []) as Array).size() == 5, str(lit.get("spawn")))
@@ -147,7 +147,7 @@ func _test_installs_requires() -> void:
 	var put := cs.execute(g.key_of("item", "ITEMS_changji"), install_cmd)
 	check("装上唱针", bool(put.get("ok", false)))
 	check("零件记账落在节点上",
-		(g.node("item:ITEMS_changji").get("installed", {}) as Dictionary).has("ITEMS_cz"))
+		(g.node("item:ITEMS_changji").installed as Dictionary).has("ITEMS_cz"))
 
 	var play := cs.execute(g.key_of("item", "ITEMS_changji"), play_cmd)
 	check("装了唱针后放黑胶：成功", bool(play.get("ok", false)))
@@ -194,7 +194,7 @@ func _test_use_item_via_combo() -> void:
 	g.add_node("item", "ITEM_shoudiantong")
 	var blocked := comb.use_item("item:ITEM_shoudiantong", "item:ITEM_something")
 	check("没点亮的手电筒拖到黑影：发光门拦下", bool(blocked.get("blocked", false)))
-	g.node("item:ITEM_shoudiantong")["lit"] = true
+	g.node("item:ITEM_shoudiantong").lit = true
 	var ok := comb.use_item("item:ITEM_shoudiantong", "item:ITEM_something")
 	check("点亮后拖过去：成功并带出尸体场景",
 		bool(ok.get("ok", false)) and String(ok.get("next_scene", "")) == "SCENES_body")

@@ -85,14 +85,14 @@ func _assign_to_matrix(key: String) -> bool:
 	if n.is_empty():
 		return false
 	if not desk.drag._is_zheng_node(n):
-		var why := "推演桌布只收带五感的证；词先和物合成。" if String(n.get("kind", "")) == "evidence" \
+		var why := "推演桌布只收带五感的证；词先和物合成。" if n.kind == "evidence" \
 			else "推演桌布只收证；物是原料。"
 		if desk._tutorial_active and desk._tutorial_step == Desktop.TutorialStep.INFER:
 			desk.tutorial._tutorial_say(why)
 		else:
 			desk.drag._reject_drop(why)
 		return false
-	var ev := desk.case_def.evidence_of(String(n["id"]))
+	var ev := desk.case_def.evidence_of(n.id)
 	if ev == null:
 		return false
 	## 收纳是可选的：直接拖证上桌布也视为进入推演。
@@ -100,7 +100,7 @@ func _assign_to_matrix(key: String) -> bool:
 		desk.tutorial._tutorial_begin_infer()
 	var before := desk._save.snapshot()
 	if not desk.graph.matrix_assign(key):
-		desk.drag._reject_drop("「%s」的感官类型是%s，无法放到推演桌布。" % [n.get("label", ""), MatrixState.SENSE_NAMES.get(ev.sense, ev.sense)])
+		desk.drag._reject_drop("「%s」的感官类型是%s，无法放到推演桌布。" % [n.label, MatrixState.SENSE_NAMES.get(ev.sense, ev.sense)])
 		return false
 	desk.card_ui._apply_hidden()
 	desk.canvas._refresh_or_spawn_card(key)

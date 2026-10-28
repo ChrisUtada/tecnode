@@ -34,11 +34,11 @@ func _populate(g: GraphState) -> void:
 	g.reveal_container("item", "ITEM_shuzhuo")
 	var torch := g.key_of("item", "ITEM_shoudiantong")
 	g.add_node("item", "ITEM_shoudiantong")
-	g.node(torch)["lit"] = true
-	g.node(torch)["pinned"] = true
-	g.node(torch)["x"] = 123.5
-	g.node(torch)["y"] = 67.25
-	g.node(g.key_of("item", "ITEM_shuzhuo"))["installed"]["ITEMS_cz"] = true
+	g.node(torch).lit = true
+	g.node(torch).pinned = true
+	g.node(torch).x = 123.5
+	g.node(torch).y = 67.25
+	g.node(g.key_of("item", "ITEM_shuzhuo")).installed["ITEMS_cz"] = true
 	g.capture_clue("CLUES_nm", g.key_of("loc", "SCENES_garden"))
 	g.matrix_assign(g.key_of("clue", "CLUES_nm"))
 	g.bag_store(g.key_of("item", "ITEM_taideng"))
@@ -98,9 +98,9 @@ func _test_snapshot_roundtrip() -> void:
 	check("恢复：折叠状态一致", g2.collapsed.has("ITEM_shuzhuo"))
 	check("恢复：五感槽位一致", (g2.matrix["hearing"] as Array).has("CLUES_nm"))
 	check("恢复：收纳去向一致", String(g2.stored.get(g2.key_of("item", "ITEM_taideng"), "")) == GraphState.BAG)
-	check("恢复：位置一致", is_equal_approx(float(g2.node(torch_key)["x"]), 123.5))
-	check("恢复：点亮 / 钉住一致", bool(g2.node(torch_key)["lit"]) and bool(g2.node(torch_key)["pinned"]))
-	check("恢复：零件一致", bool(g2.node(g2.key_of("item", "ITEM_shuzhuo"))["installed"].get("ITEMS_cz", false)))
+	check("恢复：位置一致", is_equal_approx(float(g2.node(torch_key).x), 123.5))
+	check("恢复：点亮 / 钉住一致", bool(g2.node(torch_key).lit) and bool(g2.node(torch_key).pinned))
+	check("恢复：零件一致", bool(g2.node(g2.key_of("item", "ITEM_shuzhuo")).installed.get("ITEMS_cz", false)))
 	check("恢复：结局一致", g2.endings.has("TRUE_E"))
 	check("恢复：lastScene 一致", g2.last_scene == "SCENES_garden")
 	check("恢复：tried / talkProg", g2.tried.has("item:ITEM_shoudiantong>item:ITEM_something")
@@ -158,7 +158,7 @@ func _test_undo_knowledge() -> void:
 	var g := GraphState.new(c)
 	g.reveal_scene("SCENES_garden")
 	var key := g.scene_key("SCENES_garden")
-	g.node(key)["unread"] = true
+	g.node(key).unread = true
 	g.card_seen["SCENES_0602"] = true
 	g.debuted["NPC_FB"] = true
 	g.notes["CHARS_luhengs"] = "旧备注"
@@ -166,7 +166,7 @@ func _test_undo_knowledge() -> void:
 	var before := ss.snapshot()
 
 	# 玩家在快照之后：点掉新角标、认识新人物，同时给撤销一点图结构可回滚。
-	g.node(key)["unread"] = false
+	g.node(key).unread = false
 	g.card_seen["SCENES_0602"] = false
 	g.card_seen["SCENES_0704"] = true
 	g.debuted["NPC_FB"] = false
@@ -176,7 +176,7 @@ func _test_undo_knowledge() -> void:
 	ss.push_history_snapshot(before)
 	check("S8 撤销成功", ss.undo())
 	check("S8 撤销保留「已读」：unread 不被快照复活",
-		not bool(g.node(key).get("unread", true)))
+		not bool(g.node(key).unread))
 	check("S8 撤销保留 cardSeen 当前值（true 与 false）",
 		not bool(g.card_seen.get("SCENES_0602", true))
 			and bool(g.card_seen.get("SCENES_0704", false)),
@@ -199,7 +199,7 @@ func _test_undo_knowledge() -> void:
 	check("S8 读档按存档知识：不保留当前额外的 cardSeen/debuted",
 		not g2.card_seen.has("SCENES_extra") and not g2.debuted.has("CHARS_extra"),
 		str(g2.card_seen) + " / " + str(g2.debuted))
-	check("S8 读档恢复存档里的 unread", bool(g2.node(key).get("unread", false)))
+	check("S8 读档恢复存档里的 unread", bool(g2.node(key).unread))
 	check("S8 读档按存档恢复备注",
 		String(g2.notes.get("CHARS_luhengs", "")) == "旧备注",
 		String(g2.notes.get("CHARS_luhengs", "")))
@@ -259,6 +259,14 @@ func _test_node_state() -> void:
 	check("NodeState 证据带 tier/sense", ev.tier != "" and ev.sense != "",
 		"%s/%s" % [ev.tier, ev.sense])
 	check("NodeState 证据已捕获", ev.captured)
+
+	var live := g.add_node("item", "ITEM_live")
+	check("节点表存 NodeState", g.nodes[live.key] is NodeState)
+	live.pinned = true
+	check("NodeState 写入直接落表", g.node(live.key).pinned)
+	g.nodes["item:ITEM_injected"] = {"kind": "item", "id": "ITEM_injected", "label": "注入"}
+	check("字典节点读取时就地升级",
+		g.node("item:ITEM_injected") is NodeState and g.nodes["item:ITEM_injected"] is NodeState)
 
 	var legacy := {"kind": "item", "id": "ITEM_old", "x": "12.5", "unknown_flag": 7}
 	var old := NodeState.from_dict(legacy)

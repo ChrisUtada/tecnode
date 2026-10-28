@@ -53,16 +53,16 @@ func execute(node_key: String, cmd: CommandDef) -> Dictionary:
 
 # ── 六型 ────────────────────────────────────────────────────────────────
 
-func _run_text(node_key: String, n: Dictionary, cmd: TextCommandDef) -> Dictionary:
+func _run_text(node_key: String, n: NodeState, cmd: TextCommandDef) -> Dictionary:
 	var out := _ok(cmd.value)
 	if cmd.requires_lit.is_empty():
 		# 纯文本也可能顺手开关灯（手电筒 / 台灯）
-		var it := case_def.item_of(String(n["id"]))
+		var it := case_def.item_of(n.id)
 		if it != null and it.toggle_light:
-			n["lit"] = not bool(n.get("lit", false))
+			n.lit = not n.lit
 			out["lit_changed"] = true
-			out["lit"] = bool(n["lit"])
-			var flavor := it.lit_on_message if n["lit"] else it.lit_off_message
+			out["lit"] = n.lit
+			var flavor := it.lit_on_message if n.lit else it.lit_off_message
 			out["flavor"] = flavor
 	out["captured"] = graph.capture_clue_refs(cmd.clues, node_key)
 	return out
@@ -123,7 +123,7 @@ func _run_conditional(node_key: String, cmd: ConditionalCommandDef) -> Dictionar
 	return out
 
 
-func _run_use_item(node_key: String, n: Dictionary, cmd: UseItemCommandDef) -> Dictionary:
+func _run_use_item(node_key: String, n: NodeState, cmd: UseItemCommandDef) -> Dictionary:
 	var need := cmd.required_item
 	if need == null:
 		return _fail("这条命令没有配工具")
@@ -135,18 +135,16 @@ func _run_use_item(node_key: String, n: Dictionary, cmd: UseItemCommandDef) -> D
 	for req in cmd.requires:
 		if req == null:
 			continue
-		var installed: Dictionary = n.get("installed", {})
+		var installed: Dictionary = n.installed
 		if not installed.has(req.id):
 			var why2 := cmd.fail_message if cmd.fail_message != "" else "还缺「%s」没装上，现在做不了这件事。" % req.label
 			return _blocked(why2)
-	if need.needs_lit_to_use and not bool(have.get("lit", false)):
+	if need.needs_lit_to_use and not have.lit:
 		var why := need.lit_fail_message if need.lit_fail_message != "" else "还没有点亮，照不出任何东西。"
 		return _blocked("「%s」%s" % [need.label, why])
 
 	if cmd.installs:
-		var ins: Dictionary = n.get("installed", {})
-		ins[need.id] = true
-		n["installed"] = ins
+		n.installed[need.id] = true
 
 	var out := _ok(cmd.success_message)
 	out["installed"] = cmd.installs
@@ -164,14 +162,14 @@ func _run_use_item(node_key: String, n: Dictionary, cmd: UseItemCommandDef) -> D
 	return out
 
 
-func _run_reveal(node_key: String, n: Dictionary, cmd: RevealCommandDef) -> Dictionary:
+func _run_reveal(node_key: String, _n: NodeState, cmd: RevealCommandDef) -> Dictionary:
 	var text: String = cmd.value          # RevealCommandDef 只有 value（数据侧同款）
 	var out := _ok(text)
 	var spawn: Array = []
 	for it in cmd.items:
 		if it == null:
 			continue
-		var key: String = String(graph.add_node("item", it.id)["key"])
+		var key: String = graph.add_node("item", it.id).key
 		graph.link(node_key, key, "entity")
 		spawn.append(key)
 	out["spawn"] = spawn
@@ -184,7 +182,7 @@ func submit_password(node_key: String, cmd: PasswordCommandDef, input: String) -
 	var v := input.strip_edges()
 	if v != cmd.value:
 		return {"ok": false, "blocked": true, "wrong_password": true,
-			"message": "「%s」密码 %s 不正确" % [graph.node(node_key).get("label", ""), ("(空)" if v == "" else v)]}
+			"message": "「%s」密码 %s 不正确" % [graph.node(node_key).label, ("(空)" if v == "" else v)]}
 	var out := _ok("打开了。")
 	var r := _apply_payload(cmd.on_success, node_key)
 	out["spawn"] = r.get("spawn", [])
@@ -202,15 +200,15 @@ func submit_password(node_key: String, cmd: PasswordCommandDef, input: String) -
 func _light_on(lamps: Array[ItemDef]) -> bool:
 	if lamps.is_empty():
 		for key in graph.nodes.keys():
-			var n: Dictionary = graph.nodes[key]
-			if n["kind"] == "item" and bool(n.get("lit", false)):
+			var n := graph.node(String(key))
+			if n.kind == "item" and n.lit:
 				return true
 		return false
 	for lamp in lamps:
 		if lamp == null:
 			continue
 		var n := graph.node(graph.key_of("item", lamp.id))
-		if not n.is_empty() and bool(n.get("lit", false)):
+		if not n.is_empty() and n.lit:
 			return true
 	return false
 
@@ -224,7 +222,7 @@ func _apply_payload(payload: PayloadDef, node_key: String) -> Dictionary:
 	for it in payload.items:
 		if it == null:
 			continue
-		var key: String = String(graph.add_node("item", it.id)["key"])
+		var key: String = graph.add_node("item", it.id).key
 		graph.link(node_key, key, "entity")
 		(out["spawn"] as Array).append(key)
 	if payload.scene != null:

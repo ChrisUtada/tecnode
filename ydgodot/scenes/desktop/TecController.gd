@@ -152,8 +152,8 @@ func _start_tec_analysis(key: String) -> bool:
 	var n := desk.graph.node(key)
 	if n.is_empty():
 		return false
-	if String(n.get("kind", "")) == "evidence":
-		desk.drag._reject_drop(desk.people._evidence_tec_message(String(n.get("tier", ""))))
+	if n.kind == "evidence":
+		desk.drag._reject_drop(desk.people._evidence_tec_message(n.tier))
 		return false
 	if desk._tec.is_analyzing():
 		if desk._tutorial_active:
@@ -165,7 +165,7 @@ func _start_tec_analysis(key: String) -> bool:
 		return false
 	if not desk._tec.visible and not desk._tec_min:
 		_open_tec()
-	return desk._tec.analyze(key, String(n.get("label", key)))
+	return desk._tec.analyze(key, n.label if n.label != "" else key)
 
 
 func _on_tec_analysis_started(_target: String, _label: String) -> void:
@@ -309,16 +309,16 @@ func _tec_reaction(key: String) -> bool:
 		return false
 	if desk.case_def.char_of("CHARS_TEC") == null:
 		return false
-	var id := String(n["id"])
-	var hit := _tec_reaction_hit(String(n["kind"]), id)
+	var id := n.id
+	var hit := _tec_reaction_hit(n.kind, id)
 	var raw := String(hit.get("text", ""))
 	if raw == "":
-		desk._tec.append_line("关于「%s」，我暂时没有更多证据。试试把它和别的节点组合。" % String(n["label"]))
-		desk._log("TEC 对「%s」没有特别的反应" % String(n["label"]), "warn")
+		desk._tec.append_line("关于「%s」，我暂时没有更多证据。试试把它和别的节点组合。" % n.label)
+		desk._log("TEC 对「%s」没有特别的反应" % n.label, "warn")
 		desk.graph.tried[key + ">tec-dock"] = true
 		return false
 	var got := desk.graph.capture_clue_refs(hit.get("clues", []), key)
-	var reaction_line := "（分析 %s）%s" % [String(n["label"]), raw]
+	var reaction_line := "（分析 %s）%s" % [n.label, raw]
 	if desk._has_true_name_clue(got):
 		desk._tec.append_true_clue(reaction_line)
 	else:
@@ -346,9 +346,9 @@ func _tec_next_hint() -> String:
 	## G11：场上有带密码锁、且 TEC 有专属反应的东西时，直接把「拖给我」说明白。
 	for key in desk.graph.nodes.keys():
 		var n := desk.graph.node(String(key))
-		if n.is_empty() or String(n["kind"]) != "item":
+		if n.is_empty() or n.kind != "item":
 			continue
-		var it := desk.case_def.item_of(String(n["id"]))
+		var it := desk.case_def.item_of(n.id)
 		if it == null:
 			continue
 		var locked := false
@@ -356,8 +356,8 @@ func _tec_next_hint() -> String:
 			if cmd is PasswordCommandDef:
 				locked = true
 				break
-		if locked and _tec_reaction_text("item", String(n["id"])) != "":
-			hints.append("明示：带密码锁的「%s」可以拖给我，我能读出数字提示。" % String(n.get("label", "")))
+		if locked and _tec_reaction_text("item", n.id) != "":
+			hints.append("明示：带密码锁的「%s」可以拖给我，我能读出数字提示。" % n.label)
 			break
 	for ch in desk.case_def.chars.values():
 		var missing := ""
@@ -409,9 +409,9 @@ func _on_tec_analysis_done(target: String) -> void:
 	if n.is_empty():
 		desk._tec_before = {}
 		return
-	var kind := String(n["kind"])
-	var id := String(n["id"])
-	var label := String(n.get("label", id))
+	var kind := n.kind
+	var id := n.id
+	var label := n.label if n.label != "" else id
 	if GraphState.is_scene_kind(kind):
 		var talks := _tec_talk_lines(id)
 		var prog := int(desk.graph.tec_prog.get(id, 0))

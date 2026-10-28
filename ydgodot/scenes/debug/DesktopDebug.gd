@@ -584,18 +584,18 @@ func dbg_state() -> Dictionary:
 func _installed_map() -> Dictionary:
 	var out := {}
 	for k in desk.graph.nodes.keys():
-		var n: Dictionary = desk.graph.nodes[k]
-		if n["kind"] == "item" and not (n.get("installed", {}) as Dictionary).is_empty():
-			out[k] = (n["installed"] as Dictionary).keys()
+		var n := desk.graph.node(String(k))
+		if n.kind == "item" and not n.installed.is_empty():
+			out[k] = n.installed.keys()
 	return out
 
 
 func _lit_map() -> Dictionary:
 	var out := {}
 	for k in desk.graph.nodes.keys():
-		var n: Dictionary = desk.graph.nodes[k]
-		if n["kind"] == "item":
-			out[String(n["id"])] = bool(n.get("lit", false))
+		var n := desk.graph.node(String(k))
+		if n.kind == "item":
+			out[String(n.id)] = n.lit
 	return out
 
 
@@ -616,10 +616,10 @@ func dbg_activate(key: String) -> void:
 
 ## 建节点并上卡片（等价 Web 的 __ensure）
 func dbg_ensure(kind: String, id: String) -> String:
-	var n: Dictionary = desk.graph.add_node(kind, id)
-	desk.canvas._spawn_card(String(n["key"]))
+	var n := desk.graph.add_node(kind, id)
+	desk.canvas._spawn_card(n.key)
 	desk.canvas._relayout()
-	return String(n["key"])
+	return n.key
 
 
 func dbg_pw_open(node_key: String) -> void:
@@ -890,8 +890,8 @@ func dbg_combo_ui(tool_id: String, target_id: String) -> void:
 
 func _dbg_node_key(id: String) -> String:
 	for key in desk.graph.nodes.keys():
-		var n: Dictionary = desk.graph.node(String(key))
-		if String(n.get("id", "")) == id and String(n.get("kind", "")) != "time":
+		var n := desk.graph.node(String(key))
+		if n.id == id and n.kind != "time":
 			return String(key)
 	return desk.graph.key_of(CaseLoader.kind_of_ref(id), id)
 
@@ -1682,11 +1682,11 @@ func _shot_p3_flow() -> void:
 	## 证号写死成 TEC-GD-2160，两边的证章文字才逐字相同。
 	desk._investigator = {"name": "陈调整", "id": "TEC-GD-2160", "sense": ["vision"], "avatarId": "CHARS_EXEC"}
 	desk.session._refresh_chip()
-	var loc: Dictionary = desk.graph.add_node("loc", desk.SLICE_SCENE)
-	loc["x"] = 40.0
-	loc["y"] = 30.0
-	desk.graph.mark_fresh(String(loc["key"]))
-	desk.canvas._spawn_card(loc["key"])
+	var loc := desk.graph.add_node("loc", desk.SLICE_SCENE)
+	loc.x = 40.0
+	loc.y = 30.0
+	desk.graph.mark_fresh(loc.key)
+	desk.canvas._spawn_card(loc.key)
 	desk.canvas._relayout()
 	desk._hide_toast()
 	await _wait(0.5)
@@ -1715,6 +1715,6 @@ func _show_mem_lines(n: int) -> void:
 
 
 func _ensure_card(kind: String, id: String) -> void:
-	var n: Dictionary = desk.graph.add_node(kind, id)
-	desk.canvas._spawn_card(String(n["key"]))
+	var n := desk.graph.add_node(kind, id)
+	desk.canvas._spawn_card(n.key)
 	desk.canvas._relayout()

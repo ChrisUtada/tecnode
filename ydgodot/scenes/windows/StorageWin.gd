@@ -64,8 +64,8 @@ func refresh_store() -> void:
 	var sig := "v1:"
 	for key in list:
 		var n := graph.node(String(key))
-		sig += String(key) + String.chr(31) + String(n.get("label", "")) + String.chr(31) \
-			+ String(n.get("bag_from", "")) + String.chr(30)
+		sig += String(key) + String.chr(31) + n.label + String.chr(31) \
+			+ n.bag_from + String.chr(30)
 	if sig == _list_sig:
 		return
 	_list_sig = sig
@@ -105,7 +105,7 @@ func _make_row(key: String) -> Control:
 	text_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hb.add_child(text_col)
 
-	var label_text := String(n.get("label", key))
+	var label_text := n.label if n.label != "" else key
 	var label := TecTheme.label(label_text, TecTheme.FS_BODY, TecTheme.TEXT)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.clip_text = true
@@ -117,7 +117,7 @@ func _make_row(key: String) -> Control:
 	# 袋清单标注来源（Web 版 bagFrom 口径）。放第二行：长来源只在自己的
 	# 文本列里省略，不会把「取回 / 上桌布」挤出条目。
 	if store_kind == GraphState.BAG:
-		var from_id := String(n.get("bag_from", ""))
+		var from_id := n.bag_from
 		if from_id != "":
 			var from_text := "来自 " + case_def.label_of(CaseLoader.kind_of_ref(from_id), from_id)
 			var src := TecTheme.label(from_text, TecTheme.FS_BODY, TecTheme.MUTED)

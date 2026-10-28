@@ -150,16 +150,24 @@ func has(kind: String, id: String) -> bool:
 	return nodes.has(key_of(kind, id))
 
 
-func node(key: String) -> Dictionary:
-	return nodes.get(key, {})
+func node(key: String) -> NodeState:
+	var value = nodes.get(key)
+	if value is NodeState:
+		return value
+	if value is Dictionary:
+		## 兼容入口：测试 / 旧调用若直接塞了字典，就地升级成实体。
+		var upgraded := NodeState.from_dict(value)
+		nodes[key] = upgraded
+		return upgraded
+	return NodeState.new()
 
 
-func add_node(kind: String, id: String) -> Dictionary:
+func add_node(kind: String, id: String) -> NodeState:
 	kind = normalize_kind(kind, id)
 	var key := key_of(kind, id)
 	if nodes.has(key):
-		return nodes[key]
-	## 字段名 / 类型 / 默认值只在 NodeState 里写一次；这里拿回存储用的字典。
+		return node(key)
+	## 字段名 / 类型 / 默认值只在 NodeState 里写一次。
 	## -1 = **还没落过位**。布局只给「未落位」的节点播种，已落位的一律保留
 	## （Web 用 `x == null` 判同一件事；Godot 的 Dictionary 没法存 null 语义的 float）
 	var ns := NodeState.make_new(kind, id, key, case_def.label_of(kind, id))
@@ -173,9 +181,8 @@ func add_node(kind: String, id: String) -> Dictionary:
 		var ev := case_def.evidence_of(id) if case_def != null else null
 		## 证据是玩家已经拿到的知识，不随时刻 / 折叠容器消失。
 		ns.apply_evidence(ev, captured.has(id))
-	var n := ns.to_dict()
-	nodes[key] = n
-	return n
+	nodes[key] = ns
+	return ns
 
 
 func link(a: String, b: String, rel: String) -> void:
@@ -200,7 +207,7 @@ func has_edge(a: String, b: String, rel: String = "") -> bool:
 func delete_node(key: String) -> bool:
 	if not nodes.has(key):
 		return false
-	var gone_id := String((nodes[key] as Dictionary).get("id", ""))
+	var gone_id := node(key).id
 	nodes.erase(key)
 	hidden.erase(key)
 	stored.erase(key)
@@ -255,8 +262,8 @@ func reveal_scene(sid: String) -> Array:
 	var fresh: Array = []
 	var sn := add_node("loc", sid)
 	if not explored.has(sid):
-		fresh.append(sn["key"])
-		mark_fresh(String(sn["key"]))
+		fresh.append(sn.key)
+		mark_fresh(sn.key)
 	explored[sid] = true
 	last_scene = sid
 
@@ -268,13 +275,13 @@ func reveal_scene(sid: String) -> Array:
 		## 场景 / 时间点通过 `node_locs` 连过来是「通路」，不是「被场景装下」。
 		## 若把目的地场景的 home_scene 写成当前场景，会和反向通路组成环，
 		## 两边都折叠时会互相隐藏，最后整张画布清空。
-		_assign_home(n, String(sn["key"]))
+		_assign_home(n, sn.key)
 		if not existed:
-			fresh.append(n["key"])
-			mark_fresh(String(n["key"]))
+			fresh.append(n.key)
+			mark_fresh(n.key)
 		if kind == "char":
 			meet_char_at(id, sid)         # 这个场景正是 debut 点的，此刻置位
-		link(sn["key"], n["key"], "move" if is_scene_kind(String(n["kind"])) else "entity")
+		link(sn.key, n.key, "move" if is_scene_kind(n.kind) else "entity")
 	return fresh
 
 
@@ -311,8 +318,8 @@ func reveal_container(kind: String, id: String) -> Array:
 	var host_key := key_of(kind, id)
 	var host := add_node(kind, id)
 	if not explored.has(id):
-		fresh.append(host["key"])
-		mark_fresh(String(host["key"]))
+		fresh.append(host.key)
+		mark_fresh(host.key)
 	explored[id] = true
 	collapsed.erase(id)
 
@@ -325,28 +332,28 @@ func reveal_container(kind: String, id: String) -> Array:
 		## 回指花园，不能把花园的 home_scene 改成书桌，否则折叠会成环。
 		_assign_home(n, host_key)
 		if not existed:
-			fresh.append(n["key"])
-			mark_fresh(String(n["key"]))
+			fresh.append(n.key)
+			mark_fresh(n.key)
 		if k == "char":
 			meet_char_at(cid, id)
-		link(host_key, n["key"], "move" if is_scene_kind(String(n["kind"])) else "entity")
+		link(host_key, n.key, "move" if is_scene_kind(n.kind) else "entity")
 	return fresh
 
 
 ## 写入归属前先做环检查：容器自己不能是子节点的后代。
 ## 例：书桌 node_locs 指回花园（通路），垃圾桶 node_items 又写了书桌（上下文提及），
 ## 若直接写 home_scene 会得到「书桌属于垃圾桶、垃圾桶属于书桌」，折叠时互相藏光。
-func _assign_home(n: Dictionary, host_key: String) -> void:
-	if String(n.get("home_scene", "")) != "":
+func _assign_home(n: NodeState, host_key: String) -> void:
+	if n.home_scene != "":
 		return
-	if is_scene_kind(String(n.get("kind", ""))):
+	if is_scene_kind(n.kind):
 		return
-	if _home_would_cycle(String(n.get("key", "")), host_key):
+	if _home_would_cycle(n.key, host_key):
 		return
-	var host: Dictionary = nodes.get(host_key, {})
+	var host := node(host_key)
 	if host.is_empty():
 		return
-	n["home_scene"] = String(host.get("id", ""))
+	n.home_scene = host.id
 
 
 func _home_would_cycle(child_key: String, host_key: String) -> bool:
@@ -360,10 +367,10 @@ func _home_would_cycle(child_key: String, host_key: String) -> bool:
 		if seen.has(cursor):
 			return true
 		seen[cursor] = true
-		var host: Dictionary = nodes.get(cursor, {})
+		var host := node(cursor)
 		if host.is_empty():
 			return false
-		var home_id := String(host.get("home_scene", ""))
+		var home_id := host.home_scene
 		if home_id == "":
 			return false
 		cursor = _key_of_id(home_id)
@@ -372,7 +379,7 @@ func _home_would_cycle(child_key: String, host_key: String) -> bool:
 
 func _key_of_id(id: String) -> String:
 	for k in nodes.keys():
-		if String((nodes[k] as Dictionary).get("id", "")) == id:
+		if node(String(k)).id == id:
 			return String(k)
 	return ""
 
@@ -401,7 +408,7 @@ func store(key: String, where: String) -> void:
 func take(key: String) -> String:
 	var where := String(stored.get(key, ""))
 	if where == MATRIX:
-		_remove_from_matrix(String(node(key).get("id", "")))
+		_remove_from_matrix(node(key).id)
 	stored.erase(key)
 	hidden.erase(key)
 	return where
@@ -422,8 +429,8 @@ func mark_fresh(key: String) -> void:
 	var n := node(key)
 	if n.is_empty():
 		return
-	n["fresh"] = true
-	n["unread"] = true
+	n.fresh = true
+	n.unread = true
 
 
 ## 玩家点过这个节点 ⇒ 摘掉「新」角标（Web 的 clearFresh）
@@ -431,8 +438,8 @@ func clear_fresh(key: String) -> void:
 	var n := node(key)
 	if n.is_empty():
 		return
-	n["fresh"] = false
-	n["unread"] = false
+	n.fresh = false
+	n.unread = false
 
 
 ## 入场动画的一次性消费：只摘 fresh（pop 的来源），unread 还在
@@ -441,11 +448,11 @@ func consume_fresh(key: String) -> void:
 	var n := node(key)
 	if n.is_empty():
 		return
-	n["fresh"] = false
+	n.fresh = false
 
 
 func has_unread(key: String) -> bool:
-	return bool(node(key).get("unread", false))
+	return node(key).unread
 
 
 # ── 时间轴 / 时刻图层 / 登场门控（对齐 Web 03-utils.js）─────────────────
@@ -505,12 +512,12 @@ func mem_place_of(t: String) -> SceneDef:
 
 
 ## 时间可见性：当前时刻的节点集里没有它 ⇒ 不可见；present 档全通过。
-func visible_now(n: Dictionary) -> bool:
+func visible_now(n: NodeState) -> bool:
 	if n.is_empty():
 		return false
 	var st := current_stage()
 	var keys = st.get("keys", null)
-	return keys == null or (keys as Array).has(String(n["key"]))
+	return keys == null or (keys as Array).has(n.key)
 
 
 func char_debut(id: String) -> String:
@@ -544,7 +551,7 @@ func char_talk_queue(id: String) -> Array:
 	var home := ""
 	var n := node(key_of("char", id))
 	if not n.is_empty():
-		home = String(n.get("home_scene", ""))
+		home = n.home_scene
 	if home == "":
 		return out
 	for st in c.scene_talks:
@@ -625,15 +632,15 @@ func char_now_met(id: String) -> bool:
 
 
 ## 综合可见（时间 × 空间 × 登场）：渲染 / 交互 / 聚焦一律认这一个。
-func visible_node(n: Dictionary) -> bool:
-	if n.is_empty() or hidden.has(String(n["key"])) or stored.has(String(n["key"])):
+func visible_node(n: NodeState) -> bool:
+	if n.is_empty() or hidden.has(n.key) or stored.has(n.key):
 		return false
 	## 没有场景上下文的常驻节点（例如教学期由 TEC 直接调出的「调查员」人物）：
 	## 显式豁免「必须在已探索场景里」的判定，避免拖拽收尾 / 收纳重算把它藏掉。
-	if bool(n.get("always_visible", false)):
+	if n.always_visible:
 		return true
-	if String(n["kind"]) == "char":
-		var id := String(n["id"])
+	if n.kind == "char":
+		var id := n.id
 		if not char_debuted(id):
 			return false
 		if not visible_now(n):
@@ -652,9 +659,9 @@ func spawn_mem_cast(t: String) -> int:
 	if s == null or not case_def.is_time_id(t):
 		return 0
 	var place := case_def.mem_place_of(t)
-	var pn: Dictionary = nodes.get(scene_key(place.id), {}) if place != null else {}
-	var hx := float(pn.get("x", 0.0)) if not pn.is_empty() else -1.0
-	var hy := float(pn.get("y", 0.0)) if not pn.is_empty() else -1.0
+	var pn := node(scene_key(place.id)) if place != null else NodeState.new()
+	var hx := pn.x if not pn.is_empty() else -1.0
+	var hy := pn.y if not pn.is_empty() else -1.0
 	var added := 0
 	var i := 0
 	for tag in case_def.nodes_of_scene(s):
@@ -667,17 +674,17 @@ func spawn_mem_cast(t: String) -> int:
 			continue                      # 登场点不在这一刻：文本提及 ≠ 遇到
 		var existed := has("char", cid)
 		var n := add_node("char", cid)
-		if String(n.get("home_scene", "")) == "":
-			n["home_scene"] = t
+		if n.home_scene == "":
+			n.home_scene = t
 		meet_char_at(cid, t)
 		if not existed:
 			added += 1
 			if hx >= 0.0:
-				n["x"] = hx + MEM_CAST_DX + float(tag_i % 3) * MEM_CAST_STEP
-				n["y"] = hy + MEM_CAST_DY + float(int(tag_i / 3)) * MEM_CAST_STEP
-			mark_fresh(String(n["key"]))
+				n.x = hx + MEM_CAST_DX + float(tag_i % 3) * MEM_CAST_STEP
+				n.y = hy + MEM_CAST_DY + float(int(tag_i / 3)) * MEM_CAST_STEP
+			mark_fresh(n.key)
 			if not pn.is_empty():
-				link(String(pn["key"]), String(n["key"]), "entity")
+				link(pn.key, n.key, "entity")
 	return added
 
 
@@ -687,7 +694,7 @@ func is_container_node(key: String) -> bool:
 	var n := node(key)
 	if n.is_empty():
 		return false
-	return is_container(String(n["kind"]), String(n["id"]))
+	return is_container(n.kind, n.id)
 
 
 ## 物品窗准入：物品必须显式允许（ItemDef.baggable）。
@@ -696,13 +703,13 @@ func can_bag(key: String) -> bool:
 	var n := node(key)
 	if n.is_empty() or stored.has(key):
 		return false
-	var kind := String(n.get("kind", ""))
+	var kind := n.kind
 	if kind == "evidence":
 		## 「物品」收物与词；证是知识，进「证据」，不进「物品」。
-		return String(n.get("tier", "")) == "ci"
+		return n.tier == "ci"
 	if kind != "item":
 		return false
-	var it := case_def.item_of(String(n.get("id", "")))
+	var it := case_def.item_of(n.id)
 	return it != null and it.baggable
 
 
@@ -711,8 +718,8 @@ func bag_store(key: String) -> bool:
 	if not can_bag(key):
 		return false
 	var n := node(key)
-	n["bag_from"] = String(n.get("home_scene", ""))
-	n["pinned"] = false
+	n.bag_from = n.home_scene
+	n.pinned = false
 	stored[key] = BAG
 	recompute_hidden()
 	return true
@@ -723,9 +730,9 @@ func ledger_store(key: String) -> bool:
 	var n := node(key)
 	if n.is_empty() or stored.has(key):
 		return false
-	if String(n["kind"]) != "evidence" or String(n.get("tier", "")) != "zheng":
+	if n.kind != "evidence" or n.tier != "zheng":
 		return false
-	n["pinned"] = false
+	n.pinned = false
 	stored[key] = LEDGER
 	recompute_hidden()
 	return true
@@ -737,13 +744,13 @@ func take_back(key: String, x: float = -1.0, y: float = -1.0) -> bool:
 		return false
 	var n := node(key)
 	if String(stored[key]) == MATRIX:
-		_remove_from_matrix(String(n.get("id", "")))
+		_remove_from_matrix(n.id)
 	stored.erase(key)
 	hidden.erase(key)
-	n["pinned"] = false
+	n.pinned = false
 	if x >= 0.0 and y >= 0.0:
-		n["x"] = x
-		n["y"] = y
+		n.x = x
+		n.y = y
 	recompute_hidden()
 	return true
 
@@ -756,19 +763,19 @@ func restash(key: String, from: String, to: String) -> bool:
 		return false
 	var n := node(key)
 	## 袋收物与词，册收证：两边不互通。
-	var kind := String(n.get("kind", ""))
-	var tier := String(n.get("tier", ""))
+	var kind := n.kind
+	var tier := n.tier
 	if to == BAG and not (kind == "item" or (kind == "evidence" and tier == "ci")):
 		return false
 	if to == LEDGER and not (kind == "evidence" and tier == "zheng"):
 		return false
 	if from == MATRIX:
-		_remove_from_matrix(String(n.get("id", "")))
-	n["pinned"] = false
+		_remove_from_matrix(n.id)
+	n.pinned = false
 	if to == BAG:
-		n["bag_from"] = String(n.get("home_scene", ""))
+		n.bag_from = n.home_scene
 	else:
-		n["bag_from"] = ""
+		n.bag_from = ""
 	stored[key] = to
 	return true
 
@@ -781,9 +788,9 @@ func restash(key: String, from: String, to: String) -> bool:
 ## 归位到推演桌布（证 → 某感官槽位）。词 / 物没有五感，不收。
 func matrix_assign(key: String, sense: String = "") -> bool:
 	var n := node(key)
-	if n.is_empty() or String(n["kind"]) != "evidence" or String(n.get("tier", "")) != "zheng":
+	if n.is_empty() or n.kind != "evidence" or n.tier != "zheng":
 		return false
-	var ev := case_def.evidence_of(String(n["id"]))
+	var ev := case_def.evidence_of(n.id)
 	if ev == null:
 		return false
 	if sense == "":
@@ -792,7 +799,7 @@ func matrix_assign(key: String, sense: String = "") -> bool:
 		return false
 	stored[key] = MATRIX
 	hidden.erase(key)
-	n["pinned"] = false
+	n.pinned = false
 	return true
 
 
@@ -877,26 +884,26 @@ func capture_evidence(eid: String, from_key: String = "", x: float = -1.0, y: fl
 		origin: String = "synth") -> String:
 	var existing := key_of("evidence", eid)
 	if nodes.has(existing):
-		var old := nodes[existing] as Dictionary
-		if String(old.get("tier", "")) == "zheng":
+		var old := node(existing)
+		if old.tier == "zheng":
 			captured[eid] = true
-			old["captured"] = true
+			old.captured = true
 		return existing
 	var n := add_node("evidence", eid)
-	n["origin"] = origin
-	if String(n.get("tier", "")) == "zheng":
+	n.origin = origin
+	if n.tier == "zheng":
 		captured[eid] = true
-		n["captured"] = true
+		n.captured = true
 	if from_key != "":
-		link(from_key, String(n["key"]), "entity")
+		link(from_key, n.key, "entity")
 		var src := node(from_key)
-		if String(n.get("home_scene", "")) == "":
-			n["home_scene"] = String(src.get("home_scene", ""))
+		if n.home_scene == "":
+			n.home_scene = src.home_scene
 	if x >= 0.0 and y >= 0.0:
-		n["x"] = x
-		n["y"] = y
-	mark_fresh(String(n["key"]))
-	return String(n["key"])
+		n.x = x
+		n.y = y
+	mark_fresh(n.key)
+	return n.key
 
 
 # ── 档案字段：主张 / 核准 ───────────────────────────────────────────────
@@ -963,24 +970,24 @@ func recompute_hidden() -> void:
 	var by_scene := {}
 	var id_to_key := {}
 	for key in nodes.keys():
-		id_to_key[String((nodes[key] as Dictionary).get("id", ""))] = String(key)
+		id_to_key[node(String(key)).id] = String(key)
 	## 先修历史坏数据：
 	## · 场景 / 时间点永远是根，home_scene 一律清空；
 	## · 物品归属若成环（A→B→A），把环上节点全部改成根，否则先后折叠会互相藏光。
 	var cyclic := {}
 	for key in nodes.keys():
-		var n: Dictionary = nodes[key]
-		if is_scene_kind(String(n.get("kind", ""))):
-			n["home_scene"] = ""
+		var n := node(String(key))
+		if is_scene_kind(n.kind):
+			n.home_scene = ""
 			continue
-		if String(n.get("home_scene", "")) == "":
+		if n.home_scene == "":
 			continue
 		if _home_chain_cycles(String(key), id_to_key):
 			cyclic[key] = true
 	for key in cyclic.keys():
-		(nodes[key] as Dictionary)["home_scene"] = ""
+		node(String(key)).home_scene = ""
 	for key in nodes.keys():
-		var home := String((nodes[key] as Dictionary).get("home_scene", ""))
+		var home := node(String(key)).home_scene
 		if home == "":
 			continue
 		if not by_scene.has(home):
@@ -995,10 +1002,10 @@ func recompute_hidden() -> void:
 			if not nodes.has(container_key):
 				container_key = key_of("item", scene_id)
 			for key in by_scene.get(scene_id, []):
-				var n: Dictionary = nodes[key]
-				if stored.has(key) or hidden.has(key) or bool(n.get("pinned", false)):
+				var n := node(String(key))
+				if stored.has(key) or hidden.has(key) or n.pinned:
 					continue
-				if bool(n.get("always_visible", false)):
+				if n.always_visible:
 					continue
 				if key == container_key:
 					continue
@@ -1011,7 +1018,7 @@ func recompute_hidden() -> void:
 						continue
 					if hidden.has(other_key) or stored.has(other_key):
 						continue
-					if String((nodes[other_key] as Dictionary).get("home_scene", "")) == scene_id:
+					if node(String(other_key)).home_scene == scene_id:
 						continue
 					exported = true
 					break
@@ -1025,10 +1032,10 @@ func _home_chain_cycles(key: String, id_to_key: Dictionary) -> bool:
 	var seen := {key: true}
 	var cursor := key
 	while true:
-		var n: Dictionary = nodes.get(cursor, {})
+		var n := node(cursor)
 		if n.is_empty():
 			return false
-		var home := String(n.get("home_scene", ""))
+		var home := n.home_scene
 		if home == "":
 			return false
 		var next_key := String(id_to_key.get(home, ""))
@@ -1067,9 +1074,9 @@ func is_hub(kind: String, id: String) -> bool:
 ## 的第一道提醒（若在推演 / 档案里确实有别的到达法，药丸会在数据里替它背书）。
 func is_no_entry(key: String) -> bool:
 	var n := node(key)
-	if n.is_empty() or String(n["kind"]) != "loc":
+	if n.is_empty() or n.kind != "loc":
 		return false
-	var id := String(n["id"])
+	var id := n.id
 	if explored.has(id):
 		return false
 	if _loc_in.is_empty():

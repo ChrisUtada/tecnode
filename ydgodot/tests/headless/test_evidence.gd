@@ -87,13 +87,13 @@ func _test_recipes() -> void:
 		and String(res.get("produced_evidence", "")) == "EVID_Z_lamp_notes", str(res))
 	var k := g.key_of("evidence", "EVID_Z_lamp_notes")
 	var n := g.node(k)
-	check("产物是「证」", String(n.get("tier", "")) == "zheng"
-		and bool(n.get("captured", false)), str(n))
+	check("产物是「证」", n.tier == "zheng"
+		and n.captured, str(n))
 	check("产物 origin=synth / sense=vision",
-		String(n.get("origin", "")) == "synth" and String(n.get("sense", "")) == "vision", str(n))
-	check("产物带「新」标记", bool(n.get("fresh", false)) and bool(n.get("unread", false)), str(n))
-	check("产物落在目标右下 60/60", Vector2(float(n["x"]), float(n["y"])) == Vector2(260.0, 160.0),
-		str(Vector2(float(n["x"]), float(n["y"]))))
+		n.origin == "synth" and n.sense == "vision", str(n))
+	check("产物带「新」标记", n.fresh and n.unread, str(n))
+	check("产物落在目标右下 60/60", Vector2(n.x, n.y) == Vector2(260.0, 160.0),
+		str(Vector2(n.x, n.y)))
 	check("原料不消耗：笔记还在", g.has("item", "ITEM_sxbj"))
 	check("原料不消耗：台灯还在", g.has("item", "ITEM_taideng"))
 	check("原料不会被塞进物品 / 证据", not g.stored.has("item:ITEM_sxbj")
@@ -118,17 +118,17 @@ func _test_recipes() -> void:
 	var g4 := GraphState.new(c)
 	var comb4 := ComboSystem.new(c, g4)
 	var word := g4.add_node("evidence", "EVID_CI_lhs_word")
-	word["x"] = 200.0
-	word["y"] = 100.0
+	word.x = 200.0
+	word.y = 100.0
 	g4.add_node("item", "ITEM_sxbj")
 	var sig := comb4.use_item("item:ITEM_sxbj", "evidence:EVID_CI_lhs_word")
 	check("物×词签名配方命中", bool(sig.get("ok", false))
 		and String(sig.get("produced_evidence", "")) == "EVID_Z_note_voice", str(sig))
 	var sig_n := g4.node(g4.key_of("evidence", "EVID_Z_note_voice"))
-	check("物×词产物带配方五感", String(sig_n.get("sense", "")) == "hearing", str(sig_n))
+	check("物×词产物带配方五感", sig_n.sense == "hearing", str(sig_n))
 	check("词本身不被消耗、不变成已捕获",
 		g4.has("evidence", "EVID_CI_lhs_word")
-			and not bool(g4.node("evidence:EVID_CI_lhs_word").get("captured", false)))
+			and not bool(g4.node("evidence:EVID_CI_lhs_word").captured))
 
 	# 链式：台灯笔记 × 独白 → 伪造时间；再 × 绳索 → 缢死。
 	var g5 := GraphState.new(c)
@@ -144,7 +144,7 @@ func _test_recipes() -> void:
 	check("链式第二层：证×物", bool(step2.get("ok", false))
 		and String(step2.get("produced_evidence", "")) == "EVID_Z_strangled", str(step2))
 	var strangled := g5.node(g5.key_of("evidence", "EVID_Z_strangled"))
-	check("链式产物的五感来自配方", String(strangled.get("sense", "")) == "touch", str(strangled))
+	check("链式产物的五感来自配方", strangled.sense == "touch", str(strangled))
 
 	var g6 := GraphState.new(c)
 	var comb6 := ComboSystem.new(c, g6)
@@ -218,7 +218,7 @@ func _test_word_drops() -> void:
 	await process_frame
 	check("独白完整播放掉落「词」证据", scene.graph.has("evidence", "EVID_CI_lhs_word"))
 	check("掉落的词不被当作已捕获的证",
-		not bool(scene.graph.node("evidence:EVID_CI_lhs_word").get("captured", true)))
+		not bool(scene.graph.node("evidence:EVID_CI_lhs_word").captured))
 	var logs: int = int(scene.graph.logs.size())
 	scene.debug.dbg_chat_close()
 	scene.debug.dbg_open_monologue("CHARS_luhengs")
@@ -335,7 +335,7 @@ func _test_glyph() -> void:
 	check("画布合成有 toast", scene.debug.dbg_toast_text().contains("获得证据"),
 		scene.debug.dbg_toast_text())
 	check("画布合成产物 origin=synth",
-		String(scene.graph.node(made).get("origin", "")) == "synth", str(scene.graph.node(made)))
+		String(scene.graph.node(made).origin) == "synth", str(scene.graph.node(made)))
 	check("画布合成原料还在",
 		scene.graph.has("item", "ITEM_sxbj") and scene.graph.has("item", "ITEM_taideng"))
 	if made_card != null:
@@ -358,10 +358,10 @@ func _test_tec_hidden_evidence() -> void:
 	check("TEC 证卡带「新」角标", card != null and card._badge.visible
 		and scene.graph.has_unread(card.card_key), "null" if card == null else str(card._badge.visible))
 	check("TEC 产出的证 origin=tec",
-		String(scene.graph.node("evidence:DATA_T_sun").get("origin", "")) == "tec",
+		String(scene.graph.node("evidence:DATA_T_sun").origin) == "tec",
 		str(scene.graph.node("evidence:DATA_T_sun")))
 	check("TEC 产出的证已捕获",
-		bool(scene.graph.node("evidence:DATA_T_sun").get("captured", false)))
+		bool(scene.graph.node("evidence:DATA_T_sun").captured))
 
 
 func _test_drop_rules() -> void:
@@ -477,8 +477,8 @@ func _test_field_flow() -> void:
 	var mc_key: String = scene.graph.key_of("evidence", "CLUES_mc")
 	check("字段集齐掉落人物证据", scene.graph.captured.has("CLUES_mc") and scene.graph.has("evidence", "CLUES_mc"))
 	check("人物证据 origin=deduce / 已捕获",
-		String(scene.graph.node(mc_key).get("origin", "")) == "deduce"
-			and bool(scene.graph.node(mc_key).get("captured", false)),
+		String(scene.graph.node(mc_key).origin) == "deduce"
+			and bool(scene.graph.node(mc_key).captured),
 		str(scene.graph.node(mc_key)))
 	check("人物证据卡在画布", _cards().has(mc_key))
 	var tec_win = scene.debug.dbg_tec_win()

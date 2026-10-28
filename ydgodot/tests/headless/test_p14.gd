@@ -80,7 +80,7 @@ func _test_capture() -> void:
 	var key := g.capture_clue("CLUES_nm")
 	check("捕获：记入 captured", g.captured.has("CLUES_nm"))
 	check("捕获：建出证节点", g.has("clue", "CLUES_nm"))
-	check("捕获：节点带 captured 标记", bool(g.node(key).get("captured", false)))
+	check("捕获：节点带 captured 标记", bool(g.node(key).captured))
 	var from_refs := g.capture_clue_refs([c.clue_of("CLUES_xds")])
 	check("§7-2 结构化证据引用捕获", from_refs.size() == 1 and g.captured.has("CLUES_xds"))
 

@@ -17,8 +17,7 @@ func _music_unlocked() -> bool:
 	if desk.graph == null:
 		return false
 	for n in desk.graph.nodes.values():
-		var ins = n.get("installed", {})
-		if ins is Dictionary and bool(ins.get("ITEMS_cz", false)):
+		if n is NodeState and bool((n as NodeState).installed.get("ITEMS_cz", false)):
 			return true
 	return false
 

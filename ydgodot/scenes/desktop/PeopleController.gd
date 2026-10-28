@@ -158,7 +158,7 @@ func _person_payload(id: String) -> Dictionary:
 		photo = _person_photo(id, ch)
 		var n := desk.graph.node(desk.graph.key_of("char", id))
 		if not n.is_empty():
-			first_scene = String(n.get("home_scene", ""))
+			first_scene = n.home_scene
 		if first_scene == "" and ch.debut != null:
 			first_scene = ch.debut.id
 	elif id == "CHARS_EXEC":
@@ -273,23 +273,23 @@ func _assign_evidence_to_field(person_id: String, field_id: String, key: String,
 	var field := _find_evidence_field(person_id, field_id)
 	if n.is_empty() or field == null:
 		return false
-	var label := String(n.get("label", key))
+	var label := n.label if n.label != "" else key
 	if desk.graph.is_field_confirmed(person_id, field_id):
 		desk.drag._reject_drop("「%s」已经核准，不能再附证据。" % field.label)
 		return false
-	var kind := String(n.get("kind", ""))
+	var kind := n.kind
 	if kind == "item":
 		desk.drag._reject_drop("「%s」是物，只是原料——先和词合成「证」。" % label)
 		return false
 	if kind != "evidence":
 		desk.drag._reject_drop("只有「证」能填进档案字段。")
 		return false
-	var tier := String(n.get("tier", ""))
+	var tier := n.tier
 	if tier != "zheng":
 		desk.drag._reject_drop("「%s」是词，只是证言——先和物合成「证」。" % label)
 		return false
 	var before := desk._save.snapshot()
-	desk.graph.set_claim(person_id, field_id, "", String(n.get("id", "")))
+	desk.graph.set_claim(person_id, field_id, "", n.id)
 	_refresh_person_card_fields()
 	desk._log("将证据「%s」附到「%s」的「%s」字段，待核对" % [
 		label, desk.case_def.char_of(person_id).name if desk.case_def.char_of(person_id) != null else person_id,

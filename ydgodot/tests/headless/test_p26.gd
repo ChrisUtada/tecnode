@@ -95,7 +95,7 @@ func _test_roster_core(c: CaseLoader) -> void:
 		str(g4.char_talk_queue("CHARS_luhengs").size()))
 	check("没落场景就不加场台词", g4.char_talk_queue("CHARS_JS").is_empty(),
 		str(g4.char_talk_queue("CHARS_JS").size()))
-	(n as Dictionary)["home_scene"] = "SCENES_0704"
+	n.home_scene = "SCENES_0704"
 	check("落场后加到 14 句", g4.char_talk_queue("CHARS_luhengs").size() == 14,
 		str(g4.char_talk_queue("CHARS_luhengs").size()))
 	check("队列没有空行", not g4.char_talk_queue("CHARS_luhengs").has(""))

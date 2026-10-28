@@ -242,7 +242,7 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.add_child(col)
 
-	var title := TecTheme.label(String(n.get("label", cid)), TecTheme.FS_BODY, TecTheme.TEXT)
+	var title := TecTheme.label(n.label if n.label != "" else cid, TecTheme.FS_BODY, TecTheme.TEXT)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.clip_text = true
 	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS

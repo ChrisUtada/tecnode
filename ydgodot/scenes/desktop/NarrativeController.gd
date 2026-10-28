@@ -40,22 +40,22 @@ func _try_memory_combo(tool_key: String, target_key: String, before: Dictionary)
 	var target := desk.graph.node(target_key)
 	if tool.is_empty() or target.is_empty():
 		return false
-	var who: Dictionary = {}
-	var where: Dictionary = {}
+	var who: NodeState = null
+	var where: NodeState = null
 	var where_key := ""
-	if String(tool["kind"]) == "char":
+	if tool.kind == "char":
 		who = tool
-	elif String(target["kind"]) == "char":
+	elif target.kind == "char":
 		who = target
-	if String(tool["kind"]) == "loc":
+	if tool.kind == "loc":
 		where = tool
 		where_key = tool_key
-	elif String(target["kind"]) == "loc":
+	elif target.kind == "loc":
 		where = target
 		where_key = target_key
-	if who.is_empty() or where.is_empty():
+	if who == null or where == null:
 		return false
-	var mem := desk.case_def.memory_for(desk.graph.time, String(who["id"]), String(where["id"]))
+	var mem := desk.case_def.memory_for(desk.graph.time, who.id, where.id)
 	desk.graph.tried[tool_key + ">" + target_key] = true
 	if mem != null:
 		_open_memory_play(mem, where_key)
@@ -108,7 +108,7 @@ func _close_time_transients() -> void:
 func _sync_cards_for_time() -> void:
 	for key in desk.graph.nodes.keys():
 		var n := desk.graph.node(String(key))
-		if n.is_empty() or String(n["kind"]) == "time":
+		if n.is_empty() or n.kind == "time":
 			continue
 		if desk._cards.has(String(key)):
 			(desk._cards[String(key)] as NodeCard).refresh()
@@ -368,8 +368,9 @@ func _grant_evidence(ev: EvidenceDef, from_key: String = "", x: float = -1.0,
 		var n := desk.graph.node(key)
 		desk.canvas._refresh_or_spawn_card(key)
 		desk.canvas._relayout()
-		desk._log("获得证据「%s」" % String(n.get("label", ev.label)), "cap")
-		desk._show_toast("获得证据：" + String(n.get("label", ev.label)))
+		var got_label := n.label if n.label != "" else ev.label
+		desk._log("获得证据「%s」" % got_label, "cap")
+		desk._show_toast("获得证据：" + got_label)
 		desk.tec._tec_teach_evidence()
 	return key
 
@@ -443,7 +444,7 @@ func _chat_drop(key: String) -> bool:
 	var n := desk.graph.node(key)
 	if n.is_empty():
 		return false
-	return chat.drop_node(String(n["kind"]), String(n["id"]))
+	return chat.drop_node(n.kind, n.id)
 
 
 func _mark_archive_new() -> void:

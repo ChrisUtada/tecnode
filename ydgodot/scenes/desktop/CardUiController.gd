@@ -45,7 +45,7 @@ func _open_card_context(key: String, at_global: Vector2) -> void:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 2)
 	menu.add_child(col)
-	var pin := TecTheme.button("取消钉住" if bool(n.get("pinned", false)) else "钉住")
+	var pin := TecTheme.button("取消钉住" if n.pinned else "钉住")
 	pin.name = "ctx_pin"
 	pin.custom_minimum_size = Vector2(104, 26)
 	pin.pressed.connect(func():
@@ -82,7 +82,7 @@ func _on_card_pin_toggled(key: String) -> void:
 	if n.is_empty():
 		return
 	var before := desk._save.snapshot()
-	n["pinned"] = not bool(n.get("pinned", false))
+	n.pinned = not n.pinned
 	desk.canvas._sync_card_shell(desk._cards.get(key, null))
 	desk.session._commit(before)
 
@@ -145,9 +145,9 @@ func _replay_talk(key: String) -> bool:
 	var n := desk.graph.node(key)
 	if n.is_empty() or desk._chat_win != null and is_instance_valid(desk._chat_win):
 		return false
-	if String(n["kind"]) != "char":
+	if n.kind != "char":
 		return false
-	var ch := desk.case_def.char_of(String(n["id"]))
+	var ch := desk.case_def.char_of(n.id)
 	if ch == null:
 		return false
 	## S13：重看对话要覆盖 talkQueue + 当前 home_scene 的场景限定台词。
@@ -174,14 +174,14 @@ func _on_card_activated(key: String) -> void:
 		return
 	if desk._tutorial_active and desk.tutorial._tutorial_on_activate(key):
 		return
-	var id := String(n["id"])
+	var id := n.id
 	# 证是知识代币：双击 = 确认（已由 TEC / 合成产出的证通常已 captured，重复双击只提示）。
-	if String(n["kind"]) == "evidence" and String(n.get("tier", "")) == "zheng":
+	if n.kind == "evidence" and n.tier == "zheng":
 		_capture_clue_node(key)
 		return
-	if String(n["kind"]) == "evidence":
+	if n.kind == "evidence":
 		return
-	if n["kind"] == "loc":
+	if n.kind == "loc":
 		# Web dblclick：场景若带命令（SCENES[id].commands），双击先跑 commands[0]，
 		# 不展开容器 —— 数据里 0/11 的场景用到这条，分支为未来案件铺路
 		var sc := desk.case_def.scene_of(id)
@@ -202,7 +202,7 @@ func _on_card_activated(key: String) -> void:
 	var before := desk._save.snapshot()
 	var res := desk.combos.activate(key)
 	if res.is_empty():
-		if String(n["kind"]) == "char":
+		if n.kind == "char":
 			if _say_next_line(id):
 				return
 			if desk.narrative._open_monologue(id):
@@ -219,8 +219,8 @@ func _capture_clue_node(key: String) -> void:
 	var n := desk.graph.node(key)
 	if n.is_empty():
 		return
-	var id := String(n["id"])
-	var lab := String(n.get("label", id))
+	var id := n.id
+	var lab := n.label if n.label != "" else id
 	if desk.graph.captured.has(id):
 		desk._log("证据「%s」已经确认过了" % lab, "warn")
 		return
@@ -246,7 +246,7 @@ func _toggle_container(kind: String, id: String) -> void:
 			if kk == self_key:
 				continue
 			var nn := desk.graph.node(kk)
-			if String(nn.get("home_scene", "")) != id:
+			if nn.home_scene != id:
 				continue
 			if desk.graph.visible_node(nn):
 				left += 1
@@ -292,7 +292,7 @@ func _apply_outcome(res: Dictionary, node_key: String) -> void:
 	var blocked := bool(res.get("blocked", false))
 	var msg := String(res.get("message", ""))
 	if msg != "":
-		var nlab := String(desk.graph.node(node_key).get("label", node_key))
+		var nlab := String(desk.graph.node(node_key).label)
 		desk._log("「%s」：%s" % [nlab, msg], "warn" if blocked else "act")
 		desk._show_toast(msg, blocked)
 	for m in res.get("messages", []):
@@ -372,7 +372,7 @@ func _labels_of(ids: Array) -> Array:
 
 func _open_password(node_key: String) -> void:
 	var n := desk.graph.node(node_key)
-	var it := desk.case_def.item_of(String(n.get("id", "")))
+	var it := desk.case_def.item_of(n.id)
 	if it == null:
 		return
 	var cmd: PasswordCommandDef = null
@@ -415,7 +415,7 @@ func _submit_password(text: String) -> void:
 	if bool(res.get("wrong_password", false)):
 		if desk._pw_pop != null and is_instance_valid(desk._pw_pop):
 			desk._pw_pop.reject_wrong()
-		var pw_lab := String(desk.graph.node(pw_key).get("label", pw_key))
+		var pw_lab := String(desk.graph.node(pw_key).label)
 		var pw_txt := String(text) if String(text) != "" else "(空)"
 		desk._log("「%s」密码 %s 不正确" % [pw_lab, pw_txt], "warn")
 		desk._show_toast(String(res.get("message", "")), true)
@@ -425,7 +425,7 @@ func _submit_password(text: String) -> void:
 		if wrong == 2:
 			var hint := "连续错两次了。这个锁我可能有办法——把「%s」拖给 TEC 分析，看看有没有数字提示。" % pw_lab
 			var n := desk.graph.node(pw_key)
-			if desk.tec._tec_reaction_text("item", String(n.get("id", ""))) != "":
+			if desk.tec._tec_reaction_text("item", n.id) != "":
 				desk.tec._tec_hint("「%s」的密码？把它拖给我，我看看能不能读出数字。" % pw_lab, false)
 				desk._show_toast(hint, true)
 				desk._log(hint, "warn")
@@ -445,13 +445,13 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 	# 折叠的容器（场景 / 书桌 / 垃圾桶）既不收纳也不组合：里面的东西看不见，隔空命中的结果没有着力点
 	var tn := desk.graph.node(target_key)
 	if not tn.is_empty() and desk.graph.is_container_node(target_key) \
-		and desk.graph.collapsed.has(String(tn.get("id", ""))):
-		desk._show_toast("「%s」已折叠：先双击展开，或把节点拖到「物品」" % String(tn.get("label", "")), true)
+		and desk.graph.collapsed.has(tn.id):
+		desk._show_toast("「%s」已折叠：先双击展开，或把节点拖到「物品」" % tn.label, true)
 		return
 	var before := desk._save.snapshot()
 	# 标签要在 use_item 之前取：工具可能被消耗并从图中移除，事后再拿只剩内部 key。
-	var tool_label := String(desk.graph.node(tool_key).get("label", tool_key))
-	var target_label := String(tn.get("label", target_key))
+	var tool_label := String(desk.graph.node(tool_key).label)
+	var target_label := tn.label if tn.label != "" else target_key
 	if desk.narrative._try_memory_combo(tool_key, target_key, before):
 		return
 	if desk.narrative._try_dialogue_combo(tool_key, target_key):
@@ -475,9 +475,11 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 		var bits := "组合 %s ⇒ %s：%s" % [tool_label, target_label, String(res.get("message", ""))]
 		var gained: Array = []
 		for k in res.get("reveal", []):
-			gained.append(String(desk.graph.node(String(k)).get("label", k)))
+			var kn := desk.graph.node(String(k))
+			gained.append(kn.label if kn.label != "" else String(k))
 		for k in res.get("captured", []):
-			gained.append(String(desk.graph.node(String(k)).get("label", k)))
+			var kn2 := desk.graph.node(String(k))
+			gained.append(kn2.label if kn2.label != "" else String(k))
 		if not gained.is_empty():
 			bits += "　［获得 %s］" % "、".join(gained)
 		var consumed: Array = []

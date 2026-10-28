@@ -1019,7 +1019,7 @@ func _has_true_name_clue(keys: Array) -> bool:
 			recipe[String(clue.id)] = true
 	for key in keys:
 		var n := graph.node(String(key))
-		if recipe.has(String(n.get("id", ""))):
+		if recipe.has(n.id):
 			return true
 	return false
 

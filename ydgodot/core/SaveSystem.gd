@@ -50,8 +50,7 @@ func snapshot() -> Dictionary:
 	dbg_snapshot_calls += 1
 	var nodes_out := {}
 	for key in graph.nodes.keys():
-		var n: Dictionary = graph.nodes[key]
-		var item: Dictionary = n.duplicate(true)
+		var item: Dictionary = graph.node(String(key)).to_dict()
 		var where := String(graph.stored.get(key, ""))
 		item["stored"] = where != ""
 		item["storedIn"] = where
@@ -144,7 +143,7 @@ func _reset_graph() -> void:
 func _knowledge_now() -> Dictionary:
 	var unread := {}
 	for raw_key in graph.nodes.keys():
-		unread[String(raw_key)] = bool((graph.nodes[raw_key] as Dictionary).get("unread", false))
+		unread[String(raw_key)] = graph.node(String(raw_key)).unread
 	return {
 		"card_seen": graph.card_seen.duplicate(true),
 		"debuted": graph.debuted.duplicate(true),
@@ -166,14 +165,11 @@ func _restore_nodes(raw_nodes: Dictionary) -> void:
 			continue
 		ns.key = key
 		var where := ns.stored_in
-		var n := ns.to_dict()
-		n[NodeState.F_STORED] = where != ""
-		n[NodeState.F_STORED_IN] = where
 		if where != "":
 			graph.stored[key] = where
 		if ns.captured:
 			graph.captured[ns.id] = true
-		graph.nodes[key] = n
+		graph.nodes[key] = ns
 
 
 func _restore_edges(raw_edges) -> void:
@@ -271,7 +267,7 @@ func _merge_knowledge(knowledge: Dictionary) -> void:
 	var unread: Dictionary = knowledge.get("unread", {})
 	for key in unread.keys():
 		if graph.nodes.has(key):
-			graph.nodes[key]["unread"] = bool(unread[key])
+			graph.node(String(key)).unread = bool(unread[key])
 	## 已盖章字段是玩家知识：撤销能把主张与节点倒回去，但不能把章倒掉。
 	graph.confirmed_fields = (knowledge.get("confirmed", {}) as Dictionary).duplicate(true)
 

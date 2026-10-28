@@ -40,7 +40,7 @@ func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void
 	desk._sdrag_from = from_kind
 	desk._sdrag_origin = at_global
 	desk._sdrag_started = false
-	desk._sdrag_label = String(desk.graph.node(key).get("label", key))
+	desk._sdrag_label = String(desk.graph.node(key).label)
 	var rc := desk._cards.get(key, null) as NodeCard
 	## 行在袋里时，真实卡片必须不可见；若历史补间/刷新把它留在了旧位置，这里强制收掉，
 	## 避免拖拽时看到「幽灵在光标处、节点却在旧坐标」。
@@ -277,8 +277,8 @@ func _on_card_drag_finished(key: String, pos: Vector2, handled: bool) -> void:
 	if handled:
 		return
 	var before := desk._save.snapshot()
-	n["x"] = pos.x
-	n["y"] = pos.y
+	n.x = pos.x
+	n.y = pos.y
 	desk.chrome._refresh_crumbs()
 	desk.session._commit(before)
 
@@ -369,7 +369,7 @@ func _drop_hover_allowed(target_id: String) -> bool:
 	var n := desk.graph.node(desk._sdrag_key)
 	if n.is_empty():
 		return true
-	var kind := String(n["kind"])
+	var kind := n.kind
 	var zheng := _is_zheng_node(n)
 	var word := _is_word_node(n)
 	if target_id.begins_with("person-field:"):
@@ -467,12 +467,12 @@ func _reject_drop(text: String) -> void:
 	desk._show_toast(text, true)
 
 
-func _is_word_node(n: Dictionary) -> bool:
-	return String(n.get("kind", "")) == "evidence" and String(n.get("tier", "")) == "ci"
+func _is_word_node(n: NodeState) -> bool:
+	return n.kind == "evidence" and n.tier == "ci"
 
 
-func _is_zheng_node(n: Dictionary) -> bool:
-	return String(n.get("kind", "")) == "evidence" and String(n.get("tier", "")) == "zheng"
+func _is_zheng_node(n: NodeState) -> bool:
+	return n.kind == "evidence" and n.tier == "zheng"
 
 
 func _source_name(source: String) -> String:
@@ -494,14 +494,14 @@ func _dispatch_drop(key: String, target_id: String, _at_global: Vector2, source:
 	var n := desk.graph.node(key)
 	if n.is_empty():
 		return true
-	var kind := String(n["kind"])
-	var label := String(n.get("label", key))
+	var kind := n.kind
+	var label := n.label if n.label != "" else key
 	if target_id.begins_with("person-field:"):
 		var parts := target_id.split(":")
 		if parts.size() >= 3:
 			desk.people._assign_evidence_to_field(String(parts[1]), String(parts[2]), key, source)
 		return true
-	var tier := String(n.get("tier", ""))
+	var tier := n.tier
 	match target_id:
 		"bag-win", "bag-dock":
 			if source == "canvas":
@@ -553,8 +553,8 @@ func _restash_to(key: String, to: String, label: String) -> void:
 	if from == to:
 		return
 	var nd := desk.graph.node(key)
-	var kind := String(nd.get("kind", ""))
-	var tier := String(nd.get("tier", ""))
+	var kind := nd.kind
+	var tier := nd.tier
 	if to == GraphState.BAG and not (kind == "item" or (kind == "evidence" and tier == "ci")):
 		_reject_drop("「物品」收物与词；证是知识，进「证据」。")
 		return
@@ -578,24 +578,24 @@ func _store_into(where: String, key: String) -> void:
 		return
 	var target_name := "物品" if where == GraphState.BAG else "证据"
 	if desk.graph.stored.has(key):
-		var already := "「%s」已经在「%s」里了。" % [String(n.get("label", key)), target_name]
+		var already := "「%s」已经在「%s」里了。" % [n.label if n.label != "" else key, target_name]
 		if not desk.tutorial._tutorial_correct(already):
 			_reject_drop(already)
 		return
-	var kind := String(n.get("kind", ""))
-	var tier := String(n.get("tier", ""))
+	var kind := n.kind
+	var tier := n.tier
 	if where == GraphState.BAG:
 		if kind != "item" and not (kind == "evidence" and tier == "ci"):
-			var bag_msg := "「物品」收物与词；「%s」是证，请进「证据」。" % String(n.get("label", key)) \
-				if kind == "evidence" else "「物品」收物与词；「%s」不能放进「物品」。" % String(n.get("label", key))
+			var bag_msg := "「物品」收物与词；「%s」是证，请进「证据」。" % n.label \
+				if kind == "evidence" else "「物品」收物与词；「%s」不能放进「物品」。" % n.label
 			if not desk.tutorial._tutorial_correct(bag_msg):
 				_reject_drop(bag_msg)
 			return
 		if not desk.graph.can_bag(key):
-			var bag_msg2 := "「%s」不能放进「物品」。" % String(n.get("label", key))
+			var bag_msg2 := "「%s」不能放进「物品」。" % n.label
 			if desk.graph.is_container_node(key):
 				bag_msg2 = "「%s」是现场的一部分，收不走；它装着的东西可以单独收。" \
-					% String(n.get("label", key))
+					% n.label
 			if not desk.tutorial._tutorial_correct(bag_msg2):
 				_reject_drop(bag_msg2)
 			return
@@ -611,7 +611,7 @@ func _store_into(where: String, key: String) -> void:
 		return
 	desk.card_ui._apply_hidden()
 	_refresh_storage_wins()
-	desk._show_toast("「%s」收进「%s」" % [String(n.get("label", "")), target_name])
+	desk._show_toast("「%s」收进「%s」" % [n.label, target_name])
 	desk.session._commit(before)
 
 
