@@ -19,6 +19,26 @@ func dbg_last_rebuild_stats() -> Dictionary:
 	return desk.canvas._last_rebuild_stats.duplicate(true)
 
 
+## 批次 5：清空所有逐帧待办，供测试断言空闲态（不写盘）。
+func dbg_settle_idle() -> void:
+	desk._autosave_pending = false
+	desk.canvas._cancel_layout_job()
+	desk.canvas._follow_frames = 0
+	desk._edges_dirty = false
+	desk._panning = false
+	desk._sdrag_key = ""
+	if desk.narrative != null:
+		desk.narrative._mem_anchor_key = ""
+
+
+func dbg_is_processing() -> bool:
+	return desk.is_processing()
+
+
+func dbg_wake() -> void:
+	desk._wake_process()
+
+
 func dbg_save() -> bool:
 	return desk._save.save_to_disk() if desk._save != null else false
 

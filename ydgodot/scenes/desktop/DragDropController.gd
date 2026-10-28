@@ -35,6 +35,7 @@ func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void
 		_drop_card_mirror(null)
 	_drop_sdrag_card_mirror()
 	desk._sdrag_key = key
+	desk._wake_process()
 	## 起点直接用行事件的坐标——事件流与点击命中同流，任何窗口模式下都不会错位
 	desk._sdrag_from = from_kind
 	desk._sdrag_origin = at_global
@@ -209,6 +210,7 @@ func _on_card_drag_moved(key: String, at_global: Vector2) -> void:
 	_sync_card_mirror(card)
 	_update_drop_over(at_global)
 	desk._edges_dirty = true
+	desk._wake_process()
 
 
 func _mount_card_mirror(card: NodeCard) -> void:

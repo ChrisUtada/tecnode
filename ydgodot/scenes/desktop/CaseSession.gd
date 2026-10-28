@@ -708,6 +708,7 @@ func _queue_autosave() -> void:
 		return
 	desk._autosave_pending = true
 	desk._autosave_due_msec = Time.get_ticks_msec() + Desktop.AUTOSAVE_DELAY_MSEC
+	desk._wake_process()
 
 
 ## 动作开始前拍一张；动作结束后状态真的变了才入撤销栈并写盘

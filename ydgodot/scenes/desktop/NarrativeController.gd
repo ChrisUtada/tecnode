@@ -226,6 +226,7 @@ func _anchor_card_to(card: MemCard, node_key: String) -> void:
 	if card == null:
 		return
 	_mem_anchor_key = node_key
+	desk._wake_process()
 	var area := Vector2(desk._vw(), desk._vh() - Desktop.HEADER_H)
 	var pos := Vector2(700.0, 290.0)
 	var nc := desk._cards.get(node_key) as NodeCard

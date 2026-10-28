@@ -165,6 +165,7 @@ func _on_stage_input(event: InputEvent) -> void:
 				desk.drag._abort_card_drag()
 				return
 			desk._panning = true
+			desk._wake_process()
 			desk._pan_from = mb.position
 			desk._pan_origin = desk._view_pos
 			if desk._stage != null:
@@ -336,6 +337,7 @@ func _spawn_card(key: String) -> NodeCard:
 			## pop 期间连线不能停在旧端点；接下来半秒逐帧重画。
 			_follow_frames = maxi(_follow_frames, 30)
 			desk._edges_dirty = true
+			desk._wake_process()
 	## 新卡一上画布就重画连线；否则同帧刚建立的边要等下一次布局/交互才出现。
 	_repaint_edges()
 	return card
@@ -758,6 +760,7 @@ func _layout_force(animated: bool = false, force := false) -> void:
 		return
 	_layout_job = ForceLayoutScript.new()
 	_layout_job.prepare(desk.graph, list)
+	desk._wake_process()
 	## 无头 / 截图 / 页眉「立即重排」：一次跑完，坐标语义不变。
 	## 常规展开：先跑 40 轮把大致形状铺开，剩余 220 轮交给 _process 每帧 8 轮，
 	## 避免 60 节点时 46 万次对迭代把一帧卡死（F1）。
@@ -818,6 +821,7 @@ func _start_move_tween(key: String, card: NodeCard, p: Vector2) -> void:
 		_repaint_edges(), CONNECT_ONE_SHOT)
 	_move_twens[key] = tw
 	_follow_frames = maxi(_follow_frames, 21)   # ≈420ms @ 60fps（Web paintEdgesFor(420)）
+	desk._wake_process()
 
 
 func _kill_move(key: String) -> void:

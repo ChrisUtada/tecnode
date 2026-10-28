@@ -546,6 +546,11 @@ func _notification(what: int) -> void:
 ## 为什么不用 Control 的 drag&drop：那套只搬数据、画不了跟手的幽灵；
 ## 而画布拖动本来就是我们自己算的指针手势，两边口径要一致。
 func _process(_dt: float) -> void:
+	## 空闲关流：没有分帧任务 / 拖拽会话 / 待写盘时不再每帧进函数。
+	## 任何重新产生工作的入口都要 `_wake_process()`。
+	if not _has_process_work():
+		set_process(false)
+		return
 	if _panning and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_panning = false
 		if _stage != null:
@@ -573,6 +578,7 @@ func _process(_dt: float) -> void:
 		and canvas._move_twens.has(narrative._mem_anchor_key):
 		narrative._anchor_card_to(_mem_card, narrative._mem_anchor_key)
 	if _sdrag_key == "":
+		set_process(_has_process_work())
 		return
 	if _card_mirror != null and is_instance_valid(_card_mirror):
 		drag._drop_card_mirror(null)
@@ -596,6 +602,26 @@ func _process(_dt: float) -> void:
 	drag._update_drop_over(at)
 	if not _mouse_left_down:
 		drag._finish_sdrag(at)
+	set_process(_has_process_work())
+
+
+## 还有没有需要逐帧推进的工作：分帧力导向、连线重画、拖拽会话、待写盘、浮层跟锚。
+func _has_process_work() -> bool:
+	if _panning or _autosave_pending or _edges_dirty or _sdrag_key != "":
+		return true
+	if canvas != null and (canvas._layout_job != null or canvas._follow_frames > 0):
+		return true
+	if narrative != null and _mem_card != null and is_instance_valid(_mem_card) \
+			and narrative._mem_anchor_key != "" and canvas._move_twens.has(narrative._mem_anchor_key):
+		return true
+	return false
+
+
+## 把 `_process` 重新拉起来；空闲帧由 `_process` 自己关流。
+func _wake_process() -> void:
+	if not is_processing():
+		set_process(true)
+
 
 ## 命令行参数（`--` 之后的用户参数）
 func _has_arg(flag: String) -> bool:

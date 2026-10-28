@@ -2339,6 +2339,16 @@ func _initialize() -> void:
 			scene._goal.text.contains("已记录") and scene._goal.text.contains("真名"),
 			scene._goal.text)
 
+	# 批次 5：空闲帧不再每帧进 _process；拖拽 / 布局 / 写盘等待办出现时才唤醒。
+	scene.debug.dbg_settle_idle()
+	await process_frame
+	check("空闲帧关闭 _process", not scene.debug.dbg_is_processing())
+	scene.debug.dbg_wake()
+	check("待办出现时唤醒 _process", scene.debug.dbg_is_processing())
+	scene.debug.dbg_settle_idle()
+	await process_frame
+	check("待办清空后再次休眠", not scene.debug.dbg_is_processing())
+
 	_finish()
 
 
