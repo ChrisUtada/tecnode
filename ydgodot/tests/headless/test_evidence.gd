@@ -188,7 +188,7 @@ func _test_ui() -> void:
 	root.add_child(scene)
 	await process_frame
 	await process_frame
-	scene.dbg_use_temp_progress(TEMP_PROGRESS)
+	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
 	scene._save.path = TEMP_SAVE
 	scene._save_enabled = false
 
@@ -214,66 +214,66 @@ func _last_log() -> String:
 
 func _test_word_drops() -> void:
 	# 独白：整段一次贴出 = 完整播放。
-	scene.dbg_open_monologue("CHARS_luhengs")
+	scene.debug.dbg_open_monologue("CHARS_luhengs")
 	await process_frame
 	check("独白完整播放掉落「词」证据", scene.graph.has("evidence", "EVID_CI_lhs_word"))
 	check("掉落的词不被当作已捕获的证",
 		not bool(scene.graph.node("evidence:EVID_CI_lhs_word").get("captured", true)))
 	var logs: int = int(scene.graph.logs.size())
-	scene.dbg_chat_close()
-	scene.dbg_open_monologue("CHARS_luhengs")
+	scene.debug.dbg_chat_close()
+	scene.debug.dbg_open_monologue("CHARS_luhengs")
 	await process_frame
 	check("重播不重复掉落", scene.graph.logs.size() == logs,
 		"%d -> %d" % [logs, scene.graph.logs.size()])
-	scene.dbg_chat_close()
+	scene.debug.dbg_chat_close()
 
 	# 对话：补全跳过不算完整播放。
-	scene.dbg_open_dialogue("DLG_0704_zs_lhs", ["CHARS_zs", "CHARS_luhengs"])
+	scene.debug.dbg_open_dialogue("DLG_0704_zs_lhs", ["CHARS_zs", "CHARS_luhengs"])
 	await process_frame
-	var chat: ChatWindow = scene.dbg_chat()
+	var chat: ChatWindow = scene.debug.dbg_chat()
 	for i in 40:
-		scene.dbg_chat_finish()
-		if not scene.dbg_chat_advance():
+		scene.debug.dbg_chat_finish()
+		if not scene.debug.dbg_chat_advance():
 			break
 	check("对话补全跳过不掉「词」", not scene.graph.has("evidence", "EVID_CI_zs_word"))
-	scene.dbg_chat_close()
+	scene.debug.dbg_chat_close()
 
 	# 对话：自然打完才掉。
-	scene.dbg_open_dialogue("DLG_0704_zs_lhs", ["CHARS_zs", "CHARS_luhengs"])
+	scene.debug.dbg_open_dialogue("DLG_0704_zs_lhs", ["CHARS_zs", "CHARS_luhengs"])
 	await process_frame
-	chat = scene.dbg_chat()
+	chat = scene.debug.dbg_chat()
 	chat.dbg_set_char_ms(0.1)
 	var guard := 0
 	while guard < 300 and not scene.graph.has("evidence", "EVID_CI_zs_word"):
 		guard += 1
 		if chat.is_typing():
 			await create_timer(0.02).timeout
-		elif not scene.dbg_chat_advance():
+		elif not scene.debug.dbg_chat_advance():
 			break
 	check("对话首次完整播放掉落「词」", scene.graph.has("evidence", "EVID_CI_zs_word"),
 		"guard=%d" % guard)
 	var logs2: int = int(scene.graph.logs.size())
-	scene.dbg_chat_close()
-	scene.dbg_open_dialogue("DLG_0704_zs_lhs", ["CHARS_zs", "CHARS_luhengs"])
+	scene.debug.dbg_chat_close()
+	scene.debug.dbg_open_dialogue("DLG_0704_zs_lhs", ["CHARS_zs", "CHARS_luhengs"])
 	await process_frame
-	chat = scene.dbg_chat()
+	chat = scene.debug.dbg_chat()
 	chat.dbg_set_char_ms(0.1)
 	guard = 0
 	while guard < 300 and not chat.state().get("done", false):
 		guard += 1
 		if chat.is_typing():
 			await create_timer(0.02).timeout
-		elif not scene.dbg_chat_advance():
+		elif not scene.debug.dbg_chat_advance():
 			break
 	check("对话重播不重复掉落", scene.graph.logs.size() == logs2,
 		"%d -> %d" % [logs2, scene.graph.logs.size()])
-	scene.dbg_chat_close()
+	scene.debug.dbg_chat_close()
 
 	# 回忆：同口径。
 	var mem := c.memory_for("SCENES_0602", "CHARS_luhengs", "SCENES_garden")
 	scene._open_memory_play(mem, scene.graph.scene_key("SCENES_garden"))
 	await process_frame
-	var mem_card: MemCard = scene.dbg_mem_card()
+	var mem_card: MemCard = scene.debug.dbg_mem_card()
 	check("回忆小剧场打开", mem_card != null)
 	if mem_card != null:
 		mem_card.dbg_set_char_ms(0.1)
@@ -286,13 +286,13 @@ func _test_word_drops() -> void:
 				break
 		check("回忆首次完整播放掉落「词」", scene.graph.has("evidence", "EVID_CI_lhs_mem"),
 			"guard=%d" % guard)
-		scene.dbg_close_mem()
+		scene.debug.dbg_close_mem()
 
 
 func _test_glyph() -> void:
-	var item: String = scene.dbg_ensure("item", "ITEM_sxbj")
-	var word: String = scene.dbg_ensure("evidence", "EVID_CI_lhs_word")
-	var zheng: String = scene.dbg_ensure("evidence", "EVID_Z_strangled")
+	var item: String = scene.debug.dbg_ensure("item", "ITEM_sxbj")
+	var word: String = scene.debug.dbg_ensure("evidence", "EVID_CI_lhs_word")
+	var zheng: String = scene.debug.dbg_ensure("evidence", "EVID_Z_strangled")
 	await process_frame
 	for pair in [[item, "物", false], [word, "词", true], [zheng, "证", true]]:
 		var card: NodeCard = _cards().get(String(pair[0]), null)
@@ -313,7 +313,7 @@ func _test_glyph() -> void:
 			not wcard._title.visible and wcard._glyph.visible and wcard._glyph.size.x > 60.0,
 			"%.0f" % wcard._glyph.size.x)
 		wcard.set_lod(1.0)
-	scene.dbg_select(item)
+	scene.debug.dbg_select(item)
 	scene._refresh_detail(true)
 	var detail: DetailWin = scene._detail_win
 	check("物品详情标出可用作证据原料", detail != null and not detail._status_text(
@@ -322,18 +322,18 @@ func _test_glyph() -> void:
 		"" if detail == null else detail._status_text(scene.graph.node(item), "item"))
 
 	# 画布合成：Desktop 入口也要把产物上画布、记案卷、弹 toast。
-	scene.dbg_ensure("item", "ITEM_taideng")
+	scene.debug.dbg_ensure("item", "ITEM_taideng")
 	await process_frame
 	var logs_before: int = int(scene.graph.logs.size())
-	scene.dbg_combo_ui("ITEM_sxbj", "ITEM_taideng")
+	scene.debug.dbg_combo_ui("ITEM_sxbj", "ITEM_taideng")
 	await process_frame
 	var made: String = scene.graph.key_of("evidence", "EVID_Z_lamp_notes")
 	var made_card: NodeCard = _cards().get(made, null)
 	check("画布合成产物上卡", made_card != null and scene.graph.has("evidence", "EVID_Z_lamp_notes"))
 	check("画布合成进案卷", scene.graph.logs.size() > logs_before and _last_log().contains("获得"),
 		_last_log())
-	check("画布合成有 toast", scene.dbg_toast_text().contains("获得证据"),
-		scene.dbg_toast_text())
+	check("画布合成有 toast", scene.debug.dbg_toast_text().contains("获得证据"),
+		scene.debug.dbg_toast_text())
 	check("画布合成产物 origin=synth",
 		String(scene.graph.node(made).get("origin", "")) == "synth", str(scene.graph.node(made)))
 	check("画布合成原料还在",
@@ -345,10 +345,10 @@ func _test_glyph() -> void:
 
 func _test_tec_hidden_evidence() -> void:
 	## 帘幕上挂着隐藏证「阳光」：TEC 分析应把它落成一张证卡。
-	var lianmu: String = scene.dbg_ensure("item", "ITEM_lianmu")
+	var lianmu: String = scene.debug.dbg_ensure("item", "ITEM_lianmu")
 	await process_frame
-	check("TEC 开始分析帘幕", scene.dbg_tec_analyze_key(lianmu))
-	scene.dbg_tec_complete()
+	check("TEC 开始分析帘幕", scene.debug.dbg_tec_analyze_key(lianmu))
+	scene.debug.dbg_tec_complete()
 	await process_frame
 	await process_frame
 	check("TEC 分析掉落「证」", scene.graph.has("evidence", "DATA_T_sun"))
@@ -365,7 +365,7 @@ func _test_tec_hidden_evidence() -> void:
 
 
 func _test_drop_rules() -> void:
-	var zheng: String = scene.dbg_ensure("evidence", "EVID_Z_zs_knife")
+	var zheng: String = scene.debug.dbg_ensure("evidence", "EVID_Z_zs_knife")
 	await process_frame
 	scene._apply_drop("bag-dock", zheng)
 	check("物品拒证", String(scene.graph.stored.get(zheng, "")) != GraphState.BAG,
@@ -381,7 +381,7 @@ func _test_drop_rules() -> void:
 	check("TEC 拒收证", not scene._tec.is_analyzing())
 	check("TEC 拒收证话术", _last_log().contains("已经是结论"), _last_log())
 
-	var word: String = scene.dbg_ensure("evidence", "EVID_CI_lhs_word")
+	var word: String = scene.debug.dbg_ensure("evidence", "EVID_CI_lhs_word")
 	await process_frame
 	scene._apply_drop("clue-icon", word)
 	check("证据拒词", String(scene.graph.stored.get(word, "")) != GraphState.LEDGER)
@@ -396,7 +396,7 @@ func _test_drop_rules() -> void:
 	scene._apply_drop("tec-dock", word)
 	check("TEC 拒收词", _last_log().contains("词是证言"), _last_log())
 
-	var item: String = scene.dbg_ensure("item", "ITEMS_a4paper")
+	var item: String = scene.debug.dbg_ensure("item", "ITEMS_a4paper")
 	await process_frame
 	scene._apply_drop("clue-icon", item)
 	check("证据拒物", String(scene.graph.stored.get(item, "")) != GraphState.LEDGER)
@@ -421,51 +421,51 @@ func _test_field_flow() -> void:
 	extra.drop_clue = scene.case_def.clue_of("CLUES_mc")
 	ch.evidence_fields.append(extra)
 
-	scene.dbg_people_row("CHARS_luhengs")
+	scene.debug.dbg_people_row("CHARS_luhengs")
 	await process_frame
 	await process_frame
-	var card = scene.dbg_person_card()
+	var card = scene.debug.dbg_person_card()
 	check("档案卡含两个关键字段", card != null
-		and scene.dbg_person_fields("CHARS_luhengs").size() == 2)
+		and scene.debug.dbg_person_fields("CHARS_luhengs").size() == 2)
 	check("有字段时档案卡自动增高", card != null and card.size.y > 360.0,
 		str(card.size) if card != null else "null")
 
 	var item: String = scene.graph.key_of("item", "ITEM_sxbj")
 	var word: String = scene.graph.key_of("evidence", "EVID_CI_lhs_word")
 	var zheng: String = scene.graph.key_of("evidence", "EVID_Z_strangled")
-	check("物→字段退回", not scene.dbg_person_field_drop("CHARS_luhengs", "FIELD_lhs_cause", item))
+	check("物→字段退回", not scene.debug.dbg_person_field_drop("CHARS_luhengs", "FIELD_lhs_cause", item))
 	check("物退回话术", _last_log().contains("是物，只是原料"), _last_log())
-	check("词→字段退回", not scene.dbg_person_field_drop("CHARS_luhengs", "FIELD_lhs_cause", word))
+	check("词→字段退回", not scene.debug.dbg_person_field_drop("CHARS_luhengs", "FIELD_lhs_cause", word))
 	check("词退回话术", _last_log().contains("先和物合成「证」"), _last_log())
 	check("证→字段待核对",
-		scene.dbg_person_field_drop("CHARS_luhengs", "FIELD_lhs_cause", zheng))
+		scene.debug.dbg_person_field_drop("CHARS_luhengs", "FIELD_lhs_cause", zheng))
 	await process_frame
-	check("待核对态", scene.dbg_person_field_state("FIELD_lhs_cause") == "pending",
-		scene.dbg_person_field_state("FIELD_lhs_cause"))
+	check("待核对态", scene.debug.dbg_person_field_state("FIELD_lhs_cause") == "pending",
+		scene.debug.dbg_person_field_state("FIELD_lhs_cause"))
 	check("待核对虚线框",
 		card != null and card.find_child("field_pending_dash", true, false) != null)
 	check("词库按钮存在",
 		card != null and card.find_child("field_opt_缢死", true, false) != null)
-	scene.dbg_person_field_word("CHARS_luhengs", "FIELD_lhs_cause", "刺伤")
-	check("错误词条核对退回", scene.dbg_person_check("CHARS_luhengs"))
+	scene.debug.dbg_person_field_word("CHARS_luhengs", "FIELD_lhs_cause", "刺伤")
+	check("错误词条核对退回", scene.debug.dbg_person_check("CHARS_luhengs"))
 	await process_frame
-	check("错误主张不盖章", scene.dbg_person_field_state("FIELD_lhs_cause") == "empty",
-		scene.dbg_person_field_state("FIELD_lhs_cause"))
-	check("错误词条不剧透", " ".join(scene.dbg_tec_win().dbg_lines()).contains("站不住"),
-		" ".join(scene.dbg_tec_win().dbg_lines().slice(-3)))
+	check("错误主张不盖章", scene.debug.dbg_person_field_state("FIELD_lhs_cause") == "empty",
+		scene.debug.dbg_person_field_state("FIELD_lhs_cause"))
+	check("错误词条不剧透", " ".join(scene.debug.dbg_tec_win().dbg_lines()).contains("站不住"),
+		" ".join(scene.debug.dbg_tec_win().dbg_lines().slice(-3)))
 
 	# 两条待核对一起交批：正确词条 + 正确证据。
-	check("重新附上结论", scene.dbg_person_field_drop("CHARS_luhengs", "FIELD_lhs_cause", zheng))
-	scene.dbg_person_field_word("CHARS_luhengs", "FIELD_lhs_cause", "缢死")
+	check("重新附上结论", scene.debug.dbg_person_field_drop("CHARS_luhengs", "FIELD_lhs_cause", zheng))
+	scene.debug.dbg_person_field_word("CHARS_luhengs", "FIELD_lhs_cause", "缢死")
 	check("第二字段附上结论",
-		scene.dbg_person_field_drop("CHARS_luhengs", "FIELD_lhs_probe", zheng))
-	scene.dbg_person_field_word("CHARS_luhengs", "FIELD_lhs_probe", "绳痕")
-	check("批量核对 2 条", scene.dbg_person_check("CHARS_luhengs"))
+		scene.debug.dbg_person_field_drop("CHARS_luhengs", "FIELD_lhs_probe", zheng))
+	scene.debug.dbg_person_field_word("CHARS_luhengs", "FIELD_lhs_probe", "绳痕")
+	check("批量核对 2 条", scene.debug.dbg_person_check("CHARS_luhengs"))
 	await process_frame
-	check("死因盖章", scene.dbg_person_field_state("FIELD_lhs_cause") == "stamped",
-		scene.dbg_person_field_state("FIELD_lhs_cause"))
-	check("致死方式盖章", scene.dbg_person_field_state("FIELD_lhs_probe") == "stamped",
-		scene.dbg_person_field_state("FIELD_lhs_probe"))
+	check("死因盖章", scene.debug.dbg_person_field_state("FIELD_lhs_cause") == "stamped",
+		scene.debug.dbg_person_field_state("FIELD_lhs_cause"))
+	check("致死方式盖章", scene.debug.dbg_person_field_state("FIELD_lhs_probe") == "stamped",
+		scene.debug.dbg_person_field_state("FIELD_lhs_probe"))
 	check("核准进图状态", scene.graph.is_field_confirmed("CHARS_luhengs", "FIELD_lhs_cause")
 		and scene.graph.is_field_confirmed("CHARS_luhengs", "FIELD_lhs_probe"))
 	var stamped_box := card.find_child("field_FIELD_lhs_cause", true, false) as PanelContainer
@@ -481,7 +481,7 @@ func _test_field_flow() -> void:
 			and bool(scene.graph.node(mc_key).get("captured", false)),
 		str(scene.graph.node(mc_key)))
 	check("人物证据卡在画布", _cards().has(mc_key))
-	var tec_win = scene.dbg_tec_win()
+	var tec_win = scene.debug.dbg_tec_win()
 	var true_line := false
 	if tec_win != null:
 		for row in tec_win._lines.get_children():

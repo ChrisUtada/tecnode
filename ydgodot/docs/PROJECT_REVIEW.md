@@ -26,6 +26,8 @@
 - **1158 行** —— 藏在产品类里的测试/截图代码（143 个 `dbg_*` = 805 行，6 个 `_shot_*` = 353 行）。
 - **18 份** —— 测试脚本各自复制的 `check()/fails/total` 脚手架与退出逻辑。
 
+> 以上为**批次执行前**的体检快照，用于说明改造动机。批次 0–2 完成后的实时数字与验证结果见 §7。
+
 ### 0.3 建议的 Top 5 动作
 
 1. 先提交当前术语收敛改动，清理调试残留与失效 UID（P0）。
@@ -38,7 +40,7 @@
 
 ## 1. 现状快照
 
-### 1.1 规模分布
+### 1.1 规模分布（体检时）
 
 | 文件 | 行数 | 职责 |
 |---|---:|---|
@@ -78,6 +80,8 @@
 | `test_p28.gd` | 无汇总 | ✅（自行 quit） |
 | `test_ui.gd` | 501 | ✅ |
 | **合计** | **1858 + P28** | **0 失败** |
+
+> 批次 1 后 P28 也接入汇总（7 项），全量口径固定为 **1865 项**；见 §7。
 
 另有 `bench_f7_f2.gd`、`bench_perf.gd` 两个基准脚本，不在回归口径内。
 
@@ -272,7 +276,7 @@ scene.dbg_expand("SCENES_garden")
 
 - 抽 `DesktopDebug`，Desktop 保留 `var debug` 引用；
 - 测试从 `desk.dbg_xxx` 改为 `desk.debug.xxx`（同一批次内可加一次性转发 shim，见 §6.C.1）；
-- 截图流程移到 `tools/shot_flow.gd` —— 它本质是集成脚本，不是产品逻辑。
+- 截图流程随 `dbg_*` 一并进 `DesktopDebug`，不再单独建 `tools/shot_flow.gd`（它只在 `--shot` 下由 Desktop 调度，单列一个工具反而多一层入口）。
 
 #### P2-2 `GraphState` 是模型层的大杂烩
 
@@ -437,7 +441,7 @@ tools/           迁移 / 基准 / 截图 / 审计
 |---|---|---|---|
 | **0 · 卫生** | 提交术语改动；删调试残留；修 6 个 UID；更新 README | 极低 | 装载无 UID 警告；17 脚本全绿；工作区干净 |
 | **1 · 测试基建** | `_test_base.gd` + 统一运行器 + CI + `test_audit.py` | 低 | 一条命令跑完全部；失败必返回非 0；README 不再手写计数；测试不新增私有字段访问 |
-| **2 · Debug 抽离** | `DesktopDebug` + `tools/shot_flow.gd` | 低-中 | Desktop 减少约 1150 行；17 个测试改为 `desk.debug.*`；发布构建不实例化 |
+| **2 · Debug 抽离** | `DesktopDebug`（含截图流程） | 低-中 | Desktop 减少约 1150 行；17 个测试改为 `desk.debug.*`；发布构建不实例化 |
 | **3 · Desktop 拆分** | Canvas → DragDrop → Tec → Matrix/Garden → People → Tutorial → CaseSession | 中 | 每步 17 脚本全绿；`Desktop.gd` ≤ 1200 行 |
 | **4 · 模型收敛** | GraphState 领域拆分 + NodeState 类型化 | 中-高（动存档） | `test_p15` 全绿；旧档可读；魔法字符串显著减少 |
 | **5 · 表现层收尾** | `ListPanel` / `FloatingPanel`；`_process` 门控；测试私有访问清零 | 低 | 重复 helper 归零；空闲帧无 `_process`；测试只走公开接缝 |
@@ -555,4 +559,40 @@ if OS.is_debug_build() or _shot_mode():
 
 ---
 
-> 本报告只描述现状与建议，未修改任何产品代码。体检当天的工作区包含未提交的术语收敛改动，建议先提交再开始任何结构性变更。
+## 7. 执行记录
+
+> 批次按 §5 的顺序落地，每个批次独立提交；验证口径固定为 `tools/run_tests.sh` 全量回归 + 两项审计。
+
+| 批次 | 状态 | 落地内容 | 验证 |
+|---|---|---|---|
+| **0 · 卫生** | ✅ | 术语统一（`e6130ea`）、清理调试残留与失效 UID（`ca84a8d`）、体检文档（`b77ce61`） | 装载无 UID 警告；17 脚本全绿 |
+| **1 · 测试基建** | ✅ | `tests/headless/_test_base.gd`；`tools/run_tests.sh`；`tools/test_audit.py` + 124 条基线；`mono_audit.py` UTF-8 修复；GitHub Actions；README 去手写计数（`1196076`） | **1865 项 / 0 失败**；两项审计通过 |
+| **2 · Debug 抽离** | ✅ | 新增 `scenes/debug/DesktopDebug.gd`；`Desktop.gd` 8358 → 6807 行；`class_name Desktop`；测试 776 处改为 `scene.debug.dbg_*` | **1865 项 / 0 失败**；发布构建不实例化；审计 124 条无新增 |
+| **3 · Desktop 拆分** | ⏳ | 待执行：Canvas → DragDrop → Tec → Matrix/Garden → People → Tutorial → CaseSession | `Desktop.gd` ≤ 1200 行 |
+| **4 · 模型收敛** | ⏳ | 待执行：`GraphState` 领域拆分 + 节点模型类型化 | 旧档可读（`format: 1`） |
+| **5 · 表现层收尾** | ⏳ | 待执行：UI 组件复用、`_process` 门控、测试私有访问清零 | 审计基线归零 |
+
+**批次 2 的实际结果与预估差异**
+
+- 实际减少 **1551 行**（预估约 1150 行）：抽走了 143 个 `dbg_*`、6 个 `_shot_*` 流程，以及 `_installed_map` / `_lit_map` / `_dbg_node_key` / `_show_chat_lines` / `_show_mem_lines` / `_ensure_card` / `_wait` 共 7 个仅被测试使用的辅助函数。
+- `DesktopDebug` 最终为 `Node` 子节点而非 `RefCounted`：`RefCounted` 持有 `Desktop` 会被 `Desktop` 的引用反向持有，形成引用环；挂成子节点后生命周期随场景销毁，`get_tree()` / `get_viewport()` 走 `desk.`。
+- 未新增长期转发 shim：测试一次性机械替换完成，`Desktop` 上不保留 `dbg_*` 入口。
+- 截图流程留在 `DesktopDebug` 内，`tools/shoot_aesthetic.gd` 改走 `scene.debug.dbg_*`。
+
+**当前规模**
+
+| 文件 | 行数 |
+|---|---:|
+| `scenes/Desktop.gd` | 6807 |
+| `scenes/debug/DesktopDebug.gd` | 1198 |
+
+**仍待收敛的测试接缝**
+
+- 窗口 / 画布组件里还有 **45 个 `dbg_*`**（`IntroWin` 10、`CertWin` 6、`EdgeLayer` 4、`GardenWin` 4、`LogWin` 4、`CaseMapWin` 3 等）。它们位于组件边界，不在 `Desktop` 内，暂不阻塞批次 3；批次 5 统一评估：能由真实输入驱动的删掉，其余改名为 `test_*` 或并入 `DesktopDebug` 的查询层。
+- `Desktop.gd:966` 把调试面板按钮命名为 `dbg_btn_*`，`test_ui.gd` 依赖该名称查找。批次 3 搬动页眉代码时一并改为按文案查找。
+
+**下一步**：批次 3 从 `CanvasController` 开始，先搬相机 / 卡片同步 / 连线 / 布局等无状态纯逻辑；每搬一个子系统提交一次，保持 1865 项全绿，并以 §6.C.2 的私有访问基线只减不增为约束。
+
+---
+
+> 本报告起初只描述现状与建议；批次 0–2 已按 §5 落地，现状与本节的差异以本节为准。

@@ -252,71 +252,71 @@ func _test_desktop() -> void:
 	await process_frame
 	await process_frame
 	var temp := "user://test_p15_desktop.save"
-	scene.dbg_use_temp_save(temp)
-	check("桌面：开局没有撤销步", scene.dbg_history_size() == 0)
-	check("桌面：没有可撤销", not bool(scene.dbg_state()["can_undo"]))
+	scene.debug.dbg_use_temp_save(temp)
+	check("桌面：开局没有撤销步", scene.debug.dbg_history_size() == 0)
+	check("桌面：没有可撤销", not bool(scene.debug.dbg_state()["can_undo"]))
 	var undo_btn := scene.get_node("header/btn_撤销") as Button
 	check("K8 空栈时撤销按钮禁用", undo_btn != null and undo_btn.disabled)
 
 	# 开局不再凭空给手电筒（对齐 Web `17-boot.js`：画布上只有一张起始场景卡），
 	# 这一节只验撤销栈，工具自己造一把摆上桌
-	scene.dbg_ensure("item", "ITEM_shoudiantong")
+	scene.debug.dbg_ensure("item", "ITEM_shoudiantong")
 	await process_frame
 
-	scene.dbg_activate("item:ITEM_shoudiantong")
+	scene.debug.dbg_activate("item:ITEM_shoudiantong")
 	await process_frame
-	check("桌面：开关灯进了撤销栈", scene.dbg_history_size() == 1)
+	check("桌面：开关灯进了撤销栈", scene.debug.dbg_history_size() == 1)
 	check("K8 有历史时撤销按钮可用", undo_btn != null and not undo_btn.disabled)
-	check("桌面：灯亮了", bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false)))
-	check("桌面：撤销一步", scene.dbg_undo())
+	check("桌面：灯亮了", bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false)))
+	check("桌面：撤销一步", scene.debug.dbg_undo())
 	await process_frame
 	await process_frame
-	check("桌面：灯回到熄灭", not bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", true)))
-	check("桌面：撤销栈空了", scene.dbg_history_size() == 0)
+	check("桌面：灯回到熄灭", not bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", true)))
+	check("桌面：撤销栈空了", scene.debug.dbg_history_size() == 0)
 	check("K8 撤销后按钮重新禁用", undo_btn != null and undo_btn.disabled)
 
-	scene.dbg_activate("loc:SCENES_garden")
+	scene.debug.dbg_activate("loc:SCENES_garden")
 	await process_frame
-	check("桌面：展开场景进撤销栈", scene.dbg_history_size() == 1)
-	check("桌面：场景已探索", (scene.dbg_state()["explored"] as Array).has("SCENES_garden"))
-	check("桌面：撤销展开", scene.dbg_undo())
+	check("桌面：展开场景进撤销栈", scene.debug.dbg_history_size() == 1)
+	check("桌面：场景已探索", (scene.debug.dbg_state()["explored"] as Array).has("SCENES_garden"))
+	check("桌面：撤销展开", scene.debug.dbg_undo())
 	await process_frame
 	await process_frame
-	check("桌面：场景回到未探索", not (scene.dbg_state()["explored"] as Array).has("SCENES_garden"))
+	check("桌面：场景回到未探索", not (scene.debug.dbg_state()["explored"] as Array).has("SCENES_garden"))
 	check("桌面：撤销后卡片重建", _cards(scene).has("item:ITEM_shoudiantong"))
 
-	scene.dbg_ensure("item", "ITEM_taideng")
+	scene.debug.dbg_ensure("item", "ITEM_taideng")
 	await process_frame
-	scene.dbg_select("item:ITEM_taideng")
-	check("桌面：收进物品", scene.dbg_store("BAG"))
-	check("桌面：收纳进撤销栈", scene.dbg_history_size() == 1)
-	scene.dbg_open_storage(GraphState.BAG)
+	scene.debug.dbg_select("item:ITEM_taideng")
+	check("桌面：收进物品", scene.debug.dbg_store("BAG"))
+	check("桌面：收纳进撤销栈", scene.debug.dbg_history_size() == 1)
+	scene.debug.dbg_open_storage(GraphState.BAG)
 	await process_frame
 	var bag: StorageWin = scene.get_node_or_null("desk/bag_win") as StorageWin
 	check("桌面：物品窗打开", bag != null)
 	bag._take("item:ITEM_taideng")
 	await process_frame
-	check("桌面：取出成功", not (scene.dbg_state()["stored"] as Array).has("item:ITEM_taideng"))
-	check("桌面：取回也进撤销栈", scene.dbg_history_size() == 2)
-	check("桌面：撤销取回", scene.dbg_undo())
+	check("桌面：取出成功", not (scene.debug.dbg_state()["stored"] as Array).has("item:ITEM_taideng"))
+	check("桌面：取回也进撤销栈", scene.debug.dbg_history_size() == 2)
+	check("桌面：撤销取回", scene.debug.dbg_undo())
 	await process_frame
 	await process_frame
-	check("桌面：物品回到物品窗", (scene.dbg_state()["stored"] as Array).has("item:ITEM_taideng"))
+	check("桌面：物品回到物品窗", (scene.debug.dbg_state()["stored"] as Array).has("item:ITEM_taideng"))
 
-	scene.dbg_use_temp_save(temp)
-	check("桌面：写临时存档", scene.dbg_save())
-	check("桌面：存档路径正确", scene.dbg_save_path() == temp)
-	scene.dbg_activate("item:ITEM_shoudiantong")
+	scene.debug.dbg_use_temp_save(temp)
+	check("桌面：写临时存档", scene.debug.dbg_save())
+	check("桌面：存档路径正确", scene.debug.dbg_save_path() == temp)
+	scene.debug.dbg_activate("item:ITEM_shoudiantong")
 	await process_frame
-	check("桌面：读档前灯是亮的", bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false)))
-	check("桌面：读档成功", scene.dbg_load())
+	check("桌面：读档前灯是亮的", bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false)))
+	check("桌面：读档成功", scene.debug.dbg_load())
 	await process_frame
 	await process_frame
-	check("桌面：读档恢复灯状态", not bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", true)))
-	check("桌面：读档清空撤销栈", scene.dbg_history_size() == 0)
+	check("桌面：读档恢复灯状态", not bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", true)))
+	check("桌面：读档清空撤销栈", scene.debug.dbg_history_size() == 0)
 	check("K8 读档后撤销按钮禁用", undo_btn != null and undo_btn.disabled)
 	check("桌面：读档后卡片重建", _cards(scene).has("item:ITEM_taideng"))
-	scene.dbg_clear_save()
+	scene.debug.dbg_clear_save()
 	check("桌面：临时存档已删", not FileAccess.file_exists(temp))
 	scene.queue_free()
 	await process_frame

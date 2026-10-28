@@ -211,22 +211,22 @@ func _test_ui() -> void:
 	root.add_child(scene)
 	await process_frame
 	await process_frame
-	check("桌面建起来", scene != null and scene.dbg_state()["cards"] >= 1)
+	check("桌面建起来", scene != null and scene.debug.dbg_state()["cards"] >= 1)
 	# 「现在档的物品在回忆档里应隐藏、切回来应重新可见」需要一件真实存在的物品；
 	# 开局不再预置手电筒（对齐 Web），这里自己造一把
-	scene.dbg_ensure("item", "ITEM_shoudiantong")
+	scene.debug.dbg_ensure("item", "ITEM_shoudiantong")
 	await process_frame
 
-	scene.dbg_expand("SCENES_fkjl")
+	scene.debug.dbg_expand("SCENES_fkjl")
 	await process_frame
 	check("访客记录带出两档已知时刻",
-		scene.dbg_time_known() == ["SCENES_0602", "SCENES_0704"], str(scene.dbg_time_known()))
-	check("新时刻点亮档案「新」角标", scene.dbg_archive_new())
+		scene.debug.dbg_time_known() == ["SCENES_0602", "SCENES_0704"], str(scene.debug.dbg_time_known()))
+	check("新时刻点亮档案「新」角标", scene.debug.dbg_archive_new())
 
-	var win: ArchiveWin = scene.dbg_open_archive()
+	var win: ArchiveWin = scene.debug.dbg_open_archive()
 	await process_frame
 	check("档案窗打开", win != null and is_instance_valid(win))
-	check("打开档案即清角标", not scene.dbg_archive_new())
+	check("打开档案即清角标", not scene.debug.dbg_archive_new())
 	var rows: Array = win.rows_info()
 	check("档案三档", rows.size() == 3, str(rows.size()))
 	check("现在档在最上", rows.size() > 0 and String(rows[0]["id"]) == "present"
@@ -250,10 +250,10 @@ func _test_ui() -> void:
 	var last_row := win.find_child("row_SCENES_0602", true, false) as Control
 	check("D2 档案末行不拖尾线", last_row != null and last_row.get_node_or_null("sep") == null)
 
-	check("档案里点 6/2 能换档", scene.dbg_archive_press("SCENES_0602"))
+	check("档案里点 6/2 能换档", scene.debug.dbg_archive_press("SCENES_0602"))
 	await process_frame
-	check("graph.time 切到 6/2", scene.dbg_time() == "SCENES_0602", scene.dbg_time())
-	check("当前档标签 = 6月2日", scene.dbg_time_label() == "6月2日", scene.dbg_time_label())
+	check("graph.time 切到 6/2", scene.debug.dbg_time() == "SCENES_0602", scene.debug.dbg_time())
+	check("当前档标签 = 6月2日", scene.debug.dbg_time_label() == "6月2日", scene.debug.dbg_time_label())
 	## 页眉面包屑在 P3 改回 Web 口径：显示「节点 / 已探索 / 组合 / 线索 / 结局」计数，
 	## 不再兼任场景名（场景与时刻显示在档案窗与案件窗标题栏）。所以这里查计数格式，
 	## 「换档」本身由上面 `dbg_time()` / 档案窗当前档两条钉住。
@@ -262,13 +262,13 @@ func _test_ui() -> void:
 		crumb != null and crumb.text.contains("节点") and crumb.text.contains("已探索场景")
 		and not crumb.text.contains("6月2日"),
 		crumb.text if crumb != null else "null")
-	check("6/2 档：花园可见", scene.dbg_card_visible("loc:SCENES_garden"))
-	check("6/2 档：现在档的物品隐藏", not scene.dbg_card_visible("item:ITEM_shoudiantong"))
+	check("6/2 档：花园可见", scene.debug.dbg_card_visible("loc:SCENES_garden"))
+	check("6/2 档：现在档的物品隐藏", not scene.debug.dbg_card_visible("item:ITEM_shoudiantong"))
 	check("6/2 档：傅柏 / 槿杉上画布并可见",
-		scene.dbg_card_visible("char:NPC_FB") and scene.dbg_card_visible("char:CHARS_JS"))
-	check("6/2 档：朱穗（7/4 才登场）不出现", not scene.dbg_card_visible("char:CHARS_zs"))
+		scene.debug.dbg_card_visible("char:NPC_FB") and scene.debug.dbg_card_visible("char:CHARS_JS"))
+	check("6/2 档：朱穗（7/4 才登场）不出现", not scene.debug.dbg_card_visible("char:CHARS_zs"))
 
-	var card: MemCard = scene.dbg_mem_card()
+	var card: MemCard = scene.debug.dbg_mem_card()
 	check("6/2 首次进入自动开放映卡", card != null and is_instance_valid(card))
 	check("卡已读记进状态", bool(scene.graph.card_seen.get("SCENES_0602", false)))
 	check("放映卡标题", card != null and String(card.title).contains("6月2日"))
@@ -281,8 +281,8 @@ func _test_ui() -> void:
 				has_talk = true
 	check("正文带当天角色台词", has_talk)
 	# 画布有缩放 / 平移 ⇒ 「谁压住谁」只能在屏幕空间里比（world 坐标比必然误判）
-	var garden_rect: Rect2 = scene.dbg_card_global("loc:SCENES_garden")
-	var mem_rect: Rect2 = scene.dbg_mem_global()
+	var garden_rect: Rect2 = scene.debug.dbg_card_global("loc:SCENES_garden")
+	var mem_rect: Rect2 = scene.debug.dbg_mem_global()
 	check("放映卡锚在地点旁且不压住节点", card != null and not garden_rect.intersects(mem_rect),
 		str(garden_rect) + " / " + str(mem_rect))
 	check("首行在打字", card != null and card.is_typing())
@@ -317,59 +317,59 @@ func _test_ui() -> void:
 	check("放映卡黑框随内容增高", mem_border != null
 		and absf(mem_border.size.y - (card.size.y - SysWindow.PAD * 2.0)) < 0.5,
 		"null" if mem_border == null else "%.0f / %.0f" % [mem_border.size.y, card.size.y])
-	check("单击先补全本行", scene.dbg_mem_advance() and not card.is_typing())
+	check("单击先补全本行", scene.debug.dbg_mem_advance() and not card.is_typing())
 	check("补全后文字完整", card != null and card.typed_text() == card.current_text())
 	var idx_before := card.index()
-	check("再单击出下一行", scene.dbg_mem_advance() and card.index() == idx_before + 1)
+	check("再单击出下一行", scene.debug.dbg_mem_advance() and card.index() == idx_before + 1)
 
-	var win2: ArchiveWin = scene.dbg_open_archive()
+	var win2: ArchiveWin = scene.debug.dbg_open_archive()
 	await process_frame
-	check("再开档案不重新亮角标", not scene.dbg_archive_new())
+	check("再开档案不重新亮角标", not scene.debug.dbg_archive_new())
 	var rows2: Array = win2.rows_info()
 	check("当前 6/2 档标「当前」", rows2.size() > 2 and String(rows2[2]["status"]) == "当前",
 		str(rows2[2]["status"]) if rows2.size() > 2 else "")
-	check("档案里点「现在」能回现在档", scene.dbg_archive_press("present"))
+	check("档案里点「现在」能回现在档", scene.debug.dbg_archive_press("present"))
 	await process_frame
-	check("回到现在档", scene.dbg_time() == "present")
-	check("换回现在档时收走放映卡", scene.dbg_mem_card() == null)
-	check("手电筒重新可见", scene.dbg_card_visible("item:ITEM_shoudiantong"))
-	check("傅柏不会跟回现在档", not scene.dbg_card_visible("char:NPC_FB"))
+	check("回到现在档", scene.debug.dbg_time() == "present")
+	check("换回现在档时收走放映卡", scene.debug.dbg_mem_card() == null)
+	check("手电筒重新可见", scene.debug.dbg_card_visible("item:ITEM_shoudiantong"))
+	check("傅柏不会跟回现在档", not scene.debug.dbg_card_visible("char:NPC_FB"))
 
-	var win3: ArchiveWin = scene.dbg_open_archive()
+	var win3: ArchiveWin = scene.debug.dbg_open_archive()
 	await process_frame
 	var rows3: Array = win3.rows_info()
 	check("离开 6/2 后标「已回顾」", rows3.size() > 2 and String(rows3[2]["status"]) == "已回顾",
 		str(rows3[2]["status"]) if rows3.size() > 2 else "")
 
-	scene.dbg_open_archive()
+	scene.debug.dbg_open_archive()
 	await process_frame
-	scene.dbg_archive_press("SCENES_0602")
+	scene.debug.dbg_archive_press("SCENES_0602")
 	await process_frame
-	check("已读档再进入不自动放映", scene.dbg_mem_card() == null)
+	check("已读档再进入不自动放映", scene.debug.dbg_mem_card() == null)
 
-	scene.dbg_open_archive()
+	scene.debug.dbg_open_archive()
 	await process_frame
-	scene.dbg_archive_press("SCENES_0602")
+	scene.debug.dbg_archive_press("SCENES_0602")
 	await process_frame
-	check("点当前档 = 重放回忆", scene.dbg_mem_card() != null)
+	check("点当前档 = 重放回忆", scene.debug.dbg_mem_card() != null)
 
-	scene.dbg_open_archive()
+	scene.debug.dbg_open_archive()
 	await process_frame
-	scene.dbg_archive_press("SCENES_0704")
+	scene.debug.dbg_archive_press("SCENES_0704")
 	await process_frame
-	check("切到 7/4", scene.dbg_time() == "SCENES_0704")
-	check("7/4 带出朱穗并可见", scene.dbg_card_visible("char:CHARS_zs"))
-	check("7/4 档不显示傅柏", not scene.dbg_card_visible("char:NPC_FB"))
-	check("7/4 首次进入自动放映", scene.dbg_mem_card() != null)
+	check("切到 7/4", scene.debug.dbg_time() == "SCENES_0704")
+	check("7/4 带出朱穗并可见", scene.debug.dbg_card_visible("char:CHARS_zs"))
+	check("7/4 档不显示傅柏", not scene.debug.dbg_card_visible("char:NPC_FB"))
+	check("7/4 首次进入自动放映", scene.debug.dbg_mem_card() != null)
 
 	print("--- 第 3 步：回忆小剧场 ---")
-	check("切回 6/2 档", scene.dbg_set_time("SCENES_0602"))
+	check("切回 6/2 档", scene.debug.dbg_set_time("SCENES_0602"))
 	await process_frame
-	check("已读档切回不自动开卡", scene.dbg_mem_card() == null)
+	check("已读档切回不自动开卡", scene.debug.dbg_mem_card() == null)
 
-	scene.dbg_combo_ui("NPC_FB", "SCENES_garden")
+	scene.debug.dbg_combo_ui("NPC_FB", "SCENES_garden")
 	await process_frame
-	var play: MemCard = scene.dbg_mem_card()
+	var play: MemCard = scene.debug.dbg_mem_card()
 	check("人物 × 地点 × 时刻触发小剧场", play != null and play.is_play())
 	check("小剧场标题带人物", play != null and String(play.title).contains("傅柏"),
 		play.title if play != null else "null")
@@ -390,20 +390,20 @@ func _test_ui() -> void:
 	check("小剧场头像走 CharDef（傅柏 → fu.png）", mem_path == "res://assets/raw/fu.png", mem_path)
 	check("小剧场有 tried 痕迹",
 		bool(scene.graph.tried.get("char:NPC_FB>loc:SCENES_garden", false)))
-	var play_garden: Rect2 = scene.dbg_card_global("loc:SCENES_garden")
-	var play_rect: Rect2 = scene.dbg_mem_global()
+	var play_garden: Rect2 = scene.debug.dbg_card_global("loc:SCENES_garden")
+	var play_rect: Rect2 = scene.debug.dbg_mem_global()
 	check("小剧场锚在地点旁且不压住节点", play != null and not play_garden.intersects(play_rect),
 		str(play_garden) + " / " + str(play_rect))
 	var rail := Rect2(Vector2(22, 30), Vector2(96, 290))
 	check("小剧场不压左侧图标栏", play != null and not rail.intersects(play_rect),
 		str(rail) + " / " + str(play_rect))
 	check("小剧场逐行打字", play != null and play.is_typing())
-	check("小剧场单击补全", scene.dbg_mem_advance() and not play.is_typing())
+	check("小剧场单击补全", scene.debug.dbg_mem_advance() and not play.is_typing())
 	check("小剧场补全后整句完整", play != null and play.typed_text() == play.current_text())
 
-	scene.dbg_combo_ui("CHARS_JS", "SCENES_garden")
+	scene.debug.dbg_combo_ui("CHARS_JS", "SCENES_garden")
 	await process_frame
-	var play2: MemCard = scene.dbg_mem_card()
+	var play2: MemCard = scene.debug.dbg_mem_card()
 	check("换人物换回忆", play2 != null and String(play2.title).contains("槿杉"),
 		play2.title if play2 != null else "null")
 	check("槿杉回忆四行", play2 != null and play2.line_count() == 4,
@@ -413,29 +413,29 @@ func _test_ui() -> void:
 
 	# P2 Toast 排队：上一条「想起了一段回忆」还在屏上，先清掉再断言错误提示。
 	scene._hide_toast()
-	scene.dbg_combo_ui("NPC_FB", "SCENES_fkjl")
+	scene.debug.dbg_combo_ui("NPC_FB", "SCENES_fkjl")
 	await process_frame
-	check("时刻里没有这对组合时给提示", scene.dbg_toast_text().contains("没有")
-		and scene.dbg_toast_text().contains("回忆"), scene.dbg_toast_text())
-	check("没有回忆时保留原卡", scene.dbg_mem_card() == play2)
+	check("时刻里没有这对组合时给提示", scene.debug.dbg_toast_text().contains("没有")
+		and scene.debug.dbg_toast_text().contains("回忆"), scene.debug.dbg_toast_text())
+	check("没有回忆时保留原卡", scene.debug.dbg_mem_card() == play2)
 
-	check("切到 7/4", scene.dbg_set_time("SCENES_0704"))
+	check("切到 7/4", scene.debug.dbg_set_time("SCENES_0704"))
 	await process_frame
-	check("换档收起小剧场", scene.dbg_mem_card() == null)
-	scene.dbg_combo_ui("CHARS_zs", "SCENES_garden")
+	check("换档收起小剧场", scene.debug.dbg_mem_card() == null)
+	scene.debug.dbg_combo_ui("CHARS_zs", "SCENES_garden")
 	await process_frame
-	var play3: MemCard = scene.dbg_mem_card()
+	var play3: MemCard = scene.debug.dbg_mem_card()
 	check("7/4 朱穗小剧场", play3 != null and play3.is_play()
 		and String(play3.title).contains("朱穗"), play3.title if play3 != null else "null")
 	check("朱穗回忆五行 / 三段台词", play3 != null and play3.line_count() == 5
 		and play3.say_count() == 3, str(play3.line_count()) if play3 != null else "null")
 
-	check("回现在档", scene.dbg_set_time("present"))
+	check("回现在档", scene.debug.dbg_set_time("present"))
 	await process_frame
-	check("现在档收起小剧场", scene.dbg_mem_card() == null)
-	scene.dbg_combo_ui("NPC_FB", "SCENES_garden")
+	check("现在档收起小剧场", scene.debug.dbg_mem_card() == null)
+	scene.debug.dbg_combo_ui("NPC_FB", "SCENES_garden")
 	await process_frame
-	check("现在档人物 × 地点不演回忆", scene.dbg_mem_card() == null)
+	check("现在档人物 × 地点不演回忆", scene.debug.dbg_mem_card() == null)
 
 	scene.queue_free()
 	await process_frame

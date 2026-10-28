@@ -17,7 +17,7 @@ func _initialize() -> void:
 	await _wait(1.2)
 	await _shot("desktop")
 
-	scene.dbg_expand("SCENES_garden")
+	scene.debug.dbg_expand("SCENES_garden")
 	await _wait(0.6)
 	scene._open_tec()
 	await _wait(0.4)

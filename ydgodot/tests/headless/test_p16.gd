@@ -142,15 +142,15 @@ func _test_desktop() -> void:
 	root.add_child(scene)
 	await process_frame
 	await process_frame
-	check("无头模式不自动弹开场", not scene.dbg_intro_open())
-	scene.dbg_use_temp_investigator(TEMP_INV_DESK)
-	check("临时调查员路径为空", scene.dbg_investigator().is_empty())
+	check("无头模式不自动弹开场", not scene.debug.dbg_intro_open())
+	scene.debug.dbg_use_temp_investigator(TEMP_INV_DESK)
+	check("临时调查员路径为空", scene.debug.dbg_investigator().is_empty())
 	var chip: Button = scene.get_node_or_null("header/inv_chip") as Button
 	check("页眉证件位存在", chip != null)
 	check("无证时不显示证章", chip == null or not chip.visible)
-	var intro: IntroWin = scene.dbg_open_intro()
+	var intro: IntroWin = scene.debug.dbg_open_intro()
 	await process_frame
-	check("可以手动打开开场", scene.dbg_intro_open())
+	check("可以手动打开开场", scene.debug.dbg_intro_open())
 	check("开场仍停在第 0 步", intro.dbg_step() == "name", str(intro.dbg_step()))
 	intro.dbg_set_name("执行者")
 	intro.dbg_begin()
@@ -161,15 +161,15 @@ func _test_desktop() -> void:
 	intro.dbg_confirm_pick()
 	intro.dbg_confirm()
 	await create_timer(0.5).timeout
-	check("领证后开场关闭", not scene.dbg_intro_open())
-	var inv: Dictionary = scene.dbg_investigator()
+	check("领证后开场关闭", not scene.debug.dbg_intro_open())
+	var inv: Dictionary = scene.debug.dbg_investigator()
 	check("桌面记住调查员", String(inv.get("name", "")) == "执行者")
 	check("调查员证持久化", FileAccess.file_exists(TEMP_INV_DESK))
 	check("页眉证章出现", chip != null and chip.visible)
 	check("页眉证章带编号", chip != null and String(chip.text).contains(String(inv.get("id", ""))))
-	scene.dbg_open_cert()
+	scene.debug.dbg_open_cert()
 	await process_frame
-	check("可回看调查员证", scene.dbg_cert_open())
+	check("可回看调查员证", scene.debug.dbg_cert_open())
 	scene._view_user = true
 	scene._view_k = 1.8
 	scene._view_pos = Vector2(-4000.0, -4000.0)
@@ -190,9 +190,9 @@ func _test_desktop() -> void:
 		scene._cards.has(start_slice_key)
 			and scene._stage.get_global_rect().intersects(
 				(scene._cards[start_slice_key] as NodeCard).get_global_rect()))
-	check("重来不清调查员", String(scene.dbg_investigator().get("name", "")) == "执行者")
-	scene.dbg_clear_investigator()
-	check("清证后内存为空", scene.dbg_investigator().is_empty())
+	check("重来不清调查员", String(scene.debug.dbg_investigator().get("name", "")) == "执行者")
+	scene.debug.dbg_clear_investigator()
+	check("清证后内存为空", scene.debug.dbg_investigator().is_empty())
 	check("清证后文件删除", not FileAccess.file_exists(TEMP_INV_DESK))
 	check("清证后证章隐藏", chip == null or not chip.visible)
 	scene.queue_free()

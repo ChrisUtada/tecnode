@@ -80,8 +80,8 @@ func _test_desktop() -> void:
 	root.add_child(scene)
 	await process_frame
 	await process_frame
-	scene.dbg_use_temp_progress(TEMP_PROGRESS)
-	var info: Dictionary = scene.dbg_case_info()
+	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
+	var info: Dictionary = scene.debug.dbg_case_info()
 	check("桌面当前案件 A001", info["id"] == "A001", str(info["id"]))
 	check("桌面案件窗默认展开", bool(info["open"]))
 	check("桌面无 dock", not bool(info["dock_visible"]))
@@ -89,21 +89,21 @@ func _test_desktop() -> void:
 	check("桌面标题含案件 A-001", String(info["title"]).contains("案件 A-001"), String(info["title"]))
 	check("桌面进度为临时路径", info["progress_path"] == TEMP_PROGRESS)
 
-	var map: CaseMapWin = scene.dbg_open_case_map()
+	var map: CaseMapWin = scene.debug.dbg_open_case_map()
 	await process_frame
 	check("案件可打开", map != null and map.visible)
 	check("案件窗标题", map != null and map.title == "案件", map.title if map != null else "null")
 	check("案件 2 行", map != null and map.dbg_row_count() == 2, str(map.dbg_row_count() if map != null else -1))
-	check("W28 A001 当前状态", scene.dbg_case_map_state("A001") == "进行中", scene.dbg_case_map_state("A001"))
-	check("A002 锁定状态", scene.dbg_case_map_state("A002") == "锁定", scene.dbg_case_map_state("A002"))
-	check("当前案件不可重复进入", not scene.dbg_case_map_click("A001"))
-	check("锁定案件不可点击", not scene.dbg_case_map_click("A002"))
+	check("W28 A001 当前状态", scene.debug.dbg_case_map_state("A001") == "进行中", scene.debug.dbg_case_map_state("A001"))
+	check("A002 锁定状态", scene.debug.dbg_case_map_state("A002") == "锁定", scene.debug.dbg_case_map_state("A002"))
+	check("当前案件不可重复进入", not scene.debug.dbg_case_map_click("A001"))
+	check("锁定案件不可点击", not scene.debug.dbg_case_map_click("A002"))
 
 	scene._save.path = TEMP_SAVE
 	scene._save_enabled = true
-	check("× 收起进案件图标", scene.dbg_park_case("icon"))
+	check("× 收起进案件图标", scene.debug.dbg_park_case("icon"))
 	await process_frame
-	info = scene.dbg_case_info()
+	info = scene.debug.dbg_case_info()
 	check("收起后案件窗关闭", not bool(info["open"]))
 	check("收起后图标角标显示", bool(info["badge_visible"]))
 	check("收起后无 dock", not bool(info["dock_visible"]))
@@ -111,19 +111,19 @@ func _test_desktop() -> void:
 	check("案件窗隐藏", not scene._case_win.visible)
 	scene._save_enabled = false
 
-	scene.dbg_open_case_map()
+	scene.debug.dbg_open_case_map()
 	await process_frame
-	check("W28 收起后地图仍显示进行中", scene.dbg_case_map_state("A001") == "进行中", scene.dbg_case_map_state("A001"))
-	check("点击本案行重新展开", scene.dbg_case_map_click("A001"))
+	check("W28 收起后地图仍显示进行中", scene.debug.dbg_case_map_state("A001") == "进行中", scene.debug.dbg_case_map_state("A001"))
+	check("点击本案行重新展开", scene.debug.dbg_case_map_click("A001"))
 	await process_frame
-	info = scene.dbg_case_info()
+	info = scene.debug.dbg_case_info()
 	check("重开后案件窗可见", bool(info["open"]) and scene._case_win.visible)
 	check("重开后角标隐藏", not bool(info["badge_visible"]))
-	check("重开后地图关闭", scene.dbg_case_map_win() == null)
+	check("重开后地图关闭", scene.debug.dbg_case_map_win() == null)
 
-	check("– 收进 dock", scene.dbg_park_case("dock"))
+	check("– 收进 dock", scene.debug.dbg_park_case("dock"))
 	await process_frame
-	info = scene.dbg_case_info()
+	info = scene.debug.dbg_case_info()
 	check("dock 可见", bool(info["dock"]) and bool(info["dock_visible"]))
 	check("U6 dock 卡片完整落在桌面内",
 		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
@@ -192,45 +192,45 @@ func _test_desktop() -> void:
 	dock_cup.position = dock_click
 	dock_cup.global_position = dock_click
 	scene._dock_card.gui_input.emit(dock_cup)
-	info = scene.dbg_case_info()
+	info = scene.debug.dbg_case_info()
 	check("点 dock 重新展开", bool(info["open"]) and not bool(info["dock_visible"]))
 
-	scene.dbg_park_case("icon")
+	scene.debug.dbg_park_case("icon")
 	await process_frame
-	scene.dbg_open_case_map()
+	scene.debug.dbg_open_case_map()
 	await process_frame
-	check("未解锁 A002 不可进入", not scene.dbg_enter_case("A002"))
-	check("未解锁不切换案件", String(scene.dbg_case_info()["id"]) == "A001")
-	check("解锁 A002", scene.dbg_catalog_unlock("A002"))
-	check("地图 A002 待接入", scene.dbg_case_map_state("A002") == "待接入", scene.dbg_case_map_state("A002"))
-	check("A002 无数据不可切换", not scene.dbg_enter_case("A002"))
-	check("切换失败保持 A001", String(scene.dbg_case_info()["id"]) == "A001")
+	check("未解锁 A002 不可进入", not scene.debug.dbg_enter_case("A002"))
+	check("未解锁不切换案件", String(scene.debug.dbg_case_info()["id"]) == "A001")
+	check("解锁 A002", scene.debug.dbg_catalog_unlock("A002"))
+	check("地图 A002 待接入", scene.debug.dbg_case_map_state("A002") == "待接入", scene.debug.dbg_case_map_state("A002"))
+	check("A002 无数据不可切换", not scene.debug.dbg_enter_case("A002"))
+	check("切换失败保持 A001", String(scene.debug.dbg_case_info()["id"]) == "A001")
 	check("进度已写入临时档", CaseCatalog.new(TEMP_PROGRESS).is_unlocked("A002"))
-	check("重复解锁 A002 返回 false", not scene.dbg_catalog_unlock("A002"))
-	check("A001 下一案已解锁", not scene.dbg_catalog_unlock_next("A001"))
+	check("重复解锁 A002 返回 false", not scene.debug.dbg_catalog_unlock("A002"))
+	check("A001 下一案已解锁", not scene.debug.dbg_catalog_unlock_next("A001"))
 
-	scene.dbg_use_temp_progress(TEMP_PROGRESS)
-	scene.dbg_reopen_case()
+	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
+	scene.debug.dbg_reopen_case()
 	var true_e = scene.case_def.ending_by_id("TRUE_E")
 	var assigned := true
 	for clue in true_e.recipe:
-		scene.dbg_ensure("clue", clue.id)
-		if not scene.dbg_matrix_assign("evidence:" + clue.id):
+		scene.debug.dbg_ensure("clue", clue.id)
+		if not scene.debug.dbg_matrix_assign("evidence:" + clue.id):
 			assigned = false
-	check("配方证全部归位", assigned and (scene.dbg_state()["matrix_ids"] as Array).size() == 5,
-		str(scene.dbg_state()["matrix_ids"]))
-	scene.dbg_open_matrix()
-	scene.dbg_matrix_charge()
+	check("配方证全部归位", assigned and (scene.debug.dbg_state()["matrix_ids"] as Array).size() == 5,
+		str(scene.debug.dbg_state()["matrix_ids"]))
+	scene.debug.dbg_open_matrix()
+	scene.debug.dbg_matrix_charge()
 	await process_frame
-	info = scene.dbg_case_info()
+	info = scene.debug.dbg_case_info()
 	check("真名结局标记完成", (info["completed"] as Array).has("A001"), str(info["completed"]))
 	check("真名结局解锁 A002", (info["unlocked"] as Array).has("A002"), str(info["unlocked"]))
 	check("解锁进度已落盘", CaseCatalog.new(TEMP_PROGRESS).is_unlocked("A002"))
-	scene.dbg_ending_finish()
+	scene.debug.dbg_ending_finish()
 
-	scene.dbg_use_temp_progress(TEMP_PROGRESS)
+	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
 	scene._sync_case_progress_from_graph()
-	info = scene.dbg_case_info()
+	info = scene.debug.dbg_case_info()
 	check("旧存档补记完成", (info["completed"] as Array).has("A001"), str(info["completed"]))
 	check("旧存档补解锁 A002", (info["unlocked"] as Array).has("A002"), str(info["unlocked"]))
 

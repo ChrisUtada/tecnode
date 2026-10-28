@@ -1,3 +1,4 @@
+class_name Desktop
 extends Control
 ## 桌面外壳 + 画布 + P0 垂直切片链路
 ##
@@ -80,6 +81,8 @@ const DEBUG_POP_W := 196.0
 var case_def: CaseLoader
 var graph: GraphState
 var combos: ComboSystem
+## 测试 / 截图 API。仅在调试构建或 --shot 下存在；产品代码不得引用。
+var debug = null
 
 var _desk: Control
 var _head: Panel
@@ -263,7 +266,6 @@ var _bag_badge: PanelContainer = null
 var _clue_badge: PanelContainer = null
 var _log_badge: PanelContainer = null
 
-
 ## 窗口物理尺寸按屏幕可用区算 —— **绝不能写死**。旧版 `window_*_override` 写死
 ## 1280×800，在 2560×1440 上只占 28% 面积，这就是「看着偏小」的根因。
 ##
@@ -296,7 +298,6 @@ func _setup_window_scale() -> void:
 	win.size = avail
 	win.position = usable.position
 
-
 # ── 自适应布局（不缩放的配套）────────────────────────────────────────────
 ## `content_scale_mode` 是 DISABLED，所以视口尺寸就是窗口像素。凡是「贴着窗口右/下边」
 ## 的东西都按这两个值现算，不再拿 DESIGN_W/H 当坐标系（那两个只是默认窗口尺寸）。
@@ -305,11 +306,9 @@ func _vw() -> float:
 	var w := get_viewport_rect().size.x
 	return w if w >= float(MIN_W) * 0.5 else DESIGN_W
 
-
 func _vh() -> float:
 	var h := get_viewport_rect().size.y
 	return h if h >= float(MIN_H) * 0.5 else DESIGN_H
-
 
 ## 屏幕尺寸变了：页眉拉满、桌面区铺满、主窗跟长、贴右的浮层重新对边。
 ## 只改「容器与贴边位置」，画布内容靠 `_stage.size` 变化后的中心补偿保持视觉不动。
@@ -343,7 +342,6 @@ func _layout_root() -> void:
 	_relayout_edge_windows(vw)
 	_clamp_windows_to_desk()
 
-
 ## 窄窗口先收左半边：按右侧「撤销 / 调试」的真实左沿反推目标条可用宽度，
 ## 太窄时隐藏目标条与副题，并把证章挪到品牌后。
 func _layout_header_left(vw: float) -> void:
@@ -365,7 +363,6 @@ func _layout_header_left(vw: float) -> void:
 	_brand_sub.visible = show_sub
 	_inv_chip.position.x = HDR_X_CHIP if show_sub else HDR_X_SUB
 
-
 ## 页眉工具组是 flex 的 `margin-left:auto`：贴右，不贴左。坐标表按 1280 量出来的，
 ## 存的是「距右边多少」，所以窗口变宽时整体右移即可。
 func _layout_header_right(vw: float) -> void:
@@ -373,7 +370,6 @@ func _layout_header_right(vw: float) -> void:
 		var c: Control = pair[0]
 		if is_instance_valid(c):
 			c.position.x = vw - float(pair[1])
-
 
 ## 主窗铺满「桌面 − 左侧图标列」。宽度/高度都用实际视口算，1280×720 下正好落在
 ## 原来的 1164(内宽) × 638(内高)、画布 1162 × 608，与 Web 版 P3 对拍口径一致
@@ -403,7 +399,6 @@ func _resize_case_window(vw: float, vh: float) -> void:
 		## 还在「适应窗口」自动档上：窗口变大就重新铺满，否则卡片会缩在中间一小块。
 		_fit_cards()
 
-
 ## 贴右边的常驻浮窗（人物名册 / 日志）：只在它们开着的时候重算，关着的等下次打开。
 ## 日志窗是**右下角**（x、y 都贴边），名册只有 x 贴边、y 固定 60。
 func _relayout_edge_windows(vw: float) -> void:
@@ -412,7 +407,6 @@ func _relayout_edge_windows(vw: float) -> void:
 	if _log_win != null and is_instance_valid(_log_win):
 		_log_win.position = Vector2(vw - 14.0 - _log_win.size.x + SysWindow.PAD,
 			_desk.size.y - 96.0 - _log_win.size.y + SysWindow.PAD)
-
 
 func _ready() -> void:
 	_setup_window_scale()
@@ -432,6 +426,11 @@ func _ready() -> void:
 	combos = ComboSystem.new(case_def, graph)
 	_cmds = CommandSystem.new(case_def, graph)
 	_build_ui()
+	if OS.is_debug_build() or _shot_mode():
+		debug = load("res://scenes/debug/DesktopDebug.gd").new()
+		debug.name = "debug"
+		debug.desk = self
+		add_child(debug)
 	_update_case_chrome()
 	_update_case_park_ui()
 	_refresh_chip()
@@ -439,16 +438,17 @@ func _ready() -> void:
 		_open_start_screen()
 	else:
 		_boot_session()
+	if debug == null:
+		return
 	if _has_arg("--shot-p2"):
-		_shot_p2_flow.call_deferred()
+		debug._shot_p2_flow.call_deferred()
 	elif _has_arg("--shot-p3"):
-		_shot_p3_flow.call_deferred()
+		debug._shot_p3_flow.call_deferred()
 	elif _has_arg("--shot"):
 		if _has_arg("--shot-intro"):
-			_shot_intro_flow.call_deferred()
+			debug._shot_intro_flow.call_deferred()
 		else:
-			_shot_flow.call_deferred()
-
+			debug._shot_flow.call_deferred()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -458,7 +458,6 @@ func _notification(what: int) -> void:
 		## 不缩放之后，窗口尺寸变了就得自己重排（页眉拉满 / 主窗跟长 / 贴右浮层对边）。
 		## `_ui_built` 挡住 _build_ui 期间的那几次重排：那时 _case_win 还没建出来。
 		_layout_root()
-
 
 ## 收纳行拖拽会话（Web `06-storage.js` / `12-panels.js` 的行拖拽）：
 ## 行按下时开一个会话，桌面每帧跟手 + 刷新落点高亮，松左键时结算。
@@ -516,7 +515,6 @@ func _process(_dt: float) -> void:
 	if not _mouse_left_down:
 		_finish_sdrag(at)
 
-
 func _take_from_store(key: String, _unused: String) -> void:
 	if key == "":
 		return
@@ -524,14 +522,12 @@ func _take_from_store(key: String, _unused: String) -> void:
 	if win != null:
 		(win as StorageWin)._take(key)
 
-
 func _storage_win_of(key: String) -> Control:
 	if _bag_win != null and is_instance_valid(_bag_win) and (_bag_win as StorageWin).items().has(key):
 		return _bag_win
 	if _ledger_win != null and is_instance_valid(_ledger_win) and (_ledger_win as StorageWin).items().has(key):
 		return _ledger_win
 	return null
-
 
 ## 收纳窗里按住一行（StorageWin.row_pressed）→ 开启拖拽会话
 func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void:
@@ -557,7 +553,6 @@ func _on_row_pressed(key: String, from_kind: String, at_global: Vector2) -> void
 	if rc != null:
 		rc.visible = false
 
-
 func _make_drag_ghost(text: String) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.name = "drag_ghost"
@@ -580,13 +575,11 @@ func _make_drag_ghost(text: String) -> PanelContainer:
 	p.position = _sdrag_ghost_position(_sdrag_origin)
 	return p
 
-
 ## 收纳清单拖拽幽灵挂在 `_desk` 下，位置必须用 desk 局部坐标；
 ## 指针是屏幕/全局坐标，直接赋值会整整偏一个顶栏高度。
 func _sdrag_ghost_position(at_global: Vector2) -> Vector2:
 	## 幽灵在 CanvasLayer 上，坐标直接就是视口坐标；不再做 desk 局部换算。
 	return at_global
-
 
 func _sdrag_cancel() -> void:
 	_sdrag_key = ""
@@ -597,7 +590,6 @@ func _sdrag_cancel() -> void:
 		_sdrag_ghost.queue_free()
 	_sdrag_ghost = null
 	_clear_drop_over()
-
 
 ## 行拖拽时用整张卡片的镜像跟着光标走：玩家看到的是「节点」而不是一个小标签。
 ## （当前已改回小标签；保留函数便于以后切换视觉，不再参与主路径。）
@@ -612,14 +604,11 @@ func _make_sdrag_card_mirror(at: Vector2) -> void:
 	_place_z(mirror, ZR_MIRROR)
 	_sync_sdrag_card_mirror(at)
 
-
 func _sync_sdrag_card_mirror(_at: Vector2) -> void:
 	pass
 
-
 func _drop_sdrag_card_mirror() -> void:
 	pass
-
 
 ## 松手结算：另一个收纳窗 → 推演桌布 / 推演图标 → 画布（落在松手那一点）→ 都不中：回去
 func _finish_sdrag(at: Vector2) -> void:
@@ -668,12 +657,9 @@ func _finish_sdrag(at: Vector2) -> void:
 	_repaint_edges()
 	_commit(before)
 
-
-
 ## 命令行参数（`--` 之后的用户参数）
 func _has_arg(flag: String) -> bool:
 	return OS.get_cmdline_user_args().has(flag) or OS.get_cmdline_args().has(flag)
-
 
 ## 调试用：`--win=1600x900` 直接钉窗口尺寸。因为 `content_scale_mode` 是 DISABLED，
 ## 这个值就等于逻辑尺寸 —— 排查「某个尺寸下布局崩了」和换截图口径全靠它。
@@ -687,10 +673,8 @@ func _win_override() -> Vector2i:
 			return Vector2i(int(parts[0]), int(parts[1]))
 	return Vector2i.ZERO
 
-
 func _shot_mode() -> bool:
 	return _has_arg("--shot") or _has_arg("--shot-p2") or _has_arg("--shot-p3")
-
 
 ## 调试用：`--zoom=0.62` 钉死相机倍率（截图取证 / 排查某个倍率下的 LOD 与字重）。
 ## 不传返回 -1（照常 fit）。**只影响镜头，不写存档**。
@@ -702,7 +686,6 @@ func _zoom_override() -> float:
 		if v.is_valid_float():
 			return clampf(float(v), ZOOM_MIN, ZOOM_MAX)
 	return -1.0
-
 
 # ── 界面搭建 ────────────────────────────────────────────────────────────
 
@@ -776,13 +759,11 @@ func _build_ui() -> void:
 	_ui_built = true
 	_layout_root()
 
-
 func setup_ending() -> void:
 	add_child(_ending)
 	_ending.setup_overlay()
 	if not _ending.finished.is_connected(_on_ending_finished):
 		_ending.finished.connect(_on_ending_finished)
-
 
 func _build_header() -> void:
 	var head := Panel.new()
@@ -878,7 +859,6 @@ func _build_header() -> void:
 	_refresh_crumbs()
 	call_deferred("_sync_header_sizes")
 
-
 ## 页眉开关：奶油描边的胶囊 + 13×13 勾选框 + 文案，与 Web 的 `.tog` 同尺寸（25 高）。
 ## 位置 / 尺寸由调用方经 `_place_hdr()` 摆（Button 的 size 要等入树后再赋一遍才压得住）。
 func _make_toggle(text: String) -> Button:
@@ -904,7 +884,6 @@ func _make_toggle(text: String) -> Button:
 	b.toggled.connect(func(on: bool): b.icon = _check_tex(on); _on_header_toggle(text, on))
 	return b
 
-
 ## 摆页眉控件并记下目标尺寸。
 ## ⚠ Button 的 `size` 会被「最小尺寸」反顶：控件还没进场景树时，`get_theme_font_size()`
 ## 取不到我们的 12px 覆盖、退回主题默认 16px，算出来的最小高度是 31 ——
@@ -920,13 +899,11 @@ func _place_hdr(c: Control, pos: Vector2, sz: Vector2, anchor_right: bool = fals
 	if anchor_right:
 		_hdr_right.append([c, DESIGN_W - pos.x])
 
-
 func _sync_header_sizes() -> void:
 	for pair in _hdr_sized:
 		var c: Control = pair[0]
 		if is_instance_valid(c) and c.size != pair[1]:
 			c.size = pair[1]
-
 
 ## 「调试」弹出面板：黑底 + 奶油字，跟页眉同一套 header_button 语法。
 ## 点击面板外任意位置由全屏 scrim 关闭；开关留在面板里连续调，动作按钮点完收起。
@@ -994,13 +971,11 @@ func _build_debug_panel() -> void:
 		b.pressed.connect(_close_debug_panel)
 		col.add_child(b)
 
-
 func _on_debug_toggled(on: bool) -> void:
 	if on:
 		_open_debug_panel()
 	else:
 		_close_debug_panel()
-
 
 func _open_debug_panel() -> void:
 	if _debug_pop == null or _debug_scrim == null:
@@ -1014,7 +989,6 @@ func _open_debug_panel() -> void:
 	if _debug_btn != null and not _debug_btn.button_pressed:
 		_debug_btn.set_pressed_no_signal(true)
 
-
 func _close_debug_panel() -> void:
 	if _debug_pop != null:
 		_debug_pop.visible = false
@@ -1025,11 +999,9 @@ func _close_debug_panel() -> void:
 	if _debug_btn != null and _debug_btn.button_pressed:
 		_debug_btn.set_pressed_no_signal(false)
 
-
 func _on_debug_scrim_input(ev: InputEvent) -> void:
 	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and ev.pressed:
 		_close_debug_panel()
-
 
 func _layout_debug_panel() -> void:
 	if _debug_pop == null or not _debug_pop.visible:
@@ -1040,7 +1012,6 @@ func _layout_debug_panel() -> void:
 	if _debug_shadow != null:
 		_debug_shadow.size = _debug_pop.size
 		_debug_shadow.position = _debug_pop.position + SysWindow.OFFSET_SHADOW
-
 
 ## 13×13 勾选框：奶油底 + 墨色勾（Web 的 `accent-color:#e6e3d2` 渲染出来就是这个样子）。
 ## 现画而不是切图：勾是 2px 阶梯，缩放后比切图更稳。
@@ -1080,7 +1051,6 @@ func _check_tex(on: bool) -> ImageTexture:
 						break
 	return ImageTexture.create_from_image(img)
 
-
 func _on_header_toggle(text: String, on: bool) -> void:
 	match text:
 		"合成消耗":
@@ -1093,7 +1063,6 @@ func _on_header_toggle(text: String, on: bool) -> void:
 			_opt_reveal = on
 			if on:
 				_relayout(false, true)   # 开关本身要求「现在就居中」——签名没变也得跑
-
 
 ## 面包屑计数：与 Web `updateCrumbs()` 同口径（可见/总数 · 已探索场景 · 已试组合 · 线索 · 结局）
 func _refresh_crumbs() -> void:
@@ -1118,7 +1087,6 @@ func _refresh_crumbs() -> void:
 		_goal.text = goal
 		_goal.tooltip_text = goal
 	_refresh_undo_btn()
-
 
 ## G6：可读的当前目标。普通结局后改成「已记录 X/Y，可继续找真名」。
 func _goal_text() -> String:
@@ -1159,11 +1127,9 @@ func _goal_text() -> String:
 		return "当前目标：把证放到推演桌布，长按执行者"
 	return "当前目标：核对推演桌布的证，长按执行者"
 
-
 ## 「适应窗口」：按内容包围盒重新缩放居中。**不跑布局** —— 那会把玩家摆的位置全收回去。
 func _fit_view() -> void:
 	_fit_cards(false)
-
 
 ## 「检查可达性」：从当前切片场景出发沿连线走一遍，把走不到的画布节点报出来。
 ## Web 同名按钮是开发期自查；Godot 侧一样只提示、不改状态。
@@ -1189,7 +1155,6 @@ func _check_reachability() -> void:
 	else:
 		_show_toast("可达性：%d 个节点走不到 —— %s" % [orphan.size(), ", ".join(orphan.slice(0, 3))], true)
 
-
 ## 选中即聚焦：与选中卡既不相同、也没有连线的卡淡化（Web `applyFocus`）
 func _apply_focus() -> void:
 	if _cards == null:
@@ -1208,7 +1173,6 @@ func _apply_focus() -> void:
 			# 选中环独立于「聚焦淡化」：关掉聚焦时环照样在（Web 的 `.sel` 不依赖任何开关）
 			card.set_selected(_selected != "" and _selected == String(key))
 	_repaint_edges()
-
 
 func _build_case_window() -> void:
 	_case_win = SysWindow.new()
@@ -1262,7 +1226,6 @@ func _build_case_window() -> void:
 	_desk.add_child(_drag_line)
 	_place_z(_drag_line, ZR_MIRROR - 1)
 
-
 ## 桌面图标栏（对齐 Web `ICON_LAYOUT`）：8 个常驻，左侧竖排、**可自由拖动**。
 ## 站位：left 18 / top 16 / 步距 85；图标变多时按 Web `resetIconPositions()` 压缩步距
 ## （下限 70），避免最后一个被 `#desktop{overflow:hidden}` 裁掉。
@@ -1306,7 +1269,6 @@ const ZR_TOAST := 30      # #toast / #verdict
 const ZR_CERT := 32       # 教学期领证窗体：压住 TEC / 地图，必须填完
 const ZR_MIRROR := 40     # #drag-layer：桌面最高层（批 3 的拖动镜像也用这档）
 
-
 ## 把一个桌面直系子控件排到 Web 同款的层序位置：插到**第一个更高 rank 的孩子**之前，
 ## 同 rank 的相对顺序保持不变（等价于后来者在上）。`ctrl` 本来就在名单里，若它排在
 ## 插入点之前，`move_child` 的目标下标要扣掉它自己占的 1 位。
@@ -1340,7 +1302,6 @@ func _place_z(ctrl: Control, rank: int) -> void:
 		_raise_to_front(ctrl, false)
 	_refresh_window_activation()
 
-
 ## 把一扇已经打开的窗口提到浮动窗栈顶（不改变它的默认 zrank）。
 ## 这样点任何窗口都能成为当前窗，但 toast、拖拽虚线框、拖拽镜像和领证窗仍在最上层。
 func _raise_to_front(w: Control, refresh := true) -> void:
@@ -1365,7 +1326,6 @@ func _raise_to_front(w: Control, refresh := true) -> void:
 	if refresh:
 		_refresh_window_activation()
 
-
 ## 指针按下：把指针下最上层的可见系统窗提为当前窗；点空白 / 卡片 / 图标不改层级。
 func _raise_window_at(at_global: Vector2) -> bool:
 	if _desk == null or not is_instance_valid(_desk):
@@ -1389,7 +1349,6 @@ func _raise_window_at(at_global: Vector2) -> bool:
 		return true
 	return false
 
-
 func _input(event: InputEvent) -> void:
 	## 事件流是唯一可信的鼠标来源：轮询（get_mouse_position）在嵌入运行/非常规窗口下
 	## 可能拿到带窗口偏移的绝对坐标（实测偏出正好一个窗口位置），而事件坐标与点击命中同流。
@@ -1412,7 +1371,6 @@ func _input(event: InputEvent) -> void:
 			and not _card_ctx.get_global_rect().has_point(mb.global_position):
 		_close_card_context()
 	_raise_window_at(mb.global_position)
-
 
 ## W11：最小键盘层。Esc = 关最上层窗（先收密码浮层 / 人物卡），Ctrl+Z = 撤销。
 ## 不做全局快捷键表，避免和输入框、浏览器/系统快捷键打架。
@@ -1449,7 +1407,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _close_top_window():
 		get_viewport().set_input_as_handled()
 
-
 ## 关掉层序最上面的可见系统窗。案件主窗排最后：有浮窗时先收浮窗，只剩案件时才收起。
 func _close_top_window() -> bool:
 	if _desk == null or not is_instance_valid(_desk):
@@ -1466,11 +1423,9 @@ func _close_top_window() -> bool:
 		return _park_case("icon")
 	return false
 
-
 ## 窗口标题栏 / 历史卡按下的提层请求：提到浮动窗栈顶，并成为当前激活窗。
 func _on_window_raise(w: Control) -> void:
 	_raise_to_front(w)
-
 
 ## A2：激活态只看**实际层序**。系统窗打开或被点击后会提到栈顶，因此当前窗就是
 ## `_desk` 子序里最靠后的可见系统窗；隐藏、最小化、关窗后自动让位。
@@ -1491,7 +1446,6 @@ func _refresh_window_activation() -> void:
 		if w != null and is_instance_valid(w) and w.participates_in_activation():
 			w.set_active(w == top)
 	_active_win = top
-
 
 func _build_icons() -> void:
 	# 容器只做「分组 + 树路径」用（`desk/icons/icon_bag` 是测试与落点表的公共锚点），
@@ -1557,7 +1511,6 @@ func _build_icons() -> void:
 	_garden_badge = _make_badge(_garden_btn, "garden_badge")
 	_reset_icon_positions()
 
-
 ## 角标基件（Web `.desk-icon .badge`：右上角、深底浅字、999px 药丸）
 func _make_badge(parent: Control, badge_name: String, text: String = "") -> PanelContainer:
 	if parent == null:
@@ -1582,7 +1535,6 @@ func _make_badge(parent: Control, badge_name: String, text: String = "") -> Pane
 		(parent as DeskIcon).place_badges()
 	return badge
 
-
 ## text == "" = 收起角标
 func _set_badge(badge: PanelContainer, text: String) -> void:
 	if badge == null or not is_instance_valid(badge):
@@ -1596,7 +1548,6 @@ func _set_badge(badge: PanelContainer, text: String) -> void:
 		lab.text = text
 	if badge.get_parent() is DeskIcon:
 		(badge.get_parent() as DeskIcon).place_badges()
-
 
 ## 按当前可见图标数重排（Web `resetIconPositions()`）—— 图标增减时才调，
 ## 平时不碰，免得把玩家拖过的位置收走。
@@ -1623,7 +1574,6 @@ func _refresh_tutorial_icons() -> void:
 		_reset_icon_positions()
 	_refresh_count_badges()
 
-
 func _tutorial_unlock_apps() -> void:
 	_tutorial_apps_unlocked = true
 	var layer := _icon_layer()
@@ -1632,7 +1582,6 @@ func _tutorial_unlock_apps() -> void:
 	_refresh_tutorial_icons()
 	_animate_tutorial_icons(["infer", "clue", "bag"])
 
-
 func _tutorial_unlock_map() -> void:
 	_tutorial_map_unlocked = true
 	var layer := _icon_layer()
@@ -1640,7 +1589,6 @@ func _tutorial_unlock_map() -> void:
 		layer.visible = true
 	_refresh_tutorial_icons()
 	_animate_tutorial_icons(["map"])
-
 
 ## 图标从左侧滑入：只动教学刚解锁的几枚，不碰运行中的拖拽 / 落点计算。
 func _animate_tutorial_icons(apps: Array) -> void:
@@ -1657,7 +1605,6 @@ func _animate_tutorial_icons(apps: Array) -> void:
 			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		tw.tween_property(b, "modulate:a", 1.0, 0.22)\
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-
 
 func _reset_icon_positions() -> void:
 	var layer := _icon_layer()
@@ -1694,7 +1641,6 @@ func _reset_icon_positions() -> void:
 		ic.set_bounds(Rect2(Vector2.ZERO, _desk.size))
 		ic.place_badges()
 
-
 ## W7：桌布尺寸变化时不重排，只同步每枚图标的拖动边界，并把已拖出屏的夹回来。
 func _sync_icon_bounds() -> void:
 	var layer := _icon_layer()
@@ -1710,12 +1656,10 @@ func _sync_icon_bounds() -> void:
 			clampf(ic.position.x, 0.0, maxf(0.0, bounds.size.x - ic.size.x)),
 			clampf(ic.position.y, 0.0, maxf(0.0, bounds.size.y - ic.size.y)))
 
-
 ## 图标层（`desk/icons`）：只做分组，不排版。
 func _icon_layer() -> Control:
 	var n := _desk.get_node_or_null("icons") as Control
 	return n if n != null else _desk
-
 
 func _icon_by_app(app: String) -> Button:
 	match app:
@@ -1730,7 +1674,6 @@ func _icon_by_app(app: String) -> Button:
 		"music": return _music_btn
 		"garden": return _garden_btn
 	return null
-
 
 ## 桌面图标：单击 = 选中（`.desk-icon.sel`），双击 = 打开（对齐 Web `attachIcon`）。
 ## 播放器是唯一例外（Web 里传了 onQuick，单击即开）。
@@ -1747,7 +1690,6 @@ func _on_icon_pressed(app: String, icon: DeskIcon) -> void:
 	_icon_last_ms = now
 	_select_icon(icon)
 
-
 func _select_icon(icon: DeskIcon) -> void:
 	if _icon_sel != null and is_instance_valid(_icon_sel) and _icon_sel != icon:
 		_icon_sel.set_selected(false)
@@ -1755,12 +1697,10 @@ func _select_icon(icon: DeskIcon) -> void:
 	if icon != null and is_instance_valid(icon):
 		icon.set_selected(true)
 
-
 func _clear_icon_selection() -> void:
 	if _icon_sel != null and is_instance_valid(_icon_sel):
 		_icon_sel.set_selected(false)
 	_icon_sel = null
-
 
 ## K3：图标双击 = 打开/提到最前，绝不因为「已经开着」就把它关掉。
 ## 关闭只交给窗口 × / 最小化。
@@ -1788,7 +1728,6 @@ func _open_icon_app(app: String) -> void:
 			_open_music()
 	_clear_icon_selection()
 
-
 # ── K3：打开入口统一为幂等「open」；原地关闭只由窗口自己承担 ──────────────
 
 func _open_storage(kind: String) -> void:
@@ -1803,14 +1742,12 @@ func _open_storage(kind: String) -> void:
 		return
 	_toggle_storage(kind)
 
-
 func _open_people() -> void:
 	if _people_win != null and is_instance_valid(_people_win):
 		_refresh_people_win()
 		_raise_to_front(_people_win)
 		return
 	_toggle_people()
-
 
 func _open_log() -> void:
 	if _log_win != null and is_instance_valid(_log_win):
@@ -1819,13 +1756,11 @@ func _open_log() -> void:
 		return
 	_toggle_log()
 
-
 func _open_archive() -> void:
 	if _archive_win != null and is_instance_valid(_archive_win):
 		_raise_to_front(_archive_win)
 		return
 	_toggle_archive()
-
 
 func _open_matrix() -> void:
 	if _matrix_win != null and is_instance_valid(_matrix_win):
@@ -1834,21 +1769,17 @@ func _open_matrix() -> void:
 		return
 	_toggle_matrix()
 
-
 func _open_case_map() -> void:
 	if _map_win != null and is_instance_valid(_map_win):
 		_raise_to_front(_map_win)
 		return
 	_toggle_case_map()
 
-
 func _build_map_badge() -> void:
 	_map_badge = _make_badge(_map_btn, "map_badge", "已关闭")
 
-
 func _build_archive_badge() -> void:
 	_archive_badge = _make_badge(_archive_btn, "archive_badge", "新")
-
 
 # ── 音乐播放器 / 花园彩蛋（P2.5）────────────────────────────────────────
 
@@ -1860,7 +1791,6 @@ func _music_unlocked() -> bool:
 		if ins is Dictionary and bool(ins.get("ITEMS_cz", false)):
 			return true
 	return false
-
 
 func _refresh_app_icons() -> void:
 	if graph == null:
@@ -1911,7 +1841,6 @@ func _refresh_app_icons() -> void:
 	if music != had_music or garden != had_garden:
 		_reset_icon_positions()
 
-
 ## 计数角标（Web `updateInferBadge` / `updateBagBadge` / `updateLedgerBadge` / `updateLogBadge`）：
 ## 推演 = 桌布上已归位的证条数、物品 = N 件、证据 = N 条、日志 = 未读条数。
 func _refresh_count_badges() -> void:
@@ -1933,7 +1862,6 @@ func _refresh_count_badges() -> void:
 	_set_badge(_clue_badge, ("%d 条" % ledger) if ledger > 0 else "")
 	_set_badge(_log_badge, str(_log_unread) if _log_unread > 0 else "")
 
-
 func _open_music() -> void:
 	if not _music_unlocked():
 		return
@@ -1951,7 +1879,6 @@ func _open_music() -> void:
 	if _music_dock != null:
 		_music_dock.visible = false
 
-
 func _ensure_music_dock() -> MusicDock:
 	if _music_dock != null and is_instance_valid(_music_dock):
 		return _music_dock
@@ -1967,7 +1894,6 @@ func _ensure_music_dock() -> MusicDock:
 	_place_music_windows()
 	return _music_dock
 
-
 ## 播放器与 dock 的默认落点按 1280×720 量的 906/414、1026/532；
 ## 缩到 960×560 时只把越界的那一轴拉回右下安全区，不改变 1280 的既有构图。
 ## 案件收进右下角时的卡片：跟随桌面现算，别再用 1280×720 下的固定 678。
@@ -1978,7 +1904,6 @@ func _clamp_windows_to_desk() -> void:
 		var w := c as SysWindow
 		if w != null and is_instance_valid(w) and w.visible:
 			w.clamp_into_parent()
-
 
 func _place_case_dock() -> void:
 	if _dock_card == null or not is_instance_valid(_dock_card):
@@ -1992,12 +1917,10 @@ func _place_case_dock() -> void:
 		maxf(14.0, desk_w - 16.0 - _dock_card.size.x),
 		maxf(14.0, desk_h - 16.0 - _dock_card.size.y))
 
-
 func _clamp_dock_pos(p: Vector2, desk_w: float, desk_h: float) -> Vector2:
 	return Vector2(
 		clampf(p.x, 0.0, maxf(0.0, desk_w - _dock_card.size.x)),
 		clampf(p.y, 0.0, maxf(0.0, desk_h - _dock_card.size.y)))
-
 
 func _on_case_dock_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -2030,7 +1953,6 @@ func _on_case_dock_input(event: InputEvent) -> void:
 		_place_toast_anchor()
 		_dock_card.accept_event()
 
-
 func _place_music_windows() -> void:
 	var desk_h := _desk.size.y if _desk != null and is_instance_valid(_desk) else _vh() - HEADER_H
 	if _music_win != null and is_instance_valid(_music_win):
@@ -2044,7 +1966,6 @@ func _place_music_windows() -> void:
 			_music_dock.position = Vector2(
 				minf(1026.0, _vw() - 16.0 - _music_dock.size.x),
 				minf(532.0, desk_h - 16.0 - _music_dock.size.y))
-
 
 ## 1280 下的浮窗坐标是量出来的；小窗口只收越界的那一轴，避免 TEC / 对话窗
 ## 在 960×560 里整扇跑到屏幕外。夹取基于 `size`，窗口长高后同样成立。
@@ -2101,9 +2022,6 @@ func _place_floating_windows() -> void:
 			maxf(14.0, minf(380.0, vw - 14.0 - _garden_win.size.x)),
 			maxf(14.0, minf(58.0, desk_h - 14.0 - _garden_win.size.y)))
 
-
-
-
 func _minimize_music() -> void:
 	if _music_win == null:
 		return
@@ -2112,7 +2030,6 @@ func _minimize_music() -> void:
 	dock.update_state(_music_win.state())
 	dock.visible = true
 	_place_z(dock, ZR_DOCK)
-
 
 func _restore_music() -> void:
 	if _music_win == null or not is_instance_valid(_music_win):
@@ -2125,7 +2042,6 @@ func _restore_music() -> void:
 	if _music_dock != null:
 		_music_dock.visible = false
 
-
 func _on_music_closed() -> void:
 	if _music_win != null:
 		_music_win.visible = false
@@ -2134,11 +2050,9 @@ func _on_music_closed() -> void:
 	if _music_win != null and _music_win.is_playing():
 		_show_toast("播放器已收起，音乐继续")
 
-
 func _on_music_progress(_cur: float, _dur: float) -> void:
 	if _music_dock != null and _music_dock.visible and _music_win != null:
 		_music_dock.update_state(_music_win.state())
-
 
 func _toggle_music() -> void:
 	if _music_win == null:
@@ -2147,14 +2061,12 @@ func _toggle_music() -> void:
 	if _music_dock != null and _music_dock.visible:
 		_music_dock.update_state(_music_win.state())
 
-
 func _stop_music() -> void:
 	if _music_win == null:
 		return
 	_music_win.stop()
 	if _music_dock != null:
 		_music_dock.visible = false
-
 
 func _open_garden() -> void:
 	if not GardenSystem.has_garden(graph):
@@ -2176,16 +2088,13 @@ func _open_garden() -> void:
 	_place_z(_garden_win, ZR_WIN)
 	_place_floating_windows()
 
-
 func _on_garden_changed() -> void:
 	_autosave()
 	_refresh_app_icons()
 
-
 func _on_garden_bloomed(_idx: int, fresh: bool) -> void:
 	if fresh:
 		_show_toast("花园里的种子开花了")
-
 
 ## 种子从桌布拖到花园窗 / 花园图标；成功返回 true，MatrixWin 据此决定是否弹回。
 func _drop_seed(at_global: Vector2) -> bool:
@@ -2221,10 +2130,8 @@ func _drop_seed(at_global: Vector2) -> bool:
 	_show_toast("种下了「真名」")
 	return true
 
-
 func _on_seed_dropped(at_global: Vector2) -> void:
 	_drop_seed(at_global)
-
 
 func _on_ending_finished() -> void:
 	if _last_ending_id == "":
@@ -2254,7 +2161,6 @@ func _on_ending_finished() -> void:
 		_matrix_win.refresh_seed()
 	_refresh_app_icons()
 	_show_toast("结局留下了一枚种子。把桌布上的种子拖到左侧「花园」图标。")
-
 
 func _build_case_park() -> void:
 	## U7：案件卡片改成自管手势的 PanelContainer；按下可拖，松手未拖才展开案件。
@@ -2334,7 +2240,6 @@ func _build_case_park() -> void:
 	_dock_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.add_child(_dock_sub)
 
-
 func _build_tec_chip() -> void:
 	_tec_chip = TecChip.new()
 	_tec_chip.setup_chip()
@@ -2344,7 +2249,6 @@ func _build_tec_chip() -> void:
 	_tec_chip.moved.connect(_place_toast_anchor)
 	_desk.add_child(_tec_chip)
 	_place_z(_tec_chip, ZR_DOCK)
-
 
 func _build_toast() -> void:
 	_toast = PanelContainer.new()
@@ -2364,39 +2268,32 @@ func _build_toast() -> void:
 	_desk.add_child(_toast)
 	_place_z(_toast, ZR_TOAST)
 
-
 # ── 切片 ────────────────────────────────────────────────────────────────
 
 func _case_id() -> String:
 	return case_def.case_def.id if case_def != null and case_def.case_def != null else ""
 
-
 func _case_label() -> String:
 	return "案件 " + CaseCatalog.code_of(_active_case).trim_prefix("CASE ")
-
 
 func _case_title() -> String:
 	if case_def != null and case_def.case_def != null and case_def.case_def.title != "":
 		return case_def.case_def.title
 	return CaseCatalog.title_of(_active_case)
 
-
 func _case_window_title() -> String:
 	return "案件 " + CaseCatalog.code_of(_active_case).trim_prefix("CASE ") + " · " + _case_title()
-
 
 func _update_case_chrome() -> void:
 	if _case_win != null:
 		_case_win.set_title(_case_window_title())
 	_refresh_crumbs()
 
-
 func _require_case() -> bool:
 	if _case_open:
 		return true
 	_show_toast("当前不在案件中，请先展开案件图标或右下角案件卡片", true)
 	return false
-
 
 func _toggle_case_map() -> void:
 	if _map_win != null and is_instance_valid(_map_win):
@@ -2421,7 +2318,6 @@ func _toggle_case_map() -> void:
 	_map_win = w
 	_place_floating_windows()
 
-
 func _on_case_map_enter(id: String) -> void:
 	if _map_win != null and is_instance_valid(_map_win):
 		_map_win.queue_free()
@@ -2430,7 +2326,6 @@ func _on_case_map_enter(id: String) -> void:
 		_finish_tutorial_to_case(id)
 		return
 	_enter_case(id)
-
 
 func _enter_case(id: String) -> bool:
 	if not CaseCatalog.exists(id):
@@ -2469,7 +2364,6 @@ func _enter_case(id: String) -> bool:
 	_log("已进入案件 %s // %s" % [CaseCatalog.code_of(id), CaseCatalog.title_of(id)], "sys")
 	return true
 
-
 ## 解锁提示里要写的「下一案编号」（A001 → CASE A-002）
 func _next_case_code(from_id: String) -> String:
 	var list: Array = CaseCatalog.all()
@@ -2480,7 +2374,6 @@ func _next_case_code(from_id: String) -> String:
 			return String((list[i + 1] as Dictionary).get("code", ""))
 		break
 	return ""
-
 
 func _park_case(where: String) -> bool:
 	if not _case_open:
@@ -2494,7 +2387,6 @@ func _park_case(where: String) -> bool:
 	_update_case_park_ui()
 	return true
 
-
 func _reopen_case() -> void:
 	if _case_win == null:
 		return
@@ -2507,7 +2399,6 @@ func _reopen_case() -> void:
 	if _tec != null and _tec.visible:
 		_place_z(_tec, ZR_TEC)
 	_update_case_park_ui()
-
 
 func _close_case_transients() -> void:
 	_close_card_context()
@@ -2532,7 +2423,6 @@ func _close_case_transients() -> void:
 	if _detail_win != null and is_instance_valid(_detail_win):
 		_detail_win.hide()
 
-
 func _update_case_park_ui() -> void:
 	if _dock_card != null:
 		_dock_code.text = CaseCatalog.code_of(_active_case)
@@ -2555,12 +2445,10 @@ func _update_case_park_ui() -> void:
 	if _garden_win != null and is_instance_valid(_garden_win):
 		_garden_win.set_writes_enabled(_case_open)
 
-
 func _resume_allowed() -> bool:
 	if not _save_enabled or _has_arg("--fresh"):
 		return false
 	return DisplayServer.get_name() != "headless"
-
 
 ## 重建一套运行时对象（图 / 命令系统 / 存档），并清掉旧卡片与会话窗
 func _new_runtime() -> void:
@@ -2644,7 +2532,6 @@ func _new_runtime() -> void:
 	_refresh_crumbs()
 	_refresh_undo_btn()
 
-
 ## 不可逆操作：默认先弹确认；测试 / 调试可传 force=true 直接重置。
 func _reset_case(force := false) -> void:
 	if not _require_case():
@@ -2664,7 +2551,6 @@ func _reset_case(force := false) -> void:
 	add_child(w)
 	_confirm_win = w
 
-
 func _reset_case_now() -> void:
 	if _confirm_win != null and is_instance_valid(_confirm_win):
 		_confirm_win.queue_free()
@@ -2675,7 +2561,6 @@ func _reset_case_now() -> void:
 	_log("已重置为初始状态", "sys")
 	_show_toast("已重置为初始状态")
 
-
 func _resume_from_save() -> bool:
 	_new_runtime()
 	if not _save.load_from_disk():
@@ -2684,7 +2569,6 @@ func _resume_from_save() -> bool:
 	_rebuild_from_graph(true)
 	_sync_case_progress_from_graph()
 	return true
-
 
 func _sync_case_progress_from_graph() -> void:
 	if graph == null or case_def == null or _progress_read_only:
@@ -2698,7 +2582,6 @@ func _sync_case_progress_from_graph() -> void:
 		if newly:
 			_log("新案件地址已解锁：%s" % _next_case_code(_active_case), "cap")
 		return
-
 
 func _start_slice() -> void:
 	## 重置 / 换案后镜头必须回到自动档，否则玩家之前拖过的镜头会对着空画布。
@@ -2721,12 +2604,10 @@ func _start_slice() -> void:
 		% case_def.scene_title(sid))
 	_relayout()
 
-
 ## 面包屑不再显示「案件 + 场景名」——那是**案件窗标题栏**的职责（Web 也是这样分工）。
 ## 仍保留这个函数名，是因为各处收尾（展开 / 换时刻 / 重置）都调它；现在统一刷计数。
 func _set_crumb(_text: String) -> void:
 	_refresh_crumbs()
-
 
 # ── 调查员 / 开场适性测试 ───────────────────────────────────────────────
 
@@ -2735,13 +2616,11 @@ func _intro_allowed() -> bool:
 		return false
 	return not _shot_mode() and not _has_arg("--no-intro")
 
-
 ## 第 0 幕：正常启动（非无头 / 非截图 / 未显式 --no-start）先停在开始界面。
 func _start_screen_allowed() -> bool:
 	if DisplayServer.get_name() == "headless":
 		return false
 	return not _shot_mode() and not _has_arg("--no-start")
-
 
 func _open_start_screen() -> void:
 	if _start_screen != null and is_instance_valid(_start_screen):
@@ -2756,12 +2635,10 @@ func _open_start_screen() -> void:
 	_start_screen.quit_requested.connect(func(): get_tree().quit())
 	add_child(_start_screen)
 
-
 func _close_start_screen() -> void:
 	if _start_screen != null and is_instance_valid(_start_screen):
 		_start_screen.queue_free()
 	_start_screen = null
-
 
 func _boot_session() -> void:
 	var resumed := _resume_allowed() and _resume_from_save()
@@ -2772,13 +2649,11 @@ func _boot_session() -> void:
 	if not resumed and _intro_allowed() and _investigator.is_empty():
 		_begin_tutorial()
 
-
 func _on_start_new(overwrite: bool) -> void:
 	_close_start_screen()
 	if overwrite:
 		_clear_case_save()
 	_begin_tutorial()
-
 
 ## 第 1–2 幕：空白桌面 + 常驻 TEC + 三步登记教学。
 ## 不启动正式案件、不出图标栏、不放诊断入口；教学用自己的迷你案件数据。
@@ -2830,7 +2705,6 @@ func _begin_tutorial() -> void:
 		_tutorial_tec_placed = false
 		_place_floating_windows()
 
-
 func _hide_tutorial_chrome() -> void:
 	_refresh_tutorial_icons()
 	for n in ["btn_撤销", "btn_调试"]:
@@ -2850,7 +2724,6 @@ func _hide_tutorial_chrome() -> void:
 		if c != null:
 			c.visible = false
 
-
 func _spawn_tutorial_office() -> void:
 	var n := graph.add_node("loc", TUT_OFFICE_ID)
 	n["label"] = "TEC办公室"
@@ -2865,7 +2738,6 @@ func _spawn_tutorial_office() -> void:
 		card.position = pos
 		card.set_home_silent(pos)
 		_sync_card_shell(card)
-
 
 ## 教学卡片沿左下角向上斜排：调查员 → 线索 → 证件 → 证件线索。
 func _tutorial_card_pos(layer: int) -> Vector2:
@@ -2884,7 +2756,6 @@ func _tutorial_card_pos(layer: int) -> Vector2:
 	y = maxf(20.0, y)
 	return Vector2(x, y)
 
-
 func _tutorial_spawn_node(kind: String, id: String, layer: int) -> String:
 	var n := graph.add_node(kind, id)
 	var pos := _tutorial_card_pos(layer)
@@ -2895,7 +2766,6 @@ func _tutorial_spawn_node(kind: String, id: String, layer: int) -> String:
 	_refresh_or_spawn_card(key)
 	_relayout()
 	return key
-
 
 func _tutorial_spawn_clue(id: String, from_key: String, layer: int) -> String:
 	var key := graph.capture_evidence(id, from_key, -1.0, -1.0, "deduce")
@@ -2908,12 +2778,10 @@ func _tutorial_spawn_clue(id: String, from_key: String, layer: int) -> String:
 	_relayout()
 	return key
 
-
 func _tutorial_say(text: String) -> void:
 	if _tec == null or not is_instance_valid(_tec):
 		return
 	_tec.append_line(text)
-
 
 func _tutorial_set_hint() -> void:
 	if _tec == null:
@@ -2934,7 +2802,6 @@ func _tutorial_set_hint() -> void:
 		_:
 			_tec.set_guidance("待命 · 登记完成", "证件信息已核对")
 
-
 ## 拖到 TEC 前的教学门：只放行当前步骤该交的节点；其余由 TEC 亲口纠正。
 func _tutorial_talk_line() -> String:
 	match _tutorial_step:
@@ -2952,7 +2819,6 @@ func _tutorial_talk_line() -> String:
 			return "在「案件」里选 A-001。"
 		_:
 			return "登记已经完成了。证件信息都齐了。"
-
 
 func _tutorial_tec_guard(key: String) -> bool:
 	match _tutorial_step:
@@ -2976,7 +2842,6 @@ func _tutorial_tec_guard(key: String) -> bool:
 			_tutorial_say("证件已经核对完了。")
 	return false
 
-
 ## 证件由 TEC办公室本身产出；TEC 分析只给提示，不产出证件。
 func _tutorial_on_activate(key: String) -> bool:
 	if _tutorial_step == TutorialStep.DOUBLE_CLICK_OFFICE and key == TUT_OFFICE_KEY:
@@ -2992,7 +2857,6 @@ func _tutorial_on_activate(key: String) -> bool:
 		return true
 	return false
 
-
 ## TEC 分析只产生节点相关提示 / 证；TEC办公室分析不会产出调查员证。
 func _tutorial_on_tec_done(key: String) -> bool:
 	if _tutorial_step == TutorialStep.DOUBLE_CLICK_OFFICE and key == TUT_OFFICE_KEY:
@@ -3007,7 +2871,6 @@ func _tutorial_on_tec_done(key: String) -> bool:
 		return true
 	return false
 
-
 func _tutorial_begin_infer() -> void:
 	_tutorial_step = TutorialStep.INFER
 	_tutorial_set_hint()
@@ -3019,7 +2882,6 @@ func _tutorial_begin_infer() -> void:
 		_tutorial_say("双击左边「推演」打开桌布；如果 TEC 挡住，把我拖开或点「–」收起。"
 			+ "把「调查员证」放到推演桌布，长按执行者开始推演。")
 
-
 func _tutorial_on_matrix_changed() -> void:
 	if not _tutorial_active or _tutorial_step != TutorialStep.INFER:
 		return
@@ -3030,7 +2892,6 @@ func _tutorial_on_matrix_changed() -> void:
 		_matrix_win.set_hint("TEC：证齐了。长按执行者，开始推演。")
 	else:
 		_matrix_win.set_hint("TEC：还需要「调查员证」——把它放到推演桌布，然后长按执行者。")
-
 
 func _tutorial_on_inference_success(hit: EndingDef) -> void:
 	graph.mark_ending(hit.id)
@@ -3053,7 +2914,6 @@ func _tutorial_on_inference_success(hit: EndingDef) -> void:
 	_place_floating_windows()
 	_open_cert_form()
 
-
 func _open_cert_form() -> void:
 	if _tutorial_cert_win != null and is_instance_valid(_tutorial_cert_win):
 		return
@@ -3066,7 +2926,6 @@ func _open_cert_form() -> void:
 	_place_z(w, ZR_CERT)
 	w.place_center(_vw(), _desk.size.y)
 	_tutorial_cert_win = w
-
 
 func _on_tutorial_cert_completed(card: Dictionary) -> void:
 	_investigator = card.duplicate(true)
@@ -3087,7 +2946,6 @@ func _on_tutorial_cert_completed(card: Dictionary) -> void:
 		_refresh_app_icons()
 	_open_case_map()
 	_arrange_tutorial_map_once()
-
 
 ## 地图是 TEC 主动弹的：第一次打开时把地图和 TEC 并排摆一次，免得 TEC 正好压住
 ## 唯一可点的 A-001 行。摆完就是普通窗口，玩家拖到哪都算数，不再自动归位。
@@ -3111,7 +2969,6 @@ func _arrange_tutorial_map_once() -> void:
 		_map_win.position = Vector2(maxf(96.0, (vw - _map_win.size.x) * 0.5),
 			maxf(14.0, minf(72.0, desk_h - 14.0 - _map_win.size.y)))
 
-
 func _write_tutorial_entry_save() -> void:
 	if _shot_mode() or DisplayServer.get_name() == "headless" or _has_arg("--fresh"):
 		return
@@ -3130,7 +2987,6 @@ func _write_tutorial_entry_save() -> void:
 	var s := SaveSystem.new(g, loader.case_def.id)
 	if not s.save_to_disk():
 		push_warning("开场完成后写档失败：" + s.last_error)
-
 
 func _finish_tutorial_to_case(id: String) -> bool:
 	if id != CaseCatalog.DEFAULT_ID:
@@ -3183,7 +3039,6 @@ func _finish_tutorial_to_case(id: String) -> bool:
 	_log("已进入案件 %s // %s" % [CaseCatalog.code_of(id), CaseCatalog.title_of(id)], "sys")
 	return true
 
-
 func _restore_full_chrome() -> void:
 	var layer := _icon_layer()
 	if layer != null:
@@ -3212,7 +3067,6 @@ func _restore_full_chrome() -> void:
 				c.visible = true
 	_layout_header_left(_vw())
 
-
 func _on_start_continue() -> void:
 	if _resume_allowed() and _resume_from_save():
 		_close_start_screen()
@@ -3226,14 +3080,12 @@ func _on_start_continue() -> void:
 	_start_slice()
 	_show_toast("存档不可用，已回到桌面", true)
 
-
 func _clear_case_save() -> void:
 	if _save != null:
 		_save.clear_save()
 	var path := SaveSystem.save_path_for(_case_id())
 	if FileAccess.file_exists(path):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
-
 
 func _refresh_chip() -> void:
 	if _people_win != null and is_instance_valid(_people_win):
@@ -3249,7 +3101,6 @@ func _refresh_chip() -> void:
 	_inv_chip.tooltip_text = _inv_chip.text
 	_inv_chip.visible = true
 
-
 func _avatar_pool() -> Array:
 	var out: Array = Investigator.AVATAR_INITIAL.duplicate()
 	for key in graph.nodes.keys():
@@ -3259,7 +3110,6 @@ func _avatar_pool() -> Array:
 		if id != "CHARS_TEC" and not out.has(id):
 			out.append(id)
 	return out
-
 
 func _avatar_names() -> Dictionary:
 	var out := {"CHARS_EXEC": "执行者", "CHARS_TEC": "TEC"}
@@ -3271,7 +3121,6 @@ func _avatar_names() -> Dictionary:
 			out[String(id)] = ch.name
 	return out
 
-
 func _locked_avatar_count() -> int:
 	if case_def == null:
 		return 0
@@ -3281,7 +3130,6 @@ func _locked_avatar_count() -> int:
 		if not pool.has(String(id)):
 			n += 1
 	return n
-
 
 func _open_intro() -> IntroWin:
 	if _intro != null and is_instance_valid(_intro):
@@ -3296,10 +3144,8 @@ func _open_intro() -> IntroWin:
 	_intro = w
 	return w
 
-
 func _on_intro_closed() -> void:
 	_intro = null
-
 
 func _on_intro_finished(card: Dictionary) -> void:
 	_investigator = card.duplicate(true)
@@ -3307,7 +3153,6 @@ func _on_intro_finished(card: Dictionary) -> void:
 	_show_toast("调查员 %s 已接入 T.E.C-OS" % String(_investigator.get("name", "")))
 	_log("调查员 %s（%s）已接入 T.E.C-OS" % [String(_investigator.get("name", "")),
 		String(_investigator.get("id", ""))], "sys")
-
 
 func _open_cert_review() -> void:
 	if _investigator.is_empty():
@@ -3334,7 +3179,6 @@ func _open_cert_review() -> void:
 	w.tree_exited.connect(func(): _cert_win = null)
 	_cert_win = w
 
-
 func _open_photo_picker() -> void:
 	if _investigator.is_empty():
 		return
@@ -3351,7 +3195,6 @@ func _open_photo_picker() -> void:
 	w.place_center(_vw(), _desk.size.y)
 	_photo_win = w
 
-
 func _on_photo_picked(avatar_id: String) -> void:
 	_investigator["avatarId"] = avatar_id
 	if not Investigator.save_to(_investigator, _inv_path):
@@ -3360,7 +3203,6 @@ func _on_photo_picked(avatar_id: String) -> void:
 	_refresh_chip()
 	_open_cert_review()
 
-
 func _show_toast(text: String, warn: bool = false) -> void:
 	## 首条立即显示（测试与即时反馈都依赖这一点）；正在显示 / 淡出时的后续消息排队，
 	## 不再用新消息粗暴顶掉旧消息——玩家往往会连点两下，前一句没读完就换字更易漏信息。
@@ -3368,7 +3210,6 @@ func _show_toast(text: String, warn: bool = false) -> void:
 		_toast_queue.append({"text": text, "warn": warn})
 		return
 	_show_toast_now(text, warn)
-
 
 func _show_toast_now(text: String, warn: bool) -> void:
 	_toast_active = true
@@ -3382,7 +3223,6 @@ func _show_toast_now(text: String, warn: bool) -> void:
 	_toast_timer = get_tree().create_timer(2.4)
 	_toast_timer.timeout.connect(_fade_toast)
 
-
 func _fade_toast() -> void:
 	if not _toast_active:
 		return
@@ -3394,7 +3234,6 @@ func _fade_toast() -> void:
 	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.18)
 	_toast_tween.finished.connect(_after_toast_fade)
 
-
 func _after_toast_fade() -> void:
 	_toast.visible = false
 	_toast.modulate.a = 1.0
@@ -3404,14 +3243,12 @@ func _after_toast_fade() -> void:
 	var next: Dictionary = _toast_queue.pop_front()
 	_show_toast_now(String(next.get("text", "")), bool(next.get("warn", false)))
 
-
 func _stop_toast_timer() -> void:
 	if _toast_timer == null:
 		return
 	if _toast_timer.timeout.is_connected(_fade_toast):
 		_toast_timer.timeout.disconnect(_fade_toast)
 	_toast_timer = null
-
 
 ## toast 停**右下角**，不压底部正中：底部正中是叙事卡 / 详情卡的下沉落点
 ## （`_anchor_card_to` 上→下→右→左都会用到），停在那儿十有八九正好盖住卡上的字。
@@ -3424,7 +3261,6 @@ func _place_toast_anchor() -> void:
 	## 右下角的 TEC 胶囊 / 音乐卡片天然分开。
 	var bottom := _vh() - HEADER_H - 16.0
 	_toast.position = Vector2((_vw() - _toast.size.x) * 0.5, bottom - _toast.size.y)
-
 
 func _toast_style(warn: bool) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -3439,7 +3275,6 @@ func _toast_style(warn: bool) -> StyleBoxFlat:
 		sb.border_color = TecTheme.LINE2
 	return sb
 
-
 func _hide_toast() -> void:
 	_stop_toast_timer()
 	if _toast_tween != null and _toast_tween.is_valid():
@@ -3450,7 +3285,6 @@ func _hide_toast() -> void:
 	_toast.modulate.a = 1.0
 	_toast.visible = false
 
-
 # ── 撤销 / 存档 ─────────────────────────────────────────────────────────
 
 func _autosave() -> void:
@@ -3460,13 +3294,11 @@ func _autosave() -> void:
 	if not _save.flush_pending():
 		push_warning("自动存档失败：" + _save.last_error)
 
-
 func _queue_autosave() -> void:
 	if _save == null or not _save_enabled:
 		return
 	_autosave_pending = true
 	_autosave_due_msec = Time.get_ticks_msec() + AUTOSAVE_DELAY_MSEC
-
 
 ## 动作开始前拍一张；动作结束后状态真的变了才入撤销栈并写盘
 func _commit(before: Dictionary) -> void:
@@ -3489,45 +3321,6 @@ func _commit(before: Dictionary) -> void:
 	_refresh_person_card_fields()
 	_refresh_log_win()
 
-
-func dbg_undo() -> bool:
-	return _undo()
-
-
-func dbg_history_size() -> int:
-	return _save.history.size() if _save != null else 0
-
-
-func dbg_last_rebuild_stats() -> Dictionary:
-	return _last_rebuild_stats.duplicate(true)
-
-
-func dbg_save() -> bool:
-	return _save.save_to_disk() if _save != null else false
-
-
-func dbg_load() -> bool:
-	if _save == null or not _save.load_from_disk():
-		return false
-	_rebuild_from_graph(true)
-	return true
-
-
-func dbg_clear_save() -> void:
-	if _save != null:
-		_save.clear_save()
-
-
-func dbg_save_path() -> String:
-	return _save.path if _save != null else ""
-
-
-func dbg_use_temp_save(p_path: String) -> void:
-	_save = SaveSystem.new(graph, _case_id(), p_path)
-	_save.clear_save()
-	_save.clear_history()
-
-
 ## K8：撤销按钮必须反映空栈；所有会改变历史的路径在提交后统一刷这里。
 func _refresh_undo_btn() -> void:
 	if _undo_btn == null or not is_instance_valid(_undo_btn):
@@ -3535,7 +3328,6 @@ func _refresh_undo_btn() -> void:
 	var can := _save != null and _save.can_undo()
 	_undo_btn.disabled = not can
 	_undo_btn.tooltip_text = "撤销上一步" if can else "没有可撤销的操作"
-
 
 func _undo() -> bool:
 	if not _require_case():
@@ -3553,7 +3345,6 @@ func _undo() -> bool:
 	_show_toast("已撤销上一步")
 	_refresh_undo_btn()
 	return true
-
 
 ## 按当前图状态重建所有卡片（撤销 / 续档共用）
 func _rebuild_from_graph(fit_camera := false) -> void:
@@ -3648,7 +3439,6 @@ func _rebuild_from_graph(fit_camera := false) -> void:
 	_update_case_chrome()
 	_refresh_app_icons()
 
-
 func _refresh_archive_new_from_graph() -> void:
 	_clear_archive_new()
 	for raw_key in graph.nodes.keys():
@@ -3656,7 +3446,6 @@ func _refresh_archive_new_from_graph() -> void:
 		if String(n.get("kind", "")) == "time" and graph.has_unread(String(raw_key)):
 			_mark_archive_new()
 			return
-
 
 func _replay_unread_pops(skip: Dictionary) -> void:
 	if _shot_mode() or _tutorial_active:
@@ -3670,7 +3459,6 @@ func _replay_unread_pops(skip: Dictionary) -> void:
 			continue
 		card.pivot_offset = card.size * 0.5
 		card.play_pop()
-
 
 # ── 画布手势（Web `15-desktop.js`）────────────────────────────────────────
 # 点空白 = 清选中；拖空白 = 平移；滚轮 = 以光标为锚连续缩放（0.45~2.0，×1.12）。
@@ -3727,7 +3515,6 @@ func _on_stage_input(event: InputEvent) -> void:
 		_view_user = true
 		_apply_view()
 
-
 ## W12：平移 / 缩放后世界不能被整个推出视口。四边各留 80px 世界可见。
 func _clamp_view_pos(p: Vector2) -> Vector2:
 	if _stage == null or not is_instance_valid(_stage):
@@ -3738,7 +3525,6 @@ func _clamp_view_pos(p: Vector2) -> Vector2:
 	return Vector2(
 		clampf(p.x, keep - world.x, maxf(keep - world.x, stage.x - keep)),
 		clampf(p.y, keep - world.y, maxf(keep - world.y, stage.y - keep)))
-
 
 ## 拖动会话没收尾就遇到新的按下：把卡按当前坐标落地并清掉镜像。
 ## （正常路径由 NodeCard 的松手处理；这里只兜「松手事件丢了」的那条）
@@ -3757,13 +3543,11 @@ func _abort_card_drag() -> void:
 		if _drag_line != null and is_instance_valid(_drag_line):
 			_drag_line.clear_ghost()
 
-
 func _reset_camera() -> void:
 	_view_k = 1.0
 	_view_pos = Vector2.ZERO
 	_view_user = false
 	_apply_view()
-
 
 func _apply_view() -> void:
 	if _card_layer == null:
@@ -3778,7 +3562,6 @@ func _apply_view() -> void:
 	_reanchor_mem_card()
 	_sync_card_mirror(null)
 
-
 ## 把当前倍率分发给每张卡（NodeCard.set_lod 自己判档并早退，重复调用不吃性能）
 func _apply_lod() -> void:
 	if _cards.is_empty():
@@ -3788,13 +3571,11 @@ func _apply_lod() -> void:
 		if c != null and is_instance_valid(c):
 			c.set_lod(_view_k)
 
-
 ## 缩放 / 平移 / 重排都会让锚点节点在屏幕上换位置，而放映卡是**屏幕坐标**摆的 ——
 ## 不重锚它就会留在原地，看起来像压在节点上（实测 448×328 的卡盖住花园卡）。
 func _reanchor_mem_card() -> void:
 	if _mem_card != null and is_instance_valid(_mem_card) and _mem_anchor_key != "":
 		_anchor_card_to(_mem_card, _mem_anchor_key)
-
 
 func _clear_selection() -> void:
 	_clear_icon_selection()
@@ -3805,7 +3586,6 @@ func _clear_selection() -> void:
 		graph.selected = ""
 	_apply_focus()
 	_refresh_detail()
-
 
 # ── 卡片 ────────────────────────────────────────────────────────────────
 
@@ -3831,7 +3611,6 @@ func _despawn_card(key: String) -> void:
 		_apply_focus()
 		_refresh_detail()
 
-
 ## 任何改图路径的兜底：数据层已不存在的卡片必须从 _cards 清掉，避免僵尸卡继续画线 / 参与布局。
 func _sync_canvas() -> void:
 	if graph == null or _cards.is_empty():
@@ -3845,7 +3624,6 @@ func _sync_canvas() -> void:
 	if removed:
 		_apply_hidden()
 		_repaint_edges()
-
 
 func _spawn_card(key: String) -> NodeCard:
 	if _cards.has(key):
@@ -3900,7 +3678,6 @@ func _spawn_card(key: String) -> NodeCard:
 	_repaint_edges()
 	return card
 
-
 ## 播种：**只给还没落过位的节点**（x/y < 0）一个初始坐标，已落位的原样保留。
 ## 容器（场景 / 书桌）按 5 列网格，实体围在画布中央 —— 与 Web `layout()` 的 seed 同口径。
 func _seed_one(key: String) -> void:
@@ -3926,7 +3703,6 @@ func _seed_one(key: String) -> void:
 		n["x"] = 700.0 + (h - 0.5) * 420.0
 		n["y"] = 560.0 + (h2 - 0.5) * 420.0
 
-
 func _on_card_selected(key: String) -> void:
 	_selected = key
 	graph.selected = key
@@ -3939,14 +3715,12 @@ func _on_card_selected(key: String) -> void:
 	if _detail_win != null and is_instance_valid(_detail_win) and _detail_win.visible:
 		_raise_to_front(_detail_win)
 
-
 ## 卡片按下（未拖未点都算）：把它的重排落位补间杀掉——卡冻结在指针下面，
 ## 双击不会因为卡「飞走了」而落空，拖动起手也不会跟 0.34s 过渡打架
 func _on_card_pressed(key: String) -> void:
 	## F1：玩家接管某张卡时停止后台收敛，避免每帧把卡从他手边推走。
 	_cancel_layout_job()
 	_kill_move(key)
-
 
 func _on_card_dragged(key: String) -> void:
 	_cancel_layout_job()
@@ -3965,7 +3739,6 @@ func _on_card_dragged(key: String) -> void:
 	if card != null:
 		_mount_card_mirror(card)
 
-
 ## 拖动中：落点悬停高亮（Web 的 `.over`）+ 幽灵线，每帧按指针重算一次。
 ## 幽灵线画在连线层（world 空间），所以要把指针的屏幕坐标换算回 world。
 func _on_card_drag_moved(key: String, at_global: Vector2) -> void:
@@ -3982,11 +3755,9 @@ func _on_card_drag_moved(key: String, at_global: Vector2) -> void:
 	_update_drop_over(at_global)
 	_edges_dirty = true
 
-
 ## ── 拖动镜像（Web #drag-layer）──────────────────────────────────────────
 ## 镜像 = 卡片的「假身」：挂到桌布根（在所有窗子之上）、吃不到输入、
 ## 每帧跟着原卡的位置。原卡被隐藏，但仍是连线端点与数据写回的坐标来源。
-
 
 func _mount_card_mirror(card: NodeCard) -> void:
 	if card == null or _desk == null:
@@ -4008,7 +3779,6 @@ func _mount_card_mirror(card: NodeCard) -> void:
 	mirror.global_position = card.get_global_position()
 	_card_mirror = mirror
 
-
 func _sync_card_mirror(card: NodeCard) -> void:
 	if _card_mirror == null or not is_instance_valid(_card_mirror):
 		return
@@ -4022,7 +3792,6 @@ func _sync_card_mirror(card: NodeCard) -> void:
 	_card_mirror.set_lod(_view_k)
 	_card_mirror.global_position = card.get_global_position()
 
-
 ## 松手换身回来：镜像销毁、原卡按数据可见性复位（后续的弹回 / 收纳 / 消费各走各路）
 func _drop_card_mirror(card: NodeCard) -> void:
 	if _card_mirror != null and is_instance_valid(_card_mirror):
@@ -4031,7 +3800,6 @@ func _drop_card_mirror(card: NodeCard) -> void:
 	if card != null and is_instance_valid(card):
 		card.set_ghost(false)
 		card.visible = graph.visible_node(graph.node(card.card_key))
-
 
 ## 松手：落点由 `_handle_card_drop` 分派；没命中就停在松手处并把坐标写回数据
 func _on_card_drag_finished(key: String, pos: Vector2, handled: bool) -> void:
@@ -4057,7 +3825,6 @@ func _on_card_drag_finished(key: String, pos: Vector2, handled: bool) -> void:
 	_refresh_crumbs()
 	_commit(before)
 
-
 ## 重画连线（Web `paintEdges()`）：端点取 `visual_center()`，四种边各自配色 / 线宽 / 虚线。
 ## 聚焦选中开着时，与选中节点无关的边降到 12% 不透明（Web 的 `opacity .12`）。
 ## 连线端点是否真的可见：卡被矩阵窗用 modulate.a=0 暂时遮掉时，不能继续画线。
@@ -4071,7 +3838,6 @@ func _edge_card_shown(card: NodeCard, key: String) -> bool:
 	var shown := card.visible and graph != null and graph.visible_node(graph.node(String(key)))
 	return shown and (card.modulate.a > 0.0 or card.is_popping())
 
-
 ## 边的可见度跟随端点卡片的 pop alpha；普通卡恒为 1。
 func _edge_card_alpha(card: NodeCard) -> float:
 	if card == null or not is_instance_valid(card):
@@ -4079,7 +3845,6 @@ func _edge_card_alpha(card: NodeCard) -> float:
 	if card.is_popping():
 		return clampf(card.modulate.a, 0.0, 1.0)
 	return 1.0
-
 
 func _repaint_edges() -> void:
 	_edges_dirty = false
@@ -4123,7 +3888,6 @@ func _repaint_edges() -> void:
 		})
 	_edge_layer.set_segments(segs)
 
-
 ## 兼容旧入口（无头测试与 dbg 钩子还在调）：等价于「卡片松手落在 at_global」的完整分派。
 ## 真实交互走 NodeCard → drop_sink → `_handle_card_drop`，这里只是给测试用的一次性封装。
 func _on_card_drag_released(key: String, at_global: Vector2) -> void:
@@ -4136,7 +3900,6 @@ func _on_card_drag_released(key: String, at_global: Vector2) -> void:
 		if _cards.has(key):
 			(_cards[key] as NodeCard).spring_back()
 		_on_card_combo(key, target)
-
 
 ## 右键 = 钉住 / 取消钉住（Web 里这是唯一入口，拖动不再顺手钉住）
 func _open_card_context(key: String, at_global: Vector2) -> void:
@@ -4180,13 +3943,11 @@ func _open_card_context(key: String, at_global: Vector2) -> void:
 	_card_ctx = menu
 	_card_ctx_key = key
 
-
 func _close_card_context() -> void:
 	if _card_ctx != null and is_instance_valid(_card_ctx):
 		_card_ctx.queue_free()
 	_card_ctx = null
 	_card_ctx_key = ""
-
 
 func _on_card_pin_toggled(key: String) -> void:
 	var n := graph.node(key)
@@ -4196,7 +3957,6 @@ func _on_card_pin_toggled(key: String) -> void:
 	n["pinned"] = not bool(n.get("pinned", false))
 	_sync_card_shell(_cards.get(key, null))
 	_commit(before)
-
 
 # ── 落点（对齐 Web `nodeDropTargets()`，顺序即优先级）──────────────────────
 
@@ -4247,7 +4007,6 @@ func _drop_targets() -> Array:
 		return int(a.get("depth", -1)) > int(b.get("depth", -1)))
 	return out
 
-
 func _target_depth(ctrl: Control) -> int:
 	if ctrl == null or not is_instance_valid(ctrl):
 		return -1
@@ -4256,13 +4015,11 @@ func _target_depth(ctrl: Control) -> int:
 		n = n.get_parent()
 	return n.get_index() if n != null else -1
 
-
 func _drop_target_at(at_global: Vector2) -> Dictionary:
 	for t in _drop_targets():
 		if (t["rect"] as Rect2).has_point(at_global):
 			return t
 	return {}
-
 
 ## 节点详情窗（Web `#detail-win`）：选中即显示，点空白即收起
 func _ensure_detail() -> DetailWin:
@@ -4279,7 +4036,6 @@ func _ensure_detail() -> DetailWin:
 	_detail_win.place_right(_vw())
 	_place_z(_detail_win, ZR_DETAIL)
 	return _detail_win
-
 
 func _refresh_detail(force := false) -> void:
 	## U2 收敛：叙事卡在屏上时，详情完全让位，不并排抢阅读焦点。
@@ -4307,7 +4063,6 @@ func _refresh_detail(force := false) -> void:
 	else:
 		_detail_win.show_node(_selected)
 
-
 ## 收起叙事卡但不触发「关闭后补详情」：用于玩家点节点、主动切到详情。
 func _dismiss_narr() -> void:
 	if _narr != null and is_instance_valid(_narr):
@@ -4315,7 +4070,6 @@ func _dismiss_narr() -> void:
 		_narr.queue_free()
 	_narr = null
 	_pending_detail = false
-
 
 ## 「重看对话」：把这个人已经说过的台词整段重放进对话窗（Web `renarrTalk`）
 func _replay_talk(key: String) -> bool:
@@ -4344,7 +4098,6 @@ func _replay_talk(key: String) -> bool:
 		d.script_lines.append(line)
 	return _open_chat(d, [String(ch.id)])
 
-
 ## W8/K4：收纳行拖拽时，只高亮松手真的会生效的落点。
 ## 高亮 ≠ 命中会让玩家以为「拖到 TEC 也能分析收纳里的东西」，实际却只能先取回。
 func _drop_hover_allowed(target_id: String) -> bool:
@@ -4366,7 +4119,6 @@ func _drop_hover_allowed(target_id: String) -> bool:
 		"clue-win", "clue-icon", "infer-icon", "mx-board":
 			return zheng
 	return true
-
 
 ## 拖动中用：命中的窗口 / 图标 / 卡片统一画一层虚线框
 func _update_drop_over(at_global: Vector2) -> void:
@@ -4396,7 +4148,6 @@ func _update_drop_over(at_global: Vector2) -> void:
 	elif _drop_outline != null and is_instance_valid(_drop_outline):
 		_drop_outline.clear_outline()
 
-
 ## 所有落点共用同一层虚线框：窗口在可见边框外 4px（PAD-4），图标 / 卡片贴外框，桌布贴板边。
 func _show_drop_outline(rect_global: Rect2, inset: float) -> void:
 	if _drop_outline == null or not is_instance_valid(_drop_outline):
@@ -4405,16 +4156,13 @@ func _show_drop_outline(rect_global: Rect2, inset: float) -> void:
 	var origin := inv * rect_global.position
 	_drop_outline.show_rect(Rect2(origin, rect_global.size).grow(-inset))
 
-
 func _clear_drop_over() -> void:
 	if _drop_outline != null and is_instance_valid(_drop_outline):
 		_drop_outline.clear_outline()
 	_drag_over_card = ""
 
-
 func _on_card_spring_finished(_key: String) -> void:
 	_repaint_edges()
-
 
 ## 松手分派：命中落点即消费（卡片回原位）。返回 true 表示已被落点接管。
 func _handle_card_drop(key: String, at_global: Vector2) -> bool:
@@ -4432,7 +4180,6 @@ func _handle_card_drop(key: String, at_global: Vector2) -> bool:
 		return true
 	return false
 
-
 ## K5：已退役的落点不再「生效」，但仍要挡住卡片并说清原因（不能穿透到画布）。
 func _drop_blocker_at(at_global: Vector2) -> String:
 	var goto_icon := _desk.get_node_or_null("icons/icon_goto") as Control \
@@ -4442,14 +4189,12 @@ func _drop_blocker_at(at_global: Vector2) -> String:
 		return "档案只收时间点：场景请双击展开；时间点请从档案窗前往。"
 	return ""
 
-
 ## C5：教学期错误统一由 TEC 口头纠正，不落系统 toast。
 func _tutorial_correct(text: String) -> bool:
 	if _tutorial_active and _tutorial_step != TutorialStep.DONE:
 		_tutorial_say(text)
 		return true
 	return false
-
 
 ## K6：所有拒收统一「warning toast + 日志」，话术由调用方按目标分派。
 func _reject_drop(text: String) -> void:
@@ -4458,14 +4203,11 @@ func _reject_drop(text: String) -> void:
 	_log(text, "warn")
 	_show_toast(text, true)
 
-
 func _is_word_node(n: Dictionary) -> bool:
 	return String(n.get("kind", "")) == "evidence" and String(n.get("tier", "")) == "ci"
 
-
 func _is_zheng_node(n: Dictionary) -> bool:
 	return String(n.get("kind", "")) == "evidence" and String(n.get("tier", "")) == "zheng"
-
 
 func _source_name(source: String) -> String:
 	match source:
@@ -4474,7 +4216,6 @@ func _source_name(source: String) -> String:
 		"matrix":
 			return "推演桌布"
 	return "画布"
-
 
 ## K4：三条拖放路径（画布卡片 / 收纳行 / 桌布线索引）共用的唯一分派器。
 ## 返回 true = 已处理（包括明确拒收）；false = 未命中，交给来源自己的默认回弹。
@@ -4531,11 +4272,9 @@ func _dispatch_drop(key: String, target_id: String, _at_global: Vector2, source:
 			return false
 	return true
 
-
 ## 兼容旧调用 / 测试：等价于「画布卡片落在某落点」。
 func _apply_drop(id: String, key: String) -> void:
 	_dispatch_drop(key, id, Vector2.ZERO, "canvas")
-
 
 ## 收纳之间搬运（袋 ↔ 册 / 桌布 → 册）：类型不合就按目标回绝。
 func _restash_to(key: String, to: String, label: String) -> void:
@@ -4561,7 +4300,6 @@ func _restash_to(key: String, to: String, label: String) -> void:
 	_show_toast("「%s」搬到「%s」" % [label,
 		"物品" if to == GraphState.BAG else "证据"])
 	_commit(before)
-
 
 ## 收进物品 / 证据（拒收时给一句人话，别让玩家以为是坏了）
 func _store_into(where: String, key: String) -> void:
@@ -4606,13 +4344,11 @@ func _store_into(where: String, key: String) -> void:
 	_show_toast("「%s」收进「%s」" % [String(n.get("label", "")), target_name])
 	_commit(before)
 
-
 func _refresh_storage_wins() -> void:
 	if _bag_win != null and is_instance_valid(_bag_win):
 		_bag_win.refresh_store()
 	if _ledger_win != null and is_instance_valid(_ledger_win):
 		_ledger_win.refresh_store()
-
 
 ## 「前往」（Web gotoScene）：确保场景卡在画布上，镜头平移居中并选中它
 func _goto_scene(id: String) -> void:
@@ -4639,7 +4375,6 @@ func _goto_scene(id: String) -> void:
 	_on_first_expand("loc", id, was_explored)
 	_commit(before)
 
-
 ## 把镜头平移到某张卡（只平移，不替玩家改缩放 —— 与 Web 的 focusOn 同口径）
 func _center_on(card: NodeCard) -> void:
 	if _stage == null or _card_layer == null:
@@ -4648,7 +4383,6 @@ func _center_on(card: NodeCard) -> void:
 	_view_pos = _stage.size * 0.5 - c * _view_k
 	_card_layer.position = _view_pos
 	_view_user = true
-
 
 ## 指针下面是哪张卡（world 顺序里最上面那张：从后往前找）
 ## 指针下最上层的浮动窗（排除永远铺底的案件主窗）。卡片命中 / 落点都先过这一层，
@@ -4664,7 +4398,6 @@ func _floating_window_at(at_global: Vector2) -> SysWindow:
 			return w
 	return null
 
-
 func _card_key_at(at_global: Vector2) -> String:
 	## 指针落在任何浮动窗 / 人物档案卡上时，下面的卡片不可被选中 / 当作组合目标。
 	if _floating_window_at(at_global) != null or _person_card_blocks(at_global):
@@ -4679,7 +4412,6 @@ func _card_key_at(at_global: Vector2) -> String:
 		if card.get_global_rect().grow(-NodeCard.PAD * 0.5).has_point(at_global):
 			return card.card_key
 	return ""
-
 
 func _on_card_activated(key: String) -> void:
 	var n := graph.node(key)
@@ -4724,7 +4456,6 @@ func _on_card_activated(key: String) -> void:
 	_apply_outcome(res, key)
 	_commit(before)
 
-
 ## 双击线索 = 捕获（对齐 Web `08-interact.js:346`）。
 ## 捕获进 `graph.captured` + 卡面翻成 `.got` + 案卷一条 `cap`；重复双击只留一条 warn。
 ## **不进 toast** —— Web 这里刻意不弹，让画面自己说话。
@@ -4743,7 +4474,6 @@ func _capture_clue_node(key: String) -> void:
 	_log("已确认证据「%s」" % lab, "cap")
 	_on_card_selected(key)
 	_commit(before)
-
 
 ## 容器双重身份：第一次双击展开，已展开再双击收起（对齐 Web 的展开 / 折叠）
 func _toggle_container(kind: String, id: String) -> void:
@@ -4787,7 +4517,6 @@ func _toggle_container(kind: String, id: String) -> void:
 	_on_first_expand(kind, id, was_explored)
 	_commit(before)
 
-
 ## 把图状态的隐藏结论落到卡片上（对齐 Web 的 recomputeHidden：钉住的、跟场外有连线的都不藏）
 func _apply_hidden() -> void:
 	graph.recompute_hidden()
@@ -4795,7 +4524,6 @@ func _apply_hidden() -> void:
 		(_cards[key] as NodeCard).visible = graph.visible_node(graph.node(String(key)))
 	_repaint_edges()
 	_refresh_detail()
-
 
 ## 统一落地一次命令结果：提示 / 长卡片 / 刷新 / 重排
 func _apply_outcome(res: Dictionary, node_key: String) -> void:
@@ -4832,7 +4560,6 @@ func _apply_outcome(res: Dictionary, node_key: String) -> void:
 	if first_scene != "":
 		_on_first_expand("loc", first_scene, false)
 	_relayout()
-
 
 # ── 收纳窗（物品 / 证据）────────────────────────────────────────────
 
@@ -4873,11 +4600,9 @@ func _toggle_storage(kind: String) -> void:
 	_desk.add_child(_ledger_win)
 	_place_z(_ledger_win, ZR_WIN)
 
-
 ## 收纳窗取出前先拍快照（StorageWin 自己改图，Desktop 只能从信号里抢在它前面）
 func _on_storage_will_take(_key: String) -> void:
 	_storage_before = _save.snapshot()
-
 
 ## 从收纳窗取回：节点回到画布，并刷新两个清单窗
 func _on_storage_took(key: String) -> void:
@@ -4890,7 +4615,6 @@ func _on_storage_took(key: String) -> void:
 		_ledger_win.refresh_store()
 	_commit(_storage_before)
 	_storage_before = {}
-
 
 # ── 人物名册 / 因果追踪（批 1：差距报告 I1 / I2）─────────────────────────
 
@@ -4916,11 +4640,9 @@ func _toggle_people() -> void:
 	_desk.add_child(_people_win)
 	_place_z(_people_win, ZR_WIN)
 
-
 func _refresh_people_win() -> void:
 	if _people_win != null and is_instance_valid(_people_win):
 		_people_win.refresh_people()
-
 
 ## 名册点行 = 打开人物档案卡（PEOPLE_CARD_PLAN）。跳转/叫人降级为卡内「前往此人」。
 func _on_people_row(id: String) -> void:
@@ -4928,20 +4650,17 @@ func _on_people_row(id: String) -> void:
 		return
 	_open_person_card(id)
 
-
 # ── 人物档案卡（PEOPLE_CARD_PLAN）────────────────────────────────────────
 
 func _person_card_blocks(at_global: Vector2) -> bool:
 	return _people_card != null and is_instance_valid(_people_card) \
 		and _people_card.visible and _people_card.get_global_rect().has_point(at_global)
 
-
 func _close_person_card() -> void:
 	if _people_card != null and is_instance_valid(_people_card):
 		_people_card.commit_note()
 		_people_card.queue_free()
 	_people_card = null
-
 
 func _open_person_card(id: String) -> void:
 	if graph == null or case_def == null:
@@ -4961,7 +4680,6 @@ func _open_person_card(id: String) -> void:
 	_desk.add_child(_people_card)
 	_place_z(_people_card, ZR_PERSON)
 	_place_person_card()
-
 
 func _place_person_card() -> void:
 	if _people_card == null or not is_instance_valid(_people_card) or _desk == null:
@@ -4983,7 +4701,6 @@ func _place_person_card() -> void:
 	pos.y = clampf(pos.y, 12.0, maxf(12.0, desk_h - _people_card.size.y - 12.0))
 	_people_card.position = pos
 
-
 func _on_person_action(id: String) -> void:
 	_close_person_card()
 	if id == GraphState.INVESTIGATOR_ID:
@@ -4995,7 +4712,6 @@ func _on_person_action(id: String) -> void:
 	else:
 		_goto_char(id)
 
-
 func _on_person_note_changed(id: String, text: String) -> void:
 	if graph == null or id == "":
 		return
@@ -5005,11 +4721,9 @@ func _on_person_note_changed(id: String, text: String) -> void:
 		graph.notes[id] = text
 	_queue_autosave()
 
-
 func _on_person_note_committed(id: String, text: String) -> void:
 	_on_person_note_changed(id, text)
 	_autosave()
-
 
 func _person_payload(id: String) -> Dictionary:
 	if id == GraphState.INVESTIGATOR_ID:
@@ -5086,14 +4800,12 @@ func _person_payload(id: String) -> Dictionary:
 		"evidence_fields": _person_field_payload(id),
 	}
 
-
 func _person_photo(id: String, ch: CharDef) -> String:
 	if case_def != null:
 		var path := case_def.avatar_path_of(id)
 		if path != "":
 			return path
 	return CaseLoader.avatar_path_of_def(ch)
-
 
 ## 档案卡关键字段的显示载荷。`correct` 不下发给 UI，避免在卡面 / 调试出口里直接看到答案。
 func _person_field_payload(person_id: String) -> Array:
@@ -5126,7 +4838,6 @@ func _person_field_payload(person_id: String) -> Array:
 		})
 	return out
 
-
 func _find_evidence_field(person_id: String, field_id: String) -> EvidenceFieldDef:
 	var ch := case_def.char_of(person_id) if case_def != null else null
 	if ch == null:
@@ -5136,7 +4847,6 @@ func _find_evidence_field(person_id: String, field_id: String) -> EvidenceFieldD
 			return f
 	return null
 
-
 func _evidence_tec_message(tier: String) -> String:
 	match tier:
 		"ci":
@@ -5145,14 +4855,12 @@ func _evidence_tec_message(tier: String) -> String:
 			return "证已经是结论了，不用再分析——把它拖到「证据」或档案字段上。"
 	return "证据不需要再分析。"
 
-
 func _refresh_person_card_fields() -> void:
 	if _people_card == null or not is_instance_valid(_people_card):
 		return
 	if not _people_card.visible:
 		return
 	_people_card.refresh_evidence(_person_field_payload(String(_people_card.person_id)))
-
 
 ## 把「证」级证据附到某个人物的关键字段上，进入待核对。
 func _assign_evidence_to_field(person_id: String, field_id: String, key: String,
@@ -5191,7 +4899,6 @@ func _assign_evidence_to_field(person_id: String, field_id: String, key: String,
 		_commit(before)
 	return true
 
-
 func _on_person_field_word(person_id: String, field_id: String, value: String) -> void:
 	if graph == null or case_def == null:
 		return
@@ -5206,7 +4913,6 @@ func _on_person_field_word(person_id: String, field_id: String, value: String) -
 	_tec_teach_claim()
 	_commit(before)
 
-
 func _tec_teach_claim() -> void:
 	if graph == null or _tec == null:
 		return
@@ -5217,7 +4923,6 @@ func _tec_teach_claim() -> void:
 	## 台词先存进 TEC，另用一条轻提示把节拍说出来。
 	_tec.append_line("主张先放着，攒几条我一起核对。")
 	_show_toast("TEC：主张先放着，攒几条我一起核对。")
-
 
 ## TEC 批量核对：逐条判词条 + 证据，正确的盖章，错误的退回；全部字段核准后掉落人物线索。
 func _check_person_claims(person_id: String, before := {}) -> bool:
@@ -5265,7 +4970,6 @@ func _check_person_claims(person_id: String, before := {}) -> bool:
 	_commit(snap)
 	return true
 
-
 ## 关键字段全部盖章后，把该人物档案里的演绎证据落到画布（origin=deduce，落地即已捕获）。
 func _drop_person_completion_clues(person_id: String) -> void:
 	var ch := case_def.char_of(person_id)
@@ -5295,7 +4999,6 @@ func _drop_person_completion_clues(person_id: String) -> void:
 	else:
 		_tec.append_line("「%s」的档案已经全部核准。" % ch.name)
 
-
 func _first_sentence(text: String) -> String:
 	var clean := text.strip_edges()
 	if clean == "":
@@ -5304,7 +5007,6 @@ func _first_sentence(text: String) -> String:
 	if idx > 0:
 		return clean.substr(0, idx)
 	return clean
-
 
 ## 把人物叫到画面中央（Web `gotoChar`）：没节点就补一个、在袋里就取回，然后居中 + 选中。
 func _goto_char(id: String) -> bool:
@@ -5345,7 +5047,6 @@ func _goto_char(id: String) -> bool:
 	_commit(before)
 	return true
 
-
 ## 说下一句（Web `showCharLine`）：推进 talkQueue、收下台词里提到的线索、开对话窗。
 ## 说完 / 没有台词时不推进 —— 点了也不再出新句。
 func _say_next_line(id: String) -> bool:
@@ -5377,13 +5078,11 @@ func _say_next_line(id: String) -> bool:
 	_commit(before)
 	return true
 
-
 func _labels_of(ids: Array) -> Array:
 	var out: Array = []
 	for cid in ids:
 		out.append(case_def.label_of("clue", String(cid)))
 	return out
-
 
 ## 日志窗：Web `#log-win`（right 14 / bottom 96 / 宽 320）
 func _toggle_log() -> void:
@@ -5404,11 +5103,9 @@ func _toggle_log() -> void:
 	_log_unread = 0
 	_set_badge(_log_badge, "")
 
-
 func _refresh_log_win() -> void:
 	if _log_win != null and is_instance_valid(_log_win):
 		_log_win.refresh_log()
-
 
 ## 写一条案卷（口径见 GraphState.add_log 上方）。窗关着时累未读 —— Web `logUnread`。
 ## 带内部 key 的调试条目（`item:ITEMS_x` / `loc:SCENES_y`）不进玩家案卷，
@@ -5426,13 +5123,11 @@ func _log(text: String, kind: String = "") -> void:
 	_log_unread += 1
 	_set_badge(_log_badge, str(_log_unread))
 
-
 func _has_internal_key(text: String) -> bool:
 	var re := RegEx.new()
 	if re.compile("(?i)(?:^|[\\s（「『【\\[,，：])(?:item|clue|char|loc|scene|time|dlg|npcs?|scenes|chars|items|clues):[a-z0-9_]+") != OK:
 		return false
 	return re.search(text) != null
-
 
 func _append_debug_log(text: String, kind: String) -> void:
 	var path := "user://tec-debug.log"
@@ -5444,7 +5139,6 @@ func _append_debug_log(text: String, kind: String) -> void:
 	f.seek_end()
 	f.store_line("[%s]%s %s" % [Time.get_datetime_string_from_system(false, true),
 		(" " + kind) if kind != "" else "", text])
-
 
 # ── 推演桌布（五感槽位 / 归位 / 长按推演）──────────────────────────────
 
@@ -5481,7 +5175,6 @@ func _toggle_matrix() -> void:
 	if _tutorial_active and _tutorial_step == TutorialStep.INFER:
 		_tutorial_on_matrix_changed()
 
-
 ## A7：矩阵窗会把正下方的卡片遮得只剩一条白边，看起来像窗口漏了一块。
 ## 只对「大部分面积都被窗盖住」的卡片淡出；拖窗时实时重算，关窗恢复。
 ## 用 modulate 而非 visible：_layout_force 只排可见卡片，隐藏会让别的卡重排。
@@ -5505,7 +5198,6 @@ func _sync_matrix_occlusion() -> void:
 		c.process_mode = Node.PROCESS_MODE_DISABLED
 		_matrix_faded.append(key)
 
-
 func _restore_matrix_occlusion() -> void:
 	for key in _matrix_faded:
 		var c: NodeCard = _cards.get(String(key), null)
@@ -5514,12 +5206,10 @@ func _restore_matrix_occlusion() -> void:
 			c.process_mode = Node.PROCESS_MODE_INHERIT
 	_matrix_faded.clear()
 
-
 func _on_matrix_closed() -> void:
 	_restore_matrix_occlusion()
 	_matrix_win = null
 	_place_floating_windows()
-
 
 ## 画布 / 证据 → 桌布。感官自动取证自身的 sense。
 func _assign_to_matrix(key: String) -> bool:
@@ -5551,13 +5241,11 @@ func _assign_to_matrix(key: String) -> bool:
 	_commit(before)
 	return true
 
-
 ## K2：桌布线索引单击 = 看详情，和画布节点同一套语义（取回只走按钮 / 拖出）。
 func _on_matrix_chip_shown(key: String) -> void:
 	if graph == null or not graph.nodes.has(key):
 		return
 	_on_card_selected(key)
-
 
 func _on_matrix_took(key: String, at_global: Vector2 = Vector2(-1.0, -1.0)) -> void:
 	var before := _save.snapshot()
@@ -5581,7 +5269,6 @@ func _on_matrix_took(key: String, at_global: Vector2 = Vector2(-1.0, -1.0)) -> v
 	_tutorial_on_matrix_changed()
 	_commit(before)
 
-
 ## 桌布上的证拖到「证据」（窗**或图标**）= 改归证据；
 ## 拖出桌布落到别处 = **带坐标**取回画布。
 func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
@@ -5603,7 +5290,6 @@ func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
 		return
 	_on_matrix_took(key, at_global)
 
-
 func _on_ledger_to_matrix(key: String) -> void:
 	## C6：证据行内按钮必须和拖到「推演」图标走同一条教学守卫。
 	if _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES:
@@ -5618,7 +5304,6 @@ func _on_ledger_to_matrix(key: String) -> void:
 		if not _tutorial_correct("这条证没有可用的感官槽位。"):
 			_reject_drop("这条证没有可用的感官槽位。")
 
-
 func _refresh_matrix_views() -> void:
 	if _matrix_win != null and is_instance_valid(_matrix_win):
 		_matrix_win.refresh_matrix()
@@ -5629,7 +5314,6 @@ func _refresh_matrix_views() -> void:
 		_ledger_win.refresh_store()
 	if _ledger_win != null and is_instance_valid(_ledger_win):
 		_ledger_win.refresh_store()
-
 
 ## 长按蓄力完成 → 配方判定：恰好命中才算，多余的证也失败
 func _run_inference() -> void:
@@ -5680,7 +5364,6 @@ func _run_inference() -> void:
 		## 不等 180ms 合并窗：结局触发即落盘，遮罩期间退出也不丢种子。
 		_autosave()
 
-
 func _refresh_or_spawn_card(key: String) -> void:
 	var card: NodeCard = _cards.get(key, null)
 	if card == null:
@@ -5689,7 +5372,6 @@ func _refresh_or_spawn_card(key: String) -> void:
 		card.visible = graph.visible_node(graph.node(key))
 		card.refresh()
 		_sync_card_shell(card)
-
 
 func _sync_card_shell(card: NodeCard) -> void:
 	if card == null or graph == null:
@@ -5701,46 +5383,6 @@ func _sync_card_shell(card: NodeCard) -> void:
 		graph.is_hub(String(n.get("kind", "")), id))
 	## 教学是线性引导，不挂「无文本入口」警告；TEC办公室尤其不该因为不需要叙事而被标红。
 	card.set_warn(not _tutorial_active and graph.is_no_entry(card.card_key))
-
-
-## 供测试钩子 / 后续接线用：把当前选中的节点收进某个收纳处
-## 无头钩子：模拟「把收纳窗里的一行拖到 at_global」（跳过 _process 的指针轮询）
-func dbg_storage_drag(key: String, at_global: Vector2) -> void:
-	if not graph.stored.has(key):
-		return
-	_on_row_pressed(key, String(graph.stored.get(key, "")), at_global)
-	_sdrag_started = true
-	_finish_sdrag(at_global)
-
-
-## 探针：当前落点表的 id 列表（保持顺序）。
-## 单一入口的意义就在这里 —— 以后加落点只改 `_drop_targets()` 与 `_apply_drop()`，
-## 悬停高亮、松手分派共用同一份，不可能出现"高亮了但不生效"。
-func dbg_drop_target_ids() -> Array:
-	var out: Array = []
-	for t in _drop_targets():
-		out.append(String(t["id"]))
-	return out
-
-
-func dbg_store(kind: String) -> bool:
-	if _selected == "":
-		return false
-	if kind == GraphState.MATRIX:
-		return _assign_to_matrix(_selected)
-	var before := _save.snapshot()
-	var ok := false
-	if kind == GraphState.BAG:
-		ok = graph.bag_store(_selected)
-	elif kind == GraphState.LEDGER:
-		ok = graph.ledger_store(_selected)
-	if not ok:
-		return false
-	_apply_hidden()
-	_refresh_matrix_views()
-	_commit(before)
-	return true
-
 
 # ── 密码弹窗 ────────────────────────────────────────────────────────────
 
@@ -5779,7 +5421,6 @@ func _open_password(node_key: String) -> void:
 	_place_z(_pw_pop, ZR_PW)
 	_pw_ctx = {"node_key": node_key, "cmd": cmd}
 
-
 func _submit_password(text: String) -> void:
 	if _pw_ctx.is_empty():
 		return
@@ -5813,7 +5454,6 @@ func _submit_password(text: String) -> void:
 	_apply_outcome(res, String(_pw_ctx["node_key"]))
 	_pw_ctx = {}
 	_commit(before)
-
 
 func _on_card_combo(tool_key: String, target_key: String) -> void:
 	# 折叠的容器（场景 / 书桌 / 垃圾桶）既不收纳也不组合：里面的东西看不见，隔空命中的结果没有着力点
@@ -5897,7 +5537,6 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 		# 失败只多一条「试过」虚线，**不动坐标**（以前这里跑 _relayout，等于每次失败都把全场归位）
 		_repaint_edges()
 
-
 func _expand_scene(sid: String, show_narr: bool) -> void:
 	var was_explored := graph.explored.has(sid)
 	var fresh := graph.reveal_scene(sid)
@@ -5915,7 +5554,6 @@ func _expand_scene(sid: String, show_narr: bool) -> void:
 		_show_narr(sid)
 	_set_crumb(_case_label() + " // " + case_def.scene_title(sid))
 	_on_first_expand("loc", sid, was_explored)
-
 
 func _show_narr(sid: String) -> void:
 	var n := graph.node(graph.scene_key(sid))
@@ -5943,12 +5581,10 @@ func _show_narr(sid: String) -> void:
 	if not _narr.is_typing():
 		_on_narr_typing_finished()
 
-
 func _on_narr_typing_finished() -> void:
 	## 叙事卡还在屏上，详情继续让位。等玩家关掉叙事卡 / 明确点节点后再显示。
 	_pending_detail = _pending_detail or (_selected != "" and graph != null
 		and graph.nodes.has(_selected))
-
 
 func _on_narr_closed() -> void:
 	_narr = null
@@ -5956,7 +5592,6 @@ func _on_narr_closed() -> void:
 		_pending_detail = false
 		_detail_full_once = true
 		_refresh_detail()
-
 
 # ── 档案 / 时间图层 / 回忆放映 ─────────────────────────────────────────
 
@@ -5979,10 +5614,8 @@ func _toggle_archive() -> void:
 	for sid in graph.timeline_known():
 		graph.clear_fresh(graph.scene_key(String(sid)))
 
-
 func _on_archive_time(tid: String) -> void:
 	_select_time(tid)
-
 
 func _try_memory_combo(tool_key: String, target_key: String, before: Dictionary) -> bool:
 	if graph == null or case_def == null or graph.time == GraphState.PRESENT_TIME:
@@ -6018,7 +5651,6 @@ func _try_memory_combo(tool_key: String, target_key: String, before: Dictionary)
 	_relayout()
 	return true
 
-
 ## 换档 = 改 graph.time → 收掉锚在画布上的浮层 → 带出那天的登场人物 → 重算可见性。
 func _select_time(tid: String) -> bool:
 	if graph == null or case_def == null:
@@ -6042,7 +5674,6 @@ func _select_time(tid: String) -> bool:
 	_autosave()
 	return true
 
-
 func _close_time_transients() -> void:
 	if _pw_pop != null and is_instance_valid(_pw_pop):
 		_pw_pop.queue_free()
@@ -6053,7 +5684,6 @@ func _close_time_transients() -> void:
 	_narr = null
 	_close_mem_card()
 	_close_chat()
-
 
 ## 把图上已有、但还没上过画布的实体补成卡片；已存在的只刷新（时刻切换不重排）。
 func _sync_cards_for_time() -> void:
@@ -6067,7 +5697,6 @@ func _sync_cards_for_time() -> void:
 		else:
 			_spawn_card(String(key))
 
-
 func _sync_time_crumb() -> void:
 	if graph.time != GraphState.PRESENT_TIME:
 		_set_crumb(_case_label() + " // " + graph.time_label_of())
@@ -6078,7 +5707,6 @@ func _sync_time_crumb() -> void:
 	else:
 		_set_crumb(_case_label() + " // " + graph.time_label_of())
 
-
 ## 每档回忆的放映卡只自动放一遍；重放走档案里点当前档。
 func _open_time_card_once(tid: String) -> void:
 	if tid == GraphState.PRESENT_TIME or not case_def.is_time_id(tid):
@@ -6088,7 +5716,6 @@ func _open_time_card_once(tid: String) -> void:
 	graph.card_seen[tid] = true
 	_open_time_card(tid)
 	_autosave()
-
 
 func _open_time_card(tid: String) -> void:
 	if tid == GraphState.PRESENT_TIME or not case_def.is_time_id(tid):
@@ -6102,7 +5729,6 @@ func _open_time_card(tid: String) -> void:
 	_desk.add_child(_mem_card)
 	_anchor_memory_card(_mem_card, tid)
 	_place_z(_mem_card, ZR_NARR)
-
 
 ## 放映卡正文 = 日期场景正文（按行拆）+ 该场景里各角色当天的 sceneTalks。
 func _memory_lines(tid: String) -> Array:
@@ -6131,7 +5757,6 @@ func _memory_lines(tid: String) -> Array:
 					out.append("——%s：%s" % [ch.name, talk_line])
 	return out
 
-
 func _memory_play_lines(mem: MemoryDef) -> Array:
 	var out: Array = []
 	for line in mem.script_lines:
@@ -6145,7 +5770,6 @@ func _memory_play_lines(mem: MemoryDef) -> Array:
 		var who_name := line.who.name if line.who != null else ""
 		out.append({"t": kind, "text": text, "who": who_id, "name": who_name})
 	return out
-
 
 func _open_memory_play(mem: MemoryDef, where_key: String) -> void:
 	if mem == null:
@@ -6163,17 +5787,14 @@ func _open_memory_play(mem: MemoryDef, where_key: String) -> void:
 	_anchor_card_to(_mem_card, where_key)
 	_place_z(_mem_card, ZR_NARR)
 
-
 ## 锚在该时刻的发生地点上方；上方放不下就放下面，再整体钳进桌面。
 func _anchor_memory_card(card: MemCard, tid: String) -> void:
 	var place := case_def.mem_place_of(tid)
 	_anchor_card_to(card, graph.scene_key(place.id) if place != null else "")
 
-
 ## 锚定时的「锚点节点」：节点还在重排补间里飞的时候锚出来的位置是**中途位置**，
 ## 补间一结束就对不上（实测 448×328 的放映卡压住花园节点）。补间收尾时按新位置重锚。
 var _mem_anchor_key := ""
-
 
 func _anchor_card_to(card: MemCard, node_key: String) -> void:
 	if card == null:
@@ -6220,7 +5841,6 @@ func _anchor_card_to(card: MemCard, node_key: String) -> void:
 	pos.y = clampf(pos.y, 8.0, area.y - card.size.y - 8.0)
 	card.position = pos
 
-
 ## 回忆卡候选位是否压住别的可见节点（浮窗不算 —— 那本就允许被压）。
 func _mem_blocked(r: Rect2, skip_key: String) -> bool:
 	var origin := _desk.get_global_rect().position
@@ -6235,26 +5855,21 @@ func _mem_blocked(r: Rect2, skip_key: String) -> bool:
 			return true
 	return false
 
-
 func _close_mem_card() -> void:
 	if _mem_card != null and is_instance_valid(_mem_card):
 		_mem_card.queue_free()
 	_mem_card = null
 
-
 func _on_mem_closed() -> void:
 	_mem_card = null
-
 
 func _close_chat() -> void:
 	if _chat_win != null and is_instance_valid(_chat_win):
 		_chat_win.queue_free()
 	_chat_win = null
 
-
 func _on_chat_closed() -> void:
 	_chat_win = null
-
 
 ## 对话窗固定贴右上（Web `.chat-win`：right 18 / top 72；desk 已让出 header，再减 PAD 14）。
 func _open_chat(entry: DialogueDef, ids: Array, reveal_all := false,
@@ -6273,7 +5888,6 @@ func _open_chat(entry: DialogueDef, ids: Array, reveal_all := false,
 	_place_floating_windows()
 	return true
 
-
 ## 独白 = 整段台词一次贴出；不像多人对话那样等玩家逐句点。
 func _open_monologue(char_id: String) -> bool:
 	if dialogues == null:
@@ -6282,7 +5896,6 @@ func _open_monologue(char_id: String) -> bool:
 	if entry == null:
 		return false
 	return _open_chat(entry, [char_id], true)
-
 
 ## 人物对物品 / 线索的反应：仍进独白窗，但标题带上反应对象；
 ## 单句反应一次贴完，不再只写进案卷让玩家错过。
@@ -6306,7 +5919,6 @@ func _open_reaction_monologue(char_id: String, text: String, trigger_label: Stri
 	var tail := "对「%s」的反应" % trigger_label if trigger_label != "" else "反应"
 	return _open_chat(entry, [char_id], true, "独白 · %s · %s" % [ch.name, tail])
 
-
 # ── 证据：落地 / 同源去重 / 首次教学 ─────────────────────────────────────
 
 ## 把一条证据落到画布。已存在（含在「物品」里）就复用，不再刷「新」。
@@ -6327,7 +5939,6 @@ func _grant_evidence(ev: EvidenceDef, from_key: String = "", x: float = -1.0,
 		_tec_teach_evidence()
 	return key
 
-
 ## 一次掉一组证据，返回实际新增的 key 列表（已存在的跳过）。
 func _grant_evidences(evs: Array, from_key: String = "") -> Array:
 	var out: Array = []
@@ -6342,7 +5953,6 @@ func _grant_evidences(evs: Array, from_key: String = "") -> Array:
 			out.append(key)
 	return out
 
-
 func _on_dialogue_playback_completed(id: String) -> void:
 	if id == "" or dialogues == null or graph == null:
 		return
@@ -6352,7 +5962,6 @@ func _on_dialogue_playback_completed(id: String) -> void:
 	var before := _save.snapshot()
 	if not _grant_evidences(d.drops_evidence).is_empty():
 		_commit(before)
-
 
 func _on_memory_playback_completed(id: String) -> void:
 	if id == "" or case_def == null or graph == null:
@@ -6368,7 +5977,6 @@ func _on_memory_playback_completed(id: String) -> void:
 			_commit(before)
 		return
 
-
 func _tec_teach_evidence() -> void:
 	if graph == null or _tec == null:
 		return
@@ -6381,7 +5989,6 @@ func _tec_teach_evidence() -> void:
 	else:
 		_open_tec()
 
-
 func _tec_teach_recipe() -> void:
 	if graph == null or _tec == null:
 		return
@@ -6393,7 +6000,6 @@ func _tec_teach_recipe() -> void:
 		_show_toast("TEC：物和词只是原料——拼成「证」才能填进档案。")
 	else:
 		_open_tec()
-
 
 func _try_dialogue_combo(tool_key: String, target_key: String) -> bool:
 	if dialogues == null:
@@ -6410,14 +6016,12 @@ func _try_dialogue_combo(tool_key: String, target_key: String) -> bool:
 		entry = dialogues.fallback(ids)
 	return _open_chat(entry, ids)
 
-
 func _chat_drop_hit(at_global: Vector2) -> bool:
-	var chat := dbg_chat()
+	var chat := _chat_win
 	return chat != null and chat.get_global_rect().has_point(at_global)
 
-
 func _chat_drop(key: String) -> bool:
-	var chat := dbg_chat()
+	var chat := _chat_win
 	if chat == null or graph == null:
 		return false
 	var n := graph.node(key)
@@ -6425,18 +6029,15 @@ func _chat_drop(key: String) -> bool:
 		return false
 	return chat.drop_node(String(n["kind"]), String(n["id"]))
 
-
 func _mark_archive_new() -> void:
 	_archive_new = true
 	if _archive_badge != null:
 		_archive_badge.visible = true
 
-
 func _clear_archive_new() -> void:
 	_archive_new = false
 	if _archive_badge != null:
 		_archive_badge.visible = false
-
 
 ## 当前「可见节点集合」的签名。力导向只认它：集合没变 = 结构没变 = 一个坐标都不该动。
 ## 对齐 Web `09-commands.js`：「开关灯只重绘（重排会让灯自己跳位置）」—— 那边只有真长出
@@ -6454,7 +6055,6 @@ const LAYOUT_FRAME_ROUNDS := 5
 ## F3 基准：最近一次 reconcile 的复用 / 新建 / 移除数量。
 var _last_rebuild_stats := {"reused": 0, "spawned": 0, "despawned": 0}
 
-
 func _layout_signature() -> String:
 	var keys: Array = []
 	for key in _cards.keys():
@@ -6462,7 +6062,6 @@ func _layout_signature() -> String:
 			keys.append(String(key))
 	keys.sort()
 	return "|".join(PackedStringArray(keys))
-
 
 ## 布局（对齐 Web `layout()`）：**松弛一次**，不是重新排版。
 ##   - 只给「从没落过位」的节点播种（x/y < 0）；已落位的保留；
@@ -6514,7 +6113,6 @@ func _relayout(animated := false, force := false) -> void:
 	_repaint_edges()
 	_reanchor_mem_card()
 	_sync_matrix_occlusion()
-
 
 ## 常规展开的稳定落位：以触发卡为锚，把新卡摆在外圈，避开已经可见的卡片。
 ## 不移动旧卡、不跑力导向、不自动 fit —— 点开容器时玩家先看到完整标题。
@@ -6608,7 +6206,6 @@ func _place_new_cards(keys: Array) -> void:
 	## 只平移、不缩放：把新节点纳入当前视口，文字仍是 1x/0.95x 档。
 	_pan_to_include(fresh.keys())
 
-
 ## 最小平移让这批卡片完整进入 stage（四周留 40px）。不动倍率，所以不会把标题缩成符号。
 func _pan_to_include(keys: Array) -> void:
 	if keys.is_empty() or _stage == null or not is_instance_valid(_stage):
@@ -6639,7 +6236,6 @@ func _pan_to_include(keys: Array) -> void:
 		_view_pos = _clamp_view_pos(p)
 		_apply_view()
 
-
 ## 教学桌面不做力导向：三张卡是 TEC 亲手摆的教学道具，位置必须稳定可预期，
 ## 否则刚生成的线索会被弹簧/斥力推到画布边上，玩家根本找不到。
 func _layout_tutorial() -> void:
@@ -6652,7 +6248,6 @@ func _layout_tutorial() -> void:
 		var p := Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
 		card.set_home_silent(p)
 		card.position = p
-
 
 ## 力导向：斥力 30000/d²、最小间距 R_a+R_b+14、弹簧 rest 185/300/150、向心 0.0022，260 轮。
 ## 参数照抄 `src/js/07-render.js`；R 用视觉半径（半对角线），与 Web 的 80 / 68 同口径。
@@ -6674,10 +6269,8 @@ func _layout_force(animated: bool = false, force := false) -> void:
 	if sync:
 		_layout_job = null
 
-
 func _cancel_layout_job() -> void:
 	_layout_job = null
-
 
 ## 把求解器当前坐标写回图与卡片。progressive=true 时逐帧直落（物理收敛观感），
 ## 不启动 0.34s 补间，否则每帧都会重新起一条 tween。
@@ -6711,10 +6304,8 @@ func _apply_layout_job(animated: bool, progressive: bool) -> void:
 		else:
 			_start_move_tween(String(key), card, p)
 
-
 var _move_twens: Dictionary = {}      # key -> 卡片落位补间（下一次重排前先杀）
 var _follow_frames := 0               # >0 时每帧重画连线（过渡期间连线跟着节点走）
-
 
 func _start_move_tween(key: String, card: NodeCard, p: Vector2) -> void:
 	_kill_move(key)
@@ -6731,12 +6322,10 @@ func _start_move_tween(key: String, card: NodeCard, p: Vector2) -> void:
 	_move_twens[key] = tw
 	_follow_frames = maxi(_follow_frames, 21)   # ≈420ms @ 60fps（Web paintEdgesFor(420)）
 
-
 func _kill_move(key: String) -> void:
 	if _move_twens.has(key):
 		(_move_twens[key] as Tween).kill()
 		_move_twens.erase(key)
-
 
 func _fit_cards(keep_titles := true) -> void:
 	if _card_layer == null:
@@ -6781,7 +6370,6 @@ func _fit_cards(keep_titles := true) -> void:
 	_view_user = false
 	_apply_view()
 
-
 # ── TEC ─────────────────────────────────────────────────────────────────
 
 func _tec_key(target: String) -> String:
@@ -6791,7 +6379,6 @@ func _tec_key(target: String) -> String:
 			return graph.key_of(parts[0], parts[1])
 		return target
 	return graph.scene_key(target)
-
 
 func _open_tec() -> void:
 	if not _require_case():
@@ -6807,7 +6394,6 @@ func _open_tec() -> void:
 	if _tutorial_active:
 		_tutorial_tec_icon_visible = false
 		_refresh_app_icons()
-
 
 func _close_tec() -> void:
 	if _tec == null:
@@ -6827,7 +6413,6 @@ func _close_tec() -> void:
 		_tutorial_tec_icon_visible = true
 		_refresh_app_icons()
 
-
 func _minimize_tec() -> void:
 	if _tec == null or not _tec.visible:
 		return
@@ -6837,7 +6422,6 @@ func _minimize_tec() -> void:
 	if _tutorial_active:
 		_tutorial_tec_icon_visible = true
 		_refresh_app_icons()
-
 
 func _hide_tec(reset: bool = false) -> void:
 	if _tec == null:
@@ -6852,7 +6436,6 @@ func _hide_tec(reset: bool = false) -> void:
 	if _tec_chip != null:
 		_tec_chip.visible = false
 
-
 func _toggle_tec() -> void:
 	if not _require_case():
 		return
@@ -6860,7 +6443,6 @@ func _toggle_tec() -> void:
 		_close_tec()
 	else:
 		_open_tec()
-
 
 func _sync_tec_chip() -> void:
 	if _tec_chip == null:
@@ -6875,7 +6457,6 @@ func _sync_tec_chip() -> void:
 	else:
 		_tec_chip.set_idle(_tec_dot)
 
-
 func _tec_drop_hit(at_global: Vector2) -> bool:
 	if _tec_btn != null and _tec_btn.get_global_rect().has_point(at_global):
 		return true
@@ -6884,7 +6465,6 @@ func _tec_drop_hit(at_global: Vector2) -> bool:
 	if _tec_chip != null and _tec_chip.visible and _tec_chip.get_global_rect().has_point(at_global):
 		return true
 	return false
-
 
 func _start_tec_analysis(key: String) -> bool:
 	if not _require_case() or _tec == null:
@@ -6908,18 +6488,15 @@ func _start_tec_analysis(key: String) -> bool:
 		_open_tec()
 	return _tec.analyze(key, String(n.get("label", key)))
 
-
 func _on_tec_analysis_started(_target: String, _label: String) -> void:
 	_tec_before = _save.snapshot() if _save != null else {}
 	_tec_dot = false
 	if _tec_min:
 		_sync_tec_chip()
 
-
 func _on_tec_analysis_progress(ratio: float) -> void:
 	if _tec_min and _tec_chip != null:
 		_tec_chip.set_analyzing(_tec.target_label(), ratio)
-
 
 func _refresh_clue_keys(keys: Array) -> void:
 	if keys.is_empty():
@@ -6927,7 +6504,6 @@ func _refresh_clue_keys(keys: Array) -> void:
 	for key in keys:
 		_refresh_or_spawn_card(String(key))
 	_relayout()
-
 
 ## G14：这组线索里有没有「真名结局」配方需要的条目。
 ## 只用于 TEC 输出行的提醒样式，不向玩家指名具体是哪一条。
@@ -6947,7 +6523,6 @@ func _has_true_name_clue(keys: Array) -> bool:
 			return true
 	return false
 
-
 func _hidden_clue_of(kind: String, id: String) -> HiddenClueDef:
 	match kind:
 		"loc", "time":
@@ -6960,7 +6535,6 @@ func _hidden_clue_of(kind: String, id: String) -> HiddenClueDef:
 			var ch := case_def.char_of(id)
 			return ch.hidden_clue if ch != null else null
 	return null
-
 
 func _capture_node_hidden_clues(kind: String, id: String, host_key: String) -> Dictionary:
 	var hc := _hidden_clue_of(kind, id)
@@ -6978,7 +6552,6 @@ func _capture_node_hidden_clues(kind: String, id: String, host_key: String) -> D
 	_refresh_clue_keys(got)
 	return {"keys": got, "names": names, "text": hc.text}
 
-
 ## TEC 解读完成后落 hidden_clue（字段名沿用，内容为证）。
 func _capture_hidden_clue(scene_id: String) -> void:
 	var kind := graph.normalize_kind("loc", scene_id)
@@ -6988,7 +6561,6 @@ func _capture_hidden_clue(scene_id: String) -> void:
 		return
 	_show_toast("获得证据：" + "、".join(res["names"]))
 
-
 func _tec_talk_lines(sid: String) -> Array:
 	var tec := case_def.char_of("CHARS_TEC")
 	if tec == null:
@@ -6997,7 +6569,6 @@ func _tec_talk_lines(sid: String) -> Array:
 		if st != null and st.scene != null and st.scene.id == sid:
 			return st.lines
 	return []
-
 
 ## 这条物品 / 线索在 TEC 那里有没有专属反应。首次展开救济与密码连错提示共用。
 func _tec_reaction_hit(kind: String, id: String) -> Dictionary:
@@ -7020,10 +6591,8 @@ func _tec_reaction_hit(kind: String, id: String) -> Dictionary:
 				return {"text": r.text, "clues": r.clues}
 	return {}
 
-
 func _tec_reaction_text(kind: String, id: String) -> String:
 	return String(_tec_reaction_hit(kind, id).get("text", ""))
-
 
 ## G7：TEC 亲口留提示。默认只落进 TEC 对话（不污染「只记结果」的日志）；
 ## 档案类提示可显式 log_it，窗关着时可显式 announce 用 toast 提醒。
@@ -7045,7 +6614,6 @@ func _tec_hint(text: String, announce := false, log_it := false) -> void:
 		if announce and not _tec.visible:
 			_show_toast("TEC 留了条提示：" + text)
 
-
 ## G7：所有「第一次展开」路径统一走这里（双击场景 / 容器、组合前往、命令产出场景）。
 ## 有档案的场景指给 TEC 分析；有专属反应的物品指给 TEC；其余给一句看现场的方向提示。
 func _on_first_expand(kind: String, id: String, was_explored: bool) -> void:
@@ -7061,7 +6629,6 @@ func _on_first_expand(kind: String, id: String, was_explored: bool) -> void:
 			_tec_hint("先看看「%s」里有什么；可疑的东西可以拖给我。" % title)
 	elif _tec_reaction_text(kind, id) != "" or _hidden_clue_of(kind, id) != null:
 		_tec_hint("「%s」可以拖给我看看。" % title)
-
 
 func _tec_reaction(key: String) -> bool:
 	var n := graph.node(key)
@@ -7085,7 +6652,6 @@ func _tec_reaction(key: String) -> bool:
 		_tec.append_line(reaction_line)
 	_refresh_clue_keys(got)
 	return true
-
 
 ## G7：闲聊队列耗尽后不再静默。按当前进度给「方向 → 操作 → 明示」三档提示，
 ## 每次点击换下一条；状态越具体，提示越接近可执行动作。
@@ -7132,7 +6698,6 @@ func _tec_next_hint() -> String:
 	graph.tec_prog["_hint"] = tier + 1
 	return String(hints[tier % hints.size()])
 
-
 func _tec_talk() -> void:
 	if not _require_case() or _tec == null:
 		return
@@ -7158,7 +6723,6 @@ func _tec_talk() -> void:
 		return
 	_tec_hint(_tec_next_hint())
 	_autosave()
-
 
 func _on_tec_analysis_done(target: String) -> void:
 	var key := _tec_key(target)
@@ -7218,1138 +6782,23 @@ func _on_tec_analysis_done(target: String) -> void:
 	_commit(_tec_before)
 	_tec_before = {}
 
-
 # ── 测试钩子（与 Web 版 window.__* 同名，便于把操作脚本逐行翻译）──────────
-
-func dbg_state() -> Dictionary:
-	return {
-		"nodes": _cards.keys(),
-		"explored": graph.explored.keys(),
-		"captured": graph.captured.keys(),
-		"tec_prog": graph.tec_prog.duplicate(),
-		"lit": _lit_map(),
-		"selected": _selected,
-		"cards": _cards.size(),
-		"collapsed": graph.collapsed.keys(),
-		"stored": graph.stored.keys(),
-		"hidden": graph.hidden.keys(),
-		"installed": _installed_map(),
-		"matrix": graph.matrix.duplicate(true),
-		"matrix_ids": graph.matrix_ids(),
-		"endings": graph.endings.keys(),
-		"ending_visible": _ending.visible if _ending != null else false,
-		"ending_id": _last_ending_id,
-		"can_undo": _save.can_undo() if _save != null else false,
-		"history": _save.history.size() if _save != null else 0,
-	}
-
-
-func _installed_map() -> Dictionary:
-	var out := {}
-	for k in graph.nodes.keys():
-		var n: Dictionary = graph.nodes[k]
-		if n["kind"] == "item" and not (n.get("installed", {}) as Dictionary).is_empty():
-			out[k] = (n["installed"] as Dictionary).keys()
-	return out
-
-
-func _lit_map() -> Dictionary:
-	var out := {}
-	for k in graph.nodes.keys():
-		var n: Dictionary = graph.nodes[k]
-		if n["kind"] == "item":
-			out[String(n["id"])] = bool(n.get("lit", false))
-	return out
-
-
-func dbg_expand(sid: String) -> void:
-	_expand_scene(sid, false)
-
-
-func dbg_combo(tool_id: String, target_id: String) -> Dictionary:
-	var tkind := CaseLoader.kind_of_ref(tool_id)
-	var okind := CaseLoader.kind_of_ref(target_id)
-	return combos.use_item(graph.key_of(tkind, tool_id), graph.key_of(okind, target_id))
-
-
-## 双击某张卡（跑第一条命令 / 展开容器，与真实双击同一条路）
-func dbg_activate(key: String) -> void:
-	_on_card_activated(key)
-
-
-## 建节点并上卡片（等价 Web 的 __ensure）
-func dbg_ensure(kind: String, id: String) -> String:
-	var n := graph.add_node(kind, id)
-	_spawn_card(String(n["key"]))
-	_relayout()
-	return String(n["key"])
-
-
-func dbg_pw_open(node_key: String) -> void:
-	_open_password(node_key)
-
-
-func dbg_password(node_key: String, value: String) -> void:
-	# 已经为这个节点开着窗就直接提交（模拟「在同一个弹窗里改输入再点确定」）
-	if _pw_pop == null or not is_instance_valid(_pw_pop) or String(_pw_ctx.get("node_key", "")) != node_key:
-		_open_password(node_key)
-	_submit_password(value)
-
-
-func dbg_toggle_light(id: String) -> Dictionary:
-	return combos.toggle_light(graph.key_of("item", id))
-
-
-## 选中某个节点（等价点一下卡）
-func dbg_select(key: String) -> void:
-	_selected = key
-	graph.selected = key
-
-
-## 打开某个收纳窗
-func dbg_open_storage(kind: String) -> void:
-	_toggle_storage(kind)
-
-
-func dbg_tec_analyze(sid: String) -> void:
-	_start_tec_analysis(_tec_key(sid))
-
-
-func dbg_tec_finish() -> int:
-	return _tec.done_count() if _tec != null else 0
-
-
-func dbg_tec_complete() -> void:
-	if _tec != null:
-		_tec.finish_now()
-
-
-func dbg_tec_open() -> void:
-	_open_tec()
-
-
-func dbg_tec_close() -> void:
-	_close_tec()
-
-
-func dbg_tec_minimize() -> void:
-	_minimize_tec()
-
-
-func dbg_tec_win() -> TecWindow:
-	return _tec
-
-
-func dbg_tec_chip() -> TecChip:
-	return _tec_chip
-
-
-func dbg_tec_talk() -> void:
-	_tec_talk()
-
-
-func dbg_tec_analyze_key(key: String) -> bool:
-	return _start_tec_analysis(key)
-
-
-func dbg_tec_drop_hit(at_global: Vector2) -> bool:
-	return _tec_drop_hit(at_global)
-
-
-func dbg_tec_drop(key: String, at_global: Vector2) -> void:
-	_on_card_drag_released(key, at_global)
-
-
-func dbg_tec_icon_rect() -> Rect2:
-	return _tec_btn.get_global_rect() if _tec_btn != null else Rect2()
-
-
-func dbg_tec_info() -> Dictionary:
-	var win := {}
-	if _tec != null:
-		win = _tec.dbg_status()
-	var chip := {}
-	if _tec_chip != null:
-		chip = _tec_chip.dbg_state()
-	return {
-		"visible": _tec.visible if _tec != null else false,
-		"min": _tec_min,
-		"dot": _tec_dot,
-		"chip_visible": _tec_chip.visible if _tec_chip != null else false,
-		"win": win,
-		"chip": chip,
-	}
-
 
 # ── 档案 / 放映卡测试钩子（P2.3）──────────────────────────────────────
 
-func dbg_open_archive() -> ArchiveWin:
-	if _archive_win == null or not is_instance_valid(_archive_win):
-		_toggle_archive()
-	return _archive_win
-
-
-func dbg_archive_press(tid: String) -> bool:
-	if _archive_win == null or not is_instance_valid(_archive_win):
-		return false
-	return _archive_win.press_time(tid)
-
-
-func dbg_archive_new() -> bool:
-	return _archive_new
-
-
 # ── 多人对话 / 独白测试钩子（P2.4）────────────────────────────────────
-
-func dbg_chat() -> ChatWindow:
-	if _chat_win != null and is_instance_valid(_chat_win):
-		return _chat_win
-	return null
-
-
-func dbg_chat_state() -> Dictionary:
-	var chat := dbg_chat()
-	if chat == null:
-		return {"open": false, "id": "", "participants": [], "joined": [], "idx": 0,
-			"total": 0, "waitingFor": "", "typing": false, "done": false, "lines": 0}
-	return chat.state()
-
-
-func dbg_chat_advance() -> bool:
-	var chat := dbg_chat()
-	return chat.advance() if chat != null else false
-
-
-func dbg_chat_finish() -> void:
-	var chat := dbg_chat()
-	if chat != null:
-		chat.finish_line()
-
-
-func dbg_chat_drop(kind: String, id: String) -> bool:
-	var chat := dbg_chat()
-	return chat.drop_node(kind, id) if chat != null else false
-
-
-func dbg_chat_drop_key(key: String) -> bool:
-	return _chat_drop(key)
-
-
-func dbg_chat_hint() -> String:
-	var chat := dbg_chat()
-	return chat.hint_text() if chat != null else ""
-
-
-func dbg_chat_title() -> String:
-	var chat := dbg_chat()
-	return chat.title if chat != null else ""
-
-
-func dbg_chat_rect() -> Rect2:
-	var chat := dbg_chat()
-	return chat.get_global_rect() if chat != null else Rect2()
-
-
-func dbg_chat_close() -> void:
-	_close_chat()
-
-
-func dbg_open_dialogue(id: String, ids: Array) -> bool:
-	if dialogues == null:
-		return false
-	return _open_chat(dialogues.by_id(id), ids)
-
-
-func dbg_open_monologue(char_id: String) -> bool:
-	return _open_monologue(char_id)
-
-
-func dbg_dialogues() -> DialogueSystem:
-	return dialogues
-
-
-func dbg_time() -> String:
-	return graph.time if graph != null else ""
-
-
-func dbg_time_label() -> String:
-	return graph.time_label_of() if graph != null else ""
-
-
-func dbg_time_known() -> Array:
-	return graph.timeline_known() if graph != null else []
-
-
-func dbg_set_time(tid: String) -> bool:
-	return _select_time(tid)
-
-
-func dbg_mem_card() -> MemCard:
-	return _mem_card
-
-
-func dbg_mem_advance() -> bool:
-	return _mem_card.advance() if _mem_card != null and is_instance_valid(_mem_card) else false
-
-
-func dbg_close_mem() -> void:
-	_close_mem_card()
-
-
-func dbg_card_visible(key: String) -> bool:
-	var card: NodeCard = _cards.get(key, null)
-	return card != null and card.visible
-
-
-func dbg_card_pos(key: String) -> Vector2:
-	var card: NodeCard = _cards.get(key, null)
-	return card.position if card != null else Vector2.ZERO
-
-
-func dbg_mem_pos() -> Vector2:
-	return _mem_card.position if _mem_card != null and is_instance_valid(_mem_card) else Vector2.ZERO
-
-
-## 屏幕坐标里的视觉矩形 —— 画布有缩放 / 平移之后，「谁压住谁」只能在同一个空间里比，
-## 拿 world 坐标去和桌面坐标比必然误判（2026-10-21 世界层上线的副产物）。
-func dbg_card_global(key: String) -> Rect2:
-	var card: NodeCard = _cards.get(key, null)
-	if card == null or not is_instance_valid(card) or not card.visible:
-		return Rect2()
-	return card.get_global_rect()
-
-
-func dbg_mem_global() -> Rect2:
-	if _mem_card == null or not is_instance_valid(_mem_card):
-		return Rect2()
-	return _mem_card.get_global_rect()
-
-
-func dbg_combo_ui(tool_id: String, target_id: String) -> void:
-	if graph == null:
-		return
-	_on_card_combo(_dbg_node_key(tool_id), _dbg_node_key(target_id))
-
-
-func _dbg_node_key(id: String) -> String:
-	for key in graph.nodes.keys():
-		var n := graph.node(String(key))
-		if String(n.get("id", "")) == id and String(n.get("kind", "")) != "time":
-			return String(key)
-	return graph.key_of(CaseLoader.kind_of_ref(id), id)
-
-
-func dbg_toast_text() -> String:
-	return _toast_label.text if _toast_label != null else ""
-
 
 # ── 人物名册 / 因果追踪 / 图标栏测试钩子（批 1）────────────────────────────
 
-func dbg_open_people() -> PeopleWin:
-	if _people_win == null or not is_instance_valid(_people_win):
-		_toggle_people()
-	return _people_win
-
-
-func dbg_people_win() -> PeopleWin:
-	return _people_win if _people_win != null and is_instance_valid(_people_win) else null
-
-
-func dbg_close_people() -> void:
-	_close_person_card()
-	if _people_win != null and is_instance_valid(_people_win):
-		_people_win.queue_free()
-	_people_win = null
-
-
-func dbg_people_row(id: String) -> void:
-	_on_people_row(id)
-
-
-func dbg_person_card() -> Control:
-	return _people_card if _people_card != null and is_instance_valid(_people_card) else null
-
-
-func dbg_person_payload(id: String) -> Dictionary:
-	return _person_payload(id)
-
-
-func dbg_person_id() -> String:
-	return String(_people_card.person_id) if _people_card != null and is_instance_valid(_people_card) else ""
-
-
-func dbg_person_action(id: String = "") -> void:
-	var target := id
-	if target == "" and _people_card != null and is_instance_valid(_people_card):
-		target = _people_card.person_id
-	if target != "":
-		_on_person_action(target)
-
-
-func dbg_person_note(id: String, text: String) -> void:
-	_on_person_note_committed(id, text)
-	if _people_card != null and is_instance_valid(_people_card) and _people_card.person_id == id:
-		_people_card.set_note_text(text)
-
-
-func dbg_person_fields(person_id: String) -> Array:
-	return _person_field_payload(person_id)
-
-
-func dbg_person_field_word(person_id: String, field_id: String, value: String) -> void:
-	_on_person_field_word(person_id, field_id, value)
-
-
-func dbg_person_field_drop(person_id: String, field_id: String, key: String) -> bool:
-	return _assign_evidence_to_field(person_id, field_id, key, "canvas")
-
-
-func dbg_person_check(person_id: String) -> bool:
-	return _check_person_claims(person_id)
-
-
-func dbg_person_field_state(field_id: String) -> String:
-	return _people_card.field_state(field_id) if _people_card != null and is_instance_valid(_people_card) else ""
-
-
-func dbg_close_person_card() -> void:
-	_close_person_card()
-
-
-func dbg_open_log() -> LogWin:
-	if _log_win == null or not is_instance_valid(_log_win):
-		_toggle_log()
-	return _log_win
-
-
-func dbg_log_win() -> LogWin:
-	return _log_win if _log_win != null and is_instance_valid(_log_win) else null
-
-
-func dbg_close_log() -> void:
-	if _log_win != null and is_instance_valid(_log_win):
-		_log_win.queue_free()
-	_log_win = null
-
-
-func dbg_log_kinds() -> Array:
-	return graph.logs.map(func(e): return String((e as Dictionary).get("kind", "")))
-
-
-func dbg_log_texts() -> Array:
-	return graph.logs.map(func(e): return String((e as Dictionary).get("text", "")))
-
-
-func dbg_add_log(text: String, kind: String = "") -> void:
-	_log(text, kind)
-
-
-## 图标栏：位置 / 顺序 / 角标文字（都是玩家可见的状态，不碰内部缓存）
-func dbg_icon_pos(app: String) -> Vector2:
-	var b := _icon_by_app(app)
-	return b.position if b != null else Vector2(-1, -1)
-
-
-func dbg_icon_visible(app: String) -> bool:
-	var b := _icon_by_app(app)
-	return b != null and b.visible
-
-
-## 图标栏（只列当前可见的 —— 播放器 / 花园解锁前不算占位）
-func dbg_icon_apps() -> Array:
-	var out: Array = []
-	for c in _icon_layer().get_children():
-		if c is DeskIcon and (c as DeskIcon).visible:
-			out.append(String(c.name).trim_prefix("icon_"))
-	return out
-
-
-## 模拟一次图标拖动（不吃输入事件，直接走同一段位移逻辑）
-func dbg_drag_icon(app: String, at: Vector2) -> void:
-	var b := _icon_by_app(app)
-	if b != null:
-		b.position = Vector2(clampf(at.x, 0.0, _desk.size.x - b.size.x),
-			clampf(at.y, 0.0, _desk.size.y - b.size.y))
-
-
-func dbg_badge_text(app: String) -> String:
-	var pair := {"infer": _infer_badge, "bag": _bag_badge, "clue": _clue_badge,
-		"log": _log_badge, "garden": _garden_badge}
-	var badge: PanelContainer = pair.get(app, null)
-	if badge == null or not is_instance_valid(badge) or not badge.visible:
-		return ""
-	var lab: Label = badge.get_node_or_null("Label")
-	return lab.text if lab != null else ""
-
-
-func dbg_log_unread() -> int:
-	return _log_unread
-
-
-## 模拟双击图标（两次点击必须落在 300ms 判决窗内，见 _on_icon_pressed）
-func dbg_double_click_icon(app: String) -> void:
-	var b := _icon_by_app(app)
-	if b == null:
-		return
-	_on_icon_pressed(app, b)
-	_on_icon_pressed(app, b)
-
-
 # ── 推演桌布测试钩子（P1.4）────────────────────────────────────────────
-
-func dbg_open_matrix() -> MatrixWin:
-	if _matrix_win == null or not is_instance_valid(_matrix_win):
-		_toggle_matrix()
-	return _matrix_win
-
-
-func dbg_matrix_assign(key: String) -> bool:
-	return _assign_to_matrix(key)
-
-
-func dbg_matrix_win() -> MatrixWin:
-	return _matrix_win if _matrix_win != null and is_instance_valid(_matrix_win) else null
-
-
-func dbg_matrix_charge() -> void:
-	if _matrix_win != null and is_instance_valid(_matrix_win):
-		_matrix_win.finish_charge()
-
-
-func dbg_matrix_take(key: String) -> void:
-	_on_matrix_took(key)
-
-
-func dbg_ending() -> EndingOverlay:
-	return _ending
-
-
-func dbg_ending_id() -> String:
-	return _last_ending_id
-
-
-func dbg_ending_finish() -> void:
-	if _ending != null:
-		_ending.finish_now()
-
-
-func dbg_confirm_ending() -> void:
-	if _ending == null or not _ending.visible:
-		return
-	_ending.visible = false
-	_ending.finished.emit()
-
 
 # ── 音乐播放器 / 花园测试钩子（P2.5）──────────────────────────────────
 
-func dbg_music_icon_visible() -> bool:
-	return _music_btn != null and _music_btn.visible
-
-
-func dbg_garden_icon_visible() -> bool:
-	return _garden_btn != null and _garden_btn.visible
-
-
-func dbg_garden_badge_text() -> String:
-	if _garden_badge == null or not _garden_badge.visible:
-		return ""
-	var l: Label = _garden_badge.get_node_or_null("Label")
-	return l.text if l != null else ""
-
-
-func dbg_music_win() -> MusicWin:
-	return _music_win if _music_win != null and is_instance_valid(_music_win) else null
-
-
-func dbg_music_dock() -> MusicDock:
-	return _music_dock if _music_dock != null and is_instance_valid(_music_dock) else null
-
-
-func dbg_click_music_icon() -> void:
-	if _music_btn != null and is_instance_valid(_music_btn):
-		_on_icon_pressed("music", _music_btn)
-
-
-func dbg_open_music() -> MusicWin:
-	_open_music()
-	return dbg_music_win()
-
-
-func dbg_minimize_music() -> void:
-	_minimize_music()
-
-
-func dbg_restore_music() -> void:
-	_restore_music()
-
-
-func dbg_close_music() -> void:
-	_on_music_closed()
-
-
-func dbg_music_play(id: String) -> bool:
-	var w := dbg_music_win()
-	if w == null:
-		w = dbg_open_music()
-	return w.play_track(id) if w != null else false
-
-
-func dbg_music_toggle() -> bool:
-	return _music_win.toggle_current() if dbg_music_win() != null else false
-
-
-func dbg_music_stop() -> void:
-	_stop_music()
-
-
-func dbg_music_state() -> Dictionary:
-	var w := dbg_music_win()
-	if w == null:
-		return {}
-	var s := w.state()
-	s["win_visible"] = w.visible
-	s["dock_visible"] = _music_dock != null and is_instance_valid(_music_dock) and _music_dock.visible
-	return s
-
-
-func dbg_garden_win() -> GardenWin:
-	return _garden_win if _garden_win != null and is_instance_valid(_garden_win) else null
-
-
-func dbg_open_garden() -> GardenWin:
-	if _garden_win == null or not is_instance_valid(_garden_win):
-		_open_garden()
-	return dbg_garden_win()
-
-
-func dbg_close_garden() -> void:
-	if _garden_win != null and is_instance_valid(_garden_win):
-		_garden_win.queue_free()
-	_garden_win = null
-
-
-func dbg_garden_state() -> Dictionary:
-	var w := dbg_garden_win()
-	if w != null:
-		return w.dbg_state()
-	return {}
-
-
-func dbg_garden_icon_rect() -> Rect2:
-	return _garden_btn.get_global_rect() if _garden_btn != null else Rect2()
-
-
-func dbg_drop_seed(at_global: Vector2) -> bool:
-	return _drop_seed(at_global)
-
-
-func dbg_play_true_ending() -> void:
-	if _ending == null:
-		return
-	_last_ending_id = "TRUE_E"
-	_ending.play(case_def.ending_by_id("TRUE_E"))
-
-
-func dbg_touch_garden_plot(idx: int, at_ms: int) -> bool:
-	if graph == null or not (graph.garden is Dictionary):
-		return false
-	var plots: Array = graph.garden.get("plots", [])
-	if idx < 0 or idx >= plots.size():
-		return false
-	plots[idx]["at"] = at_ms
-	plots[idx]["hit"] = false
-	if _garden_win != null and is_instance_valid(_garden_win):
-		_garden_win.refresh()
-	return true
-
-
 # ── 案件系统测试钩子（P2.1）────────────────────────────────────────────
-
-func dbg_use_temp_progress(path: String) -> void:
-	_progress_path = path
-	_progress_read_only = false
-	_catalog.clear_progress(path)
-	_catalog = CaseCatalog.new(path)
-	_update_case_park_ui()
-
-
-func dbg_case_info() -> Dictionary:
-	return {
-		"id": _active_case,
-		"open": _case_open,
-		"held": _case_held,
-		"dock": _case_docked,
-		"dock_visible": _dock_card != null and _dock_card.visible,
-		"badge_visible": _map_badge != null and _map_badge.visible,
-		"map_open": _map_win != null and is_instance_valid(_map_win),
-		"title": _case_win.title if _case_win != null else "",
-		"unlocked": _catalog.unlocked.duplicate(),
-		"completed": _catalog.completed.duplicate(),
-		"last": _catalog.last,
-		"progress_path": _progress_path,
-	}
-
-
-func dbg_park_case(where: String) -> bool:
-	return _park_case(where)
-
-
-func dbg_reopen_case() -> void:
-	_reopen_case()
-
-
-func dbg_open_case_map() -> CaseMapWin:
-	if _map_win == null or not is_instance_valid(_map_win):
-		_toggle_case_map()
-	return _map_win
-
-
-func dbg_case_map_win() -> CaseMapWin:
-	return _map_win if _map_win != null and is_instance_valid(_map_win) else null
-
-
-func dbg_case_map_click(id: String) -> bool:
-	var w := dbg_case_map_win()
-	return w.dbg_click(id) if w != null else false
-
-
-func dbg_case_map_state(id: String) -> String:
-	var w := dbg_case_map_win()
-	return w.dbg_row_state(id) if w != null else ""
-
-
-func dbg_enter_case(id: String) -> bool:
-	return _enter_case(id)
-
-
-func dbg_catalog_unlock(id: String) -> bool:
-	var ok := _catalog.unlock(id)
-	_update_case_park_ui()
-	return ok
-
-
-func dbg_catalog() -> CaseCatalog:
-	return _catalog
-
-
-func dbg_catalog_unlock_next(id: String) -> bool:
-	var ok := _catalog.unlock_next(id)
-	_update_case_park_ui()
-	return ok
-
 
 # ── 调查员测试钩子（P1.6）──────────────────────────────────────────────
 
-func dbg_use_temp_investigator(path: String) -> void:
-	_inv_path = path
-	_investigator = Investigator.load_from(path)
-	_refresh_chip()
-
-
-func dbg_clear_investigator() -> void:
-	Investigator.clear(_inv_path)
-	_investigator = {}
-	_refresh_chip()
-
-
-func dbg_investigator() -> Dictionary:
-	return _investigator.duplicate(true)
-
-
-func dbg_open_intro() -> IntroWin:
-	return _open_intro()
-
-
-func dbg_intro_open() -> bool:
-	return _intro != null and is_instance_valid(_intro)
-
-
-func dbg_open_cert() -> void:
-	_open_cert_review()
-
-
-func dbg_cert_open() -> bool:
-	return _cert_win != null and is_instance_valid(_cert_win)
-
-
 # ── 截图采样（P0 视觉自查：跑一遍切片，按阶段存 PNG 到 docs/）──────────
-
-func _wait(sec: float) -> void:
-	await get_tree().create_timer(sec).timeout
-
-
-func _shot(path: String) -> void:
-	await RenderingServer.frame_post_draw
-	var img := get_viewport().get_texture().get_image()
-	img.save_png(path)
-	print("[shot] ", path, " ", img.get_width(), "x", img.get_height())
-
-
-func _shot_flow() -> void:
-	await _wait(0.6)
-	await _shot("res://docs/p0_1_desktop.png")
-
-	_expand_scene("SCENES_garden", true)
-	await _wait(0.5)
-	await _shot("res://docs/p0_2_garden.png")
-
-	# 开局不再直接给手电筒（对齐 Web）：截图流程走真实链路 书桌 → 抽屉 → 左侧抽屉
-	_on_card_activated("item:ITEM_shuzhuo")
-	await _wait(0.25)
-	_on_card_activated("item:ITEM_chouti")
-	await _wait(0.25)
-	_on_card_activated("loc:SCENES_choutiyi")
-	await _wait(0.25)
-
-	combos.toggle_light("item:ITEM_shoudiantong")
-	if _cards.has("item:ITEM_shoudiantong"):
-		_cards["item:ITEM_shoudiantong"].refresh()
-		_sync_card_shell(_cards["item:ITEM_shoudiantong"])
-	_on_card_combo("item:ITEM_shoudiantong", "item:ITEM_something")
-	await _wait(0.5)
-	await _shot("res://docs/p0_3_body.png")
-
-	_toggle_tec()
-	_start_tec_analysis("loc:SCENES_body")
-	await _wait(1.1)                      # 分析进行中（真实 5–8 秒，这里取中段）
-	await _shot("res://docs/p0_4_tec.png")
-	_tec.finish_now()
-	await _wait(0.25)
-	# P1.4 起 TEC 分析不再直接触发结局：这里仍按 P0 基线直接放 TRUE_E，只为保留对拍图
-	_ending.play(case_def.ending_by_id("TRUE_E"))
-	await _wait(0.25)
-	await _shot("res://docs/p0_5_ending.png")
-	_ending.finish_now()
-	await _wait(0.25)
-	await _shot("res://docs/p0_6_ending_full.png")
-
-	# ── P1 新特性：容器展开 / 选项节点 / 密码弹窗 / 折叠 ──
-	_ending.visible = false
-	_start_slice()
-	await _wait(0.3)
-	_expand_scene("SCENES_garden", false)
-	await _wait(0.2)
-	_ensure_card("item", "ITEM_shuzhuo")
-	_toggle_container("item", "ITEM_shuzhuo")
-	await _wait(0.35)
-	await _shot("res://docs/p1_1_container.png")
-
-	_toggle_container("item", "ITEM_chouti")    # choice：两个抽屉一起上画布
-	await _wait(0.35)
-	await _shot("res://docs/p1_2_choice.png")
-
-	_ensure_card("item", "ITEMS_jzmh")
-	_open_password(graph.key_of("item", "ITEMS_jzmh"))
-	await _wait(0.35)
-	await _shot("res://docs/p1_3_password.png")
-	_submit_password("0321")
-	await _wait(0.35)
-	await _shot("res://docs/p1_4_unlocked.png")
-
-	_toggle_container("item", "ITEM_shuzhuo")   # 再双击 = 收起
-	await _wait(0.35)
-	await _shot("res://docs/p1_5_collapsed.png")
-
-	# ── 收纳三态（P1.2）：物品 / 证据两扇窗 ──
-	_start_slice()
-	await _wait(0.3)
-	_expand_scene("SCENES_garden", false)
-	await _wait(0.2)
-	_ensure_card("item", "ITEM_taideng")
-	dbg_select("item:ITEM_taideng")
-	dbg_store("BAG")
-	_ensure_card("clue", "CLUES_nm")
-	dbg_select("clue:CLUES_nm")
-	dbg_store("LEDGER")
-	_toggle_storage(GraphState.BAG)
-	await _wait(0.35)
-	await _shot("res://docs/p1_6_bag.png")
-
-	_toggle_storage(GraphState.LEDGER)
-	await _wait(0.35)
-	await _shot("res://docs/p1_7_ledger.png")
-
-	# ── 推演桌布（P1.4）：五感归位 → 长按 → 真名遮罩 ──
-	var true_e := case_def.ending_by_id("TRUE_E")
-	for clue in true_e.recipe:
-		_ensure_card("clue", clue.id)
-		_assign_to_matrix(graph.key_of("clue", clue.id))
-	dbg_open_matrix()
-	await _wait(0.4)
-	await _shot("res://docs/p1_8_matrix.png")
-
-	dbg_matrix_charge()
-	await _wait(0.3)
-	dbg_ending_finish()
-	await _wait(0.3)
-	await _shot("res://docs/p1_9_truename.png")
-	quit_app()
-
-
-func _shot_intro_flow() -> void:
-	await _wait(0.4)
-	_inv_path = "user://shot_investigator.json"
-	Investigator.clear(_inv_path)
-	_investigator = {}
-	_refresh_chip()
-	var w := _open_intro()
-	await _wait(0.4)
-	await _shot("res://docs/p1_10_intro_name.png")
-	w.dbg_set_name("林雾")
-	w.dbg_begin()
-	await _wait(0.3)
-	await _shot("res://docs/p1_11_intro_quiz.png")
-	w.dbg_answer(0)
-	w.dbg_answer(0)
-	w.dbg_answer(2)
-	await _wait(0.3)
-	await _shot("res://docs/p1_12_intro_avatar.png")
-	w.dbg_confirm_pick()
-	await _wait(0.3)
-	await _shot("res://docs/p1_13_intro_card.png")
-	w.dbg_confirm()
-	await _wait(0.5)
-	await _shot("res://docs/p1_14_investigator.png")
-	_open_cert_review()
-	await _wait(0.3)
-	await _shot("res://docs/p1_15_cert.png")
-	Investigator.clear(_inv_path)
-	quit_app()
-
-
-func _shot_p2_flow() -> void:
-	await _wait(0.5)
-	_catalog.clear_progress(_progress_path)
-	_catalog = CaseCatalog.new(_progress_path)
-	_update_case_park_ui()
-
-	# ── P4.2：桌面图标的按下态（只反白标签条，图标本体不垫底板）──
-	# 必须**在流程开头**拍：跑到结尾时图标栏已经切紧凑模式、标签被收掉了。
-	var pressed_icon := _icon_by_app("bag")
-	if pressed_icon != null:
-		pressed_icon.set_selected(true)
-		_hide_toast()
-		await _wait(0.3)
-		await _shot("res://docs/p2_23_icon_press.png")
-		pressed_icon.set_selected(false)
-
-	dbg_open_case_map()
-	await _wait(0.35)
-	await _shot("res://docs/p2_1_case_map.png")
-	if _map_win != null and is_instance_valid(_map_win):
-		_map_win.queue_free()
-	_map_win = null
-
-	dbg_park_case("dock")
-	await _wait(0.35)
-	await _shot("res://docs/p2_2_case_dock.png")
-
-	dbg_reopen_case()
-	await _wait(0.25)
-	dbg_park_case("icon")
-	await _wait(0.35)
-	await _shot("res://docs/p2_3_case_closed.png")
-
-	dbg_catalog_unlock("A002")
-	dbg_open_case_map()
-	await _wait(0.35)
-	await _shot("res://docs/p2_4_case_unlocked.png")
-	if _map_win != null and is_instance_valid(_map_win):
-		_map_win.queue_free()
-	_map_win = null
-
-	_reopen_case()
-	_start_slice()
-	await _wait(0.3)
-	_expand_scene("SCENES_body", false)
-	_open_tec()
-	_tec_talk()
-	_tec_talk()
-	_tec.finish_typing()
-	_hide_toast()
-	await _wait(0.35)
-	await _shot("res://docs/p2_5_tec_chat.png")
-
-	_start_tec_analysis("loc:SCENES_body")
-	await _wait(2.5)
-	await _shot("res://docs/p2_6_tec_analysis.png")
-
-	_minimize_tec()
-	await _wait(0.35)
-	await _shot("res://docs/p2_7_tec_chip.png")
-
-	_tec.finish_now()
-	await _wait(0.3)
-	_hide_toast()
-	await _wait(0.2)
-	await _shot("res://docs/p2_8_tec_chip_done.png")
-
-	_open_tec()
-	await _wait(0.35)
-	await _shot("res://docs/p2_9_tec_archive.png")
-
-	_hide_tec()
-	_expand_scene("SCENES_fkjl", false)
-	await _wait(0.35)
-	_toggle_archive()
-	await _wait(0.35)
-	await _shot("res://docs/p2_10_archive.png")
-	_toggle_archive()
-	await _wait(0.15)
-
-	_expand_scene("SCENES_lhsdst", false)
-	await _wait(0.2)
-	_select_time("SCENES_0602")
-	await _wait(0.5)
-	_show_mem_lines(3)
-	await _wait(0.3)
-	await _shot("res://docs/p2_11_memory_card.png")
-
-	_close_mem_card()
-	_on_card_combo("char:NPC_FB", "loc:SCENES_garden")
-	await _wait(0.3)
-	_show_mem_lines(4)
-	await _wait(0.35)
-	await _shot("res://docs/p2_12_memory_play.png")
-
-	_close_mem_card()
-	_select_time("SCENES_0704")
-	await _wait(0.5)
-	_close_mem_card()
-	_hide_toast()
-	_on_card_combo("char:CHARS_zs", "char:CHARS_luhengs")
-	await _wait(0.35)
-	_show_chat_lines(5)
-	_hide_toast()
-	await _wait(0.35)
-	await _shot("res://docs/p2_13_dialogue.png")
-	_close_chat()
-
-	var garden := dialogues.by_id("DLG_garden_review") if dialogues != null else null
-	_open_chat(garden, ["CHARS_zs", "NPC_FB"])
-	await _wait(0.3)
-	_chat_win.finish_line()
-	_chat_win.advance()
-	_chat_win.finish_line()
-	_chat_win.advance()
-	_hide_toast()
-	await _wait(0.35)
-	await _shot("res://docs/p2_14_dialogue_join.png")
-	_close_chat()
-
-	_open_monologue("CHARS_luhengs")
-	await _wait(0.3)
-	_show_chat_lines(4)
-	_hide_toast()
-	await _wait(0.35)
-	await _shot("res://docs/p2_15_monologue.png")
-	_close_chat()
-
-	# ── P2.5 音乐播放器 / 花园彩蛋 ──
-	_ensure_card("item", "ITEMS_changji")
-	_ensure_card("item", "ITEMS_cz")
-	dbg_combo_ui("ITEMS_cz", "ITEMS_changji")
-	_hide_toast()
-	var music := dbg_open_music()
-	if music != null:
-		music.play_track("Air_Bach")
-		await _wait(0.2)
-		music.seek_ratio(0.25)
-	await _wait(0.8)
-	await _shot("res://docs/p2_16_music.png")
-	_minimize_music()
-	await _wait(0.45)
-	await _shot("res://docs/p2_17_music_dock.png")
-	_restore_music()
-	_stop_music()
-	_on_music_closed()
-
-	dbg_play_true_ending()
-	dbg_confirm_ending()
-	await _wait(0.25)
-	dbg_open_matrix()
-	_hide_toast()
-	await _wait(0.4)
-	await _shot("res://docs/p2_18_matrix_seed.png")
-	if _matrix_win != null and is_instance_valid(_matrix_win):
-		_matrix_win.queue_free()
-	_matrix_win = null
-	var gwin := dbg_open_garden()
-	_hide_toast()
-	await _wait(0.45)
-	await _shot("res://docs/p2_19_garden_seed.png")
-	if gwin != null:
-		_drop_seed(gwin.field_global_rect().get_center())
-		dbg_touch_garden_plot(0, GardenSystem.now_ms_now() - 181000)
-		gwin._process(1.1)
-		await _wait(0.2)
-		gwin.dbg_open_narr(0)
-		gwin.dbg_advance_narr()
-		_hide_toast()
-		await _wait(0.45)
-		await _shot("res://docs/p2_20_garden_narr.png")
-
-	# ── 批 1：人物名册 / 因果追踪 ──
-	dbg_close_garden()
-	await _wait(0.3)
-	var people := dbg_open_people()
-	_hide_toast()
-	await _wait(0.45)
-	await _shot("res://docs/p2_21_people.png")
-	dbg_close_people()
-	await _wait(0.25)
-	dbg_open_log()
-	_hide_toast()
-	await _wait(0.45)
-	await _shot("res://docs/p2_22_log.png")
-	dbg_close_log()
-	quit_app()
-
-
-func _shot_p3_flow() -> void:
-	await _wait(0.5)
-	_new_runtime()
-	## 与 Web 侧对拍脚本对齐：那边走完开场适性测试（姓名「陈调整」），页眉才有证章。
-	## 证号写死成 TEC-GD-2160，两边的证章文字才逐字相同。
-	_investigator = {"name": "陈调整", "id": "TEC-GD-2160", "sense": ["vision"], "avatarId": "CHARS_EXEC"}
-	_refresh_chip()
-	var loc := graph.add_node("loc", SLICE_SCENE)
-	loc["x"] = 40.0
-	loc["y"] = 30.0
-	graph.mark_fresh(String(loc["key"]))
-	_spawn_card(loc["key"])
-	_relayout()
-	_hide_toast()
-	await _wait(0.5)
-	await _shot("res://docs/p3/godot/start.png")
-	quit_app()
-
-
-func _show_chat_lines(n: int) -> void:
-	if _chat_win == null or not is_instance_valid(_chat_win):
-		return
-	_chat_win.finish_line()
-	for i in maxi(0, n - 1):
-		if not _chat_win.advance():
-			break
-		_chat_win.finish_line()
-
-
-func _show_mem_lines(n: int) -> void:
-	if _mem_card == null or not is_instance_valid(_mem_card):
-		return
-	_mem_card.finish_line()
-	for i in maxi(0, n - 1):
-		if not _mem_card.advance():
-			break
-		_mem_card.finish_line()
-
-
-func _ensure_card(kind: String, id: String) -> void:
-	var n := graph.add_node(kind, id)
-	_spawn_card(String(n["key"]))
-	_relayout()
-
 
 func quit_app() -> void:
 	_autosave()

@@ -16,7 +16,7 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 
-	check("桌面建起来了", scene != null and scene.dbg_state()["cards"] == 1, str(scene.dbg_state()))
+	check("桌面建起来了", scene != null and scene.debug.dbg_state()["cards"] == 1, str(scene.debug.dbg_state()))
 	check("开局只有一张卡：未探索的起始场景（Web `17-boot.js` 同口径）",
 		_cards().size() == 1 and _cards().has("loc:SCENES_garden"), str(_cards().keys()))
 	var initial_card: NodeCard = _cards()["loc:SCENES_garden"]
@@ -36,7 +36,7 @@ func _initialize() -> void:
 	scene._view_user = true
 	scene._apply_view()
 
-	scene.dbg_expand("SCENES_garden")
+	scene.debug.dbg_expand("SCENES_garden")
 	await process_frame
 	var cards: Dictionary = _cards()
 	check("展开后卡片数增加", cards.size() >= 5, str(cards.size()))
@@ -61,19 +61,19 @@ func _initialize() -> void:
 		"%.0f / %.0f" % [scene_card._w if scene_card else -1, ent_card._w if ent_card else -1])
 
 	# ── 容器链（P1.2）：双击书桌 → 抽屉 → 选项 → 左侧抽屉 → 手电筒 ──
-	scene.dbg_activate("item:ITEM_shuzhuo")
+	scene.debug.dbg_activate("item:ITEM_shuzhuo")
 	await process_frame
 	var cards2: Dictionary = _cards()
 	check("双击书桌：抽屉上画布", cards2.has("item:ITEM_chouti"))
 	check("双击书桌：笔记与台灯也上画布", cards2.has("item:ITEM_sxbj") and cards2.has("item:ITEM_taideng"))
 
-	scene.dbg_activate("item:ITEM_chouti")
+	scene.debug.dbg_activate("item:ITEM_chouti")
 	await process_frame
 	var cards3: Dictionary = _cards()
 	check("双击抽屉（choice）：两个抽屉场景都上画布",
 		cards3.has("loc:SCENES_choutiyi") and cards3.has("loc:SCENES_choutier"))
 
-	scene.dbg_activate("loc:SCENES_choutiyi")
+	scene.debug.dbg_activate("loc:SCENES_choutiyi")
 	await process_frame
 	check("展开左侧抽屉：手电筒出现", _cards().has("item:ITEM_shoudiantong"))
 	cards = _cards()
@@ -81,41 +81,41 @@ func _initialize() -> void:
 	# 1) 没点亮直接拖：发光门拦下
 	_drag(cards[TORCH], cards[SHADOW])
 	await process_frame
-	check("没点亮时拖过去：不推进到尸体", not scene.dbg_state()["explored"].has("SCENES_body"))
+	check("没点亮时拖过去：不推进到尸体", not scene.debug.dbg_state()["explored"].has("SCENES_body"))
 	check("拦下时给了提示（toast 可见）", scene.get_node("desk/toast").visible)
-	check("手电筒没被误点亮", scene.dbg_state()["lit"].get("ITEM_shoudiantong", false) == false)
+	check("手电筒没被误点亮", scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false) == false)
 
 	# 2) 双击手电筒 = 点亮
 	_double_click(cards[TORCH])
 	await process_frame
-	check("双击手电筒：亮起", scene.dbg_state()["lit"].get("ITEM_shoudiantong", false) == true)
+	check("双击手电筒：亮起", scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false) == true)
 
 	# 3) 点亮后再拖 = 组合成功，尸体场景上画布
 	_drag(cards[TORCH], cards[SHADOW])
 	await process_frame
 	await process_frame
-	var st: Dictionary = scene.dbg_state()
+	var st: Dictionary = scene.debug.dbg_state()
 	check("点亮后拖过去：尸体场景已探索", st["explored"].has("SCENES_body"), str(st["explored"]))
 	check("尸体场景卡片已出现", _cards().has("loc:SCENES_body"))
 	check("尸体的实体卡片已出现（绷带）", _cards().has("item:ITEMS_bd"))
 
 	# 再双击书桌 = 收起：它的孩子被藏起来
-	scene.dbg_activate("item:ITEM_shuzhuo")
+	scene.debug.dbg_activate("item:ITEM_shuzhuo")
 	await process_frame
-	var st2: Dictionary = scene.dbg_state()
+	var st2: Dictionary = scene.debug.dbg_state()
 	check("再次双击书桌：折叠记账", (st2["collapsed"] as Array).has("ITEM_shuzhuo"))
 	# 抽屉有 cond 边连到场外的抽屉场景 → 按 Web 的 recomputeHidden 口径「跟场外有连线的留下」
 	check("折叠后：有场外连线的节点留在画布上", (_cards()["item:ITEM_chouti"] as NodeCard).visible == true)
 	check("折叠后：没有场外连线的节点被藏起来", (_cards()["item:ITEM_taideng"] as NodeCard).visible == false)
 	# 手电筒挂在被折叠的左侧抽屉上，随之收起（Web 同口径）；后面的用例还要用它 → 重新展开书桌
-	scene.dbg_activate("item:ITEM_shuzhuo")
+	scene.debug.dbg_activate("item:ITEM_shuzhuo")
 	await process_frame
 	check("重新展开书桌：手电筒回到画布", (_cards()[TORCH] as NodeCard).visible)
 
 	# ── 密码弹窗（P1.3）：木盒 → 错码 → 对码 ──
-	scene.dbg_ensure("item", "ITEMS_jzmh")
+	scene.debug.dbg_ensure("item", "ITEMS_jzmh")
 	await process_frame
-	scene.dbg_pw_open("item:ITEMS_jzmh")
+	scene.debug.dbg_pw_open("item:ITEMS_jzmh")
 	await process_frame
 	var pop := scene.get_node_or_null("desk/pw_pop") as SysWindow
 	check("双击木盒：LOCK 弹窗出现", pop != null)
@@ -145,34 +145,34 @@ func _initialize() -> void:
 		check("密码输入数字为墨色",
 			pw_in != null and pw_in.get_theme_color("font_color").is_equal_approx(TecTheme.TEXT),
 			"null" if pw_in == null else pw_in.get_theme_color("font_color").to_html(false))
-	scene.dbg_password("item:ITEMS_jzmh", "1111")
+	scene.debug.dbg_password("item:ITEMS_jzmh", "1111")
 	await process_frame
 	check("密码错：弹窗还在", scene.get_node_or_null("desk/pw_pop") != null)
 	check("密码错：还没开箱", not _cards().has("item:ITEMS_htys"))
-	scene.dbg_password("item:ITEMS_jzmh", "2222")
+	scene.debug.dbg_password("item:ITEMS_jzmh", "2222")
 	await process_frame
 	check("G11 连续错两次：仍未开箱", not _cards().has("item:ITEMS_htys"))
-	var last_pw_log := String(scene.dbg_log_texts()[-1]) if not scene.dbg_log_texts().is_empty() else ""
+	var last_pw_log := String(scene.debug.dbg_log_texts()[-1]) if not scene.debug.dbg_log_texts().is_empty() else ""
 	check("G11 连续错两次：日志指向 TEC 分析",
 		last_pw_log.contains("TEC") and last_pw_log.contains("木盒"), last_pw_log)
 	var last_pw_tec := String(scene._tec.dbg_lines()[-1]) if not scene._tec.dbg_lines().is_empty() else ""
 	check("G11 TEC 对话留下密码提示",
 		last_pw_tec.contains("密码") and last_pw_tec.contains("木盒"), last_pw_tec)
-	scene.dbg_password("item:ITEMS_jzmh", "0321")
+	scene.debug.dbg_password("item:ITEMS_jzmh", "0321")
 	await process_frame
 	check("密码对：弹窗收走", scene.get_node_or_null("desk/pw_pop") == null)
 	check("密码对：钥匙上画布", _cards().has("item:ITEMS_htys"))
 
 	# ── 收纳三态（P1.2）：物品 / 证据两扇窗 ──
-	scene.dbg_ensure("item", "ITEM_taideng")
+	scene.debug.dbg_ensure("item", "ITEM_taideng")
 	await process_frame
-	scene.dbg_select("item:ITEM_taideng")
+	scene.debug.dbg_select("item:ITEM_taideng")
 	await process_frame
-	check("台灯收进物品", scene.dbg_store("BAG"))
+	check("台灯收进物品", scene.debug.dbg_store("BAG"))
 	await process_frame
 	check("收进物品后画布上不再显示", (_cards()["item:ITEM_taideng"] as NodeCard).visible == false)
 
-	scene.dbg_open_storage("BAG")
+	scene.debug.dbg_open_storage("BAG")
 	await process_frame
 	var bag := scene.get_node_or_null("desk/bag_win")
 	check("物品窗能打开", bag != null)
@@ -193,13 +193,13 @@ func _initialize() -> void:
 		bag_sb != null and bag_sb.expand_margin_left == -8.0
 			and bag_sb.expand_margin_right == -8.0, str(bag_sb))
 
-	scene.dbg_ensure("evidence", "CLUES_nm")
+	scene.debug.dbg_ensure("evidence", "CLUES_nm")
 	await process_frame
-	scene.dbg_select("evidence:CLUES_nm")
+	scene.debug.dbg_select("evidence:CLUES_nm")
 	await process_frame
-	check("证收进证据", scene.dbg_store("LEDGER"))
+	check("证收进证据", scene.debug.dbg_store("LEDGER"))
 	await process_frame
-	scene.dbg_open_storage("LEDGER")
+	scene.debug.dbg_open_storage("LEDGER")
 	await process_frame
 	var ledger := scene.get_node_or_null("desk/clue_win")
 	check("证据窗能打开", ledger != null)
@@ -213,11 +213,11 @@ func _initialize() -> void:
 	var k6_log0: int = scene.graph.log_count()
 	scene._store_into(GraphState.LEDGER, "loc:SCENES_garden")
 	check("K6 场景拖证据话术按目标",
-		scene.dbg_toast_text().contains("证据") and not scene.dbg_toast_text().contains("收纳袋"),
-		scene.dbg_toast_text())
+		scene.debug.dbg_toast_text().contains("证据") and not scene.debug.dbg_toast_text().contains("收纳袋"),
+		scene.debug.dbg_toast_text())
 	check("K6 拒收写一条 warning 日志",
 		scene.graph.log_count() == k6_log0 + 1
-			and String(scene.dbg_log_kinds()[-1]) == "warn",
+			and String(scene.debug.dbg_log_kinds()[-1]) == "warn",
 		str(scene.graph.log_count() - k6_log0))
 
 	# 从证据窗取回
@@ -226,8 +226,8 @@ func _initialize() -> void:
 	check("从证据窗取回：证重新可见", (_cards()["evidence:CLUES_nm"] as NodeCard).visible == true)
 	check("取回后证据窗少了一条", not (ledger as StorageWin).items().has("evidence:CLUES_nm"))
 	# A2：收起两扇存储窗，把激活态还给案件主窗，下面才能继续按 2px 激活框验窗框。
-	scene.dbg_open_storage("BAG")
-	scene.dbg_open_storage("LEDGER")
+	scene.debug.dbg_open_storage("BAG")
+	scene.debug.dbg_open_storage("LEDGER")
 	if scene._detail_win != null and is_instance_valid(scene._detail_win):
 		scene._detail_win.hide()
 	await process_frame
@@ -350,16 +350,16 @@ func _initialize() -> void:
 	check("手电筒还在画布上", torch != null)
 
 	# 1) 单击只选中、不激活（旧版单击 = 双击，是最伤手感的一条）
-	if scene.dbg_state()["lit"].get("ITEM_shoudiantong", false):
-		scene.dbg_toggle_light("ITEM_shoudiantong")
-	var lit0 := bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false))
+	if scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false):
+		scene.debug.dbg_toggle_light("ITEM_shoudiantong")
+	var lit0 := bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false))
 	_single_click(torch)
 	await process_frame
-	check("单击不激活（灯不变）", bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false)) == lit0)
-	check("单击会选中", String(scene.dbg_state()["selected"]) == TORCH, String(scene.dbg_state()["selected"]))
+	check("单击不激活（灯不变）", bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false)) == lit0)
+	check("单击会选中", String(scene.debug.dbg_state()["selected"]) == TORCH, String(scene.debug.dbg_state()["selected"]))
 	_double_click(torch)
 	await process_frame
-	check("双击才激活（灯翻了）", bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false)) != lit0)
+	check("双击才激活（灯翻了）", bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false)) != lit0)
 
 	# 2) K11：右键 = 上下文菜单（钉住 / 查看详情），不再直接改状态。
 	var rev := InputEventMouseButton.new()
@@ -408,7 +408,7 @@ func _initialize() -> void:
 	var pos_struct := {}
 	for k in _cards().keys():
 		pos_struct[String(k)] = (_cards()[k] as Control).position
-	scene.dbg_activate(TORCH)                 # 点亮 / 熄灭手电筒 = 纯状态变化，结构没变
+	scene.debug.dbg_activate(TORCH)                 # 点亮 / 熄灭手电筒 = 纯状态变化，结构没变
 	await process_frame
 	scene._relayout()                         # 结构没变的普通重排
 	scene._relayout()
@@ -418,7 +418,7 @@ func _initialize() -> void:
 		if _cards().has(k):
 			drift_max = maxf(drift_max, (pos_struct[k] as Vector2).distance_to((_cards()[k] as Control).position))
 	check("纯状态互动（点亮 / 普通重排）不挪任何一张卡", drift_max < 0.01, str(drift_max))
-	scene.dbg_activate(TORCH)                 # 熄回去，保持后面用例的前提（未点亮）
+	scene.debug.dbg_activate(TORCH)                 # 熄回去，保持后面用例的前提（未点亮）
 	await process_frame
 
 	# 4) 落点表：证据拒收非证 / 物品收物与词（并回原位）
@@ -489,7 +489,7 @@ func _initialize() -> void:
 	# 4b) 落点表完整性：id 一律来自 11 项白名单
 	#     Web 的 nodeDropTargets() 是 10 项，推演桌布在松手处单独判一遍（11 个元素）；
 	#     Godot 合并成同一条表，悬停高亮与松手分派共用 —— 不会"亮了却不生效"。
-	var ids: Array = scene.dbg_drop_target_ids()
+	var ids: Array = scene.debug.dbg_drop_target_ids()
 	var whitelist := ["chat-win", "bag-win", "clue-win", "bag-dock", "clue-icon",
 		"tec-dock", "infer-icon", "tec-avatar", "tec-chip", "mx-board"]
 	var stray: Array = []
@@ -507,15 +507,15 @@ func _initialize() -> void:
 	var goto_icon := scene.get_node("desk/icons/icon_goto") as Control
 	if goto_icon != null and goto_icon.visible:
 		scene._hide_toast()
-		var before_explored: Array = (scene.dbg_state()["explored"] as Array).duplicate()
+		var before_explored: Array = (scene.debug.dbg_state()["explored"] as Array).duplicate()
 		var k_goto := "loc:SCENES_garden"
 		check("K5 拖场景到档案被拦截",
 			scene._handle_card_drop(k_goto, goto_icon.get_global_rect().get_center()))
 		check("K5 档案拒收不改探索状态",
-			(scene.dbg_state()["explored"] as Array) == before_explored)
+			(scene.debug.dbg_state()["explored"] as Array) == before_explored)
 		check("K5 档案拒收给 warning toast",
-			scene.dbg_toast_text().contains("档案") and scene.dbg_toast_text().contains("时间点"),
-			scene.dbg_toast_text())
+			scene.debug.dbg_toast_text().contains("档案") and scene.debug.dbg_toast_text().contains("时间点"),
+			scene.debug.dbg_toast_text())
 
 	# 5) 推演图标：证能归位，非证给提示
 	var clue_card: NodeCard = null
@@ -528,7 +528,7 @@ func _initialize() -> void:
 		_drag(clue_card, scene.get_node("desk/icons/icon_infer"))
 		await process_frame
 		check("拖到推演图标：证归位", scene.graph.stored.has(clue_card.card_key)
-			or scene.graph.matrix_ids().size() > 0, str(scene.dbg_state()["matrix_ids"]))
+			or scene.graph.matrix_ids().size() > 0, str(scene.debug.dbg_state()["matrix_ids"]))
 
 	# 6) 连线：实体边必须真的画出来（旧版画布一根线都没有）
 	var edges: EdgeLayer = scene.get_node_or_null("desk/case_win/body/stage/cards/edges") as EdgeLayer
@@ -800,7 +800,7 @@ func _initialize() -> void:
 	_single_click(vis_card)
 	await process_frame
 	await process_frame
-	check("选中后有选中的 key", String(scene.dbg_state()["selected"]) != "")
+	check("选中后有选中的 key", String(scene.debug.dbg_state()["selected"]) != "")
 	var blank := InputEventMouseButton.new()
 	blank.button_index = MOUSE_BUTTON_LEFT
 	blank.pressed = true
@@ -812,7 +812,7 @@ func _initialize() -> void:
 	blank_up.position = Vector2(420, 260)
 	scene._on_stage_input(blank_up)
 	await process_frame
-	check("点空白清选中", String(scene.dbg_state()["selected"]) == "")
+	check("点空白清选中", String(scene.debug.dbg_state()["selected"]) == "")
 
 	# 9) 详情窗：选中即显示，三种内容（简介 / 状态），且不剧透「装着什么 / 谁指向它」
 	_single_click(vis_card)
@@ -895,8 +895,8 @@ func _initialize() -> void:
 		await process_frame
 
 	# 10) 反应表：把物品拖给人物要能说出话来（14 条反应表此前完全不可达）
-	var item_key: String = scene.dbg_ensure("item", "ITEMS_changji")
-	var char_key: String = scene.dbg_ensure("char", "CHARS_zs")
+	var item_key: String = scene.debug.dbg_ensure("item", "ITEMS_changji")
+	var char_key: String = scene.debug.dbg_ensure("char", "CHARS_zs")
 	var res: Dictionary = scene.combos.use_item(item_key, char_key)
 	check("反应表通道：物品拖给人有台词", bool(res.get("ok", false))
 		and String(res.get("message", "")).length() > 4, str(res.get("message", "")))
@@ -904,7 +904,7 @@ func _initialize() -> void:
 	# 11) 反向：从物品拖一行回画布，**落在松手那一点**（旧版取回只用默认位）
 	var stage3: Control = scene.get_node("desk/case_win/body/stage")
 	var drop_at := stage3.get_global_rect().get_center() + Vector2(80, -60)
-	scene.dbg_storage_drag(TORCH, drop_at)
+	scene.debug.dbg_storage_drag(TORCH, drop_at)
 	await process_frame
 	await process_frame
 	check("物品行拖回画布：重新可见", not scene.graph.stored.has(TORCH))
@@ -917,14 +917,14 @@ func _initialize() -> void:
 	scene._store_into(GraphState.BAG, TORCH)
 	check("K4 先把物品收进物品窗", String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG)
 	scene._hide_toast()
-	scene.dbg_storage_drag(TORCH, (scene.get_node("desk/icons/icon_clue") as Control).get_global_rect().get_center())
+	scene.debug.dbg_storage_drag(TORCH, (scene.get_node("desk/icons/icon_clue") as Control).get_global_rect().get_center())
 	await process_frame
 	check("K4 物品行拖到证据图标仍留在物品里",
 		String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG,
 		String(scene.graph.stored.get(TORCH, "")))
 	check("K6 物品进证据按目标回绝",
-		scene.dbg_toast_text().contains("证据") and scene.dbg_toast_text().contains("物是原料"),
-		scene.dbg_toast_text())
+		scene.debug.dbg_toast_text().contains("证据") and scene.debug.dbg_toast_text().contains("物是原料"),
+		scene.debug.dbg_toast_text())
 	scene.graph.take_back(TORCH)
 	scene._apply_hidden()
 	scene._refresh_or_spawn_card(TORCH)
@@ -932,7 +932,7 @@ func _initialize() -> void:
 	check("K4 复原手电筒到画布", not scene.graph.stored.has(TORCH))
 
 	# ── P0 交互（批 2）：拖动幽灵线 · 桌布 chip 带坐标取回 ──
-	var mw: MatrixWin = scene.dbg_open_matrix()
+	var mw: MatrixWin = scene.debug.dbg_open_matrix()
 	await process_frame
 	check("桌布窗能打开", mw != null)
 	# 挑一个不压在任何可见卡 / 开着的窗 / 桌布上的松手点（四角 + 四边各试一次）
@@ -962,7 +962,7 @@ func _initialize() -> void:
 	# 13) 桌布 chip → 画布（带坐标，反向 8 条路径的最后一条）/ chip → 证据图标 = 收进证据
 	var clue_key := "evidence:CLUES_nm"
 	check("测试前提：松手点在桌布外", not mw.get_global_rect().has_point(blank_pt))
-	scene.dbg_matrix_assign(clue_key)
+	scene.debug.dbg_matrix_assign(clue_key)
 	await process_frame
 	var chip_panel: Control = mw._chips.get("CLUES_nm", null) as Control
 	check("归位后桌布上有芯片", chip_panel != null)
@@ -1005,7 +1005,7 @@ func _initialize() -> void:
 		str(n2["x"]) + " / " + str(n2["y"]) + " want " + str(want2))
 
 	# chip 拖到证据图标 = 收进证据（Web overLedgerDrop：窗或图标都算）
-	scene.dbg_matrix_assign(clue_key)
+	scene.debug.dbg_matrix_assign(clue_key)
 	await process_frame
 	chip_panel = mw._chips.get("CLUES_nm", null) as Control
 	var clue_icon2: Control = scene.get_node("desk/icons/icon_clue")
@@ -1020,10 +1020,10 @@ func _initialize() -> void:
 	# ── 批 3（报告 §3.3 P2 残留）：warn 药丸 · pop 入场 · hover 光标 · dim 0.32 · 场景命令 · 拖动镜像 ──
 
 	# 14) G2 修复后，「门的后面」有命令产出通路，不再是「无文本入口」。
-	check("谓词：mdhm 未探索前", not (scene.dbg_state()["explored"] as Array).has("SCENES_mdhm"))
+	check("谓词：mdhm 未探索前", not (scene.debug.dbg_state()["explored"] as Array).has("SCENES_mdhm"))
 	check("谓词：枢纽花园（5 条入边）不算", not scene.graph.is_no_entry("loc:SCENES_garden"))
 	check("谓词：命令产出的 choutiyi 不算", not scene.graph.is_no_entry("loc:SCENES_choutiyi"))
-	var md_key: String = scene.dbg_ensure("loc", "SCENES_mdhm")
+	var md_key: String = scene.debug.dbg_ensure("loc", "SCENES_mdhm")
 	await process_frame
 	check("谓词：mdhm 有产出通路后不算无入口", not scene.graph.is_no_entry(md_key))
 	var md_card: NodeCard = _cards().get(md_key, null)
@@ -1038,7 +1038,7 @@ func _initialize() -> void:
 		scene._toggle_matrix()
 		await process_frame
 	scene._hide_toast()
-	var pop_key: String = scene.dbg_ensure("evidence", "CLUES_wmhj")
+	var pop_key: String = scene.debug.dbg_ensure("evidence", "CLUES_wmhj")
 	await process_frame
 	var pop_card: NodeCard = _cards().get(pop_key, null)
 	check("前提：dbg_ensure 不标记 fresh（首次出生不弹）",
@@ -1050,7 +1050,7 @@ func _initialize() -> void:
 		old_pop.queue_free()
 		scene._cards.erase(pop_key)
 	await process_frame
-	scene.dbg_ensure("evidence", "CLUES_wmhj")
+	scene.debug.dbg_ensure("evidence", "CLUES_wmhj")
 	var reborn: NodeCard = _cards().get(pop_key, null)
 	check("pop 初生：0.4", reborn != null and reborn.scale.is_equal_approx(Vector2(0.4, 0.4)),
 		str(reborn.scale if reborn != null else Vector2.ZERO))
@@ -1085,7 +1085,7 @@ func _initialize() -> void:
 	# （与 Web dblclick 同一句话）—— 这里显式 uncollapse，再验证 N7 分支
 	scene.graph.uncollapse("SCENES_garden")
 	await process_frame
-	check("前提：garden 展开态", not (scene.dbg_state()["collapsed"] as Array).has("SCENES_garden"))
+	check("前提：garden 展开态", not (scene.debug.dbg_state()["collapsed"] as Array).has("SCENES_garden"))
 	var tcmd := TextCommandDef.new()
 	tcmd.value = "SCN-CMD-PROBE 床底下压着一行蜡笔字"
 	var injected: Array[CommandDef] = [tcmd]
@@ -1099,13 +1099,13 @@ func _initialize() -> void:
 		String(scene._toast_label.text).contains("SCN-CMD-PROBE"),
 		String(scene._toast_label.text))
 	check("带命令场景双击：不折叠",
-		not (scene.dbg_state()["collapsed"] as Array).has("SCENES_garden"))
+		not (scene.debug.dbg_state()["collapsed"] as Array).has("SCENES_garden"))
 	var cleaned: Array[CommandDef] = []
 	gdef.commands = cleaned
 	_double_click(_cards()["loc:SCENES_garden"] as NodeCard)
 	await process_frame
 	check("无命令场景双击：回到折叠默认",
-		(scene.dbg_state()["collapsed"] as Array).has("SCENES_garden"))
+		(scene.debug.dbg_state()["collapsed"] as Array).has("SCENES_garden"))
 
 	# 19) D6 拖动镜像（Web #drag-layer）：拖起 = 镜像挂桌布最顶 + 原卡隐藏；
 	# 松手 = 镜像退场 + 原卡复位；被拖卡的连线照常续画
@@ -1179,7 +1179,7 @@ func _initialize() -> void:
 		if not scene.graph.has("evidence", cid20):
 			uc20 = cid20
 			break
-	var new_key20: String = scene.dbg_ensure("evidence", uc20)
+	var new_key20: String = scene.debug.dbg_ensure("evidence", uc20)
 	await process_frame
 	var new_card20: NodeCard = _cards().get(new_key20, null)
 	check("新节点：直接落位（不播过渡）",
@@ -1208,7 +1208,7 @@ func _initialize() -> void:
 	lut.results = {"scene": scene_pick, "items": item_picks}
 	var lg: CharDef = scene.case_def.char_of("CHARS_luhengs")
 	lg.item_reactions.insert(0, lut)
-	scene.dbg_ensure("char", "CHARS_luhengs")
+	scene.debug.dbg_ensure("char", "CHARS_luhengs")
 	await process_frame
 	var lc21: NodeCard = _cards().get("char:CHARS_luhengs", null)
 	check("前提：陆珩松卡片在画布", lc21 != null)
@@ -1249,7 +1249,7 @@ func _initialize() -> void:
 	lut2.text = "REACTION-PROBE-2 数据层注入"
 	lut2.results = {"scene": scene_pick2, "items": item_picks2}
 	lg.item_reactions.insert(1, lut2)
-	scene.dbg_ensure("item", "ITEMS_htys")
+	scene.debug.dbg_ensure("item", "ITEMS_htys")
 	await process_frame
 	var r21b: Dictionary = scene.combos.use_item("item:ITEMS_htys", "char:CHARS_luhengs")
 	check("数据层：反应表命中", bool(r21b.get("ok", false)), str(r21b))
@@ -1338,12 +1338,12 @@ func _initialize() -> void:
 	_press(tk23, d23)
 	_release(tk23, d23)
 	await create_timer(0.35).timeout
-	var lit23 := bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false))
+	var lit23 := bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false))
 	_press(tk23, d23)
 	_release(tk23, d23)
 	await process_frame
 	check("双击窗口 500ms：350ms 里的第二下仍算双击",
-		bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false)) != lit23)
+		bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false)) != lit23)
 	# 按下冻结：折牌式重排飞着的卡，一按就停在指针下（补间被杀、位置不再漂）
 	var far23: Vector2 = tk23.position + Vector2(420.0, -240.0)
 	scene.graph.node(TORCH)["x"] = far23.x
@@ -1424,14 +1424,14 @@ func _initialize() -> void:
 	#     这一节把事件真的推进 viewport，逐步验「跟手 / 收尾」。
 	# 前面的用例留了几扇窗口开着；真实事件会遇到「最上面的窗吃掉按下」，
 	# 先把它们收掉，让画布露出来（这一段只关心事件路由，不关心窗口）
-	scene.dbg_close_mem()
+	scene.debug.dbg_close_mem()
 	if scene._map_win != null and is_instance_valid(scene._map_win):
 		scene._toggle_case_map()
 	for ch in scene._desk.get_children():
 		if ch is NarrCard and (ch as Control).is_visible_in_tree():
 			ch.queue_free()
 	await process_frame
-	scene.dbg_expand("SCENES_garden")
+	scene.debug.dbg_expand("SCENES_garden")
 	await process_frame
 	# 前面的用例把卡片挪得很远；真实事件按屏幕坐标投递，先让画布回到「适应窗口」
 	scene._relayout()
@@ -1494,10 +1494,10 @@ func _initialize() -> void:
 		await process_frame
 
 	# 25) 桌布线索卡：拖动必须真的跟手（此前只判「移动过」、位置一动不动）
-	var mw25: MatrixWin = scene.dbg_open_matrix()
+	var mw25: MatrixWin = scene.debug.dbg_open_matrix()
 	await process_frame
-	scene.dbg_ensure("evidence", "CLUES_nm")
-	scene.dbg_matrix_assign(clue_key)
+	scene.debug.dbg_ensure("evidence", "CLUES_nm")
+	scene.debug.dbg_matrix_assign(clue_key)
 	await process_frame
 	var ch25: Control = mw25._chips.get("CLUES_nm", null) as Control
 	check("前提：桌布上有芯片", ch25 != null)
@@ -1650,7 +1650,7 @@ func _initialize() -> void:
 		p42_bag.set_selected(false)
 
 	# 案件：列表行与其它列表同一套语法 —— 行首编号牌 + 发丝线，不再套圆角盒子。
-	var p42_map: CaseMapWin = scene.dbg_open_case_map()
+	var p42_map: CaseMapWin = scene.debug.dbg_open_case_map()
 	var p42_r1: Control = p42_map.find_child("row_A001", true, false) if p42_map != null else null
 	var p42_c1: Panel = p42_r1.find_child("state", true, false) as Panel if p42_r1 != null else null
 	var p42_rs := p42_r1.get_theme_stylebox("panel") as StyleBoxFlat if p42_r1 != null else null
@@ -1703,7 +1703,7 @@ func _initialize() -> void:
 
 	# 详情窗：长简介 + 动作按钮不能溢出窗框；超过视口时由滚动区吸收。
 	scene._hide_toast()
-	var detail_key: String = scene.dbg_ensure("item", "ITEM_shuzhuo")
+	var detail_key: String = scene.debug.dbg_ensure("item", "ITEM_shuzhuo")
 	scene.graph.explored["ITEM_shuzhuo"] = true
 	scene._on_card_selected(detail_key)
 	await process_frame
@@ -1837,7 +1837,7 @@ func _initialize() -> void:
 	var office_node: Dictionary = scene.graph.node(tut_office_key)
 	check("G2 办公室拖拽回位锚点正确",
 		tut_office_card._home == Vector2(float(office_node["x"]), float(office_node["y"])))
-	scene.dbg_tec_complete()
+	scene.debug.dbg_tec_complete()
 	for i in 6:
 		await process_frame
 	check("G2 TEC 分析办公室只给提示、不产证件",
@@ -1878,7 +1878,7 @@ func _initialize() -> void:
 	check("G2 点 TEC 仍只指证件", _last_line(scene._tec).contains("调查员证"))
 	scene._apply_drop("tec-avatar", tut_cert_key)
 	check("G2 证件拖给 TEC 开始分析", scene._tec.is_analyzing())
-	scene.dbg_tec_complete()
+	scene.debug.dbg_tec_complete()
 	for i in 6:
 		await process_frame
 	check("G2 产出调查员证据",
@@ -2152,7 +2152,7 @@ func _initialize() -> void:
 			stable_sid = s.id
 			break
 	if stable_sid != "":
-		scene.dbg_ensure("loc", stable_sid)
+		scene.debug.dbg_ensure("loc", stable_sid)
 		await process_frame
 		scene._view_k = 1.0
 		scene._view_user = true
@@ -2266,9 +2266,9 @@ func _initialize() -> void:
 	if w11_card != null:
 		var w11_key: String = w11_card.card_key
 		var w11_pin_before: bool = bool(scene.graph.node(w11_key).get("pinned", false))
-		var w11_hist: int = scene.dbg_history_size()
+		var w11_hist: int = scene.debug.dbg_history_size()
 		scene._on_card_pin_toggled(w11_key)
-		check("W11 前置：置钉进入撤销栈", scene.dbg_history_size() > w11_hist)
+		check("W11 前置：置钉进入撤销栈", scene.debug.dbg_history_size() > w11_hist)
 		var w11_undo := InputEventKey.new()
 		w11_undo.keycode = KEY_Z
 		w11_undo.ctrl_pressed = true
@@ -2316,7 +2316,7 @@ func _initialize() -> void:
 	# G14：真名线索行反白 + 强调青首符号 + 打字机停顿。
 	var g14: EndingDef = scene.case_def.ending_by_id("TRUE_E")
 	if g14 != null and not g14.recipe.is_empty():
-		var g14_key: String = scene.dbg_ensure("clue", String(g14.recipe[0].id))
+		var g14_key: String = scene.debug.dbg_ensure("clue", String(g14.recipe[0].id))
 		check("G14 识别真名配方证据", scene._has_true_name_clue([g14_key]))
 		scene._tec.append_true_clue("真名证据测试行")
 		var g14_line: Node = scene._tec._lines.get_child(scene._tec._lines.get_child_count() - 3)

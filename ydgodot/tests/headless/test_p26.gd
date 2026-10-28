@@ -118,7 +118,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	root.add_child(scene)
 	await process_frame
 	await process_frame
-	scene.dbg_use_temp_progress(TEMP_PROGRESS)
+	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
 	scene._save.path = TEMP_SAVE
 	scene._save_enabled = false
 
@@ -140,7 +140,7 @@ func _test_desktop(c: CaseLoader) -> void:
 		str(badge_sb.corner_radius_top_left) if badge_sb != null else "null")
 
 	# 1) 图标栏：8 项常驻，顺序即 ICON_LAYOUT
-	var apps: Array = scene.dbg_icon_apps()
+	var apps: Array = scene.debug.dbg_icon_apps()
 	check("图标栏 8 项", apps.size() == 8, str(apps))
 	check("图标顺序对齐 ICON_LAYOUT",
 		apps == ["infer", "goto", "clue", "people", "bag", "tec", "log", "map"], str(apps))
@@ -152,9 +152,9 @@ func _test_desktop(c: CaseLoader) -> void:
 	]
 	check("图标名缩短为 推演 / 证据 / 物品 / 案件",
 		icon_names == ["推演", "证据", "物品", "案件"], str(icon_names))
-	check("推演在首位", scene.dbg_icon_pos("infer").x == 18.0 and scene.dbg_icon_pos("infer").y == 16.0,
-		str(scene.dbg_icon_pos("infer")))
-	var pitch: float = float(scene.dbg_icon_pos("goto").y) - float(scene.dbg_icon_pos("infer").y)
+	check("推演在首位", scene.debug.dbg_icon_pos("infer").x == 18.0 and scene.debug.dbg_icon_pos("infer").y == 16.0,
+		str(scene.debug.dbg_icon_pos("infer")))
+	var pitch: float = float(scene.debug.dbg_icon_pos("goto").y) - float(scene.debug.dbg_icon_pos("infer").y)
 	## P2：常驻档按「64px 槽 + 12px 间距」= 76；只有 960×560 放不下时才切紧凑。
 	## 720 基准（desk 668）8 项总高 612，仍走常驻档。
 	var want_pitch := 76.0
@@ -162,21 +162,21 @@ func _test_desktop(c: CaseLoader) -> void:
 		str(pitch) + " / want " + str(want_pitch))
 	var even := true
 	for i in range(1, apps.size()):
-		var gap: float = scene.dbg_icon_pos(String(apps[i])).y - scene.dbg_icon_pos(String(apps[i - 1])).y
+		var gap: float = scene.debug.dbg_icon_pos(String(apps[i])).y - scene.debug.dbg_icon_pos(String(apps[i - 1])).y
 		if absf(gap - pitch) > 0.01:
 			even = false
 	check("八项等距", even, str(pitch))
 	check("播放器 / 花园初始不占位",
-		not scene.dbg_icon_visible("music") and not scene.dbg_icon_visible("garden"))
+		not scene.debug.dbg_icon_visible("music") and not scene.debug.dbg_icon_visible("garden"))
 
 	# 2) 自由拖动：位置变了、不进撤销栈
-	var hist0: int = scene.dbg_history_size()
-	scene.dbg_drag_icon("infer", Vector2(300, 420))
-	check("图标可拖到任意位置", scene.dbg_icon_pos("infer") == Vector2(300, 420),
-		str(scene.dbg_icon_pos("infer")))
-	check("拖动不进撤销栈", scene.dbg_history_size() == hist0, str(scene.dbg_history_size()))
-	scene.dbg_drag_icon("infer", Vector2(18, 16))
-	check("拖回原位", scene.dbg_icon_pos("infer") == Vector2(18, 16), str(scene.dbg_icon_pos("infer")))
+	var hist0: int = scene.debug.dbg_history_size()
+	scene.debug.dbg_drag_icon("infer", Vector2(300, 420))
+	check("图标可拖到任意位置", scene.debug.dbg_icon_pos("infer") == Vector2(300, 420),
+		str(scene.debug.dbg_icon_pos("infer")))
+	check("拖动不进撤销栈", scene.debug.dbg_history_size() == hist0, str(scene.debug.dbg_history_size()))
+	scene.debug.dbg_drag_icon("infer", Vector2(18, 16))
+	check("拖回原位", scene.debug.dbg_icon_pos("infer") == Vector2(18, 16), str(scene.debug.dbg_icon_pos("infer")))
 
 	# 2a) 真指针事件走 DeskIcon 自己的手势：5px 内 = 点击，超出 = 拖动且吞掉点击
 	var ic: Control = scene.get_node("desk/icons/icon_infer")
@@ -197,33 +197,33 @@ func _test_desktop(c: CaseLoader) -> void:
 	_icon_press(ic, at + Vector2(40, 30), false)
 	check("拖动：位置跟着指针走", ic.position == base + Vector2(40, 30), str(ic.position))
 	check("拖动后吞掉点击", int(hits["n"]) == 1, str(hits["n"]))
-	scene.dbg_drag_icon("infer", Vector2(18, 16))
+	scene.debug.dbg_drag_icon("infer", Vector2(18, 16))
 	check("拖回后坐标复原", ic.position == Vector2(18, 16), str(ic.position))
 
 	# 2b) 双击图标才开窗（单击只选中）
 	var people_ic: Control = scene.get_node("desk/icons/icon_people")
-	scene.dbg_double_click_icon("people")
-	check("双击人物图标开名册", scene.dbg_people_win() != null)
+	scene.debug.dbg_double_click_icon("people")
+	check("双击人物图标开名册", scene.debug.dbg_people_win() != null)
 	check("双击后图标不残留选中", not bool(people_ic.get("_selected")))
-	scene.dbg_close_people()
+	scene.debug.dbg_close_people()
 	await process_frame
-	scene.dbg_double_click_icon("log")
-	check("双击日志图标开日志窗", scene.dbg_log_win() != null)
-	scene.dbg_close_log()
+	scene.debug.dbg_double_click_icon("log")
+	check("双击日志图标开日志窗", scene.debug.dbg_log_win() != null)
+	scene.debug.dbg_close_log()
 	await process_frame
-	check("关窗后引用清空", scene.dbg_people_win() == null and scene.dbg_log_win() == null)
+	check("关窗后引用清空", scene.debug.dbg_people_win() == null and scene.debug.dbg_log_win() == null)
 
 	# 3) 四个角标：推演 / 物品 / 证据 / 日志
 	check("初始四角标都收着",
-		scene.dbg_badge_text("infer") == "" and scene.dbg_badge_text("bag") == ""
-		and scene.dbg_badge_text("clue") == "" and scene.dbg_badge_text("log") == "")
+		scene.debug.dbg_badge_text("infer") == "" and scene.debug.dbg_badge_text("bag") == ""
+		and scene.debug.dbg_badge_text("clue") == "" and scene.debug.dbg_badge_text("log") == "")
 
-	var item_key: String = scene.dbg_ensure("item", "ITEMS_changji")
-	scene.dbg_select(item_key)
+	var item_key: String = scene.debug.dbg_ensure("item", "ITEMS_changji")
+	scene.debug.dbg_select(item_key)
 	await process_frame
-	check("收进物品", scene.dbg_store(GraphState.BAG))
+	check("收进物品", scene.debug.dbg_store(GraphState.BAG))
 	await process_frame
-	check("物品角标 1 件", scene.dbg_badge_text("bag") == "1 件", scene.dbg_badge_text("bag"))
+	check("物品角标 1 件", scene.debug.dbg_badge_text("bag") == "1 件", scene.debug.dbg_badge_text("bag"))
 	var bag_ic := scene.get_node_or_null("desk/icons/icon_bag") as DeskIcon
 	var bag_badge := scene.get_node_or_null("desk/icons/icon_bag/bag_badge") as Control
 	check("E2 徽章右沿贴在图标外 2px",
@@ -236,39 +236,39 @@ func _test_desktop(c: CaseLoader) -> void:
 			and absf(bag_badge.position.y - (bag_ic._icon.position.y - 2.0)) < 0.01,
 		"null" if bag_badge == null else str(bag_badge.position.y))
 
-	var clue_key: String = scene.dbg_ensure("clue", "CLUES_CBKW")
-	scene.dbg_select(clue_key)
+	var clue_key: String = scene.debug.dbg_ensure("clue", "CLUES_CBKW")
+	scene.debug.dbg_select(clue_key)
 	await process_frame
-	check("收进证据", scene.dbg_store(GraphState.LEDGER))
+	check("收进证据", scene.debug.dbg_store(GraphState.LEDGER))
 	await process_frame
-	check("证据角标 1 条", scene.dbg_badge_text("clue") == "1 条", scene.dbg_badge_text("clue"))
+	check("证据角标 1 条", scene.debug.dbg_badge_text("clue") == "1 条", scene.debug.dbg_badge_text("clue"))
 
 	# 4) 日志窗：关着时累未读，开窗清零
 	var before_n: int = scene.graph.log_count()
-	scene.dbg_add_log("测试：一条案卷", "warn")
+	scene.debug.dbg_add_log("测试：一条案卷", "warn")
 	check("写案卷即入账", scene.graph.log_count() == before_n + 1)
-	check("窗关着累计未读", scene.dbg_log_unread() == 1, str(scene.dbg_log_unread()))
-	check("日志角标显示未读数", scene.dbg_badge_text("log") == "1", scene.dbg_badge_text("log"))
+	check("窗关着累计未读", scene.debug.dbg_log_unread() == 1, str(scene.debug.dbg_log_unread()))
+	check("日志角标显示未读数", scene.debug.dbg_badge_text("log") == "1", scene.debug.dbg_badge_text("log"))
 
-	var lw: LogWin = scene.dbg_open_log()
+	var lw: LogWin = scene.debug.dbg_open_log()
 	check("日志窗打开", lw != null and lw.visible)
 	if lw == null:
 		scene.queue_free()
 		return
 	check("K10 日志窗标题统一为「日志」", lw.title == "日志", lw.title)
-	check("开窗清未读", scene.dbg_log_unread() == 0)
-	check("开窗收角标", scene.dbg_badge_text("log") == "")
+	check("开窗清未读", scene.debug.dbg_log_unread() == 0)
+	check("开窗收角标", scene.debug.dbg_badge_text("log") == "")
 	# 补两条已知 kind 的行，样式断言才有靶子
-	scene.dbg_add_log("测试：一条系统条", "sys")
-	scene.dbg_add_log("测试：一条警告条", "warn")
+	scene.debug.dbg_add_log("测试：一条系统条", "sys")
+	scene.debug.dbg_add_log("测试：一条警告条", "warn")
 	lw.refresh_log()
 	await process_frame
 	check("条目数等于案卷条数", lw.entry_count() == scene.graph.log_count(),
 		"%d / %d" % [lw.entry_count(), scene.graph.log_count()])
-	check("kind 逐条对齐", lw.kinds() == scene.dbg_log_kinds(), str(lw.kinds()))
+	check("kind 逐条对齐", lw.kinds() == scene.debug.dbg_log_kinds(), str(lw.kinds()))
 	# F6：新增一条只追加 1 行控件，不再全量重建历史。
 	var f6_rows_built: int = lw._rows_built
-	scene.dbg_add_log("F6 增量追加探针", "sys")
+	scene.debug.dbg_add_log("F6 增量追加探针", "sys")
 	lw.refresh_log()
 	check("F6 日志只追加新行", lw._rows_built - f6_rows_built == 1,
 		"%d -> %d" % [f6_rows_built, lw._rows_built])
@@ -277,9 +277,9 @@ func _test_desktop(c: CaseLoader) -> void:
 	var warn_row := ""
 	for i in lw.entry_count():
 		var t := lw.entry_label(i)
-		if String(scene.dbg_log_kinds()[i]) == "sys":
+		if String(scene.debug.dbg_log_kinds()[i]) == "sys":
 			sys_row = t
-		elif String(scene.dbg_log_kinds()[i]) == "warn":
+		elif String(scene.debug.dbg_log_kinds()[i]) == "warn":
 			warn_row = t
 	check("sys 行正常字重 + ▍ 前缀", sys_row.begins_with("▍ ") and not sys_row.contains("[b]"), sys_row)
 	check("warn 行 ※ 前缀", warn_row.begins_with("※ "), warn_row)
@@ -306,62 +306,62 @@ func _test_desktop(c: CaseLoader) -> void:
 	# 5) 日志口径：只记结果，不记操作流水
 	# 展开一个「既不是时间锚点、TEC 也没有档案」的场景：一条都不该记
 	var n0: int = scene.graph.log_count()
-	scene.dbg_expand("SCENES_choutiyi")
+	scene.debug.dbg_expand("SCENES_choutiyi")
 	await process_frame
 	check("展开容器不记日志", scene.graph.log_count() == n0, str(scene.graph.log_count() - n0))
 
 	n0 = scene.graph.log_count()
-	var ck: String = scene.dbg_ensure("clue", "CLUES_JSBW")
-	scene.dbg_select(ck)
+	var ck: String = scene.debug.dbg_ensure("clue", "CLUES_JSBW")
+	scene.debug.dbg_select(ck)
 	await process_frame
-	scene.dbg_store(GraphState.LEDGER)
+	scene.debug.dbg_store(GraphState.LEDGER)
 	await process_frame
 	check("收入证据不记日志", scene.graph.log_count() == n0, str(scene.graph.log_count() - n0))
 
 	# 组合成功：一条 act，且不弹提示条（Web 刻意：结果靠画面自证）
-	scene.dbg_ensure("item", "ITEMS_cz")
+	scene.debug.dbg_ensure("item", "ITEMS_cz")
 	await process_frame
 	var cz_key := "item:ITEMS_cz"
 	scene.graph.tried[cz_key + ">loc:SCENES_garden"] = true
 	n0 = scene.graph.log_count()
-	var toast_before: String = scene.dbg_toast_text()
-	scene.dbg_combo_ui("ITEMS_cz", "ITEMS_changji")
+	var toast_before: String = scene.debug.dbg_toast_text()
+	scene.debug.dbg_combo_ui("ITEMS_cz", "ITEMS_changji")
 	await process_frame
 	check("U5 组合消耗后卡片已移除", not scene._cards.has(cz_key))
 	check("U5 组合消耗后 tried 已清",
 		not scene.graph.tried.has(cz_key + ">loc:SCENES_garden"))
 	check("组合成功记一条", scene.graph.log_count() == n0 + 1, str(scene.graph.log_count() - n0))
-	var last_kind := String(scene.dbg_log_kinds()[-1])
+	var last_kind := String(scene.debug.dbg_log_kinds()[-1])
 	check("组合成功是 act", last_kind == "act", last_kind)
-	check("组合成功不弹提示条", scene.dbg_toast_text() == toast_before,
-		scene.dbg_toast_text())
-	var last_text := String(scene.dbg_log_texts()[-1])
+	check("组合成功不弹提示条", scene.debug.dbg_toast_text() == toast_before,
+		scene.debug.dbg_toast_text())
+	var last_text := String(scene.debug.dbg_log_texts()[-1])
 	check("组合文案带 ⇒ 与获得", last_text.contains("⇒") and last_text.contains("获得"), last_text)
 
 	# 组合失败：一条 warn
 	n0 = scene.graph.log_count()
-	scene.dbg_combo_ui("CLUES_CBKW", "ITEMS_changji")
+	scene.debug.dbg_combo_ui("CLUES_CBKW", "ITEMS_changji")
 	await process_frame
 	if scene.graph.log_count() > n0:
-		check("组合失败是 warn", String(scene.dbg_log_kinds()[-1]) == "warn",
-			String(scene.dbg_log_kinds()[-1]))
+		check("组合失败是 warn", String(scene.debug.dbg_log_kinds()[-1]) == "warn",
+			String(scene.debug.dbg_log_kinds()[-1]))
 	else:
 		check("无效组合不写案卷", scene.graph.log_count() == n0, "没有失败也算对（本就无反应）")
 
 	# 撤销也不回滚案卷
 	n0 = scene.graph.log_count()
-	scene.dbg_add_log("撤销前的最后一条", "sys")
+	scene.debug.dbg_add_log("撤销前的最后一条", "sys")
 	var after_log: int = scene.graph.log_count()
-	check("撤销不动案卷", scene.dbg_undo() and scene.graph.log_count() == after_log,
+	check("撤销不动案卷", scene.debug.dbg_undo() and scene.graph.log_count() == after_log,
 		"%d -> %d" % [after_log, scene.graph.log_count()])
 	check("案卷只增不减", scene.graph.log_count() == n0 + 1)
 
 	# 6) 名册窗
-	scene.dbg_set_time("SCENES_0704")
+	scene.debug.dbg_set_time("SCENES_0704")
 	await process_frame
-	scene.dbg_close_mem()
+	scene.debug.dbg_close_mem()
 	await process_frame
-	var pw: PeopleWin = scene.dbg_open_people()
+	var pw: PeopleWin = scene.debug.dbg_open_people()
 	check("名册窗打开", pw != null and pw.visible)
 	if pw == null:
 		scene.queue_free()
@@ -390,17 +390,17 @@ func _test_desktop(c: CaseLoader) -> void:
 	scene._on_people_row("CHARS_TEC")
 	await process_frame
 	check("K3 名册点 TEC 行打开档案卡",
-		scene.dbg_person_card() != null and scene.dbg_person_id() == "CHARS_TEC")
+		scene.debug.dbg_person_card() != null and scene.debug.dbg_person_id() == "CHARS_TEC")
 	check("K3 档案卡不关名册", scene._people_win != null and scene._people_win.visible)
 	check("档案卡不解锁 TEC 窗", scene._tec == null or not scene._tec.visible)
-	check("档案卡状态：TEC 在线", String(scene.dbg_person_payload("CHARS_TEC").get("state", "")) == "在线",
-		String(scene.dbg_person_payload("CHARS_TEC").get("state", "")))
+	check("档案卡状态：TEC 在线", String(scene.debug.dbg_person_payload("CHARS_TEC").get("state", "")) == "在线",
+		String(scene.debug.dbg_person_payload("CHARS_TEC").get("state", "")))
 	check("档案卡动作：TEC 打开对话窗",
-		String(scene.dbg_person_payload("CHARS_TEC").get("action", "")) == "打开对话窗")
-	scene.dbg_person_action("CHARS_TEC")
+		String(scene.debug.dbg_person_payload("CHARS_TEC").get("action", "")) == "打开对话窗")
+	scene.debug.dbg_person_action("CHARS_TEC")
 	await process_frame
-	check("卡内动作才打开 TEC 窗", scene.dbg_tec_win() != null and scene.dbg_tec_win().visible)
-	scene.dbg_tec_close()
+	check("卡内动作才打开 TEC 窗", scene.debug.dbg_tec_win() != null and scene.debug.dbg_tec_win().visible)
+	scene.debug.dbg_tec_close()
 
 	check("状态词不带计数", not pw.row_state("CHARS_luhengs").contains("/"),
 		pw.row_state("CHARS_luhengs"))
@@ -431,13 +431,13 @@ func _test_desktop(c: CaseLoader) -> void:
 	# 点普通行 = 只开档案卡；跳转/叫人降级为卡内「前往此人」。
 	var key_lhs: String = scene.graph.key_of("char", "CHARS_luhengs")
 	var prog0 := int(scene.graph.talk_prog.get(key_lhs, 0))
-	scene.dbg_people_row("CHARS_luhengs")
+	scene.debug.dbg_people_row("CHARS_luhengs")
 	await process_frame
-	check("普通行打开档案卡", scene.dbg_person_id() == "CHARS_luhengs", scene.dbg_person_id())
+	check("普通行打开档案卡", scene.debug.dbg_person_id() == "CHARS_luhengs", scene.debug.dbg_person_id())
 	check("点行不再叫人上画布", not scene.graph.nodes.has(key_lhs))
 	check("点行不再推进对话", int(scene.graph.talk_prog.get(key_lhs, 0)) == prog0)
-	check("点行不开对话窗", scene.dbg_chat() == null)
-	var lhs_payload: Dictionary = scene.dbg_person_payload("CHARS_luhengs")
+	check("点行不开对话窗", scene.debug.dbg_chat() == null)
+	var lhs_payload: Dictionary = scene.debug.dbg_person_payload("CHARS_luhengs")
 	check("死者卡状态显示死因", String(lhs_payload.get("state", "")) == "死亡 · 吊颈",
 		String(lhs_payload.get("state", "")))
 	check("死者卡关联", " ".join(lhs_payload.get("meta_lines", [])).contains("本案死者"),
@@ -450,7 +450,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	var lhs_art := lhs_av.find_child("art", true, false) as TextureRect if lhs_av != null else null
 	var lhs_path := lhs_art.texture.resource_path if lhs_art != null and lhs_art.texture != null else ""
 	check("名册头像走 CharDef（陆珩松 → lu.png）", lhs_path == "res://assets/raw/lu.png", lhs_path)
-	var card = scene.dbg_person_card()
+	var card = scene.debug.dbg_person_card()
 	check("档案卡 260×360 量级", card != null and card.size.x >= 260.0 and card.size.y >= 360.0,
 		str(card.size) if card != null else "null")
 	check("档案卡不出桌面",
@@ -504,45 +504,45 @@ func _test_desktop(c: CaseLoader) -> void:
 			String(scene.graph.notes.get("CHARS_luhengs", "")) == "手写备注",
 			String(scene.graph.notes.get("CHARS_luhengs", "")))
 		note_edit.focus_exited.emit()
-	scene.dbg_ensure("item", "ITEM_shoudiantong")
+	scene.debug.dbg_ensure("item", "ITEM_shoudiantong")
 	await process_frame
-	scene.dbg_activate("item:ITEM_shoudiantong")
+	scene.debug.dbg_activate("item:ITEM_shoudiantong")
 	await process_frame
-	scene.dbg_person_note("CHARS_luhengs", "他在撒谎，6月2日不在场。")
+	scene.debug.dbg_person_note("CHARS_luhengs", "他在撒谎，6月2日不在场。")
 	check("备注写入按人物 id 存档", String(scene.graph.notes.get("CHARS_luhengs", "")) == "他在撒谎，6月2日不在场。",
 		String(scene.graph.notes.get("CHARS_luhengs", "")))
 	check("备注进入快照", String((scene._save.snapshot().get("notes", {}) as Dictionary).get("CHARS_luhengs", "")) == "他在撒谎，6月2日不在场。",
 		str(scene._save.snapshot().get("notes", {})))
 	check("备注写入卡片", card != null and String(card.call("note_text")) == "他在撒谎，6月2日不在场。",
 		String(card.call("note_text")) if card != null else "null")
-	check("无关操作撤销", scene.dbg_undo())
+	check("无关操作撤销", scene.debug.dbg_undo())
 	await process_frame
 	check("撤销不回滚备注",
 		String(scene.graph.notes.get("CHARS_luhengs", "")) == "他在撒谎，6月2日不在场。",
 		String(scene.graph.notes.get("CHARS_luhengs", "")))
 
 	# 卡内「前往此人」= 一步恢复旧行为。
-	scene.dbg_person_action()
+	scene.debug.dbg_person_action()
 	await process_frame
 	check("前往此人：上画布", scene.graph.nodes.has(key_lhs))
-	check("前往此人：已选中", String(scene.dbg_state()["selected"]) == key_lhs,
-		String(scene.dbg_state()["selected"]))
+	check("前往此人：已选中", String(scene.debug.dbg_state()["selected"]) == key_lhs,
+		String(scene.debug.dbg_state()["selected"]))
 	check("前往此人：说下一句", int(scene.graph.talk_prog.get(key_lhs, 0)) == prog0 + 1,
 		str(scene.graph.talk_prog.get(key_lhs, 0)))
-	check("前往此人：开对话窗", scene.dbg_chat() != null)
-	if scene.dbg_chat() != null:
-		check("对话窗是这句台词", scene.dbg_chat_title().begins_with("独白 · ")
-			or scene.dbg_chat_title().begins_with("对话 · "), scene.dbg_chat_title())
+	check("前往此人：开对话窗", scene.debug.dbg_chat() != null)
+	if scene.debug.dbg_chat() != null:
+		check("对话窗是这句台词", scene.debug.dbg_chat_title().begins_with("独白 · ")
+			or scene.debug.dbg_chat_title().begins_with("对话 · "), scene.debug.dbg_chat_title())
 		# S12：对话窗开着时再从档案卡点「前往此人」，提层现有对话，不误报「暂无对话文本」。
-		scene.dbg_people_row("CHARS_luhengs")
+		scene.debug.dbg_people_row("CHARS_luhengs")
 		await process_frame
-		var toast12: String = scene.dbg_toast_text()
-		scene.dbg_person_action()
+		var toast12: String = scene.debug.dbg_toast_text()
+		scene.debug.dbg_person_action()
 		await process_frame
 		check("S12 对话窗开着时前往不再误报",
-			scene.dbg_chat() != null and not scene.dbg_toast_text().contains("暂无对话文本"),
-			scene.dbg_toast_text() + " / before=" + toast12)
-		scene.dbg_chat_close()
+			scene.debug.dbg_chat() != null and not scene.debug.dbg_toast_text().contains("暂无对话文本"),
+			scene.debug.dbg_toast_text() + " / before=" + toast12)
+		scene.debug.dbg_chat_close()
 	await process_frame
 	pw.refresh_people()
 	await process_frame
@@ -554,31 +554,31 @@ func _test_desktop(c: CaseLoader) -> void:
 	scene.graph.debuted["CHARS_zs"] = true
 	pw.refresh_people()
 	await process_frame
-	scene.dbg_people_row("CHARS_zs")
+	scene.debug.dbg_people_row("CHARS_zs")
 	await process_frame
 	check("活人卡状态显示存活",
-		String(scene.dbg_person_payload("CHARS_zs").get("state", "")) == "存活",
-		String(scene.dbg_person_payload("CHARS_zs").get("state", "")))
-	check("同时只开一张档案卡", scene.dbg_person_id() == "CHARS_zs", scene.dbg_person_id())
+		String(scene.debug.dbg_person_payload("CHARS_zs").get("state", "")) == "存活",
+		String(scene.debug.dbg_person_payload("CHARS_zs").get("state", "")))
+	check("同时只开一张档案卡", scene.debug.dbg_person_id() == "CHARS_zs", scene.debug.dbg_person_id())
 	var card_count := 0
 	for ch in scene._desk.get_children():
 		if String(ch.name).begins_with("person_card_"):
 			card_count += 1
 	check("桌面只有一张档案卡", card_count == 1, str(card_count))
 
-	scene.dbg_people_row(GraphState.INVESTIGATOR_ID)
+	scene.debug.dbg_people_row(GraphState.INVESTIGATOR_ID)
 	await process_frame
-	var inv_payload: Dictionary = scene.dbg_person_payload(GraphState.INVESTIGATOR_ID)
+	var inv_payload: Dictionary = scene.debug.dbg_person_payload(GraphState.INVESTIGATOR_ID)
 	check("调查员卡姓名取证件", String(inv_payload.get("name", "")) == "执行者",
 		String(inv_payload.get("name", "")))
 	check("调查员卡编号取证件",
 		" ".join(inv_payload.get("meta_lines", [])).contains("TEC-TEST-0001"),
 		str(inv_payload.get("meta_lines", [])))
 	check("调查员卡动作查看证件", String(inv_payload.get("action", "")) == "查看证件")
-	scene.dbg_person_note(GraphState.INVESTIGATOR_ID, "我的调查笔记")
+	scene.debug.dbg_person_note(GraphState.INVESTIGATOR_ID, "我的调查笔记")
 	check("调查员备注独立存档",
 		String(scene.graph.notes.get(GraphState.INVESTIGATOR_ID, "")) == "我的调查笔记")
-	var inv_card = scene.dbg_person_card()
+	var inv_card = scene.debug.dbg_person_card()
 	var close_btn := inv_card.find_child("card_close", true, false) as Button if inv_card != null else null
 	check("档案卡有 × 关闭", close_btn != null)
 	check("档案卡关闭键与系统窗同款（18×18 + glyph）",
@@ -593,24 +593,24 @@ func _test_desktop(c: CaseLoader) -> void:
 	if close_btn != null:
 		close_btn.pressed.emit()
 	await process_frame
-	check("档案卡 × 可关闭", scene.dbg_person_card() == null)
+	check("档案卡 × 可关闭", scene.debug.dbg_person_card() == null)
 
 	# 调查员卡动作 = 查看证件。
-	scene.dbg_people_row(GraphState.INVESTIGATOR_ID)
+	scene.debug.dbg_people_row(GraphState.INVESTIGATOR_ID)
 	await process_frame
-	scene.dbg_person_action()
+	scene.debug.dbg_person_action()
 	await process_frame
-	check("调查员卡动作打开证件复核", scene.dbg_cert_open())
+	check("调查员卡动作打开证件复核", scene.debug.dbg_cert_open())
 	if scene._cert_win != null and is_instance_valid(scene._cert_win):
 		scene._cert_win.queue_free()
 	await process_frame
 
-	scene.dbg_close_people()
+	scene.debug.dbg_close_people()
 	await process_frame
-	check("关名册窗", scene.dbg_people_win() == null)
-	scene.dbg_close_log()
+	check("关名册窗", scene.debug.dbg_people_win() == null)
+	scene.debug.dbg_close_log()
 	await process_frame
-	check("关日志窗", scene.dbg_log_win() == null)
+	check("关日志窗", scene.debug.dbg_log_win() == null)
 
 	scene.queue_free()
 	await process_frame

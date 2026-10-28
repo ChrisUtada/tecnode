@@ -121,44 +121,44 @@ func _test_desktop_flow() -> void:
 	await process_frame
 
 	# TEC 解读尸体 → hiddenClue 上画布
-	scene.dbg_expand("SCENES_body")
+	scene.debug.dbg_expand("SCENES_body")
 	await process_frame
-	scene.dbg_tec_analyze("SCENES_body")
-	scene.dbg_tec_complete()
+	scene.debug.dbg_tec_analyze("SCENES_body")
+	scene.debug.dbg_tec_complete()
 	await process_frame
 	await process_frame
-	var st: Dictionary = scene.dbg_state()
+	var st: Dictionary = scene.debug.dbg_state()
 	check("TEC 解读：捕获尸体隐藏证据", (st["captured"] as Array).has("CLUES_V_luheng"), str(st["captured"]))
 	check("TEC 解读：证卡上画布", _cards(scene).has("evidence:CLUES_V_luheng"))
 
 	# 桌布窗口：归位 / 取回
-	scene.dbg_ensure("clue", "CLUES_nm")
+	scene.debug.dbg_ensure("clue", "CLUES_nm")
 	await process_frame
-	var mw: MatrixWin = scene.dbg_open_matrix()
+	var mw: MatrixWin = scene.debug.dbg_open_matrix()
 	await process_frame
 	check("桌布窗口能打开", mw != null)
 	check("K10 推演窗标题统一", mw != null and mw.title == "推演", mw.title if mw != null else "null")
 	check("桌布五感芯片初始为空", mw != null and mw.chip_count() == 0)
-	check("普通物品不能归位", not scene.dbg_matrix_assign("item:ITEMS_bd"))
+	check("普通物品不能归位", not scene.debug.dbg_matrix_assign("item:ITEMS_bd"))
 	_drag_card_to(_cards(scene)["evidence:CLUES_nm"], mw.board_global_rect().get_center())
 	await process_frame
 	check("把证卡拖到桌布上：归位成功", mw != null and mw.has_chip("CLUES_nm"))
 	check("归位后桌布出现芯片", mw != null and mw.has_chip("CLUES_nm"))
 	check("归位后听觉槽有 1 条", mw != null and mw.chip_count("hearing") == 1)
 	check("归位后画布上的卡片收起", not (_cards(scene)["evidence:CLUES_nm"] as NodeCard).visible)
-	check("归位后状态里有 MATRIX", (scene.dbg_state()["matrix_ids"] as Array).has("CLUES_nm"))
+	check("归位后状态里有 MATRIX", (scene.debug.dbg_state()["matrix_ids"] as Array).has("CLUES_nm"))
 
-	scene.dbg_matrix_take("evidence:CLUES_nm")
+	scene.debug.dbg_matrix_take("evidence:CLUES_nm")
 	await process_frame
 	check("取回后芯片消失", mw != null and not mw.has_chip("CLUES_nm"))
 	check("取回后卡片重新可见", (_cards(scene)["evidence:CLUES_nm"] as NodeCard).visible)
 
 	# 配方不全就推演：失败 + 心碎表情
-	scene.dbg_matrix_assign("evidence:CLUES_nm")
+	scene.debug.dbg_matrix_assign("evidence:CLUES_nm")
 	await process_frame
-	scene.dbg_matrix_charge()
+	scene.debug.dbg_matrix_charge()
 	await process_frame
-	check("配方不全：不触发结局", not bool(scene.dbg_state()["ending_visible"]))
+	check("配方不全：不触发结局", not bool(scene.debug.dbg_state()["ending_visible"]))
 	check("配方不全：执行者弹出心碎", mw != null and mw.emote_visible())
 	check("配方不全：失败提示指向检查配方",
 		mw != null and mw.dbg_hint().contains("检查配方"),
@@ -169,15 +169,15 @@ func _test_desktop_flow() -> void:
 	for clue in true_e.recipe:
 		if clue.id == "CLUES_nm":
 			continue
-		scene.dbg_ensure("clue", clue.id)
-		scene.dbg_matrix_assign("evidence:" + clue.id)
+		scene.debug.dbg_ensure("clue", clue.id)
+		scene.debug.dbg_matrix_assign("evidence:" + clue.id)
 	await process_frame
 	check("五感归位完成：matrix_count = 5",
-		(scene.dbg_state()["matrix_ids"] as Array).size() == 5, str(scene.dbg_state()["matrix_ids"]))
+		(scene.debug.dbg_state()["matrix_ids"] as Array).size() == 5, str(scene.debug.dbg_state()["matrix_ids"]))
 
-	scene.dbg_matrix_charge()
+	scene.debug.dbg_matrix_charge()
 	await process_frame
-	var st2: Dictionary = scene.dbg_state()
+	var st2: Dictionary = scene.debug.dbg_state()
 	check("推演命中：结局开演", bool(st2["ending_visible"]))
 	check("推演命中：记录结局 TRUE_E", st2["ending_id"] == "TRUE_E" and (st2["endings"] as Array).has("TRUE_E"))
 	check("推演命中：真名镜头先震动", mw != null)
@@ -191,9 +191,9 @@ func _test_desktop_flow() -> void:
 		bool((scene._save.snapshot()["garden"] as Dictionary).get("seed", false)),
 		str(scene._save.snapshot()["garden"]))
 
-	var ending: EndingOverlay = scene.dbg_ending()
+	var ending: EndingOverlay = scene.debug.dbg_ending()
 	check("结局分幕共 4 幕", ending.total_lines() == 4, str(ending.total_lines()))
-	scene.dbg_ending_finish()
+	scene.debug.dbg_ending_finish()
 	check("真名遮罩出现", ending.truename_shown())
 	check("真名文字是「花魄」", ending.truename() == "花魄")
 	check("末帧按钮 = 确认捕获", ending.final_text() == "确认捕获")
