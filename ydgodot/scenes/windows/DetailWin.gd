@@ -256,7 +256,7 @@ func _status_text(n: Dictionary, kind: String) -> String:
 		var c := _case.clue_of(String(n["id"]))
 		var sense := String(c.sense) if c != null else ""
 		var cap := "已捕获" if bool(n.get("captured", false)) else "未捕获"
-		return cap + " · " + String(GraphState.SENSE_NAMES.get(sense, sense))
+		return cap + " · " + String(MatrixState.SENSE_NAMES.get(sense, sense))
 	if kind == "char":
 		var ch := _case.char_of(String(n["id"]))
 		var total := ch.talk_queue.size() if ch != null else 0
@@ -268,7 +268,7 @@ func _status_text(n: Dictionary, kind: String) -> String:
 		if String(ev.tier) == "ci":
 			return "词 · 证言（与物合成证）"
 		var origin: String = String({"tec": "TEC 分析", "synth": "物 × 词合成", "deduce": "档案演绎"}.get(String(ev.origin), String(ev.origin)))
-		return "证 · %s · %s" % [String(GraphState.SENSE_NAMES.get(ev.sense, ev.sense)), origin]
+		return "证 · %s · %s" % [String(MatrixState.SENSE_NAMES.get(ev.sense, ev.sense)), origin]
 	if kind != "item":
 		return ""
 	var it := _case.item_of(String(n["id"]))

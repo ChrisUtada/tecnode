@@ -30,11 +30,11 @@ func _initialize() -> void:
 # ── 1. 初始五个空槽 ────────────────────────────────────────────────────
 func _test_blank_slots() -> void:
 	var g := GraphState.new(c)
-	check("五感词表与领域状态一致",
-		MatrixState.SENSES == GraphState.SENSES and MatrixState.SENSE_NAMES == GraphState.SENSE_NAMES)
+	check("五感词表 5 项且中文名齐全",
+		MatrixState.SENSES.size() == 5 and MatrixState.SENSE_NAMES.size() == 5)
 	check("五感槽位共 5 个", g.matrix.size() == 5, str(g.matrix.keys()))
 	var all_empty := true
-	for sense in GraphState.SENSES:
+	for sense in MatrixState.SENSES:
 		if not (g.matrix.get(sense, []) as Array).is_empty():
 			all_empty = false
 	check("开局槽位全空", all_empty)

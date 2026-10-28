@@ -18,8 +18,13 @@ func _test_sense() -> void:
 	check("三问（2 视觉 1 听觉）→ 视觉", Investigator.pick_sense(["vision", "vision", "hearing"]) == "vision")
 	check("平局取先达到的", Investigator.pick_sense(["hearing", "vision", "touch"]) == "hearing")
 	check("空答案回退视觉", Investigator.pick_sense([]) == "vision")
-	check("五感名称齐全", Investigator.SENSE_NAMES.size() == 5)
-	check("五感描述齐全", Investigator.SENSE_FLAVOR.size() == 5)
+	check("五感名称齐全", MatrixState.SENSE_NAMES.size() == 5)
+	check("五感描述齐全", Investigator.SENSE_FLAVOR.size() == MatrixState.SENSE_NAMES.size())
+	var flavor_aligned := true
+	for sense in MatrixState.SENSES:
+		if not Investigator.SENSE_FLAVOR.has(sense):
+			flavor_aligned = false
+	check("五感描述键与词表一致", flavor_aligned)
 	check("题库 3 问", Investigator.QUIZ.size() == 3)
 	var all_five := true
 	for q in Investigator.QUIZ:

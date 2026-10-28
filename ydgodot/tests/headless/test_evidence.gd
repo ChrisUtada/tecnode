@@ -64,7 +64,7 @@ func _test_data() -> void:
 				if side is EvidenceDef and String((side as EvidenceDef).tier) == "ci":
 					has_item_word = true
 		check("配方 %s 产物是证" % r.id, String(r.evidence.tier) == "zheng", r.evidence.tier)
-		check("配方 %s 带合法五感" % r.id, GraphState.SENSES.has(String(r.sense)), String(r.sense))
+		check("配方 %s 带合法五感" % r.id, MatrixState.SENSES.has(String(r.sense)), String(r.sense))
 	check("物×物配方存在", has_item_item)
 	check("物×词配方存在", has_item_word)
 	check("证×物配方存在", has_evidence_item)

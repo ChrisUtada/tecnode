@@ -6,8 +6,8 @@ extends SysWindow
 ## 单击一行 = 取回画布（回到窗旁边的位置）。
 ## 物品收物与词；证据只收证（规则在 GraphState.ledger_store 里）。
 
-signal will_take(key: String)
-signal took(key: String)
+## 请求取回（窗口只表达意图；真正的 graph.take_back 由桌面控制器执行）
+signal take_requested(key: String)
 signal to_matrix(key: String)
 ## 行被按住（Web：按住一行拖走 = 三个落点；单击 = 取回）。桌面侧接管后续手势。
 signal row_pressed(key: String, from_kind: String, at_global: Vector2)
@@ -88,22 +88,8 @@ func refresh_store() -> void:
 ## 一行：标签 + 「取回」按钮；**整行可按住拖走**（Web `06-storage.js` 的行拖拽）
 func _make_row(key: String) -> Control:
 	var n := graph.node(key)
-	var row := PanelContainer.new()
-	row.name = "row_" + key.replace(":", "_")
-	row.custom_minimum_size = Vector2(0, 30)
-	row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	## D2：清单行不再做成独立盒子，只留底部 1px 发丝线；左右内容缩进 8，
-	## 发丝线也各缩 8（负 expand margin 只影响绘制，不动内容排版）。
-	var sb := TecTheme.flat(TecTheme.NONE, 0, TecTheme.NONE, 0)
-	sb.border_color = TecTheme.edge(0.18)
-	sb.border_width_bottom = 1
-	sb.expand_margin_left = -8.0
-	sb.expand_margin_right = -8.0
-	sb.content_margin_left = 8
-	sb.content_margin_right = 8
-	sb.content_margin_top = 4
-	sb.content_margin_bottom = 4
-	row.add_theme_stylebox_override("panel", sb)
+	## D2：清单行不再做成独立盒子，只留底部 1px 发丝线。
+	var row := ListRow.panel("row_" + key.replace(":", "_"), 30)
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
 	row.gui_input.connect(func(ev: InputEvent): _on_row_input(ev, key))
 	var hb := HBoxContainer.new()
@@ -195,8 +181,4 @@ func _on_row_input(ev: InputEvent, key: String) -> void:
 func _take(key: String) -> void:
 	if not writes_enabled or graph == null or not graph.stored.has(key):
 		return
-	will_take.emit(key)
-	if not graph.take_back(key):
-		return
-	took.emit(key)
-	refresh_store()
+	take_requested.emit(key)

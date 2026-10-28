@@ -100,7 +100,7 @@ func _assign_to_matrix(key: String) -> bool:
 		desk.tutorial._tutorial_begin_infer()
 	var before := desk._save.snapshot()
 	if not desk.graph.matrix_assign(key):
-		desk.drag._reject_drop("「%s」的感官类型是%s，无法放到推演桌布。" % [n.get("label", ""), GraphState.SENSE_NAMES.get(ev.sense, ev.sense)])
+		desk.drag._reject_drop("「%s」的感官类型是%s，无法放到推演桌布。" % [n.get("label", ""), MatrixState.SENSE_NAMES.get(ev.sense, ev.sense)])
 		return false
 	desk.card_ui._apply_hidden()
 	desk.canvas._refresh_or_spawn_card(key)

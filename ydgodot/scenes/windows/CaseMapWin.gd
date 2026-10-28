@@ -60,23 +60,10 @@ func _make_row(c: Dictionary, last: bool = false) -> Control:
 	var clickable := known and not (current and case_open)
 
 	## D2：与档案 / 名册 / 物品同一套列表语法 —— 不再给每行套一个圆角盒子。
-	## 行间只留 1px 发丝线（左右缩进 8px），行高 56 给「编号 + 标题 + 说明」两行用。
-	var row := PanelContainer.new()
-	row.name = "row_" + id
-	row.custom_minimum_size = Vector2(0, 56)
-	row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	## 行高 56 给「编号 + 标题 + 说明」两行用。
+	var row := ListRow.panel("row_" + id, 56, not last)
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
-	var style := TecTheme.flat(TecTheme.NONE, 0, TecTheme.NONE, 0)
-	style.border_color = TecTheme.edge(0.18)
-	if not last:
-		style.border_width_bottom = 1
-		style.expand_margin_left = -8.0
-		style.expand_margin_right = -8.0
-	style.content_margin_left = 8
-	style.content_margin_right = 8
-	style.content_margin_top = 4
-	style.content_margin_bottom = 4
-	row.add_theme_stylebox_override("panel", style)
+	var style := row.get_theme_stylebox("panel") as StyleBoxFlat
 	if clickable:
 		row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		row.mouse_entered.connect(func(): style.bg_color = TecTheme.BG)

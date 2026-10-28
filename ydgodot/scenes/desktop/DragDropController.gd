@@ -635,8 +635,7 @@ func _toggle_storage(kind: String) -> void:
 		desk._bag_win.setup_store("物品", GraphState.BAG, desk.graph, desk.case_def)
 		desk._bag_win.writes_enabled = desk._case_open
 		desk._bag_win.position = Vector2(150, 300)
-		desk._bag_win.will_take.connect(_on_storage_will_take)
-		desk._bag_win.took.connect(_on_storage_took)
+		desk._bag_win.take_requested.connect(_on_storage_take_requested)
 		desk._bag_win.row_pressed.connect(_on_row_pressed)
 		desk._bag_win.closed.connect(func(): desk._bag_win = null)
 		desk._desk.add_child(desk._bag_win)
@@ -651,8 +650,7 @@ func _toggle_storage(kind: String) -> void:
 	desk._ledger_win.setup_store("证据", GraphState.LEDGER, desk.graph, desk.case_def)
 	desk._ledger_win.writes_enabled = desk._case_open
 	desk._ledger_win.position = Vector2(410, 300)
-	desk._ledger_win.will_take.connect(_on_storage_will_take)
-	desk._ledger_win.took.connect(_on_storage_took)
+	desk._ledger_win.take_requested.connect(_on_storage_take_requested)
 	desk._ledger_win.to_matrix.connect(desk.matrix._on_ledger_to_matrix)
 	desk._ledger_win.row_pressed.connect(_on_row_pressed)
 	desk._ledger_win.closed.connect(func(): desk._ledger_win = null)
@@ -660,9 +658,16 @@ func _toggle_storage(kind: String) -> void:
 	desk.windows._place_z(desk._ledger_win, Desktop.ZR_WIN)
 
 
-## 收纳窗取出前先拍快照（StorageWin 自己改图，Desktop 只能从信号里抢在它前面）
-func _on_storage_will_take(_key: String) -> void:
+## 收纳窗请求取回：唯一写入口在这里（窗口只发意图）
+func _on_storage_take_requested(key: String) -> void:
+	var win := _storage_win_of(key)
+	if win == null:
+		return
 	desk._storage_before = desk._save.snapshot()
+	if not desk.graph.take_back(key):
+		desk._storage_before = {}
+		return
+	_on_storage_took(key)
 
 
 ## 从收纳窗取回：节点回到画布，并刷新两个清单窗

@@ -210,7 +210,7 @@ func refresh_matrix() -> void:
 		_chip_layer.remove_child(child)
 		child.queue_free()
 	_chips.clear()
-	for sense in GraphState.SENSES:
+	for sense in MatrixState.SENSES:
 		var list: Array = graph.matrix.get(sense, [])
 		var anchor: Vector2 = ANCHORS[sense]
 		var ax := anchor.x * BOARD_W

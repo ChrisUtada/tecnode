@@ -118,11 +118,11 @@ func _make_row(id: String) -> Control:
 
 	var row := PanelContainer.new()
 	row.name = "row_" + id
-	row.add_theme_stylebox_override("panel", _row_style(false))
+	row.add_theme_stylebox_override("panel", ListRow.style(false))
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
 	row.gui_input.connect(func(ev: InputEvent): _on_row_input(ev, id))
-	row.mouse_entered.connect(func(): row.add_theme_stylebox_override("panel", _row_style(true)))
-	row.mouse_exited.connect(func(): row.add_theme_stylebox_override("panel", _row_style(false)))
+	row.mouse_entered.connect(func(): row.add_theme_stylebox_override("panel", ListRow.style(true)))
+	row.mouse_exited.connect(func(): row.add_theme_stylebox_override("panel", ListRow.style(false)))
 
 	var hb := HBoxContainer.new()
 	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -160,21 +160,6 @@ func _make_row(id: String) -> Control:
 	st.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hb.add_child(st)
 	return row
-
-
-func _row_style(hover: bool) -> StyleBoxFlat:
-	var sb := TecTheme.flat(TecTheme.BG if hover else TecTheme.NONE, 0,
-		TecTheme.NONE, 0)
-	sb.border_color = TecTheme.edge(0.18)
-	sb.border_width_bottom = 1
-	## D2：发丝线左右各缩 8px（负 expand margin 只影响绘制，不动内容排版）。
-	sb.expand_margin_left = -8.0
-	sb.expand_margin_right = -8.0
-	sb.content_margin_left = 8
-	sb.content_margin_right = 8
-	sb.content_margin_top = 4
-	sb.content_margin_bottom = 4
-	return sb
 
 
 ## 48×48 头像位：有素材放像素图，没有放首字（Web `.people-win .goto-item .av`）

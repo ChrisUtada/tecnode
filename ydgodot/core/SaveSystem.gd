@@ -99,14 +99,32 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 	if fmt > FORMAT:
 		last_error = "存档格式过新：%d（当前支持 %d）" % [fmt, FORMAT]
 		return false
-	var now_card_seen := graph.card_seen.duplicate(true) if keep_knowledge else {}
-	var now_debuted := graph.debuted.duplicate(true) if keep_knowledge else {}
-	var now_unread := {}
-	var now_confirmed := graph.confirmed_fields.duplicate(true) if keep_knowledge else {}
+	## 撤销时玩家知识以当前值为准，必须在清空图之前抓取。
+	var knowledge := _knowledge_now() if keep_knowledge else {}
+	_reset_graph()
+	graph.time = String(s.get("time", "present"))
+	graph.garden = {"seed": false, "plots": []}
+	graph.selected = ""
+	graph.last_scene = String(s.get("lastScene", s.get("last_scene", "")))
+	graph.matrix_state.reset()
+
+	_restore_nodes(s["nodes"])
+	_restore_edges(s.get("edges", []))
+	_restore_flags(s)
+	_restore_garden(s)
+	_restore_notes(s, keep_knowledge)
+	_restore_persona(s)
 	if keep_knowledge:
-		for raw_key in graph.nodes.keys():
-			var k := String(raw_key)
-			now_unread[k] = bool((graph.nodes[raw_key] as Dictionary).get("unread", false))
+		_merge_knowledge(knowledge)
+	_prune_confirmed_claims()
+
+	graph.recompute_hidden()
+	## 图已被替换：下一次提交必须重新建立基准，不能拿旧 JSON 判「没变」。
+	last_json = ""
+	return true
+
+
+func _reset_graph() -> void:
 	graph.nodes.clear()
 	graph.edges.clear()
 	graph.explored.clear()
@@ -121,13 +139,22 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 	graph.talk_prog.clear()
 	graph.card_seen.clear()
 	graph.debuted.clear()
-	graph.time = String(s.get("time", "present"))
-	graph.garden = {"seed": false, "plots": []}
-	graph.selected = ""
-	graph.last_scene = String(s.get("lastScene", s.get("last_scene", "")))
-	graph.matrix_state.reset()
 
-	for raw in (s["nodes"] as Dictionary).values():
+
+func _knowledge_now() -> Dictionary:
+	var unread := {}
+	for raw_key in graph.nodes.keys():
+		unread[String(raw_key)] = bool((graph.nodes[raw_key] as Dictionary).get("unread", false))
+	return {
+		"card_seen": graph.card_seen.duplicate(true),
+		"debuted": graph.debuted.duplicate(true),
+		"unread": unread,
+		"confirmed": graph.confirmed_fields.duplicate(true),
+	}
+
+
+func _restore_nodes(raw_nodes: Dictionary) -> void:
+	for raw in raw_nodes.values():
 		if not (raw is Dictionary):
 			continue
 		## 旧档归一化统一走 NodeState：缺字段补默认、类型纠偏、未知字段留底。
@@ -148,7 +175,9 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 			graph.captured[ns.id] = true
 		graph.nodes[key] = n
 
-	for raw_edge in _as_array(s.get("edges", [])):
+
+func _restore_edges(raw_edges) -> void:
+	for raw_edge in _as_array(raw_edges):
 		if not (raw_edge is Dictionary):
 			continue
 		var e: Dictionary = raw_edge
@@ -161,22 +190,35 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 			"rel": String(e.get("rel", e.get("kind", "entity"))),
 		})
 
+
+func _restore_flags(s: Dictionary) -> void:
 	for id in _as_array(s.get("explored", [])):
 		graph.explored[String(id)] = true
 	for id in _as_array(s.get("captured", [])):
 		graph.captured[String(id)] = true
 	for id in _as_array(s.get("tried", [])):
 		graph.tried[String(id)] = true
-	for key in (s.get("tecProg", s.get("tec_prog", {})) as Dictionary).keys():
-		graph.tec_prog[String(key)] = int(s.get("tecProg", s.get("tec_prog", {}))[key])
-	for key in (s.get("talkProg", {}) as Dictionary).keys():
-		graph.talk_prog[String(key)] = int((s.get("talkProg", {}) as Dictionary)[key])
+	var tec_in = s.get("tecProg", s.get("tec_prog", {}))
+	if tec_in is Dictionary:
+		for key in (tec_in as Dictionary).keys():
+			graph.tec_prog[String(key)] = int((tec_in as Dictionary)[key])
+	var talk_in = s.get("talkProg", {})
+	if talk_in is Dictionary:
+		for key in (talk_in as Dictionary).keys():
+			graph.talk_prog[String(key)] = int((talk_in as Dictionary)[key])
 	for id in _as_array(s.get("collapsed", [])):
 		graph.collapsed[String(id)] = true
-	for key in (s.get("cardSeen", {}) as Dictionary).keys():
-		graph.card_seen[String(key)] = bool((s.get("cardSeen", {}) as Dictionary)[key])
-	for key in (s.get("debuted", {}) as Dictionary).keys():
-		graph.debuted[String(key)] = bool((s.get("debuted", {}) as Dictionary)[key])
+	var seen_in = s.get("cardSeen", {})
+	if seen_in is Dictionary:
+		for key in (seen_in as Dictionary).keys():
+			graph.card_seen[String(key)] = bool((seen_in as Dictionary)[key])
+	var debuted_in = s.get("debuted", {})
+	if debuted_in is Dictionary:
+		for key in (debuted_in as Dictionary).keys():
+			graph.debuted[String(key)] = bool((debuted_in as Dictionary)[key])
+
+
+func _restore_garden(s: Dictionary) -> void:
 	var garden_in = s.get("garden", null)
 	if garden_in is Dictionary:
 		graph.garden_state.from_dict(garden_in)
@@ -185,49 +227,60 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 		graph.garden_state.reset()
 		graph.garden_state.set_seed(true)
 
-	## 人物档案卡备注：读档按存档恢复；撤销（keep_knowledge）保持当前值不覆盖。
-	if not keep_knowledge:
-		graph.notes.clear()
-		var notes_in = s.get("notes", {})
-		if notes_in is Dictionary:
-			for key in (notes_in as Dictionary).keys():
-				graph.notes[String(key)] = String((notes_in as Dictionary)[key])
 
+## 人物档案卡备注：读档按存档恢复；撤销（keep_knowledge）保持当前值不覆盖。
+func _restore_notes(s: Dictionary, keep_knowledge: bool) -> void:
+	if keep_knowledge:
+		return
+	graph.notes.clear()
+	var notes_in = s.get("notes", {})
+	if notes_in is Dictionary:
+		for key in (notes_in as Dictionary).keys():
+			graph.notes[String(key)] = String((notes_in as Dictionary)[key])
+
+
+func _restore_persona(s: Dictionary) -> void:
 	var matrix_in = s.get("matrix", {})
 	if matrix_in is Dictionary:
 		graph.matrix_state.from_dict(matrix_in)
 	for id in _as_array(s.get("endings", [])):
 		graph.endings[String(id)] = true
-	for pid in (s.get("claims", {}) as Dictionary).keys():
-		var row = (s.get("claims", {}) as Dictionary)[pid]
-		if row is Dictionary:
-			graph.claims[String(pid)] = (row as Dictionary).duplicate(true)
-	for pid2 in (s.get("confirmedFields", {}) as Dictionary).keys():
-		var row2 = (s.get("confirmedFields", {}) as Dictionary)[pid2]
-		if row2 is Dictionary:
-			graph.confirmed_fields[String(pid2)] = (row2 as Dictionary).duplicate(true)
+	var claims_in = s.get("claims", {})
+	if claims_in is Dictionary:
+		for pid in (claims_in as Dictionary).keys():
+			var row = (claims_in as Dictionary)[pid]
+			if row is Dictionary:
+				graph.claims[String(pid)] = (row as Dictionary).duplicate(true)
+	var confirmed_in = s.get("confirmedFields", {})
+	if confirmed_in is Dictionary:
+		for pid in (confirmed_in as Dictionary).keys():
+			var row = (confirmed_in as Dictionary)[pid]
+			if row is Dictionary:
+				graph.confirmed_fields[String(pid)] = (row as Dictionary).duplicate(true)
 
-	## S8：撤销时用**当前值**合并知识，而不是让快照覆盖；
-	## 当前值里显式 false 的条目也照样覆盖（与 Web 的 Object.assign 同口径）。
-	if keep_knowledge:
-		for key in now_card_seen.keys():
-			graph.card_seen[String(key)] = bool(now_card_seen[key])
-		for key in now_debuted.keys():
-			graph.debuted[String(key)] = bool(now_debuted[key])
-		for key in now_unread.keys():
-			if graph.nodes.has(key):
-				graph.nodes[key]["unread"] = bool(now_unread[key])
-		## 已盖章字段是玩家知识：撤销能把主张与节点倒回去，但不能把章倒掉。
-		graph.confirmed_fields = now_confirmed
-	## 已盖章字段不应该再留一条待核对主张（旧档 / 撤销交叉时可能出现）。
+
+## S8：撤销时用**当前值**合并知识，而不是让快照覆盖；
+## 当前值里显式 false 的条目也照样覆盖（与 Web 的 Object.assign 同口径）。
+func _merge_knowledge(knowledge: Dictionary) -> void:
+	var card_seen: Dictionary = knowledge.get("card_seen", {})
+	for key in card_seen.keys():
+		graph.card_seen[String(key)] = bool(card_seen[key])
+	var debuted: Dictionary = knowledge.get("debuted", {})
+	for key in debuted.keys():
+		graph.debuted[String(key)] = bool(debuted[key])
+	var unread: Dictionary = knowledge.get("unread", {})
+	for key in unread.keys():
+		if graph.nodes.has(key):
+			graph.nodes[key]["unread"] = bool(unread[key])
+	## 已盖章字段是玩家知识：撤销能把主张与节点倒回去，但不能把章倒掉。
+	graph.confirmed_fields = (knowledge.get("confirmed", {}) as Dictionary).duplicate(true)
+
+
+## 已盖章字段不应该再留一条待核对主张（旧档 / 撤销交叉时可能出现）。
+func _prune_confirmed_claims() -> void:
 	for pid in graph.confirmed_fields.keys():
 		for fid in (graph.confirmed_fields[pid] as Dictionary).keys():
 			graph.clear_claim(String(pid), String(fid))
-
-	graph.recompute_hidden()
-	## 图已被替换：下一次提交必须重新建立基准，不能拿旧 JSON 判「没变」。
-	last_json = ""
-	return true
 
 
 func restore_json(text: String) -> bool:

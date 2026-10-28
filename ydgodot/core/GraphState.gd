@@ -110,14 +110,7 @@ const BAG := "BAG"                # 物品：收物与词
 const LEDGER := "LEDGER"          # 证据：只收证
 const MATRIX := "MATRIX"          # 推演桌布：归位的证
 
-## 五感顺序与显示名（Web 版 SENSES 的键序 —— 排序、遍历都按它来）。
-## GDScript 不允许把别的类的 const 当作常量表达式，所以这里与 MatrixState 各留一份；
-## `test_p14` 有断言保证两边不漂。
-const SENSES := ["vision", "hearing", "touch", "smell", "taste"]
-const SENSE_NAMES := {
-	"vision": "视觉", "hearing": "听觉", "touch": "触觉",
-	"smell": "嗅觉", "taste": "味觉",
-}
+## 五感顺序与显示名以 MatrixState.SENSES / SENSE_NAMES 为唯一来源。
 
 
 func _init(p_case: CaseLoader) -> void:

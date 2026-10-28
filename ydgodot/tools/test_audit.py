@@ -4,20 +4,22 @@
 
 为什么需要它：重构 `Desktop.gd` 时，私有字段 / 方法会不断移动。测试若直接访问
 `scene._cards`、`scene._on_card_selected`，每一步拆分都会变成「改产品 + 改测试」的双倍
-工作量，而且编译器不会提醒漏改。这个脚本把「现状」登记成基线：
+工作量，而且编译器不会提醒漏改。脚本把「现状」登记成基线：
 
-  · 已有访问：写入 `test_audit_baseline.txt`，允许存在；
-  · 新增访问：`--check` 直接失败，逼新测试走 `DesktopDebug` 或真实输入事件；
-  · 访问消失：只提示「可清理」，不判失败（迁移过程中会自然减少）。
+  · 基线现已清空（`test_audit_baseline.txt` 只剩说明注释）——测试一律走
+    `scene.debug.dbg_*` 接缝或真实输入事件；
+  · 新增访问：`--check` 直接失败；
+  · 访问消失：只提示「可清理」，不判失败。
 
 用法：
     python tools/test_audit.py            # 打印当前清单
     python tools/test_audit.py --check    # 门槛：出现基线外的新访问 → 退出码 1
     python tools/test_audit.py --update   # 重建基线（只应在明确接受现状时跑）
 
-扫描口径：`tests/**/*.gd` 中 `scene._xxx` / `desk._xxx`，以及批次 3 之后的
+扫描口径：`tests/**/*.gd` 中 `scene._xxx` / `desk._xxx`，以及
 `scene.<controller>._xxx`（Desktop 仍持有状态，控制器只是宿主）。
-窗口 / 卡片的视觉断言（如 `card._gui_input`）不在本守卫范围；等 Desktop 拆分完成后再逐类收紧。
+窗口 / 卡片的视觉断言（如 `card._gui_input`）不在本守卫范围：它们是控件自身的
+输入接线，不属于 Desktop 的私有实现；新增窗口级接缝时再单独收紧。
 """
 
 from __future__ import annotations
