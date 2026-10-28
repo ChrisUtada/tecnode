@@ -22,6 +22,7 @@ func _initialize() -> void:
 	_test_history()
 	_test_undo_knowledge()
 	_test_json_and_disk()
+	_test_node_state()
 	await _test_desktop()
 	_cleanup()
 
@@ -246,6 +247,28 @@ func _test_json_and_disk() -> void:
 
 
 # ── 5. 桌面：撤销按钮 / 自动记录 / 读档重建 ────────────────────────────
+# ── 6. 节点模型：NodeState 字段模式 ────────────────────────────────────
+func _test_node_state() -> void:
+	var fresh := NodeState.make_new("item", "ITEM_x", "item:ITEM_x", "手电筒")
+	check("NodeState 新节点未落位", fresh.x == -1.0 and fresh.y == -1.0)
+	check("NodeState 新节点默认未点亮", not fresh.lit and not fresh.pinned)
+
+	var g := GraphState.new(c)
+	var ev_key := g.capture_evidence("CLUES_nm")
+	var ev := NodeState.from_value(g.node(ev_key))
+	check("NodeState 证据带 tier/sense", ev.tier != "" and ev.sense != "",
+		"%s/%s" % [ev.tier, ev.sense])
+	check("NodeState 证据已捕获", ev.captured)
+
+	var legacy := {"kind": "item", "id": "ITEM_old", "x": "12.5", "unknown_flag": 7}
+	var old := NodeState.from_dict(legacy)
+	check("NodeState 旧档坐标转 float", old.x == 12.5, str(old.x))
+	check("NodeState 旧档 label 用 id", old.label == "ITEM_old")
+	var back := old.to_dict()
+	check("NodeState 未知字段不丢", back.has("unknown_flag") and int(back["unknown_flag"]) == 7)
+	check("NodeState 没证据字段就不写", not back.has("tier") and not back.has("sense"))
+
+
 func _test_desktop() -> void:
 	var scene: Control = load("res://scenes/Desktop.tscn").instantiate()
 	root.add_child(scene)

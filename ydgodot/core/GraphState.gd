@@ -166,32 +166,21 @@ func add_node(kind: String, id: String) -> Dictionary:
 	var key := key_of(kind, id)
 	if nodes.has(key):
 		return nodes[key]
-	var n := {
-		"key": key,
-		"kind": kind,
-		"id": id,
-		"label": case_def.label_of(kind, id),
-		# -1 = **还没落过位**。布局只给「未落位」的节点播种，已落位的一律保留
-		# （Web 用 `x == null` 判同一件事；Godot 的 Dictionary 没法存 null 语义的 float）
-		"x": -1.0,
-		"y": -1.0,
-		"lit": false,
-		"home_scene": "",
-		"pinned": false,     # 钉住：折叠容器时不跟着藏（Web 版右键钉住）
-		"bag_from": "",      # 进袋前的来源容器 id（袋清单标注「来自 ×××」）
-		"installed": {},      # 装在本节点上的零件（item id -> true）
-		"captured": kind == "evidence" and captured.has(id),
-		"fresh": false,       # 本次新出现（档案 / 卡片的「新」角标）
-		"unread": false,      # 玩家还没点过它
-	}
+	## 字段名 / 类型 / 默认值只在 NodeState 里写一次；这里拿回存储用的字典。
+	## -1 = **还没落过位**。布局只给「未落位」的节点播种，已落位的一律保留
+	## （Web 用 `x == null` 判同一件事；Godot 的 Dictionary 没法存 null 语义的 float）
+	var ns := NodeState.make_new(kind, id, key, case_def.label_of(kind, id))
+	ns.pinned = false     # 钉住：折叠容器时不跟着藏（Web 版右键钉住）
+	ns.bag_from = ""      # 进袋前的来源容器 id（袋清单标注「来自 ×××」）
+	ns.installed = {}     # 装在本节点上的零件（item id -> true）
+	ns.captured = kind == "evidence" and captured.has(id)
+	ns.fresh = false      # 本次新出现（档案 / 卡片的「新」角标）
+	ns.unread = false     # 玩家还没点过它
 	if kind == "evidence":
 		var ev := case_def.evidence_of(id) if case_def != null else null
-		n["tier"] = ev.tier if ev != null else "zheng"
-		n["sense"] = ev.sense if ev != null else "vision"
-		n["origin"] = ev.origin if ev != null else "tec"
-		n["captured"] = String(n["tier"]) == "zheng" and captured.has(id)
 		## 证据是玩家已经拿到的知识，不随时刻 / 折叠容器消失。
-		n["always_visible"] = true
+		ns.apply_evidence(ev, captured.has(id))
+	var n := ns.to_dict()
 	nodes[key] = n
 	return n
 

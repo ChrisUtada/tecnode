@@ -130,34 +130,22 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 	for raw in (s["nodes"] as Dictionary).values():
 		if not (raw is Dictionary):
 			continue
-		var n: Dictionary = (raw as Dictionary).duplicate(true)
-		var key := String(n.get("key", ""))
+		## 旧档归一化统一走 NodeState：缺字段补默认、类型纠偏、未知字段留底。
+		var ns := NodeState.from_dict(raw)
+		var key := ns.key
 		if key == "":
-			key = graph.key_of(String(n.get("kind", "")), String(n.get("id", "")))
+			key = graph.key_of(ns.kind, ns.id)
 		if key == ":":
 			continue
-		n["key"] = key
-		n["kind"] = String(n.get("kind", ""))
-		n["id"] = String(n.get("id", ""))
-		n["label"] = String(n.get("label", n["id"]))
-		n["x"] = float(n.get("x", 0.0))
-		n["y"] = float(n.get("y", 0.0))
-		n["lit"] = bool(n.get("lit", false))
-		n["pinned"] = bool(n.get("pinned", false))
-		n["home_scene"] = String(n.get("home_scene", ""))
-		n["bag_from"] = String(n.get("bag_from", ""))
-		var installed = n.get("installed", {})
-		n["installed"] = (installed as Dictionary).duplicate(true) if installed is Dictionary else {}
-		n["captured"] = bool(n.get("captured", false))
-		n["fresh"] = bool(n.get("fresh", false))
-		n["unread"] = bool(n.get("unread", false))
-		var where := String(n.get("storedIn", ""))
+		ns.key = key
+		var where := ns.stored_in
+		var n := ns.to_dict()
+		n[NodeState.F_STORED] = where != ""
+		n[NodeState.F_STORED_IN] = where
 		if where != "":
 			graph.stored[key] = where
-		n["stored"] = where != ""
-		n["storedIn"] = where
-		if bool(n["captured"]):
-			graph.captured[String(n["id"])] = true
+		if ns.captured:
+			graph.captured[ns.id] = true
 		graph.nodes[key] = n
 
 	for raw_edge in _as_array(s.get("edges", [])):
