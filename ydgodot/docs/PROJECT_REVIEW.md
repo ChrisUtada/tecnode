@@ -26,7 +26,7 @@
 - **1158 行** —— 藏在产品类里的测试/截图代码（143 个 `dbg_*` = 805 行，6 个 `_shot_*` = 353 行）。
 - **18 份** —— 测试脚本各自复制的 `check()/fails/total` 脚手架与退出逻辑。
 
-> 以上为**批次执行前**的体检快照，用于说明改造动机。批次 0–4 完成后的实时数字与验证结果见 §7。
+> 以上为**批次执行前**的体检快照，用于说明改造动机。批次 0–4 已完成、批次 5 进行中，实时数字与验证结果见 §7。
 
 ### 0.3 建议的 Top 5 动作
 
@@ -570,7 +570,7 @@ if OS.is_debug_build() or _shot_mode():
 | **2 · Debug 抽离** | ✅ | 新增 `scenes/debug/DesktopDebug.gd`；`Desktop.gd` 8358 → 6807 行；`class_name Desktop`；测试 776 处改为 `scene.debug.dbg_*` | **1865 项 / 0 失败**；发布构建不实例化；审计 124 条无新增 |
 | **3 · Desktop 拆分** | ✅ | 13 个子系统控制器；`Desktop.gd` 6807 → 1022 行；测试私有访问审计扩到 `scene.<controller>._` | **1865 项 / 0 失败**；`Desktop.gd` ≤ 1200 行 |
 | **4 · 模型收敛** | ✅ | 拆出 `MatrixState` / `TimelineState` / `PersonaState` / `GardenState`（`2753a3b`）；新增 `NodeState` 统一节点字段模式（`62fd2b0`） | **1874 项 / 0 失败**；旧档可读（`format: 1`） |
-| **5 · 表现层收尾** | ⏳ | 待执行：UI 组件复用、`_process` 门控、测试私有访问清零 | 审计基线归零 |
+| **5 · 表现层收尾** | ◐ | 已完成 `_process` 空闲门控（`c9dbeb5`）、`FloatingPanel` / `ScrollBox` 复用（`6e20ada`）；待办：`_make_row` 归并、测试私有访问 108 → 0 | 空闲帧无 `_process` ✅；审计基线待归零 |
 
 **批次 2 的实际结果与预估差异**
 
@@ -658,8 +658,22 @@ if OS.is_debug_build() or _shot_mode():
 - `graph.nodes` 仍是 `Dictionary[str, Dictionary]`：全项目约 714 处 `n["x"]` / `n.get("x")` 读点尚未迁移到 `NodeState.from_value()`。这一步改动面横跨 45 个文件（含测试与 addon），放在批次 4 里做会把「模型收敛」和「全量读点改写」两类风险叠在一起；按 §6 P2-4 的第 3 步，留到批次 5 按文件推进，`NodeState` 已提供入口。
 - 五感词表双份是 GDScript 常量表达式的限制，已有断言兜底；等 `GraphState.SENSES` 的外部读点收敛后，可只保留 `MatrixState` 一份。
 
-**下一步**：批次 5 收表现层——`ListPanel` / `FloatingPanel` 复用、`_process` 空闲门控、测试私有访问基线归零，并按文件把节点读点迁到 `NodeState`。
+**批次 5 的实际结果（进行中）**
+
+*已完成*
+
+- `_process` 空闲门控（`c9dbeb5`）：没有分帧力导向、连线重画、拖拽会话、待写盘、浮层跟锚时 `set_process(false)`；入口统一 `_wake_process()`。`test_ui` 新增「空闲休眠 / 唤醒 / 再次休眠」3 项断言。
+- `ui/FloatingPanel.gd`（夹边、等帧、视口高度、收底）与 `ui/ScrollBox.gd`（滚到底）（`6e20ada`）：删掉 `_clamp_pos` 两份、`_fit_height` 的等帧样板 4 份、`_scroll_to_end` 2 份，视口高度 / 收底 3 份。
+- 踩坑：`settle()` 在节点被释放后仍取 `is_inside_tree()` 会报 `previously freed instance`；加 `is_instance_valid()` 守卫，并在每一段 `await` 后重新检查。
+
+*待办*
+
+- 测试私有访问基线仍是 **108 条**（约 400 处）。主要集中在前几个高频项：`scene._tec` 72、`scene._view_k` 36、`scene._dock_card` 23、`scene._matrix_win` 22、`scene._desk` 21、`scene._cards` 21。清零需要先补一组 `DesktopDebug` 查询 / 设置接缝（相机、窗口句柄、卡片表、桌布尺寸），再按文件替换；这一轮没有硬做，避免把测试重写和产品改动叠在一起。
+- `_make_row` 仍是 5 份（`ArchiveWin` / `CaseMapWin` / `LogWin` / `PeopleWin` / `StorageWin`）。它们只共享 `HBox + 样式` 骨架，行内容差异大；先不抽象成配置式 `ListPanel`，等测试接缝收敛后再评估。
+- 节点读点迁移（批次 4 的尾巴）：`NodeState.from_value()` 已就位，约 714 处 `n["x"]` / `n.get("x")` 仍按文件待迁。
+
+**下一步**：先补 `DesktopDebug` 的查询 / 设置接缝，把 108 条私有访问按文件清零；再评估 `_make_row` 是否值得统一；节点读点迁移与测试改写分开提交。
 
 ---
 
-> 本报告起初只描述现状与建议；批次 0–4 已按 §5 落地，现状与本节的差异以本节为准。
+> 本报告起初只描述现状与建议；批次 0–4 已按 §5 落地、批次 5 进行中，现状与本节的差异以本节为准。
