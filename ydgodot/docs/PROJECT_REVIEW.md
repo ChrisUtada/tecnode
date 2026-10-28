@@ -324,6 +324,8 @@ scene.dbg_expand("SCENES_garden")
 
 **动作**：`ui/ListPanel.gd`（行构建 + 滚动 + 自适应高度）、`ui/FloatingPanel.gd`（夹边定位），窗口组合使用。
 
+> 现状：`_make_row` 已由 `ui/ListRow.gd` 收敛（`StorageWin` / `CaseMapWin` / `PeopleWin` 复用；`ArchiveWin` / `LogWin` 行体异构，保留各自实现）。`_clamp_pos` / `_fit_height` / `_scroll_to_end` 仍是各窗体自持的小工具，未并入统一面板。
+
 #### P2-6 超长函数
 
 | 函数 | 行数 | 位置 |
@@ -333,6 +335,8 @@ scene.dbg_expand("SCENES_garden")
 | `Desktop._shot_p2_flow()` | 189 | `scenes/Desktop.gd:8120` |
 
 前两个按字段域拆成私有小函数即可，风险很低，适合作为热身重构；`_shot_p2_flow` 随 P1 一起移出。
+
+> 现状：`validate_evidence()` 与 `restore()` 已按字段域拆分（`01f0128`）；`_shot_p2_flow` 已移入 `DesktopDebug`，尚未继续拆分。
 
 #### P2-7 测试脚手架 18 份复制
 
@@ -531,7 +535,7 @@ done
 
 - **不做**：把现有文本窗口批量改成 `.tscn`；
 - **可选**：`SysWindow` 壳做成场景，保留 `body` / `content` 节点名；
-- **优先**：把重复的 `_make_row` / `_fit_height` / `_scroll_to_end` / `_clamp_pos` 抽成代码组件；
+- **优先**：把重复的 `_make_row` / `_fit_height` / `_scroll_to_end` / `_clamp_pos` 抽成代码组件（`_make_row` 已由 `ui/ListRow.gd` 收敛，其余待做）；
 - 如果只是想在编辑器里预览，增加一个 dev-only 预览场景实例化各窗口即可，不动产品路径。
 
 #### C.5 调试构建开关
@@ -644,7 +648,7 @@ if OS.is_debug_build() or _shot_mode():
 - `GraphState` 保留 `time` / `matrix` / `endings` / `garden` / `notes` / `claims` / `confirmed_fields` / `talk_prog` / `card_seen` / `debuted` 同名属性，内部用 Getter/Setter 委托到领域状态。112 处 `graph.<字段>` 外部调用点因此零改动。
 - 存档字段名与结构完全不变，`format: 1`；`restore()` 改为调用各状态的 `from_dict()`，`snapshot()` 仍按原键组合。
 - 判定逻辑下沉：`MatrixState.match_ending()`、`PersonaState.confirm_field()` 等不再依赖 `case_def` 以外的上下文；`GraphState` 只留「需要案例数据」的薄包装。
-- 踩坑：GDScript 的 `const X := OtherClass.CONST` 不是常量表达式，会报 `Could not resolve external class member`。五感词表因此在 `GraphState` 与 `MatrixState` 各留一份，`test_p14` 增加一致性断言防漂移。
+- 踩坑：GDScript 的 `const X := OtherClass.CONST` 不是常量表达式，会报 `Could not resolve external class member`。五感词表现在只保留 `MatrixState` 一份，其余位置按运行时读取（后续已收敛，见「遗留收尾」）。
 
 *4b · `NodeState` 类型化边界（`62fd2b0`）*
 
@@ -653,10 +657,10 @@ if OS.is_debug_build() or _shot_mode():
 - 未知字段收进 `_extra` 原样带回，旧档 / 前瞻字段不丢；证据专属字段只在源数据确实有时才写回，不会凭空给旧档加键。
 - 落盘仍是字典，`format: 1`；`p15` 新增 8 项断言（默认值、类型纠偏、未知字段保留、证据字段不污染普通节点）。
 
-**批次 4 留下的尾巴**
+**批次 4 留下的尾巴（已在「遗留收尾」清掉）**
 
-- `graph.nodes` 仍是 `Dictionary[str, Dictionary]`：全项目约 714 处 `n["x"]` / `n.get("x")` 读点尚未迁移到 `NodeState.from_value()`。这一步改动面横跨 45 个文件（含测试与 addon），放在批次 4 里做会把「模型收敛」和「全量读点改写」两类风险叠在一起；按 §6 P2-4 的第 3 步，留到批次 5 按文件推进，`NodeState` 已提供入口。
-- 五感词表双份是 GDScript 常量表达式的限制，已有断言兜底；等 `GraphState.SENSES` 的外部读点收敛后，可只保留 `MatrixState` 一份。
+- 节点读点迁移：`graph.nodes` 已改存 `NodeState` 实体，读写都走类型化字段；不再需要逐点 `from_value()`。
+- 五感词表：`GraphState` / `Investigator` 的副本已删除，只保留 `MatrixState` 一份。
 
 **批次 5 的实际结果**
 
@@ -679,13 +683,22 @@ if OS.is_debug_build() or _shot_mode():
 - 17 个测试脚本完成迁移：`scene._xxx` / `scene.<controller>._xxx` → `scene.debug.dbg_*`。审计基线 **108 → 0**，`test_audit.py --check` 现在是硬门槛：任何新增私有访问直接失败。
 - 迁移时踩到两处机械替换的边界：`scene._save` 不能直接映射到已有的 `dbg_save()`（那是「写盘」动作），改用新增的 `dbg_save_system()`；`scene._tec` 对应的是 `dbg_tec_win()` 而不是同名的 `dbg_tec()`。多行字典赋值也要手工补右括号。
 
-*仍未做（不阻塞验收）*
+**遗留收尾（`01f0128` / `e778886`）**
 
-- `_make_row` 仍是 5 份（`ArchiveWin` / `CaseMapWin` / `LogWin` / `PeopleWin` / `StorageWin`）。它们只共享 `HBox + 样式` 骨架，行内容差异大；暂不抽象成配置式 `ListPanel`。
-- 节点读点迁移（批次 4 的尾巴）：`NodeState.from_value()` 已就位，约 714 处 `n["x"]` / `n.get("x")` 仍按文件待迁。
+- **写入口**：`StorageWin._take()` 只发 `take_requested`；`graph.take_back()` 回到 `DragDropController`，窗口不再直接改图。
+- **长函数**：`SaveSystem.restore()` 拆成重置 / 知识快照 / 节点 / 边 / 开关 / 花园 / 备注 / 人设 / 知识合并 / 盖章清理；`CaseLoader.validate_evidence()` 拆成定义 / 可达性 / 配方 / 结局 / 字段五段。行为与返回文案不变。
+- **五感词表**：只保留 `MatrixState.SENSES / SENSE_NAMES`；`GraphState`、`Investigator`、详情窗、桌布窗、案件校验、测试全部改读同一来源。
+- **列表行**：新增 `ui/ListRow.gd` 收敛「PanelContainer + 发丝线 + 8px 内边距」外壳；`StorageWin` / `CaseMapWin` / `PeopleWin` 复用。`ArchiveWin`（Button 行）与 `LogWin`（RichText 行）行体异构，保留各自实现。
+- **节点实体化**：`GraphState.nodes` 的值改为 `NodeState`，`node()` / `add_node()` 返回实体；存档仍由 `to_dict()` 输出 `format: 1`。旧字典若被直接塞进 `nodes`，首次读取时就地升级。卡片 / 画布 / 拖拽 / 对话 / TEC / 教学 / 档案窗 / 测试全部改为属性访问。
+- **警告配置**：`project.godot` 打开 `unused_parameter` / `shadowed_variable` / `unsafe_property_access` 三类 GDScript 警告。
+- 回归：**1881 项 / 0 失败**；`test_audit` 0 条；`mono_audit` 通过。
 
-**下一步**：按文件把节点读点迁到 `NodeState`；`_make_row` 是否统一等读点收敛后再评估。两项都不应和「测试接缝」再混在一次提交里。
+**仍未做（明确不在本轮范围）**
+
+- `DesktopDebug` 仍是单文件约 1700 行 / 268 个接缝。它是调试专用代码，拆分会带来大量纯委托；等接缝 API 稳定后再按 query / action / screenshot 分组。
+- `.tscn` 迁移（P3-4）按原计划保持延后：当前 UI 仍以代码搭建，迁移需要逐屏对照，不属于低风险清理。
+- `refactor/desktop-split` 分支尚未合并 / 开 PR；合并属于对外动作，等确认后执行。
 
 ---
 
-> 本报告起初只描述现状与建议；批次 0–5 已按 §5 落地（`_make_row` 归并与节点读点迁移作为后续项），现状与本节的差异以本节为准。
+> 本报告起初只描述现状与建议；批次 0–5 与「遗留收尾」均已落地，仅剩 `DesktopDebug` 分组、`.tscn` 迁移与分支合并三项明确延后，现状与本节的差异以本节为准。
