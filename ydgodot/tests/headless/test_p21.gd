@@ -99,8 +99,8 @@ func _test_desktop() -> void:
 	check("当前案件不可重复进入", not scene.debug.dbg_case_map_click("A001"))
 	check("锁定案件不可点击", not scene.debug.dbg_case_map_click("A002"))
 
-	scene._save.path = TEMP_SAVE
-	scene._save_enabled = true
+	scene.debug.dbg_save_system().path = TEMP_SAVE
+	scene.debug.dbg_set_save_enabled(true)
 	check("× 收起进案件图标", scene.debug.dbg_park_case("icon"))
 	await process_frame
 	info = scene.debug.dbg_case_info()
@@ -108,8 +108,8 @@ func _test_desktop() -> void:
 	check("收起后图标角标显示", bool(info["badge_visible"]))
 	check("收起后无 dock", not bool(info["dock_visible"]))
 	check("收起时自动存档", FileAccess.file_exists(TEMP_SAVE) and _file_text(TEMP_SAVE) != "")
-	check("案件窗隐藏", not scene._case_win.visible)
-	scene._save_enabled = false
+	check("案件窗隐藏", not scene.debug.dbg_case_win().visible)
+	scene.debug.dbg_set_save_enabled(false)
 
 	scene.debug.dbg_open_case_map()
 	await process_frame
@@ -117,7 +117,7 @@ func _test_desktop() -> void:
 	check("点击本案行重新展开", scene.debug.dbg_case_map_click("A001"))
 	await process_frame
 	info = scene.debug.dbg_case_info()
-	check("重开后案件窗可见", bool(info["open"]) and scene._case_win.visible)
+	check("重开后案件窗可见", bool(info["open"]) and scene.debug.dbg_case_win().visible)
 	check("重开后角标隐藏", not bool(info["badge_visible"]))
 	check("重开后地图关闭", scene.debug.dbg_case_map_win() == null)
 
@@ -126,20 +126,20 @@ func _test_desktop() -> void:
 	info = scene.debug.dbg_case_info()
 	check("dock 可见", bool(info["dock"]) and bool(info["dock_visible"]))
 	check("U6 dock 卡片完整落在桌面内",
-		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
-		str(scene._dock_card.get_global_rect()))
-	var desk_old: Vector2 = scene._desk.size
-	scene._desk.size = Vector2(960.0, 508.0)
-	scene.session._place_case_dock()
+		scene.debug.dbg_desk().get_global_rect().encloses(scene.debug.dbg_dock_card().get_global_rect()),
+		str(scene.debug.dbg_dock_card().get_global_rect()))
+	var desk_old: Vector2 = scene.debug.dbg_desk().size
+	scene.debug.dbg_desk().size = Vector2(960.0, 508.0)
+	scene.debug.dbg_place_case_dock()
 	check("U6 960×560 下 dock 仍在桌面内",
-		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
-		str(scene._dock_card.get_global_rect()))
-	scene._desk.size = desk_old
-	scene.session._place_case_dock()
+		scene.debug.dbg_desk().get_global_rect().encloses(scene.debug.dbg_dock_card().get_global_rect()),
+		str(scene.debug.dbg_dock_card().get_global_rect()))
+	scene.debug.dbg_desk().size = desk_old
+	scene.debug.dbg_place_case_dock()
 	check("dock 模式无图标角标", not bool(info["badge_visible"]))
-	check("dock 卡片有内容", scene._dock_title.text != "" and scene._dock_sub.text != "")
-	var dock_glyph := scene._dock_card.find_child("case_glyph", true, false) as Label
-	var dock_glyph_box := scene._dock_card.find_child("case_glyph_box", true, false) as Control
+	check("dock 卡片有内容", scene.debug.dbg_dock_title().text != "" and scene.debug.dbg_dock_sub().text != "")
+	var dock_glyph := scene.debug.dbg_dock_card().find_child("case_glyph", true, false) as Label
+	var dock_glyph_box := scene.debug.dbg_dock_card().find_child("case_glyph_box", true, false) as Control
 	check("dock 标记为「案」字 + 外框",
 		dock_glyph != null and dock_glyph.text == "案" and dock_glyph_box != null
 			and dock_glyph.get_theme_color("font_color").is_equal_approx(TecTheme.TEXT),
@@ -147,51 +147,51 @@ func _test_desktop() -> void:
 	check("dock 标记不贴边",
 		dock_glyph_box != null
 			and dock_glyph_box.get_global_rect().position.x
-				- scene._dock_card.get_global_rect().position.x >= 8.0,
-		"null" if dock_glyph_box == null else str(dock_glyph_box.get_global_rect()) + " / dock " + str(scene._dock_card.get_global_rect()))
+				- scene.debug.dbg_dock_card().get_global_rect().position.x >= 8.0,
+		"null" if dock_glyph_box == null else str(dock_glyph_box.get_global_rect()) + " / dock " + str(scene.debug.dbg_dock_card().get_global_rect()))
 	# U7：案件卡片可拖，重排不吸回；未拖动松手才展开。
-	var dock_home: Vector2 = scene._dock_card.position
-	var dock_at: Vector2 = scene._dock_card.get_global_rect().get_center()
+	var dock_home: Vector2 = scene.debug.dbg_dock_card().position
+	var dock_at: Vector2 = scene.debug.dbg_dock_card().get_global_rect().get_center()
 	var dock_down := InputEventMouseButton.new()
 	dock_down.button_index = MOUSE_BUTTON_LEFT
 	dock_down.pressed = true
 	dock_down.position = dock_at
 	dock_down.global_position = dock_at
-	scene._dock_card.gui_input.emit(dock_down)
+	scene.debug.dbg_dock_card().gui_input.emit(dock_down)
 	var dock_move := InputEventMouseMotion.new()
 	dock_move.button_mask = MOUSE_BUTTON_MASK_LEFT
 	dock_move.position = dock_at + Vector2(-140, -90)
 	dock_move.global_position = dock_at + Vector2(-140, -90)
-	scene._dock_card.gui_input.emit(dock_move)
+	scene.debug.dbg_dock_card().gui_input.emit(dock_move)
 	var dock_up := InputEventMouseButton.new()
 	dock_up.button_index = MOUSE_BUTTON_LEFT
 	dock_up.pressed = false
 	dock_up.position = dock_at + Vector2(-140, -90)
 	dock_up.global_position = dock_at + Vector2(-140, -90)
-	scene._dock_card.gui_input.emit(dock_up)
+	scene.debug.dbg_dock_card().gui_input.emit(dock_up)
 	await process_frame
-	check("U7 案件卡片可拖动", scene._dock_card.position != dock_home,
-		str(scene._dock_card.position) + " / " + str(dock_home))
+	check("U7 案件卡片可拖动", scene.debug.dbg_dock_card().position != dock_home,
+		str(scene.debug.dbg_dock_card().position) + " / " + str(dock_home))
 	check("U7 案件卡片拖动后仍在桌面内",
-		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
-		str(scene._dock_card.get_global_rect()))
-	var dock_dragged: Vector2 = scene._dock_card.position
-	scene.session._place_case_dock()
-	check("U7 案件卡片重排不被吸回", scene._dock_card.position == dock_dragged,
-		str(scene._dock_card.position) + " / " + str(dock_dragged))
-	var dock_click: Vector2 = scene._dock_card.get_global_rect().get_center()
+		scene.debug.dbg_desk().get_global_rect().encloses(scene.debug.dbg_dock_card().get_global_rect()),
+		str(scene.debug.dbg_dock_card().get_global_rect()))
+	var dock_dragged: Vector2 = scene.debug.dbg_dock_card().position
+	scene.debug.dbg_place_case_dock()
+	check("U7 案件卡片重排不被吸回", scene.debug.dbg_dock_card().position == dock_dragged,
+		str(scene.debug.dbg_dock_card().position) + " / " + str(dock_dragged))
+	var dock_click: Vector2 = scene.debug.dbg_dock_card().get_global_rect().get_center()
 	var dock_cdown := InputEventMouseButton.new()
 	dock_cdown.button_index = MOUSE_BUTTON_LEFT
 	dock_cdown.pressed = true
 	dock_cdown.position = dock_click
 	dock_cdown.global_position = dock_click
-	scene._dock_card.gui_input.emit(dock_cdown)
+	scene.debug.dbg_dock_card().gui_input.emit(dock_cdown)
 	var dock_cup := InputEventMouseButton.new()
 	dock_cup.button_index = MOUSE_BUTTON_LEFT
 	dock_cup.pressed = false
 	dock_cup.position = dock_click
 	dock_cup.global_position = dock_click
-	scene._dock_card.gui_input.emit(dock_cup)
+	scene.debug.dbg_dock_card().gui_input.emit(dock_cup)
 	info = scene.debug.dbg_case_info()
 	check("点 dock 重新展开", bool(info["open"]) and not bool(info["dock_visible"]))
 
@@ -229,7 +229,7 @@ func _test_desktop() -> void:
 	scene.debug.dbg_ending_finish()
 
 	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
-	scene.session._sync_case_progress_from_graph()
+	scene.debug.dbg_sync_case_progress()
 	info = scene.debug.dbg_case_info()
 	check("旧存档补记完成", (info["completed"] as Array).has("A001"), str(info["completed"]))
 	check("旧存档补解锁 A002", (info["unlocked"] as Array).has("A002"), str(info["unlocked"]))

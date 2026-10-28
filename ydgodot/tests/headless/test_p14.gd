@@ -190,8 +190,8 @@ func _test_desktop_flow() -> void:
 		String(scene.graph.garden.get("narr", "")) == GardenSystem.true_ending_message(c),
 		String(scene.graph.garden.get("narr", "")))
 	check("S5 快照里已带种子（遮罩期退出不丢）",
-		bool((scene._save.snapshot()["garden"] as Dictionary).get("seed", false)),
-		str(scene._save.snapshot()["garden"]))
+		bool((scene.debug.dbg_save_system().snapshot()["garden"] as Dictionary).get("seed", false)),
+		str(scene.debug.dbg_save_system().snapshot()["garden"]))
 
 	var ending: EndingOverlay = scene.debug.dbg_ending()
 	check("结局分幕共 4 幕", ending.total_lines() == 4, str(ending.total_lines()))

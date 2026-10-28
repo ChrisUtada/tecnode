@@ -148,8 +148,8 @@ func _test_desktop(c: CaseLoader) -> void:
 	await process_frame
 	await process_frame
 	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
-	scene._save.path = TEMP_SAVE
-	scene._save_enabled = false
+	scene.debug.dbg_save_system().path = TEMP_SAVE
+	scene.debug.dbg_set_save_enabled(false)
 	check("对话系统就绪", scene.debug.dbg_dialogues() != null)
 	check("初始无对话窗", scene.debug.dbg_chat() == null)
 
@@ -339,7 +339,7 @@ func _test_desktop(c: CaseLoader) -> void:
 		check("非人物不能加入", not scene.debug.dbg_chat_drop("item", "ITEM_shoudiantong"))
 		check("非人物提示", scene.debug.dbg_chat_hint() == "只有人物能加入这段对话", scene.debug.dbg_chat_hint())
 		var key := "char:CHARS_JS"
-		scene.drag._on_card_drag_released(key, scene.debug.dbg_chat_rect().get_center())
+		scene.debug.dbg_card_drag_released(key, scene.debug.dbg_chat_rect().get_center())
 		await process_frame
 		state = scene.debug.dbg_chat_state()
 		check("拖对人加入", (state["joined"] as Array).has("CHARS_JS"), str(state["joined"]))

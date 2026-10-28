@@ -153,8 +153,8 @@ func _test_desktop(c: CaseLoader) -> void:
 	await process_frame
 	await process_frame
 	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
-	scene._save.path = TEMP_SAVE
-	scene._save_enabled = false
+	scene.debug.dbg_save_system().path = TEMP_SAVE
+	scene.debug.dbg_set_save_enabled(false)
 
 	check("音乐图标初始隐藏", not scene.debug.dbg_music_icon_visible())
 	check("花园图标初始隐藏", not scene.debug.dbg_garden_icon_visible())
@@ -265,8 +265,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	scene.debug.dbg_close_music()
 	st = scene.debug.dbg_music_state()
 	check("× 关闭后音频继续", not bool(st["win_visible"]) and bool(st["playing"]), str(st))
-	scene._icon_last_app = ""
-	scene._icon_last_ms = -100000
+	scene.debug.dbg_set_icon_last("", -100000)
 	scene.debug.dbg_click_music_icon()
 	st = scene.debug.dbg_music_state()
 	check("K9 单击音乐图标不直接开窗", not bool(st["win_visible"]), str(st))
@@ -314,7 +313,7 @@ func _test_desktop(c: CaseLoader) -> void:
 		await process_frame
 		check("U7 音乐坞可拖动", dock.position != dock_home, str(dock.position) + " / " + str(dock_home))
 		check("U7 音乐坞拖动后仍在桌面内",
-			scene._desk.get_global_rect().encloses(dock.get_global_rect()), str(dock.get_global_rect()))
+			scene.debug.dbg_desk().get_global_rect().encloses(dock.get_global_rect()), str(dock.get_global_rect()))
 		var dock_dragged: Vector2 = dock.position
 		scene.debug.dbg_layout_music_windows()
 		check("U7 音乐坞 resize 不被吸回", dock.position == dock_dragged,
@@ -368,7 +367,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("撤销装针后播放器按锁定态释放", scene.debug.dbg_music_win() == null)
 
 	check("真名结局可播", scene.debug.dbg_ending() != null)
-	scene._hide_toast()
+	scene.debug.dbg_hide_toast()
 	scene.debug.dbg_play_true_ending()
 	check("结局遮罩已开", scene.debug.dbg_ending().visible)
 	scene.debug.dbg_confirm_ending()
@@ -396,7 +395,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("G3 桌布与花园并排、不互相遮挡",
 		not matrix.get_global_rect().intersects(garden.get_global_rect()),
 		"%s / %s" % [matrix.get_global_rect(), garden.get_global_rect()])
-	var view_rect := Rect2(Vector2.ZERO, Vector2(scene._vw(), scene._vh()))
+	var view_rect := Rect2(Vector2.ZERO, Vector2(scene.debug.dbg_vw(), scene.debug.dbg_vh()))
 	check("G3 桌布与花园都在视口内",
 		view_rect.encloses(matrix.get_global_rect()) and view_rect.encloses(garden.get_global_rect()),
 		"%s / %s" % [matrix.get_global_rect(), garden.get_global_rect()])
@@ -425,7 +424,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	var now := GardenSystem.now_ms_now()
 	check("回拨生长时间", scene.debug.dbg_touch_garden_plot(0, now - 181000))
 	# P2 Toast 改为同屏一条、后来者排队：先清掉上一条，下面才能立即断言开花提示。
-	scene._hide_toast()
+	scene.debug.dbg_hide_toast()
 	garden._process(1.1)
 	await process_frame
 	gs = garden.dbg_state()
@@ -492,8 +491,8 @@ func _test_desktop(c: CaseLoader) -> void:
 	for i in 30:
 		await process_frame
 	var probe: NodeCard = null
-	for key in scene._cards.keys():
-		var c2 := scene._cards[key] as NodeCard
+	for key in scene.debug.dbg_cards().keys():
+		var c2 := scene.debug.dbg_cards()[key] as NodeCard
 		if c2 == null or not c2.visible or c2.modulate.a < 0.99:
 			continue
 		if probe == null:
@@ -505,21 +504,21 @@ func _test_desktop(c: CaseLoader) -> void:
 		var saved_global := probe.global_position
 		var probe_has_edges: bool = not scene.graph.neighbors(probe.card_key).is_empty()
 		if not probe_has_edges:
-			for key in scene._cards.keys():
-				var other := scene._cards[key] as NodeCard
+			for key in scene.debug.dbg_cards().keys():
+				var other := scene.debug.dbg_cards()[key] as NodeCard
 				if other != null and other.visible and other.card_key != probe.card_key:
 					scene.graph.link(probe.card_key, other.card_key, "entity")
 					probe_has_edges = true
 					break
-		scene.canvas._repaint_edges()
-		var segs_before: int = scene._edge_layer.segment_count()
+		scene.debug.dbg_repaint_edges()
+		var segs_before: int = scene.debug.dbg_edge_layer().segment_count()
 		probe.global_position = matrix.global_position + Vector2(20, 20)
 		scene.debug.dbg_matrix_sync_occlusion()
-		scene.canvas._repaint_edges()
+		scene.debug.dbg_repaint_edges()
 		if probe_has_edges and segs_before > 0:
 			check("A7 淡出卡不再画连线",
-				scene._edge_layer.segment_count() < segs_before,
-				str(segs_before) + " -> " + str(scene._edge_layer.segment_count()))
+				scene.debug.dbg_edge_layer().segment_count() < segs_before,
+				str(segs_before) + " -> " + str(scene.debug.dbg_edge_layer().segment_count()))
 		check("A7 矩阵覆盖的卡淡出", probe.modulate.a == 0.0, str(probe.modulate.a))
 		matrix._on_close_pressed()
 		await process_frame

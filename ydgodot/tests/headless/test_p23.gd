@@ -412,7 +412,7 @@ func _test_ui() -> void:
 		play2.line_name_at(1) if play2 != null else "null")
 
 	# P2 Toast 排队：上一条「想起了一段回忆」还在屏上，先清掉再断言错误提示。
-	scene._hide_toast()
+	scene.debug.dbg_hide_toast()
 	scene.debug.dbg_combo_ui("NPC_FB", "SCENES_fkjl")
 	await process_frame
 	check("时刻里没有这对组合时给提示", scene.debug.dbg_toast_text().contains("没有")

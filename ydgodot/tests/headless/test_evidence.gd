@@ -189,8 +189,8 @@ func _test_ui() -> void:
 	await process_frame
 	await process_frame
 	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
-	scene._save.path = TEMP_SAVE
-	scene._save_enabled = false
+	scene.debug.dbg_save_system().path = TEMP_SAVE
+	scene.debug.dbg_set_save_enabled(false)
 
 	await _test_word_drops()
 	await _test_glyph()
@@ -203,7 +203,7 @@ func _test_ui() -> void:
 
 
 func _cards() -> Dictionary:
-	return scene._cards
+	return scene.debug.dbg_cards()
 
 
 func _last_log() -> String:
@@ -271,7 +271,7 @@ func _test_word_drops() -> void:
 
 	# 回忆：同口径。
 	var mem := c.memory_for("SCENES_0602", "CHARS_luhengs", "SCENES_garden")
-	scene.narrative._open_memory_play(mem, scene.graph.scene_key("SCENES_garden"))
+	scene.debug.dbg_open_memory_play(mem, scene.graph.scene_key("SCENES_garden"))
 	await process_frame
 	var mem_card: MemCard = scene.debug.dbg_mem_card()
 	check("回忆小剧场打开", mem_card != null)
@@ -314,8 +314,8 @@ func _test_glyph() -> void:
 			"%.0f" % wcard._glyph.size.x)
 		wcard.set_lod(1.0)
 	scene.debug.dbg_select(item)
-	scene.card_ui._refresh_detail(true)
-	var detail: DetailWin = scene._detail_win
+	scene.debug.dbg_refresh_detail(true)
+	var detail: DetailWin = scene.debug.dbg_detail_win()
 	check("物品详情标出可用作证据原料", detail != null and not detail._status_text(
 		scene.graph.node(item), "item").is_empty()
 			and detail._status_text(scene.graph.node(item), "item").contains("可用作证据原料"),
@@ -367,41 +367,41 @@ func _test_tec_hidden_evidence() -> void:
 func _test_drop_rules() -> void:
 	var zheng: String = scene.debug.dbg_ensure("evidence", "EVID_Z_zs_knife")
 	await process_frame
-	scene.drag._apply_drop("bag-dock", zheng)
+	scene.debug.dbg_apply_drop("bag-dock", zheng)
 	check("物品拒证", String(scene.graph.stored.get(zheng, "")) != GraphState.BAG,
 		String(scene.graph.stored.get(zheng, "")))
 	check("物品拒证话术", _last_log().contains("「物品」收物与词"), _last_log())
-	scene.drag._apply_drop("clue-icon", zheng)
+	scene.debug.dbg_apply_drop("clue-icon", zheng)
 	check("证据收证", String(scene.graph.stored.get(zheng, "")) == GraphState.LEDGER,
 		String(scene.graph.stored.get(zheng, "")))
 	scene.graph.take_back(zheng)
-	scene.drag._apply_drop("infer-icon", zheng)
+	scene.debug.dbg_apply_drop("infer-icon", zheng)
 	check("推演桌布收证", scene.graph.matrix_has("EVID_Z_zs_knife"))
-	scene.drag._apply_drop("tec-dock", zheng)
-	check("TEC 拒收证", not scene._tec.is_analyzing())
+	scene.debug.dbg_apply_drop("tec-dock", zheng)
+	check("TEC 拒收证", not scene.debug.dbg_tec_win().is_analyzing())
 	check("TEC 拒收证话术", _last_log().contains("已经是结论"), _last_log())
 
 	var word: String = scene.debug.dbg_ensure("evidence", "EVID_CI_lhs_word")
 	await process_frame
-	scene.drag._apply_drop("clue-icon", word)
+	scene.debug.dbg_apply_drop("clue-icon", word)
 	check("证据拒词", String(scene.graph.stored.get(word, "")) != GraphState.LEDGER)
 	check("证据拒词话术", _last_log().contains("「证据」只收证"), _last_log())
-	scene.drag._apply_drop("infer-icon", word)
+	scene.debug.dbg_apply_drop("infer-icon", word)
 	check("推演桌布拒词", not scene.graph.matrix_has("EVID_CI_lhs_word"))
 	check("推演桌布拒词话术", _last_log().contains("带五感的「证」"), _last_log())
-	scene.drag._apply_drop("bag-dock", word)
+	scene.debug.dbg_apply_drop("bag-dock", word)
 	check("物品收词", String(scene.graph.stored.get(word, "")) == GraphState.BAG,
 		String(scene.graph.stored.get(word, "")))
 	scene.graph.take_back(word)
-	scene.drag._apply_drop("tec-dock", word)
+	scene.debug.dbg_apply_drop("tec-dock", word)
 	check("TEC 拒收词", _last_log().contains("词是证言"), _last_log())
 
 	var item: String = scene.debug.dbg_ensure("item", "ITEMS_a4paper")
 	await process_frame
-	scene.drag._apply_drop("clue-icon", item)
+	scene.debug.dbg_apply_drop("clue-icon", item)
 	check("证据拒物", String(scene.graph.stored.get(item, "")) != GraphState.LEDGER)
 	check("证据拒物话术", _last_log().contains("物是原料"), _last_log())
-	scene.drag._apply_drop("bag-dock", item)
+	scene.debug.dbg_apply_drop("bag-dock", item)
 	check("物品收物", String(scene.graph.stored.get(item, "")) == GraphState.BAG,
 		String(scene.graph.stored.get(item, "")))
 	scene.graph.take_back(item)

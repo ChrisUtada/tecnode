@@ -16,10 +16,10 @@ func _initialize() -> void:
 	await process_frame
 
 	# 相机钉在 1x 原生格：后面所有点击都按「世界 → 屏幕」1:1 换算。
-	scene._view_k = 1.0
-	scene._view_pos = Vector2.ZERO
-	scene._view_user = true
-	scene.canvas._apply_view()
+	scene.debug.dbg_set_view_k(1.0)
+	scene.debug.dbg_set_view_pos(Vector2.ZERO)
+	scene.debug.dbg_set_view_user(true)
+	scene.debug.dbg_apply_view()
 
 	scene.debug.dbg_expand("SCENES_garden")
 	await process_frame
@@ -142,7 +142,7 @@ func _initialize() -> void:
 	check("前提：fkjl 还没探索",
 		not (scene.debug.dbg_state()["explored"] as Array).has("SCENES_fkjl"),
 		str(scene.debug.dbg_state()["explored"]))
-	scene.card_ui._on_card_combo(k0602, kfkjl)
+	scene.debug.dbg_card_combo(k0602, kfkjl)
 	await process_frame
 	await process_frame
 	check("C4 分派：目标场景被展开",
@@ -153,7 +153,7 @@ func _initialize() -> void:
 	# 无通路走界面：只留案卷、不弹条
 	var tried_before2: int = (scene.graph.tried as Dictionary).size()
 	var toast_before: bool = toast != null and toast.visible
-	scene.card_ui._on_card_combo(k0602, kbody)
+	scene.debug.dbg_card_combo(k0602, kbody)
 	await process_frame
 	check("C4 分派：无通路写进案卷", _log_has("没有直接通路"))
 	check("C4 分派：无通路不弹提示条", toast != null and toast.visible == toast_before)

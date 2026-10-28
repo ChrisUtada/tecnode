@@ -170,26 +170,26 @@ func _test_desktop() -> void:
 	scene.debug.dbg_open_cert()
 	await process_frame
 	check("可回看调查员证", scene.debug.dbg_cert_open())
-	scene._view_user = true
-	scene._view_k = 1.8
-	scene._view_pos = Vector2(-4000.0, -4000.0)
-	scene.canvas._apply_view()
+	scene.debug.dbg_set_view_user(true)
+	scene.debug.dbg_set_view_k(1.8)
+	scene.debug.dbg_set_view_pos(Vector2(-4000.0, -4000.0))
+	scene.debug.dbg_apply_view()
 	scene.debug.dbg_reset_case()
 	await process_frame
-	check("重置先弹确认", scene._confirm_win != null and scene._confirm_win.visible)
-	if scene._confirm_win != null:
-		scene._confirm_win.dbg_cancel()
+	check("重置先弹确认", scene.debug.dbg_confirm_win() != null and scene.debug.dbg_confirm_win().visible)
+	if scene.debug.dbg_confirm_win() != null:
+		scene.debug.dbg_confirm_win().dbg_cancel()
 	await process_frame
-	check("取消后确认窗关闭", scene._confirm_win == null)
+	check("取消后确认窗关闭", scene.debug.dbg_confirm_win() == null)
 	scene.debug.dbg_reset_case(true)
 	await process_frame
 	await process_frame
-	check("S1 重置后镜头回到自动档", not scene._view_user)
+	check("S1 重置后镜头回到自动档", not scene.debug.dbg_view_user())
 	var start_slice_key := "loc:SCENES_garden"
 	check("S1 重置后起始节点在可视区",
-		scene._cards.has(start_slice_key)
-			and scene._stage.get_global_rect().intersects(
-				(scene._cards[start_slice_key] as NodeCard).get_global_rect()))
+		scene.debug.dbg_cards().has(start_slice_key)
+			and scene.debug.dbg_stage().get_global_rect().intersects(
+				(scene.debug.dbg_cards()[start_slice_key] as NodeCard).get_global_rect()))
 	check("重来不清调查员", String(scene.debug.dbg_investigator().get("name", "")) == "执行者")
 	scene.debug.dbg_clear_investigator()
 	check("清证后内存为空", scene.debug.dbg_investigator().is_empty())

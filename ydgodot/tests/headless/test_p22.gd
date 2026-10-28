@@ -45,8 +45,8 @@ func _test_desktop() -> void:
 	await process_frame
 	await process_frame
 	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
-	scene._save.path = TEMP_SAVE
-	scene._save_enabled = false
+	scene.debug.dbg_save_system().path = TEMP_SAVE
+	scene.debug.dbg_set_save_enabled(false)
 
 	var chip: TecChip = scene.debug.dbg_tec_chip()
 	var info: Dictionary = scene.debug.dbg_tec_info()
@@ -141,13 +141,13 @@ func _test_desktop() -> void:
 	await process_frame
 	check("U7 TEC 胶囊可拖动", chip.position != chip_home, str(chip.position) + " / " + str(chip_home))
 	check("U7 TEC 胶囊拖动后仍在桌面内",
-		scene._desk.get_global_rect().encloses(chip.get_global_rect()), str(chip.get_global_rect()))
+		scene.debug.dbg_desk().get_global_rect().encloses(chip.get_global_rect()), str(chip.get_global_rect()))
 	var chip_dragged_pos: Vector2 = chip.position
-	scene.windows._place_floating_windows()
+	scene.debug.dbg_place_floating_windows()
 	check("U7 TEC 胶囊 resize 不被吸回", chip.position == chip_dragged_pos,
 		str(chip.position) + " / " + str(chip_dragged_pos))
 	chip.reset_place()
-	scene.windows._place_floating_windows()
+	scene.debug.dbg_place_floating_windows()
 	var chip_click: Vector2 = chip.get_global_rect().get_center()
 	var chip_cdown := InputEventMouseButton.new()
 	chip_cdown.button_index = MOUSE_BUTTON_LEFT
@@ -313,7 +313,7 @@ func _test_desktop() -> void:
 	# K7：最小化 = 后台继续；关闭 = 取消并明确告知。
 	scene.debug.dbg_tec_drop("loc:SCENES_garden", chip.get_global_rect().get_center())
 	check("K7 卡片上可再次开始分析", bool(scene.debug.dbg_tec_info()["win"]["analyzing"]))
-	scene._hide_toast()
+	scene.debug.dbg_hide_toast()
 	scene.debug.dbg_tec_close()
 	info = scene.debug.dbg_tec_info()
 	check("K7 关闭 TEC 会取消分析", not bool(info["win"]["analyzing"]))
@@ -352,9 +352,9 @@ func _test_desktop() -> void:
 	root.push_input(av_up, true)
 	scene.debug.dbg_tec_win().finish_typing()
 
-	var tec_home: Vector2 = scene._tec.position
+	var tec_home: Vector2 = scene.debug.dbg_tec_win().position
 	var w1_talk_before: int = scene.debug.dbg_tec_win().line_count()
-	var bar := scene._tec.get_node("bar") as Control
+	var bar := scene.debug.dbg_tec_win().get_node("bar") as Control
 	var bar_at: Vector2 = bar.get_global_rect().position + Vector2(28.0, bar.size.y * 0.5)
 	var bar_down := InputEventMouseButton.new()
 	bar_down.button_index = MOUSE_BUTTON_LEFT
@@ -376,9 +376,9 @@ func _test_desktop() -> void:
 	await process_frame
 	check("W1 拖 TEC 标题栏不再白聊", scene.debug.dbg_tec_win().line_count() == w1_talk_before,
 		"%d -> %d" % [w1_talk_before, scene.debug.dbg_tec_win().line_count()])
-	check("W1 标题栏拖动仍生效", scene._tec.position != tec_home,
-		str(scene._tec.position) + " / " + str(tec_home))
-	scene._tec.position = tec_home
+	check("W1 标题栏拖动仍生效", scene.debug.dbg_tec_win().position != tec_home,
+		str(scene.debug.dbg_tec_win().position) + " / " + str(tec_home))
+	scene.debug.dbg_tec_win().position = tec_home
 
 	scene.debug.dbg_ensure("loc", "SCENES_0704")
 	scene.debug.dbg_tec_analyze_key("loc:SCENES_0704")
@@ -393,7 +393,7 @@ func _test_desktop() -> void:
 
 	# G7：双击场景（`_toggle_container`）这条首次展开路径也要有 TEC 引导。
 	var lines_before_expand: int = scene.debug.dbg_tec_win().line_count()
-	scene.card_ui._toggle_container("loc", "SCENES_garden")
+	scene.debug.dbg_toggle_container("loc", "SCENES_garden")
 	check("G7 首次展开场景时 TEC 主动提示",
 		scene.debug.dbg_tec_win().line_count() == lines_before_expand + 1,
 		str(scene.debug.dbg_tec_win().line_count() - lines_before_expand))
@@ -401,26 +401,26 @@ func _test_desktop() -> void:
 		String(scene.debug.dbg_tec_win().dbg_lines()[-1]).contains("档案"),
 		String(scene.debug.dbg_tec_win().dbg_lines()[-1]))
 	var lines_after_first: int = scene.debug.dbg_tec_win().line_count()
-	scene.card_ui._toggle_container("loc", "SCENES_garden")   # 收起
-	scene.card_ui._toggle_container("loc", "SCENES_garden")   # 再展开
+	scene.debug.dbg_toggle_container("loc", "SCENES_garden")   # 收起
+	scene.debug.dbg_toggle_container("loc", "SCENES_garden")   # 再展开
 	check("G7 再次展开/收起不重复提示",
 		scene.debug.dbg_tec_win().line_count() == lines_after_first,
 		str(scene.debug.dbg_tec_win().line_count() - lines_after_first))
 
 	# 回归：花园与书桌都展开后先后折叠，不能把所有卡片（包括花园场景卡）藏光。
-	scene.card_ui._toggle_container("item", "ITEM_shuzhuo")   # 展开书桌
-	scene.card_ui._toggle_container("loc", "SCENES_garden")   # 折叠花园
-	scene.card_ui._toggle_container("item", "ITEM_shuzhuo")   # 折叠书桌
-	var reg_garden: NodeCard = scene._cards.get("loc:SCENES_garden", null)
+	scene.debug.dbg_toggle_container("item", "ITEM_shuzhuo")   # 展开书桌
+	scene.debug.dbg_toggle_container("loc", "SCENES_garden")   # 折叠花园
+	scene.debug.dbg_toggle_container("item", "ITEM_shuzhuo")   # 折叠书桌
+	var reg_garden: NodeCard = scene.debug.dbg_cards().get("loc:SCENES_garden", null)
 	check("连续折叠花园/书桌：花园场景卡仍在",
 		reg_garden != null and reg_garden.visible,
 		"null" if reg_garden == null else str(reg_garden.visible))
 	var reg_visible := 0
-	for raw_key in scene._cards.keys():
-		if (scene._cards[raw_key] as NodeCard).visible:
+	for raw_key in scene.debug.dbg_cards().keys():
+		if (scene.debug.dbg_cards()[raw_key] as NodeCard).visible:
 			reg_visible += 1
 	check("连续折叠花园/书桌：画布没有清空", reg_visible > 0, str(reg_visible))
-	scene.card_ui._toggle_container("loc", "SCENES_garden")   # 恢复展开，后续 TEC 用例继续
+	scene.debug.dbg_toggle_container("loc", "SCENES_garden")   # 恢复展开，后续 TEC 用例继续
 
 	# W26：同文本提示不重复追加。
 	scene.debug.dbg_tec_win().finish_typing()
