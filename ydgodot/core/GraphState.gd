@@ -54,14 +54,14 @@ var confirmed_fields: Dictionary = {}
 const ROSTER_PINNED := ["CHARS_TEC", "CHARS_EXEC"]
 ## 调查员（玩家自己）不是 CharDef，名册与档案卡共用这个 id 作 notes key。
 const INVESTIGATOR_ID := "INVESTIGATOR"
-const ROSTER_PINNED_TAG := {"CHARS_TEC": "助手窗", "CHARS_EXEC": "推演器"}
+const ROSTER_PINNED_TAG := {"CHARS_TEC": "助手窗", "CHARS_EXEC": "推演"}
 const ROSTER_PINNED_NAME := {"CHARS_EXEC": "执行者"}
 const ROSTER_PINNED_DESC := {"CHARS_EXEC": "推演桌布中央的执行者，长按 2.5 秒执行推演。"}
 
 ## 三个收纳落点（与 Web 版 06-storage.js / 12-panels.js / 13-matrix.js 同名）
-const BAG := "BAG"                # 证物袋：什么都收
-const LEDGER := "LEDGER"          # 线索册：只有线索能进
-const MATRIX := "MATRIX"          # 推演桌布：归位的线索
+const BAG := "BAG"                # 物品：收物与词
+const LEDGER := "LEDGER"          # 证据：只收证
+const MATRIX := "MATRIX"          # 推演桌布：归位的证
 
 ## 五感顺序与显示名（Web 版 SENSES 的键序 —— 排序、遍历都按它来）
 const SENSES := ["vision", "hearing", "touch", "smell", "taste"]
@@ -661,7 +661,7 @@ func is_container_node(key: String) -> bool:
 	return is_container(String(n["kind"]), String(n["id"]))
 
 
-## 证物袋准入：物品必须显式允许（ItemDef.baggable）。
+## 物品窗准入：物品必须显式允许（ItemDef.baggable）。
 ## 容器是否可收也走同一属性，不再靠「有没有子节点」隐式决定。
 func can_bag(key: String) -> bool:
 	var n := node(key)
@@ -669,7 +669,7 @@ func can_bag(key: String) -> bool:
 		return false
 	var kind := String(n.get("kind", ""))
 	if kind == "evidence":
-		## 袋 = 物与言；证是知识，进证据册，不进证物袋。
+		## 「物品」收物与词；证是知识，进「证据」，不进「物品」。
 		return String(n.get("tier", "")) == "ci"
 	if kind != "item":
 		return false
@@ -677,7 +677,7 @@ func can_bag(key: String) -> bool:
 	return it != null and it.baggable
 
 
-## 收进证物袋：记下来源，供袋清单标注「来自 ×××」。
+## 收进物品：记下来源，供物品清单标注「来自 ×××」。
 func bag_store(key: String) -> bool:
 	if not can_bag(key):
 		return false
@@ -689,7 +689,7 @@ func bag_store(key: String) -> bool:
 	return true
 
 
-## 收进证据册：只有「证」能进（词进证物袋，物不进册）。
+## 收进证据：只有「证」能进（词进物品，物不进证据）。
 func ledger_store(key: String) -> bool:
 	var n := node(key)
 	if n.is_empty() or stored.has(key):
@@ -719,7 +719,7 @@ func take_back(key: String, x: float = -1.0, y: float = -1.0) -> bool:
 	return true
 
 
-## 两扇收纳窗之间搬运（证物袋 ↔ 线索册）：只改去向，不重排
+## 两扇收纳窗之间搬运（物品 ↔ 证据）：只改去向，不重排
 func restash(key: String, from: String, to: String) -> bool:
 	if not stored.has(key) or String(stored[key]) != from or from == to:
 		return false
@@ -772,7 +772,7 @@ func matrix_assign(key: String, sense: String = "") -> bool:
 	return true
 
 
-## 从推演桌布取回画布（桌布 → 线索册是 restash，那条走上面）
+## 从推演桌布取回画布（桌布 → 证据是 restash，那条走上面）
 func matrix_take(key: String, x: float = -1.0, y: float = -1.0) -> bool:
 	if String(stored.get(key, "")) != MATRIX:
 		return false

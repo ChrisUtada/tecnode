@@ -17,7 +17,7 @@ func setup_map(p_catalog: CaseCatalog, p_current: String, p_open: bool, p_only_i
 	current_id = p_current
 	case_open = p_open
 	only_id = p_only_id
-	setup("案件地图", 430, 260)
+	setup("案件", 430, 260)
 	_build_map()
 
 
@@ -59,7 +59,7 @@ func _make_row(c: Dictionary, last: bool = false) -> Control:
 	var current := id == current_id
 	var clickable := known and not (current and case_open)
 
-	## D2：与档案 / 名册 / 证物袋同一套列表语法 —— 不再给每行套一个圆角盒子。
+	## D2：与档案 / 名册 / 物品同一套列表语法 —— 不再给每行套一个圆角盒子。
 	## 行间只留 1px 发丝线（左右缩进 8px），行高 56 给「编号 + 标题 + 说明」两行用。
 	var row := PanelContainer.new()
 	row.name = "row_" + id

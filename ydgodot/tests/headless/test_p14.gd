@@ -2,7 +2,7 @@ extends SceneTree
 ## P1.4 回归：五感槽位 / 推演桌布 / 结局判定与真名遮罩
 ##
 ## 覆盖：
-##   1) 五感槽位初始为空，归位 / 取回 / 跨窗搬运（袋 / 册 → 桌布、桌布 → 册）
+##   1) 五感槽位初始为空，归位 / 取回 / 跨窗搬运（物品 / 证据 → 桌布、桌布 → 证据）
 ##   2) 推演判定：配方必须**恰好**相等（多一条、少一条都不算）
 ##   3) TEC 解读捕获 hiddenClue（尸体场景 → 植物学家陆珩松）
 ##   4) 桌布窗口：归位后芯片出现、画布上的节点收起、取回后回到画布
@@ -70,19 +70,19 @@ func _test_assign_take() -> void:
 	check("取回：画布上重新可见", g.is_visible(nm))
 
 
-# ── 3. 跨窗搬运（证据册 ↔ 桌布）────────────────────────────────────────
+# ── 3. 跨窗搬运（证据 ↔ 桌布）────────────────────────────────────────
 func _test_cross_window() -> void:
 	var g := GraphState.new(c)
 	var mc := String(g.add_node("evidence", "CLUES_mc")["key"])
-	check("证不进证物袋", not g.bag_store(mc))
-	check("证进证据册", g.ledger_store(mc))
-	check("册 → 桌布：直接归位", g.matrix_assign(mc))
-	check("册 → 桌布：去向改成 MATRIX", String(g.stored.get(mc, "")) == GraphState.MATRIX)
-	check("册 → 桌布：落进触觉槽", g.matrix_slot_of("CLUES_mc") == "touch")
-	check("桌布 → 册：restash 成功", g.restash(mc, GraphState.MATRIX, GraphState.LEDGER))
-	check("桌布 → 册：槽位已摘掉", g.matrix_slot_of("CLUES_mc") == "")
-	check("桌布 → 册：去向改成 LEDGER", String(g.stored.get(mc, "")) == GraphState.LEDGER)
-	check("证不能再搬回证物袋", not g.restash(mc, GraphState.LEDGER, GraphState.BAG))
+	check("证不进物品", not g.bag_store(mc))
+	check("证卡进证据", g.ledger_store(mc))
+	check("证据 → 桌布：直接归位", g.matrix_assign(mc))
+	check("证据 → 桌布：去向改成 MATRIX", String(g.stored.get(mc, "")) == GraphState.MATRIX)
+	check("证据 → 桌布：落进触觉槽", g.matrix_slot_of("CLUES_mc") == "touch")
+	check("桌布 → 证据：restash 成功", g.restash(mc, GraphState.MATRIX, GraphState.LEDGER))
+	check("桌布 → 证据：槽位已摘掉", g.matrix_slot_of("CLUES_mc") == "")
+	check("桌布 → 证据：去向改成 LEDGER", String(g.stored.get(mc, "")) == GraphState.LEDGER)
+	check("证不能再搬回物品", not g.restash(mc, GraphState.LEDGER, GraphState.BAG))
 
 
 # ── 4. 捕获线索 ────────────────────────────────────────────────────────
@@ -150,7 +150,7 @@ func _test_desktop_flow() -> void:
 	var mw: MatrixWin = scene.dbg_open_matrix()
 	await process_frame
 	check("桌布窗口能打开", mw != null)
-	check("K10 推演器窗标题统一", mw != null and mw.title == "推演器", mw.title if mw != null else "null")
+	check("K10 推演窗标题统一", mw != null and mw.title == "推演", mw.title if mw != null else "null")
 	check("桌布五感芯片初始为空", mw != null and mw.chip_count() == 0)
 	check("普通物品不能归位", not scene.dbg_matrix_assign("item:ITEMS_bd"))
 	_drag_card_to(_cards(scene)["evidence:CLUES_nm"], mw.board_global_rect().get_center())

@@ -1,10 +1,10 @@
 class_name StorageWin
 extends SysWindow
-## 收纳窗（证物袋 / 线索册共用一个类，只差标题与收录规则）
+## 收纳窗（物品 / 证据共用一个类，只差标题与收录规则）
 ##
 ## 对齐 Web 版的 bag-win / clue-win：窗里是一份清单，每行一条；
 ## 单击一行 = 取回画布（回到窗旁边的位置）。
-## 证物袋什么都收；线索册只有线索能进（规则在 GraphState.ledger_store 里）。
+## 物品收物与词；证据只收证（规则在 GraphState.ledger_store 里）。
 
 signal will_take(key: String)
 signal took(key: String)
@@ -73,9 +73,9 @@ func refresh_store() -> void:
 		_rows.remove_child(c)
 		c.queue_free()
 	if list.is_empty():
-		var hint := "证物袋是空的。把物品或词拖到左侧「证物袋」图标或窗口上收纳；点一行可取回。"
+		var hint := "「物品」还是空的。把物与词拖到左侧「物品」图标或窗口上收纳；点一行可取回。"
 		if store_kind == GraphState.LEDGER:
-			hint = "证据册是空的。把证拖到左侧「证据册」图标或窗口上收纳；点一行可取回。"
+			hint = "「证据」还是空的。把证拖到左侧「证据」图标或窗口上收纳；点一行可取回。"
 		var empty := TecTheme.label(hint, TecTheme.FS_BODY, TecTheme.MUTED)
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empty.custom_minimum_size = Vector2(180.0, 0)

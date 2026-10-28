@@ -301,12 +301,12 @@ func _test_desktop() -> void:
 	scene.dbg_ensure("item", "ITEM_taideng")
 	await process_frame
 	scene.dbg_select("item:ITEM_taideng")
-	check("桌面：收进证物袋", scene.dbg_store("BAG"))
+	check("桌面：收进物品", scene.dbg_store("BAG"))
 	check("桌面：收纳进撤销栈", scene.dbg_history_size() == 1)
 	scene.dbg_open_storage(GraphState.BAG)
 	await process_frame
 	var bag: StorageWin = scene.get_node_or_null("desk/bag_win") as StorageWin
-	check("桌面：袋窗打开", bag != null)
+	check("桌面：物品窗打开", bag != null)
 	bag._take("item:ITEM_taideng")
 	await process_frame
 	check("桌面：取出成功", not (scene.dbg_state()["stored"] as Array).has("item:ITEM_taideng"))
@@ -314,7 +314,7 @@ func _test_desktop() -> void:
 	check("桌面：撤销取回", scene.dbg_undo())
 	await process_frame
 	await process_frame
-	check("桌面：物品回到袋里", (scene.dbg_state()["stored"] as Array).has("item:ITEM_taideng"))
+	check("桌面：物品回到物品窗", (scene.dbg_state()["stored"] as Array).has("item:ITEM_taideng"))
 
 	scene.dbg_use_temp_save(temp)
 	check("桌面：写临时存档", scene.dbg_save())

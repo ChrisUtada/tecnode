@@ -17,7 +17,7 @@ func check(name: String, cond: bool, detail: String = "") -> void:
 
 
 func _initialize() -> void:
-	print("=== P2.1 案件地图 / 停车 / 续档 / 角标 ===")
+	print("=== P2.1 案件 / 停车 / 续档 / 角标 ===")
 	_test_catalog()
 	await _test_desktop()
 	_cleanup()
@@ -105,8 +105,9 @@ func _test_desktop() -> void:
 
 	var map: CaseMapWin = scene.dbg_open_case_map()
 	await process_frame
-	check("案件地图可打开", map != null and map.visible)
-	check("案件地图 2 行", map != null and map.dbg_row_count() == 2, str(map.dbg_row_count() if map != null else -1))
+	check("案件可打开", map != null and map.visible)
+	check("案件窗标题", map != null and map.title == "案件", map.title if map != null else "null")
+	check("案件 2 行", map != null and map.dbg_row_count() == 2, str(map.dbg_row_count() if map != null else -1))
 	check("W28 A001 当前状态", scene.dbg_case_map_state("A001") == "进行中", scene.dbg_case_map_state("A001"))
 	check("A002 锁定状态", scene.dbg_case_map_state("A002") == "锁定", scene.dbg_case_map_state("A002"))
 	check("当前案件不可重复进入", not scene.dbg_case_map_click("A001"))

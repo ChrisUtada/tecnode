@@ -51,7 +51,7 @@ enum TutorialStep {
 	STORE_SUPPLIES,    # ③ 收纳可选提醒
 	INFER,             # ④ 单线索「调查员证」+ 长按执行者
 	CERT_FORM,         # ⑤ 填写调查员证
-	CHOOSE_CASE,       # ⑥ 在案件地图里选 A-001
+	CHOOSE_CASE,       # ⑥ 在案件里选 A-001
 	DONE,
 }
 
@@ -621,7 +621,7 @@ func _drop_sdrag_card_mirror() -> void:
 	pass
 
 
-## 松手结算：另一个收纳窗 → 推演桌布 / 推演器图标 → 画布（落在松手那一点）→ 都不中：回去
+## 松手结算：另一个收纳窗 → 推演桌布 / 推演图标 → 画布（落在松手那一点）→ 都不中：回去
 func _finish_sdrag(at: Vector2) -> void:
 	var key := _sdrag_key
 	var card0 := _cards.get(key, null) as NodeCard
@@ -1131,13 +1131,13 @@ func _goal_text() -> String:
 			TutorialStep.DRAG_CERT:
 				return "当前目标：把调查员证拖给 TEC 核对"
 			TutorialStep.STORE_SUPPLIES:
-				return "当前目标：整理桌面（可选），然后双击推演器"
+				return "当前目标：整理桌面（可选），然后双击「推演」"
 			TutorialStep.INFER:
 				return "当前目标：把调查员证放到推演桌布，长按执行者"
 			TutorialStep.CERT_FORM:
 				return "当前目标：填完调查员证"
 			TutorialStep.CHOOSE_CASE:
-				return "当前目标：在案件地图里选择 A-001"
+				return "当前目标：在「案件」里选择 A-001"
 			_:
 				return "登记完成"
 	var total := case_def.endings.size()
@@ -1274,16 +1274,16 @@ const ICON_TOP := 16.0
 const ICON_PITCH := 76.0
 const ICON_MIN_PITCH := 68.0
 const ICON_COMPACT_PITCH := 64.0
-## 常驻 8 项：顺序固定；证据册在人物之前、日志在 TEC 之后。
+## 常驻 8 项：顺序固定；证据在人物之前、日志在 TEC 之后。
 const ICON_DEFS := [
-	["推演器", "infer", "star"],
+	["推演", "infer", "star"],
 	["档案", "goto", "archive"],
-	["证据册", "clue", "notebook"],
+	["证据", "clue", "notebook"],
 	["人物", "people", "users"],
-	["证物袋", "bag", "briefcase"],
+	["物品", "bag", "briefcase"],
 	["TEC", "tec", "tec"],
 	["日志", "log", "clipboard-list"],
-	["案件地图", "map", "map"],
+	["案件", "map", "map"],
 ]
 
 # ── z 序基准（Web 静态 z-index 表，05-apps.css / 06-shell.css / 03-desktop.css 抄录）──
@@ -1549,7 +1549,7 @@ func _build_icons() -> void:
 
 	_build_map_badge()
 	_build_archive_badge()
-	# 批 1 新增：推演器 / 证物袋 / 线索册的条数角标 + 日志未读角标
+	# 批 1 新增：推演 / 物品 / 证据的条数角标 + 日志未读角标
 	_infer_badge = _make_badge(_infer_btn, "infer_badge")
 	_bag_badge = _make_badge(_bag_btn, "bag_badge")
 	_clue_badge = _make_badge(_clue_btn, "clue_badge")
@@ -1600,8 +1600,8 @@ func _set_badge(badge: PanelContainer, text: String) -> void:
 
 ## 按当前可见图标数重排（Web `resetIconPositions()`）—— 图标增减时才调，
 ## 平时不碰，免得把玩家拖过的位置收走。
-## 教学期图标栏是分阶段解锁的：第 3 幕只出线索册 / 证物袋 / 推演器，
-## 第 6 幕再出案件地图。其余 app 一律不露头，避免玩家提前点进未接好的系统。
+## 教学期图标栏是分阶段解锁的：第 3 幕只出证据 / 物品 / 推演，
+## 第 6 幕再出案件。其余 app 一律不露头，避免玩家提前点进未接好的系统。
 func _refresh_tutorial_icons() -> void:
 	var allowed := {}
 	if _tutorial_apps_unlocked:
@@ -1913,7 +1913,7 @@ func _refresh_app_icons() -> void:
 
 
 ## 计数角标（Web `updateInferBadge` / `updateBagBadge` / `updateLedgerBadge` / `updateLogBadge`）：
-## 推演器 = 桌布上已归位的线索条数、证物袋 = N 件、线索册 = N 条、日志 = 未读条数。
+## 推演 = 桌布上已归位的证条数、物品 = N 件、证据 = N 条、日志 = 未读条数。
 func _refresh_count_badges() -> void:
 	if graph == null:
 		return
@@ -2394,7 +2394,7 @@ func _update_case_chrome() -> void:
 func _require_case() -> bool:
 	if _case_open:
 		return true
-	_show_toast("当前不在案件中，请先展开案件地图图标或右下角案件卡片", true)
+	_show_toast("当前不在案件中，请先展开案件图标或右下角案件卡片", true)
 	return false
 
 
@@ -2924,13 +2924,13 @@ func _tutorial_set_hint() -> void:
 		TutorialStep.DRAG_CERT:
 			_tec.set_guidance("待命 · 等你交证件", "把「调查员证」拖到我身上")
 		TutorialStep.STORE_SUPPLIES:
-			_tec.set_guidance("待命 · 整理可选", "收纳可选 · 双击推演器继续")
+			_tec.set_guidance("待命 · 整理可选", "收纳可选 · 双击「推演」继续")
 		TutorialStep.INFER:
 			_tec.set_guidance("待命 · 等推演", "桌布放入调查员证 · 长按执行者")
 		TutorialStep.CERT_FORM:
 			_tec.set_guidance("待命 · 等你领证", "填写调查员证")
 		TutorialStep.CHOOSE_CASE:
-			_tec.set_guidance("待命 · 等你选案", "在案件地图里选 A-001")
+			_tec.set_guidance("待命 · 等你选案", "在「案件」里选 A-001")
 		_:
 			_tec.set_guidance("待命 · 登记完成", "证件信息已核对")
 
@@ -2943,13 +2943,13 @@ func _tutorial_talk_line() -> String:
 		TutorialStep.DRAG_CERT:
 			return "把「调查员证」拖给我，我核对一下。"
 		TutorialStep.STORE_SUPPLIES:
-			return "桌面可以整理：物与词放证物袋，证放证据册。不想收也行，直接双击推演器。"
+			return "桌面可以整理：物与词放「物品」，证放「证据」。不想收也行，直接双击「推演」。"
 		TutorialStep.INFER:
-			return "双击「推演器」开桌布，把「调查员证」拖上去，再长按执行者。挡住我的话拖开或点「–」收起。"
+			return "双击「推演」开桌布，把「调查员证」拖上去，再长按执行者。挡住我的话拖开或点「–」收起。"
 		TutorialStep.CERT_FORM:
 			return "先把调查员证填完。"
 		TutorialStep.CHOOSE_CASE:
-			return "在案件地图里选 A-001。"
+			return "在「案件」里选 A-001。"
 		_:
 			return "登记已经完成了。证件信息都齐了。"
 
@@ -2965,13 +2965,13 @@ func _tutorial_tec_guard(key: String) -> bool:
 				return true
 			_tutorial_say("把「调查员证」拖给我。")
 		TutorialStep.STORE_SUPPLIES:
-			_tutorial_say("桌面可以整理，但不是必须。收拾好就双击推演器；不想收也可以直接去。")
+			_tutorial_say("桌面可以整理，但不是必须。收拾好就双击「推演」；不想收也可以直接去。")
 		TutorialStep.INFER:
-			_tutorial_say("证不要交给我——双击「推演器」打开桌布，把「调查员证」拖上去。")
+			_tutorial_say("证不要交给我——双击「推演」打开桌布，把「调查员证」拖上去。")
 		TutorialStep.CERT_FORM:
 			_tutorial_say("先把调查员证填完。")
 		TutorialStep.CHOOSE_CASE:
-			_tutorial_say("在案件地图里选 A-001。")
+			_tutorial_say("在「案件」里选 A-001。")
 		_:
 			_tutorial_say("证件已经核对完了。")
 	return false
@@ -3003,7 +3003,7 @@ func _tutorial_on_tec_done(key: String) -> bool:
 		_tutorial_step = TutorialStep.STORE_SUPPLIES
 		_tutorial_unlock_apps()
 		_tutorial_set_hint()
-		_tutorial_say("核对完成。桌面可以整理：物与词放证物袋，证放证据册，但不整理也能继续。")
+		_tutorial_say("核对完成。桌面可以整理：物与词放「物品」，证放「证据」，但不整理也能继续。")
 		return true
 	return false
 
@@ -3011,12 +3011,12 @@ func _tutorial_on_tec_done(key: String) -> bool:
 func _tutorial_begin_infer() -> void:
 	_tutorial_step = TutorialStep.INFER
 	_tutorial_set_hint()
-	## 不替玩家打开任何 app：双击「推演器」图标打开桌布，和正式案件完全同一条路径。
+	## 不替玩家打开任何 app：双击「推演」图标打开桌布，和正式案件完全同一条路径。
 	var opened := _matrix_win != null and is_instance_valid(_matrix_win)
 	if opened:
 		_tutorial_say("桌布已经打开了。把「调查员证」拖上去，长按执行者开始推演。")
 	else:
-		_tutorial_say("双击左边「推演器」打开桌布；如果 TEC 挡住，把我拖开或点「–」收起。"
+		_tutorial_say("双击左边「推演」打开桌布；如果 TEC 挡住，把我拖开或点「–」收起。"
 			+ "把「调查员证」放到推演桌布，长按执行者开始推演。")
 
 
@@ -3034,7 +3034,7 @@ func _tutorial_on_matrix_changed() -> void:
 
 func _tutorial_on_inference_success(hit: EndingDef) -> void:
 	graph.mark_ending(hit.id)
-	## 教学桌布用完即收：清空配方，避免领证/选案期间重开推演器误触正式结局。
+	## 教学桌布用完即收：清空配方，避免领证/选案期间重开推演误触正式结局。
 	graph.clear_matrix()
 	_tutorial_step = TutorialStep.CERT_FORM
 	_tutorial_set_hint()
@@ -4548,29 +4548,29 @@ func _restash_to(key: String, to: String, label: String) -> void:
 	var kind := String(nd.get("kind", ""))
 	var tier := String(nd.get("tier", ""))
 	if to == GraphState.BAG and not (kind == "item" or (kind == "evidence" and tier == "ci")):
-		_reject_drop("证物袋收物与词；证是知识，进证据册。")
+		_reject_drop("「物品」收物与词；证是知识，进「证据」。")
 		return
 	if to == GraphState.LEDGER and not (kind == "evidence" and tier == "zheng"):
-		_reject_drop("证据册只收证；词进证物袋，物是原料。")
+		_reject_drop("「证据」只收证；词进「物品」，物是原料。")
 		return
 	var before := _save.snapshot()
 	if not graph.restash(key, from, to):
 		return
 	_apply_hidden()
 	_refresh_matrix_views()
-	_show_toast("「%s」搬到%s" % [label,
-		"证物袋" if to == GraphState.BAG else "证据册"])
+	_show_toast("「%s」搬到「%s」" % [label,
+		"物品" if to == GraphState.BAG else "证据"])
 	_commit(before)
 
 
-## 收进证物袋 / 线索册（拒收时给一句人话，别让玩家以为是坏了）
+## 收进物品 / 证据（拒收时给一句人话，别让玩家以为是坏了）
 func _store_into(where: String, key: String) -> void:
 	var n := graph.node(key)
 	if n.is_empty():
 		return
-	var target_name := "证物袋" if where == GraphState.BAG else "证据册"
+	var target_name := "物品" if where == GraphState.BAG else "证据"
 	if graph.stored.has(key):
-		var already := "「%s」已经在%s里了。" % [String(n.get("label", key)), target_name]
+		var already := "「%s」已经在「%s」里了。" % [String(n.get("label", key)), target_name]
 		if not _tutorial_correct(already):
 			_reject_drop(already)
 		return
@@ -4578,13 +4578,13 @@ func _store_into(where: String, key: String) -> void:
 	var tier := String(n.get("tier", ""))
 	if where == GraphState.BAG:
 		if kind != "item" and not (kind == "evidence" and tier == "ci"):
-			var bag_msg := "证物袋收物与词；「%s」是证，请进证据册。" % String(n.get("label", key)) \
-				if kind == "evidence" else "证物袋收物与词；「%s」不能放进证物袋。" % String(n.get("label", key))
+			var bag_msg := "「物品」收物与词；「%s」是证，请进「证据」。" % String(n.get("label", key)) \
+				if kind == "evidence" else "「物品」收物与词；「%s」不能放进「物品」。" % String(n.get("label", key))
 			if not _tutorial_correct(bag_msg):
 				_reject_drop(bag_msg)
 			return
 		if not graph.can_bag(key):
-			var bag_msg2 := "「%s」不能放进证物袋。" % String(n.get("label", key))
+			var bag_msg2 := "「%s」不能放进「物品」。" % String(n.get("label", key))
 			if graph.is_container_node(key):
 				bag_msg2 = "「%s」是现场的一部分，收不走；它装着的东西可以单独收。" \
 					% String(n.get("label", key))
@@ -4592,8 +4592,8 @@ func _store_into(where: String, key: String) -> void:
 				_reject_drop(bag_msg2)
 			return
 	if where == GraphState.LEDGER and not (kind == "evidence" and tier == "zheng"):
-		var book_msg := "证据册只收证；词是证言，进证物袋。" if kind == "evidence" \
-			else "证据册只收证；物是原料。"
+		var book_msg := "「证据」只收证；词是证言，进「物品」。" if kind == "evidence" \
+			else "「证据」只收证；物是原料。"
 		if not _tutorial_correct(book_msg):
 			_reject_drop(book_msg)
 		return
@@ -4603,7 +4603,7 @@ func _store_into(where: String, key: String) -> void:
 		return
 	_apply_hidden()
 	_refresh_storage_wins()
-	_show_toast("「%s」收进%s" % [String(n.get("label", "")), target_name])
+	_show_toast("「%s」收进「%s」" % [String(n.get("label", "")), target_name])
 	_commit(before)
 
 
@@ -4834,7 +4834,7 @@ func _apply_outcome(res: Dictionary, node_key: String) -> void:
 	_relayout()
 
 
-# ── 收纳窗（证物袋 / 线索册）────────────────────────────────────────────
+# ── 收纳窗（物品 / 证据）────────────────────────────────────────────
 
 func _toggle_storage(kind: String) -> void:
 	if not _require_case():
@@ -4846,7 +4846,7 @@ func _toggle_storage(kind: String) -> void:
 			return
 		_bag_win = StorageWin.new()
 		_bag_win.name = "bag_win"
-		_bag_win.setup_store("证物袋", GraphState.BAG, graph, case_def)
+		_bag_win.setup_store("物品", GraphState.BAG, graph, case_def)
 		_bag_win.writes_enabled = _case_open
 		_bag_win.position = Vector2(150, 300)
 		_bag_win.will_take.connect(_on_storage_will_take)
@@ -4862,7 +4862,7 @@ func _toggle_storage(kind: String) -> void:
 		return
 	_ledger_win = StorageWin.new()
 	_ledger_win.name = "clue_win"
-	_ledger_win.setup_store("证据册", GraphState.LEDGER, graph, case_def)
+	_ledger_win.setup_store("证据", GraphState.LEDGER, graph, case_def)
 	_ledger_win.writes_enabled = _case_open
 	_ledger_win.position = Vector2(410, 300)
 	_ledger_win.will_take.connect(_on_storage_will_take)
@@ -5082,7 +5082,7 @@ func _person_payload(id: String) -> Dictionary:
 		"initial": name_text.substr(0, 1) if name_text != "" else "?",
 		"meta_lines": meta,
 		"note": String(graph.notes.get(id, "")),
-		"action": "打开对话窗" if id == "CHARS_TEC" else ("打开推演器" if id == "CHARS_EXEC" else "前往此人"),
+		"action": "打开对话窗" if id == "CHARS_TEC" else ("打开推演" if id == "CHARS_EXEC" else "前往此人"),
 		"evidence_fields": _person_field_payload(id),
 	}
 
@@ -5142,7 +5142,7 @@ func _evidence_tec_message(tier: String) -> String:
 		"ci":
 			return "词是证言，不用分析——它得先和物拼成「证」。"
 		"zheng":
-			return "证已经是结论了，不用再分析——把它拖到证据册或档案字段上。"
+			return "证已经是结论了，不用再分析——把它拖到「证据」或档案字段上。"
 	return "证据不需要再分析。"
 
 
@@ -5473,7 +5473,7 @@ func _toggle_matrix() -> void:
 	_matrix_win.item_rect_changed.connect(_sync_matrix_occlusion)
 	_desk.add_child(_matrix_win)
 	_place_z(_matrix_win, ZR_WIN)
-	## 打开推演器就算离开「整理桌面」的提醒步骤；收纳不是硬门槛。
+	## 打开推演就算离开「整理桌面」的提醒步骤；收纳不是硬门槛。
 	if _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES:
 		_tutorial_begin_infer()
 	_place_floating_windows()
@@ -5521,7 +5521,7 @@ func _on_matrix_closed() -> void:
 	_place_floating_windows()
 
 
-## 画布 / 证据册 → 桌布。感官自动取证自身的 sense。
+## 画布 / 证据 → 桌布。感官自动取证自身的 sense。
 func _assign_to_matrix(key: String) -> bool:
 	var n := graph.node(key)
 	if n.is_empty():
@@ -5582,7 +5582,7 @@ func _on_matrix_took(key: String, at_global: Vector2 = Vector2(-1.0, -1.0)) -> v
 	_commit(before)
 
 
-## 桌布上的证拖到证据册（窗**或册图标**）= 改归册子；
+## 桌布上的证拖到「证据」（窗**或图标**）= 改归证据；
 ## 拖出桌布落到别处 = **带坐标**取回画布。
 func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
 	var target := _drop_target_at(at_global)
@@ -5605,7 +5605,7 @@ func _on_matrix_dropped(key: String, at_global: Vector2) -> void:
 
 
 func _on_ledger_to_matrix(key: String) -> void:
-	## C6：证据册行内按钮必须和拖到推演器图标走同一条教学守卫。
+	## C6：证据行内按钮必须和拖到「推演」图标走同一条教学守卫。
 	if _tutorial_active and _tutorial_step == TutorialStep.STORE_SUPPLIES:
 		_tutorial_begin_infer()
 	var before := _save.snapshot()
@@ -5643,7 +5643,7 @@ func _run_inference() -> void:
 				return
 			_tutorial_on_inference_success(hit)
 			return
-		## 领证 / 选案阶段重开推演器：教学已经结束，不能落入正式结局幕。
+		## 领证 / 选案阶段重开推演：教学已经结束，不能落入正式结局幕。
 		if _matrix_win != null and is_instance_valid(_matrix_win):
 			_matrix_win.show_heartbroken()
 			_matrix_win.set_hint("TEC：取证流程已经走完了。")
@@ -5820,7 +5820,7 @@ func _on_card_combo(tool_key: String, target_key: String) -> void:
 	var tn := graph.node(target_key)
 	if not tn.is_empty() and graph.is_container_node(target_key) \
 		and graph.collapsed.has(String(tn.get("id", ""))):
-		_show_toast("「%s」已折叠：先双击展开，或把节点拖到证物袋" % String(tn.get("label", "")), true)
+		_show_toast("「%s」已折叠：先双击展开，或把节点拖到「物品」" % String(tn.get("label", "")), true)
 		return
 	var before := _save.snapshot()
 	# 标签要在 use_item 之前取：工具可能被消耗并从图中移除，事后再拿只剩内部 key。
@@ -6309,7 +6309,7 @@ func _open_reaction_monologue(char_id: String, text: String, trigger_label: Stri
 
 # ── 证据：落地 / 同源去重 / 首次教学 ─────────────────────────────────────
 
-## 把一条证据落到画布。已存在（含在证物袋里）就复用，不再刷「新」。
+## 把一条证据落到画布。已存在（含在「物品」里）就复用，不再刷「新」。
 func _grant_evidence(ev: EvidenceDef, from_key: String = "", x: float = -1.0,
 		y: float = -1.0) -> String:
 	if ev == null or case_def == null or graph == null:
@@ -6375,9 +6375,9 @@ func _tec_teach_evidence() -> void:
 	if int(graph.tec_prog.get("_evi_intro", 0)) > 0:
 		return
 	graph.tec_prog["_evi_intro"] = 1
-	_tec.append_line("这是证据——它该进证物袋，或者拿去填档案。")
+	_tec.append_line("这是证——它该进「证据」，或者拿去填档案。")
 	if _people_card != null and is_instance_valid(_people_card) and _people_card.visible:
-		_show_toast("TEC：这是证据——它该进证物袋，或者拿去填档案。")
+		_show_toast("TEC：这是证——它该进「证据」，或者拿去填档案。")
 	else:
 		_open_tec()
 
@@ -7098,7 +7098,7 @@ func _tec_next_hint() -> String:
 	else:
 		hints.append("方向：还有没展开的现场或容器；双击它们，再看看人物名册。")
 	if graph.matrix_count() <= 0:
-		hints.append("操作：双击「推演器」，把证放到推演桌布上。")
+		hints.append("操作：双击「推演」，把证放到推演桌布上。")
 		hints.append("明示：桌布空着不会触发推演——先放至少一条证，再长按执行者。")
 	else:
 		hints.append("操作：长按桌布中央的执行者推演；不对就把证取回画布再换。")
@@ -8050,7 +8050,7 @@ func _shot_flow() -> void:
 	await _wait(0.35)
 	await _shot("res://docs/p1_5_collapsed.png")
 
-	# ── 收纳三态（P1.2）：证物袋 / 线索册两扇窗 ──
+	# ── 收纳三态（P1.2）：物品 / 证据两扇窗 ──
 	_start_slice()
 	await _wait(0.3)
 	_expand_scene("SCENES_garden", false)

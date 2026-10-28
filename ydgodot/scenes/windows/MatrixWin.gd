@@ -65,7 +65,7 @@ func setup_matrix(p_graph: GraphState, p_case: CaseLoader) -> void:
 	graph = p_graph
 	case_def = p_case
 	var fast := OS.get_cmdline_args().has("--fast") or OS.get_cmdline_user_args().has("--fast")
-	setup("推演器", 580, 476)
+	setup("推演", 580, 476)
 	_rite_duration = 0.08 if fast else RITE_SEC
 	body.clip_contents = true
 
@@ -232,7 +232,7 @@ func _make_chip(cid: String, ax: float, ay: float) -> PanelContainer:
 	chip.size = Vector2(CHIP_W, CHIP_H)
 	chip.custom_minimum_size = Vector2(CHIP_W, CHIP_H)
 	chip.mouse_filter = Control.MOUSE_FILTER_STOP
-	chip.tooltip_text = "单击 = 查看详情；拖出桌布 = 放回画布；拖到证据册 = 收进册子"
+	chip.tooltip_text = "单击 = 查看详情；拖出桌布 = 放回画布；拖到「证据」= 收进证据窗"
 	var sb := TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.EDGE, 1)
 	chip.add_theme_stylebox_override("panel", sb)
 

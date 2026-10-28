@@ -175,25 +175,25 @@ func _initialize() -> void:
 	check("密码对：弹窗收走", scene.get_node_or_null("desk/pw_pop") == null)
 	check("密码对：钥匙上画布", _cards().has("item:ITEMS_htys"))
 
-	# ── 收纳三态（P1.2）：证物袋 / 线索册两扇窗 ──
+	# ── 收纳三态（P1.2）：物品 / 证据两扇窗 ──
 	scene.dbg_ensure("item", "ITEM_taideng")
 	await process_frame
 	scene.dbg_select("item:ITEM_taideng")
 	await process_frame
-	check("台灯收进证物袋", scene.dbg_store("BAG"))
+	check("台灯收进物品", scene.dbg_store("BAG"))
 	await process_frame
-	check("收进袋后画布上不再显示", (_cards()["item:ITEM_taideng"] as NodeCard).visible == false)
+	check("收进物品后画布上不再显示", (_cards()["item:ITEM_taideng"] as NodeCard).visible == false)
 
 	scene.dbg_open_storage("BAG")
 	await process_frame
 	var bag := scene.get_node_or_null("desk/bag_win")
-	check("证物袋窗能打开", bag != null)
-	check("证物袋标题仅中文", bag != null and (bag as StorageWin).title == "证物袋",
+	check("物品窗能打开", bag != null)
+	check("物品标题仅中文", bag != null and (bag as StorageWin).title == "物品",
 		(bag as StorageWin).title if bag != null else "")
-	check("袋里列出台灯", bag != null and (bag as StorageWin).items().has("item:ITEM_taideng"))
+	check("物品窗里列出台灯", bag != null and (bag as StorageWin).items().has("item:ITEM_taideng"))
 	var bag_row := (bag as StorageWin).find_child("row_item_ITEM_taideng", true, false) as PanelContainer
 	var bag_sb := bag_row.get_theme_stylebox("panel") as StyleBoxFlat if bag_row != null else null
-	check("D2 证物袋行：仅底部 1px 发丝线，无盒框",
+	check("D2 物品行：仅底部 1px 发丝线，无盒框",
 		bag_sb != null
 			and bag_sb.border_width_bottom == 1
 			and bag_sb.border_width_top == 0
@@ -201,7 +201,7 @@ func _initialize() -> void:
 			and bag_sb.border_width_right == 0
 			and bag_sb.border_color.is_equal_approx(TecTheme.edge(0.18)),
 		str(bag_sb))
-	check("D2 证物袋发丝线左右缩进 8px",
+	check("D2 物品发丝线左右缩进 8px",
 		bag_sb != null and bag_sb.expand_margin_left == -8.0
 			and bag_sb.expand_margin_right == -8.0, str(bag_sb))
 
@@ -209,34 +209,34 @@ func _initialize() -> void:
 	await process_frame
 	scene.dbg_select("evidence:CLUES_nm")
 	await process_frame
-	check("证收进证据册", scene.dbg_store("LEDGER"))
+	check("证收进证据", scene.dbg_store("LEDGER"))
 	await process_frame
 	scene.dbg_open_storage("LEDGER")
 	await process_frame
 	var ledger := scene.get_node_or_null("desk/clue_win")
-	check("证据册窗能打开", ledger != null)
-	check("证据册标题仅中文", ledger != null and (ledger as StorageWin).title == "证据册",
+	check("证据窗能打开", ledger != null)
+	check("证据标题仅中文", ledger != null and (ledger as StorageWin).title == "证据",
 		(ledger as StorageWin).title if ledger != null else "")
-	check("册里列出证", ledger != null and (ledger as StorageWin).items().has("evidence:CLUES_nm"))
-	check("台灯不在册里（册只收证）",
+	check("证据窗里列出证", ledger != null and (ledger as StorageWin).items().has("evidence:CLUES_nm"))
+	check("台灯不在证据里（证据窗只收证）",
 		ledger != null and not (ledger as StorageWin).items().has("item:ITEM_taideng"))
-	# K6：拒收话术按目标分派，场景拖到证据册不能再报「收纳袋」，且必须写日志。
+	# K6：拒收话术按目标分派，场景拖到证据不能再报「收纳袋」，且必须写日志。
 	scene._hide_toast()
 	var k6_log0: int = scene.graph.log_count()
 	scene._store_into(GraphState.LEDGER, "loc:SCENES_garden")
-	check("K6 场景拖证据册话术按目标",
-		scene.dbg_toast_text().contains("证据册") and not scene.dbg_toast_text().contains("收纳袋"),
+	check("K6 场景拖证据话术按目标",
+		scene.dbg_toast_text().contains("证据") and not scene.dbg_toast_text().contains("收纳袋"),
 		scene.dbg_toast_text())
 	check("K6 拒收写一条 warning 日志",
 		scene.graph.log_count() == k6_log0 + 1
 			and String(scene.dbg_log_kinds()[-1]) == "warn",
 		str(scene.graph.log_count() - k6_log0))
 
-	# 从册里取回
+	# 从证据窗取回
 	(ledger as StorageWin)._take("evidence:CLUES_nm")
 	await process_frame
-	check("从册里取回：证重新可见", (_cards()["evidence:CLUES_nm"] as NodeCard).visible == true)
-	check("取回后册里少了一条", not (ledger as StorageWin).items().has("evidence:CLUES_nm"))
+	check("从证据窗取回：证重新可见", (_cards()["evidence:CLUES_nm"] as NodeCard).visible == true)
+	check("取回后证据窗少了一条", not (ledger as StorageWin).items().has("evidence:CLUES_nm"))
 	# A2：收起两扇存储窗，把激活态还给案件主窗，下面才能继续按 2px 激活框验窗框。
 	scene.dbg_open_storage("BAG")
 	scene.dbg_open_storage("LEDGER")
@@ -433,13 +433,13 @@ func _initialize() -> void:
 	scene.dbg_activate(TORCH)                 # 熄回去，保持后面用例的前提（未点亮）
 	await process_frame
 
-	# 4) 落点表：线索册拒收非线索 / 证物袋什么都收（并回原位）
+	# 4) 落点表：证据拒收非证 / 物品收物与词（并回原位）
 	var bag_icon: Control = scene.get_node("desk/icons/icon_bag")
 	var clue_icon: Control = scene.get_node("desk/icons/icon_clue")
 	var pos_before := torch.position
 	_drag(torch, clue_icon)
 	await process_frame
-	check("拖到证据册图标：非证被拒", not scene.graph.stored.has(TORCH))
+	check("拖到证据图标：非证被拒", not scene.graph.stored.has(TORCH))
 	await create_timer(0.45).timeout        # spring_back 是 300ms 缓出
 	check("拒收后回原位", torch.position.distance_to(pos_before) < 1.5, str(torch.position))
 	var edges_bag: EdgeLayer = scene.get_node("desk/case_win/body/stage/cards/edges")
@@ -486,16 +486,16 @@ func _initialize() -> void:
 			or (seg1["b"] as Vector2).is_equal_approx(drop_center):
 			stale_edge = true
 			break
-	check("收进袋后旧连线立即断开", not stale_edge)
+	check("收进物品后旧连线立即断开", not stale_edge)
 	await process_frame
 	await process_frame
-	check("拖到证物袋图标：收进袋",
+	check("拖到物品图标：收进物品",
 		String(scene.graph.stored.get(drop_card.card_key, "")) == GraphState.BAG,
 		String(scene.graph.stored.get(drop_card.card_key, "")))
-	check("收进袋后卡片离场", not drop_card.visible)
+	check("收进物品后卡片离场", not drop_card.visible)
 	_drag(torch, bag_icon)
 	await process_frame
-	check("手电筒也收进袋", String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG,
+	check("手电筒也收进物品", String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG,
 		String(scene.graph.stored.get(TORCH, "")))
 
 	# 4b) 落点表完整性：id 一律来自 11 项白名单
@@ -529,7 +529,7 @@ func _initialize() -> void:
 			scene.dbg_toast_text().contains("档案") and scene.dbg_toast_text().contains("时间点"),
 			scene.dbg_toast_text())
 
-	# 5) 推演器图标：证能归位，非证给提示
+	# 5) 推演图标：证能归位，非证给提示
 	var clue_card: NodeCard = null
 	for key in _cards().keys():
 		var c: NodeCard = _cards()[key]
@@ -539,7 +539,7 @@ func _initialize() -> void:
 	if clue_card != null:
 		_drag(clue_card, scene.get_node("desk/icons/icon_infer"))
 		await process_frame
-		check("拖到推演器图标：证归位", scene.graph.stored.has(clue_card.card_key)
+		check("拖到推演图标：证归位", scene.graph.stored.has(clue_card.card_key)
 			or scene.graph.matrix_ids().size() > 0, str(scene.dbg_state()["matrix_ids"]))
 
 	# 6) 连线：实体边必须真的画出来（旧版画布一根线都没有）
@@ -913,29 +913,29 @@ func _initialize() -> void:
 	check("反应表通道：物品拖给人有台词", bool(res.get("ok", false))
 		and String(res.get("message", "")).length() > 4, str(res.get("message", "")))
 
-	# 11) 反向：从证物袋拖一行回画布，**落在松手那一点**（旧版取回只用默认位）
+	# 11) 反向：从物品拖一行回画布，**落在松手那一点**（旧版取回只用默认位）
 	var stage3: Control = scene.get_node("desk/case_win/body/stage")
 	var drop_at := stage3.get_global_rect().get_center() + Vector2(80, -60)
 	scene.dbg_storage_drag(TORCH, drop_at)
 	await process_frame
 	await process_frame
-	check("袋行拖回画布：重新可见", not scene.graph.stored.has(TORCH))
+	check("物品行拖回画布：重新可见", not scene.graph.stored.has(TORCH))
 	var back: NodeCard = _cards().get(TORCH, null)
-	check("袋行拖回画布：落在松手那一点", back != null and back.visible
+	check("物品行拖回画布：落在松手那一点", back != null and back.visible
 		and back.get_global_rect().has_point(drop_at),
 		str(back.get_global_rect()) if back != null else "null")
 
 	# K4/K6：收纳行拖到「另一扇收纳图标」必须被分派器接住并拒绝，不能掉回画布取回。
 	scene._store_into(GraphState.BAG, TORCH)
-	check("K4 先把物品收回证物袋", String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG)
+	check("K4 先把物品收进物品窗", String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG)
 	scene._hide_toast()
 	scene.dbg_storage_drag(TORCH, (scene.get_node("desk/icons/icon_clue") as Control).get_global_rect().get_center())
 	await process_frame
-	check("K4 袋行拖到证据册图标仍留在袋里",
+	check("K4 物品行拖到证据图标仍留在物品里",
 		String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG,
 		String(scene.graph.stored.get(TORCH, "")))
-	check("K6 物品进证据册按目标回绝",
-		scene.dbg_toast_text().contains("证据册") and scene.dbg_toast_text().contains("物是原料"),
+	check("K6 物品进证据按目标回绝",
+		scene.dbg_toast_text().contains("证据") and scene.dbg_toast_text().contains("物是原料"),
 		scene.dbg_toast_text())
 	scene.graph.take_back(TORCH)
 	scene._apply_hidden()
@@ -971,7 +971,7 @@ func _initialize() -> void:
 	await process_frame
 	check("松手幽灵线收起", not edges2.has_ghost())
 
-	# 13) 桌布 chip → 画布（带坐标，反向 8 条路径的最后一条）/ chip → 册图标 = 收进册子
+	# 13) 桌布 chip → 画布（带坐标，反向 8 条路径的最后一条）/ chip → 证据图标 = 收进证据
 	var clue_key := "evidence:CLUES_nm"
 	check("测试前提：松手点在桌布外", not mw.get_global_rect().has_point(blank_pt))
 	scene.dbg_matrix_assign(clue_key)
@@ -1016,7 +1016,7 @@ func _initialize() -> void:
 		and absf(float(n2["y"]) - want2.y) < 0.5,
 		str(n2["x"]) + " / " + str(n2["y"]) + " want " + str(want2))
 
-	# chip 拖到线索册图标 = 收进册子（Web overLedgerDrop：窗或图标都算）
+	# chip 拖到证据图标 = 收进证据（Web overLedgerDrop：窗或图标都算）
 	scene.dbg_matrix_assign(clue_key)
 	await process_frame
 	chip_panel = mw._chips.get("CLUES_nm", null) as Control
@@ -1025,7 +1025,7 @@ func _initialize() -> void:
 	_chip_motion(chip_panel, clue_icon2.get_global_rect().get_center())
 	_chip_release(chip_panel, clue_icon2.get_global_rect().get_center())
 	await process_frame
-	check("chip 拖到册图标：收进册",
+	check("chip 拖到证据图标：收进证据",
 		String(scene.graph.stored.get(clue_key, "")) == GraphState.LEDGER,
 		String(scene.graph.stored.get(clue_key, "")))
 
@@ -1612,7 +1612,7 @@ func _initialize() -> void:
 	var p42_h := p42_btn.get_theme_stylebox("hover") as StyleBoxFlat
 	var p42_p := p42_btn.get_theme_stylebox("pressed") as StyleBoxFlat
 	# 键线必须是**纯黑 1px**。上一版走 `flat()` 的默认参数 `EDGE`（30% 黑），
-	# 那条线在白底上读作浅灰 —— 案件地图里 34px 的小方框整片「看着没改」就是它。
+	# 那条线在白底上读作浅灰 —— 案件里 34px 的小方框整片「看着没改」就是它。
 	check("按钮常态 = 白底 + 1px 纯黑键线 + R_BTN 圆角",
 		p42_n.bg_color.is_equal_approx(TecTheme.CARD)
 			and p42_n.border_width_left == 1
@@ -1661,12 +1661,12 @@ func _initialize() -> void:
 			p42_bag._icon.modulate.is_equal_approx(TecTheme.LINE))
 		p42_bag.set_selected(false)
 
-	# 案件地图：列表行与其它列表同一套语法 —— 行首编号牌 + 发丝线，不再套圆角盒子。
+	# 案件：列表行与其它列表同一套语法 —— 行首编号牌 + 发丝线，不再套圆角盒子。
 	var p42_map: CaseMapWin = scene.dbg_open_case_map()
 	var p42_r1: Control = p42_map.find_child("row_A001", true, false) if p42_map != null else null
 	var p42_c1: Panel = p42_r1.find_child("state", true, false) as Panel if p42_r1 != null else null
 	var p42_rs := p42_r1.get_theme_stylebox("panel") as StyleBoxFlat if p42_r1 != null else null
-	check("案件地图行 = 底部 1px 发丝线（不再是圆角盒）",
+	check("案件行 = 底部 1px 发丝线（不再是圆角盒）",
 		p42_rs != null and p42_rs.border_width_bottom == 1
 			and p42_rs.border_width_top == 0
 			and p42_rs.border_width_left == 0
@@ -1677,17 +1677,17 @@ func _initialize() -> void:
 		str(p42_rs))
 	var p42_code: PanelContainer = p42_r1.find_child("code", true, false) as PanelContainer if p42_r1 != null else null
 	var p42_code_txt := p42_code.get_child(0) as Label if p42_code != null and p42_code.get_child_count() > 0 else null
-	check("案件地图行首 = A-001 编号牌",
+	check("案件行首 = A-001 编号牌",
 		p42_code != null and p42_code.custom_minimum_size == Vector2(52, 24)
 			and p42_code_txt != null and p42_code_txt.text == "A-001",
 		"null" if p42_code_txt == null else p42_code_txt.text)
-	check("案件地图「当前」牌 = 白底 + 双键线",
+	check("案件「当前」牌 = 白底 + 双键线",
 		p42_c1 != null and p42_c1.get_node_or_null("keyline") != null
 			and (p42_c1.get_theme_stylebox("panel") as StyleBoxFlat).border_color.is_equal_approx(TecTheme.INK),
 		"null" if p42_c1 == null else str(p42_c1.get_theme_stylebox("panel")))
 	var p42_r2: Control = p42_map.find_child("row_A002", true, false) if p42_map != null else null
 	var p42_c2: Panel = p42_r2.find_child("state", true, false) as Panel if p42_r2 != null else null
-	check("案件地图锁定牌 = 淡键线 + 淡字，且没有内键线",
+	check("案件锁定牌 = 淡键线 + 淡字，且没有内键线",
 		p42_c2 != null and p42_c2.get_node_or_null("keyline") == null
 			and (p42_c2.get_theme_stylebox("panel") as StyleBoxFlat).border_color.is_equal_approx(TecTheme.INK_FAINT),
 		"null" if p42_c2 == null else str(p42_c2.get_theme_stylebox("panel")))
@@ -1899,7 +1899,7 @@ func _initialize() -> void:
 	check("G2 进入第③幕收纳", scene._tutorial_step == 2)
 	check("G2 TEC 收尾台词", _last_line(scene._tec).contains("核对完成"))
 
-	# ── 第 3 幕：三枚 app 解锁 + 物品进袋 / 线索进册 ──
+	# ── 第 3 幕：三枚 app 解锁 + 物与词进物品 / 证进证据 ──
 	check("G3 图标栏解锁",
 		scene._icon_layer().visible and scene._icon_by_app("bag").visible
 			and scene._icon_by_app("clue").visible and scene._icon_by_app("infer").visible)
@@ -1913,7 +1913,7 @@ func _initialize() -> void:
 	scene._toggle_storage("BAG")
 	await process_frame
 	var bag_empty := scene._bag_win._rows.get_child(0) as Label
-	check("G3 空证物袋有收纳指引",
+	check("G3 空物品有收纳指引",
 		bag_empty != null and bag_empty.text.contains("拖"))
 	scene._update_drop_over(scene._bag_win.get_global_rect().get_center())
 	check("G3 收纳窗口也显示统一虚线框", scene._drop_outline.visible)
@@ -1936,17 +1936,17 @@ func _initialize() -> void:
 	check("G3 TEC 只提醒整理、不强制", tutorial_soft.contains("不整理"), tutorial_soft)
 	scene._hide_toast()
 	scene._apply_drop("clue-icon", tut_cert_key)
-	check("G3 物品不能进证据册", not scene.graph.stored.has(tut_cert_key))
+	check("G3 物品不能进证据", not scene.graph.stored.has(tut_cert_key))
 	check("C5 教学期错收走 TEC，不弹 toast", not scene._toast_active)
-	check("C5 物品进证据册由 TEC 纠正", _last_line(scene._tec).contains("证据册"),
+	check("C5 物品进证据由 TEC 纠正", _last_line(scene._tec).contains("证据"),
 		_last_line(scene._tec))
 	scene._hide_toast()
 	scene._apply_drop("bag-dock", tut_cert_clue_key)
-	check("G3 证不能进证物袋", not scene.graph.stored.has(tut_cert_clue_key))
-	check("C5 证进证物袋也不弹 toast", not scene._toast_active)
-	check("C5 证进证物袋由 TEC 纠正", _last_line(scene._tec).contains("证物袋"),
+	check("G3 证不能进物品", not scene.graph.stored.has(tut_cert_clue_key))
+	check("C5 证进物品也不弹 toast", not scene._toast_active)
+	check("C5 证进物品由 TEC 纠正", _last_line(scene._tec).contains("物品"),
 		_last_line(scene._tec))
-	# C5：非证拖到推演器图标也只走 TEC。
+	# C5：非证拖到推演图标也只走 TEC。
 	scene._hide_toast()
 	scene._apply_drop("infer-icon", tut_office_key)
 	check("C5 非证上桌布不弹 toast", not scene._toast_active)
@@ -1956,11 +1956,11 @@ func _initialize() -> void:
 	check("G3 非落点窗体拦截卡片",
 		scene._handle_card_drop(tut_cert_key, scene._detail_win.get_global_rect().get_center()))
 	check("G3 拦截后物品没被误收", not scene.graph.stored.has(tut_cert_key))
-	# 收纳是可选的：不把两样东西收起来，直接打开推演器也要能进入下一幕。
+	# 收纳是可选的：不把两样东西收起来，直接打开推演也要能进入下一幕。
 	scene._toggle_matrix()
 	await process_frame
-	check("G3 不收纳也能打开推演器", scene._matrix_win != null)
-	check("G3 打开推演器即进入推演", scene._tutorial_step == 3)
+	check("G3 不收纳也能打开推演", scene._matrix_win != null)
+	check("G3 打开推演即进入推演步", scene._tutorial_step == 3)
 	check("G3 TEC 改指向已打开的桌布", _last_line(scene._tec).contains("桌布"))
 	# 重叠窗口：上面的推演窗必须优先接住落点，不能被下面的 TEC 抢走。
 	var old_tec_pos: Vector2 = scene._tec.position
@@ -1985,39 +1985,39 @@ func _initialize() -> void:
 	scene._apply_drop("bag-dock", tut_cert_key)
 	for i in 2:
 		await process_frame
-	check("G3 物品进证物袋", String(scene.graph.stored.get(tut_cert_key, "")) == GraphState.BAG)
+	check("G3 物卡进物品", String(scene.graph.stored.get(tut_cert_key, "")) == GraphState.BAG)
 	scene._apply_drop("clue-icon", tut_cert_clue_key)
 	for i in 4:
 		await process_frame
-	check("G3 证进证据册", String(scene.graph.stored.get(tut_cert_clue_key, "")) == GraphState.LEDGER)
+	check("G3 证卡进证据", String(scene.graph.stored.get(tut_cert_clue_key, "")) == GraphState.LEDGER)
 	check("G3 收纳不改变当前步骤", scene._tutorial_step == 3)
 	check("G3 收纳重算后办公室仍可见", scene._cards[tut_office_key].visible)
-	check("G3 不自动打开推演器 / 证据册",
+	check("G3 不自动打开推演 / 证据",
 		scene._matrix_win == null and scene._ledger_win == null)
 	check("G3 TEC 仍可拖动", scene._tec.dbg_drag_enabled())
 
-	# C6：线索册行内「去推演」也必须走 STORE_SUPPLIES → INFER 的教学守卫。
+	# C6：证据行内「去推演」也必须走 STORE_SUPPLIES → INFER 的教学守卫。
 	scene._tutorial_step = 2
 	scene._on_ledger_to_matrix(tut_cert_clue_key)
-	check("C6 证据册按钮推进到推演步", scene._tutorial_step == 3,
+	check("C6 证据按钮推进到推演步", scene._tutorial_step == 3,
 		str(scene._tutorial_step))
-	check("C6 证据册按钮由 TEC 提示桌布",
+	check("C6 证据按钮由 TEC 提示桌布",
 		_last_line(scene._tec).contains("桌布") or _last_line(scene._tec).contains("推演"),
 		_last_line(scene._tec))
 	scene.graph.matrix_take(tut_cert_clue_key)
 	scene._apply_hidden()
 	scene._refresh_matrix_views()
 	scene._store_into(GraphState.LEDGER, tut_cert_clue_key)
-	check("C6 测试后证回册", String(scene.graph.stored.get(tut_cert_clue_key, "")) == GraphState.LEDGER,
+	check("C6 测试后证回证据", String(scene.graph.stored.get(tut_cert_clue_key, "")) == GraphState.LEDGER,
 		String(scene.graph.stored.get(tut_cert_clue_key, "")))
 
-	# ── 第 4 幕：玩家自己双击推演器 / 线索册，再上桌布 ──
+	# ── 第 4 幕：玩家自己双击推演 / 证据，再上桌布 ──
 	scene._toggle_matrix()
 	scene._toggle_storage(GraphState.LEDGER)
 	for i in 2:
 		await process_frame
-	check("G4 双击推演器打开桌布", scene._matrix_win != null)
-	check("G4 证据册按普通 app 打开", scene._ledger_win != null)
+	check("G4 双击推演打开桌布", scene._matrix_win != null)
+	check("G4 证据按普通 app 打开", scene._ledger_win != null)
 	check("G4 桌布提示还差一条",
 		scene._matrix_win.dbg_hint().contains("还需要"))
 	scene._matrix_win.finish_charge()
@@ -2033,7 +2033,7 @@ func _initialize() -> void:
 			mx_target = t["rect"]
 	check("G4 整扇推演窗都是证落点", mx_target == scene._matrix_win.get_global_rect())
 	var mx_title: Vector2 = scene._matrix_win.get_global_rect().position + Vector2(40.0, 10.0)
-	check("G4 拖到推演器标题栏也归位", scene._handle_card_drop(tut_cert_clue_key, mx_title))
+	check("G4 拖到推演标题栏也归位", scene._handle_card_drop(tut_cert_clue_key, mx_title))
 	check("G4 单条调查员证上桌布", scene.graph.matrix_count() == 1)
 	check("G4 桌布提示长按", scene._matrix_win.dbg_hint().contains("长按"))
 	scene._matrix_win.finish_charge()
@@ -2095,7 +2095,7 @@ func _initialize() -> void:
 	check("C4 证件数据层不含 sense", not scene._investigator.has("sense"))
 	check("C4 读盘证件不含 sense", not saved.has("sense"))
 	check("G5 领证窗关闭", scene._tutorial_cert_win == null)
-	check("G5 案件地图弹出", scene._map_win != null)
+	check("G5 案件窗弹出", scene._map_win != null)
 	check("G5 地图图标解锁", scene._icon_by_app("map").visible)
 	check("G5 TEC 提示选案",
 		scene._tec.visible and _last_line(scene._tec).contains("选择"))
@@ -2268,7 +2268,7 @@ func _initialize() -> void:
 	# W11：Esc 关最上层窗，Ctrl+Z 撤销。
 	scene._toggle_storage(GraphState.LEDGER)
 	await process_frame
-	check("W11 前置：证据册已打开", scene._ledger_win != null)
+	check("W11 前置：证据已打开", scene._ledger_win != null)
 	var w11_esc := InputEventKey.new()
 	w11_esc.keycode = KEY_ESCAPE
 	w11_esc.pressed = true
@@ -2393,7 +2393,7 @@ func _empty_canvas_point(scene: Control) -> Vector2:
 
 ## 「拖到空白」用的落点：必须在**任何落点之外、也没被别的卡压住**。
 ## 不能写死 `center + (-40, 30)` —— 布局会随卡片集合变（2026-10-21：开局不再预置手电筒后，
-## 它被弹簧推到证物袋窗上，那一拖直接判成「收进袋」，后面两条断言跟着崩）。
+## 它被弹簧推到物品窗上，那一拖直接判成「收进物品」，后面两条断言跟着崩）。
 func _blank_point_near(scene: Control, card: NodeCard) -> Vector2:
 	var base := card.get_global_rect().get_center()
 	for off in [Vector2(-40, 30), Vector2(70, 45), Vector2(-80, -55), Vector2(95, -35), Vector2(0, 90)]:

@@ -110,7 +110,7 @@ func _test_recipes() -> void:
 		str(Vector2(float(n["x"]), float(n["y"]))))
 	check("原料不消耗：笔记还在", g.has("item", "ITEM_sxbj"))
 	check("原料不消耗：台灯还在", g.has("item", "ITEM_taideng"))
-	check("原料不会被塞进袋子 / 册子", not g.stored.has("item:ITEM_sxbj")
+	check("原料不会被塞进物品 / 证据", not g.stored.has("item:ITEM_sxbj")
 		and not g.stored.has("item:ITEM_taideng"))
 
 	var g2 := GraphState.new(c)
@@ -382,11 +382,11 @@ func _test_drop_rules() -> void:
 	var zheng: String = scene.dbg_ensure("evidence", "EVID_Z_zs_knife")
 	await process_frame
 	scene._apply_drop("bag-dock", zheng)
-	check("证物袋拒证", String(scene.graph.stored.get(zheng, "")) != GraphState.BAG,
+	check("物品拒证", String(scene.graph.stored.get(zheng, "")) != GraphState.BAG,
 		String(scene.graph.stored.get(zheng, "")))
-	check("证物袋拒证话术", _last_log().contains("证物袋收物与词"), _last_log())
+	check("物品拒证话术", _last_log().contains("「物品」收物与词"), _last_log())
 	scene._apply_drop("clue-icon", zheng)
-	check("证据册收证", String(scene.graph.stored.get(zheng, "")) == GraphState.LEDGER,
+	check("证据收证", String(scene.graph.stored.get(zheng, "")) == GraphState.LEDGER,
 		String(scene.graph.stored.get(zheng, "")))
 	scene.graph.take_back(zheng)
 	scene._apply_drop("infer-icon", zheng)
@@ -398,13 +398,13 @@ func _test_drop_rules() -> void:
 	var word: String = scene.dbg_ensure("evidence", "EVID_CI_lhs_word")
 	await process_frame
 	scene._apply_drop("clue-icon", word)
-	check("证据册拒词", String(scene.graph.stored.get(word, "")) != GraphState.LEDGER)
-	check("证据册拒词话术", _last_log().contains("证据册只收证"), _last_log())
+	check("证据拒词", String(scene.graph.stored.get(word, "")) != GraphState.LEDGER)
+	check("证据拒词话术", _last_log().contains("「证据」只收证"), _last_log())
 	scene._apply_drop("infer-icon", word)
 	check("推演桌布拒词", not scene.graph.matrix_has("EVID_CI_lhs_word"))
 	check("推演桌布拒词话术", _last_log().contains("带五感的「证」"), _last_log())
 	scene._apply_drop("bag-dock", word)
-	check("证物袋收词", String(scene.graph.stored.get(word, "")) == GraphState.BAG,
+	check("物品收词", String(scene.graph.stored.get(word, "")) == GraphState.BAG,
 		String(scene.graph.stored.get(word, "")))
 	scene.graph.take_back(word)
 	scene._apply_drop("tec-dock", word)
@@ -413,10 +413,10 @@ func _test_drop_rules() -> void:
 	var item: String = scene.dbg_ensure("item", "ITEMS_a4paper")
 	await process_frame
 	scene._apply_drop("clue-icon", item)
-	check("证据册拒物", String(scene.graph.stored.get(item, "")) != GraphState.LEDGER)
-	check("证据册拒物话术", _last_log().contains("物是原料"), _last_log())
+	check("证据拒物", String(scene.graph.stored.get(item, "")) != GraphState.LEDGER)
+	check("证据拒物话术", _last_log().contains("物是原料"), _last_log())
 	scene._apply_drop("bag-dock", item)
-	check("证物袋收物", String(scene.graph.stored.get(item, "")) == GraphState.BAG,
+	check("物品收物", String(scene.graph.stored.get(item, "")) == GraphState.BAG,
 		String(scene.graph.stored.get(item, "")))
 	scene.graph.take_back(item)
 

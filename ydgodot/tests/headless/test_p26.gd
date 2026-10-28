@@ -164,7 +164,15 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("图标栏 8 项", apps.size() == 8, str(apps))
 	check("图标顺序对齐 ICON_LAYOUT",
 		apps == ["infer", "goto", "clue", "people", "bag", "tec", "log", "map"], str(apps))
-	check("推演器在首位", scene.dbg_icon_pos("infer").x == 18.0 and scene.dbg_icon_pos("infer").y == 16.0,
+	var icon_names := [
+		scene.get_node("desk/icons/icon_infer").tooltip_text,
+		scene.get_node("desk/icons/icon_clue").tooltip_text,
+		scene.get_node("desk/icons/icon_bag").tooltip_text,
+		scene.get_node("desk/icons/icon_map").tooltip_text,
+	]
+	check("图标名缩短为 推演 / 证据 / 物品 / 案件",
+		icon_names == ["推演", "证据", "物品", "案件"], str(icon_names))
+	check("推演在首位", scene.dbg_icon_pos("infer").x == 18.0 and scene.dbg_icon_pos("infer").y == 16.0,
 		str(scene.dbg_icon_pos("infer")))
 	var pitch: float = float(scene.dbg_icon_pos("goto").y) - float(scene.dbg_icon_pos("infer").y)
 	## P2：常驻档按「64px 槽 + 12px 间距」= 76；只有 960×560 放不下时才切紧凑。
@@ -225,7 +233,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	await process_frame
 	check("关窗后引用清空", scene.dbg_people_win() == null and scene.dbg_log_win() == null)
 
-	# 3) 四个角标：推演器 / 证物袋 / 线索册 / 日志
+	# 3) 四个角标：推演 / 物品 / 证据 / 日志
 	check("初始四角标都收着",
 		scene.dbg_badge_text("infer") == "" and scene.dbg_badge_text("bag") == ""
 		and scene.dbg_badge_text("clue") == "" and scene.dbg_badge_text("log") == "")
@@ -233,9 +241,9 @@ func _test_desktop(c: CaseLoader) -> void:
 	var item_key: String = scene.dbg_ensure("item", "ITEMS_changji")
 	scene.dbg_select(item_key)
 	await process_frame
-	check("收进证物袋", scene.dbg_store(GraphState.BAG))
+	check("收进物品", scene.dbg_store(GraphState.BAG))
 	await process_frame
-	check("证物袋角标 1 件", scene.dbg_badge_text("bag") == "1 件", scene.dbg_badge_text("bag"))
+	check("物品角标 1 件", scene.dbg_badge_text("bag") == "1 件", scene.dbg_badge_text("bag"))
 	var bag_ic := scene.get_node_or_null("desk/icons/icon_bag") as DeskIcon
 	var bag_badge := scene.get_node_or_null("desk/icons/icon_bag/bag_badge") as Control
 	check("E2 徽章右沿贴在图标外 2px",
@@ -251,9 +259,9 @@ func _test_desktop(c: CaseLoader) -> void:
 	var clue_key: String = scene.dbg_ensure("clue", "CLUES_CBKW")
 	scene.dbg_select(clue_key)
 	await process_frame
-	check("收进证据册", scene.dbg_store(GraphState.LEDGER))
+	check("收进证据", scene.dbg_store(GraphState.LEDGER))
 	await process_frame
-	check("证据册角标 1 条", scene.dbg_badge_text("clue") == "1 条", scene.dbg_badge_text("clue"))
+	check("证据角标 1 条", scene.dbg_badge_text("clue") == "1 条", scene.dbg_badge_text("clue"))
 
 	# 4) 日志窗：关着时累未读，开窗清零
 	var before_n: int = scene.graph.log_count()
@@ -328,7 +336,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	await process_frame
 	scene.dbg_store(GraphState.LEDGER)
 	await process_frame
-	check("收入证据册不记日志", scene.graph.log_count() == n0, str(scene.graph.log_count() - n0))
+	check("收入证据不记日志", scene.graph.log_count() == n0, str(scene.graph.log_count() - n0))
 
 	# 组合成功：一条 act，且不弹提示条（Web 刻意：结果靠画面自证）
 	scene.dbg_ensure("item", "ITEMS_cz")
@@ -394,7 +402,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("常驻两人在册", rows.has("CHARS_TEC") and rows.has("CHARS_EXEC"), str(rows))
 	check("到过 7/4 ⇒ 陆珩松在册", rows.has("CHARS_luhengs"), str(rows))
 	check("K10 常驻行状态词统一", pw.row_state("CHARS_TEC") == "助手窗"
-		and pw.row_state("CHARS_EXEC") == "推演器",
+		and pw.row_state("CHARS_EXEC") == "推演",
 		pw.row_state("CHARS_TEC") + " / " + pw.row_state("CHARS_EXEC"))
 	# K3：再次打开名册仍是同一扇窗；点击行只开档案卡，不关名册。
 	scene._open_icon_app("people")

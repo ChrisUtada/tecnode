@@ -195,7 +195,7 @@ func _test_collapse_store() -> void:
 	check("取消隐藏后可见", g.is_visible(child))
 
 	g.store("item:ITEM_taideng", "BAG")
-	check("收进证物袋：不可见", not g.is_visible("item:ITEM_taideng"))
+	check("收进物品：不可见", not g.is_visible("item:ITEM_taideng"))
 	check("收进去向记账", String(g.take("item:ITEM_taideng")) == "BAG")
 	check("取回后可见", g.is_visible("item:ITEM_taideng"))
 

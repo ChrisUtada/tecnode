@@ -45,32 +45,32 @@ func _initialize() -> void:
 	quit(0 if fails == 0 else 1)
 
 
-# ── 1. 证物袋：什么都收（容器除外），记来源 ────────────────────────────
+# ── 1. 物品：收物与词（容器除外），记来源 ────────────────────────────
 func _test_bag() -> void:
 	g.reveal_container("loc", "SCENES_garden")
 	g.reveal_container("item", "ITEM_shuzhuo")
 	var lamp := g.key_of("item", "ITEM_taideng")
-	check("袋：普通物品属性允许", g.can_bag(lamp))
-	check("袋：普通物品收得进", g.bag_store(lamp))
-	check("袋：收进去后不可见", not g.is_visible(lamp))
-	check("袋：记账去向 BAG", String(g.stored.get(lamp, "")) == GraphState.BAG)
-	check("袋：记下来源容器", String(g.node(lamp).get("bag_from", "")) == "ITEM_shuzhuo")
-	check("袋：容器收不进（书桌是落脚点）", not g.bag_store(g.key_of("item", "ITEM_shuzhuo")))
+	check("物品：普通物品属性允许", g.can_bag(lamp))
+	check("物品：普通物品收得进", g.bag_store(lamp))
+	check("物品：收进去后不可见", not g.is_visible(lamp))
+	check("物品：记账去向 BAG", String(g.stored.get(lamp, "")) == GraphState.BAG)
+	check("物品：记下来源容器", String(g.node(lamp).get("bag_from", "")) == "ITEM_shuzhuo")
+	check("物品：容器收不进（书桌是落脚点）", not g.bag_store(g.key_of("item", "ITEM_shuzhuo")))
 	var drawer := String(g.add_node("item", "ITEM_chouti")["key"])
-	check("袋：抽屉也按 baggable=false 拒收", not g.bag_store(drawer))
-	check("袋：can_bag 与物品属性同源", not g.can_bag(drawer))
-	check("袋：已收纳的不重复收", not g.bag_store(lamp))
-	check("袋：取回后重新可见", g.take_back(lamp) and g.is_visible(lamp))
+	check("物品：抽屉也按 baggable=false 拒收", not g.bag_store(drawer))
+	check("物品：can_bag 与物品属性同源", not g.can_bag(drawer))
+	check("物品：已收纳的不重复收", not g.bag_store(lamp))
+	check("物品：取回后重新可见", g.take_back(lamp) and g.is_visible(lamp))
 
 
-# ── 2. 线索册：只有线索能进 ────────────────────────────────────────────
+# ── 2. 证据：只收证 ──────────────────────────────────────────────────
 func _test_ledger() -> void:
 	var clue: String = String(g.add_node("clue", "CLUES_nm")["key"])
 	var item: String = String(g.add_node("item", "ITEMS_bd")["key"])
-	check("册：证收得进", g.ledger_store(clue))
-	check("册：普通物品收不进", not g.ledger_store(item))
-	check("册：记账去向 LEDGER", String(g.stored.get(clue, "")) == GraphState.LEDGER)
-	check("册：取回后可见", g.take_back(clue) and g.is_visible(clue))
+	check("证据：证收得进", g.ledger_store(clue))
+	check("证据：普通物品收不进", not g.ledger_store(item))
+	check("证据：记账去向 LEDGER", String(g.stored.get(clue, "")) == GraphState.LEDGER)
+	check("证据：取回后可见", g.take_back(clue) and g.is_visible(clue))
 
 
 # ── 3. 推演桌布：按感官归位，感官不对不收 ────────────────────────────
@@ -83,15 +83,15 @@ func _test_matrix() -> void:
 	check("桌布：能取回画布", g.matrix_take(clue) and g.is_visible(clue))
 
 
-# ── 4. 跨窗搬运：袋（物/词）与册（证）不再互通 ──────────────────────────
+# ── 4. 跨窗搬运：物品（物/词）与证据（证）不再互通 ──────────────────────
 func _test_restash() -> void:
 	var word: String = String(g.add_node("evidence", "EVID_CI_lhs_word")["key"])
-	check("词进证物袋", g.bag_store(word))
-	check("词不能搬进证据册", not g.restash(word, GraphState.BAG, GraphState.LEDGER))
+	check("词进物品", g.bag_store(word))
+	check("词不能搬进证据", not g.restash(word, GraphState.BAG, GraphState.LEDGER))
 	var zheng: String = String(g.add_node("evidence", "CLUES_JS")["key"])
-	check("证不进证物袋", not g.bag_store(zheng))
-	check("证进证据册", g.ledger_store(zheng))
-	check("证不能搬进证物袋", not g.restash(zheng, GraphState.LEDGER, GraphState.BAG))
+	check("证不进物品", not g.bag_store(zheng))
+	check("证卡进证据", g.ledger_store(zheng))
+	check("证不能搬进物品", not g.restash(zheng, GraphState.LEDGER, GraphState.BAG))
 	check("搬运：搬到同一个地方算无效", not g.restash(zheng, GraphState.LEDGER, GraphState.LEDGER))
 
 
