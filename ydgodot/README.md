@@ -233,22 +233,11 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 # 2) 玩
 "$GODOT" --path ydgodot --resolution 1280x720
 
-# 3) 无头回归（逻辑 / 界面交互 / 数据迁移 三层）
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p0.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_ui.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_migration.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_commands.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p12.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p14.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p15.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p16.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p21.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p22.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p23.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p24.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p25.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p26.gd
-"$GODOT" --headless --path ydgodot --script res://tests/headless/test_p27.gd
+# 3) 无头回归（逻辑 / 界面交互 / 数据迁移三层，一条命令跑完）
+GODOT="$GODOT" ./ydgodot/tools/run_tests.sh
+
+# 只跑指定脚本
+GODOT="$GODOT" ./ydgodot/tools/run_tests.sh ydgodot/tests/headless/test_p0.gd
 
 # 3.5) 重跑数据迁移（JSON → .tres；只在确认数据基准后跑）
 "$GODOT" --headless --path ydgodot --script res://tools/json_to_tres.gd
@@ -280,9 +269,9 @@ GODOT="/d/Godot/Godot_v4.7-stable_win64.exe/Godot_v4.7-stable_win64_console.exe"
 | `addons/case_nodes/` | **编辑器插件**：四栏「画布节点」在检查器里显示成一行摘要（`物品 · 6 项` + 「编辑…」），点开是弹出窗口 —— 四个 tab（物品 / 人物 / 地点 / 线索），可「＋ 添加」挑 .tres、可直接拖资源进来、可调序 / 解绑、失效引用标红。**不用手打 id**。检查器里刻意只放一行：它每次刷新都会重建控件，把列表画在那里会卡（实测索引也从「load 全部案件资源」改成「读 .tres 文本」，1313 ms → 136 ms） |
 | `data/` | `case-a001.json` —— **已冻结为只读档案**（迁移输入 + 对照基准，运行时不再读它；正文已不参与对账） |
 | `assets/raw/` | `src/assets/` 的拷贝（字体 / 头像 / OGG / 花园序列帧） |
-| `tests/headless/` | `test_p0.gd`（逻辑 23）、`test_ui.gd`（真鼠标事件 278）、`test_migration.gd`（JSON ↔ `.tres` 逐字段 18）、`test_commands.gd`（六型命令 49）、`test_p12.gd`（图状态全量 37）、`test_p14.gd`（桌布 / 结局 56）、`test_p15.gd`（快照 / 撤销 / 存档 85）、`test_p16.gd`（开场 / 调查员证 66）、`test_p21.gd`（案件系统 71）、`test_p22.gd`（TEC 生态 87）、`test_p23.gd`（回忆系统 169）、`test_p24.gd`（多人对话 / 独白 107）、`test_p25.gd`（音乐 / 花园 160）、`test_p26.gd`（名册 / 日志 / 图标栏 95）、`test_p27.gd`（反应表 / 场景通路 39）—— **共 1340 项** |
+| `tests/headless/` | `test_*.gd`：逻辑 / 数据迁移 / 真鼠标 UI 三层回归；`_test_base.gd` 是共享基类（`check` / 计数 / 清理 / 退出）。**项数与失败数由 `tools/run_tests.sh` 实时汇总，本文不再手写。** |
 | `docs/` | P0 切片 6 张 + P1 新特性 15 张 + P2 案件 / TEC / 回忆 / 对话 / 音乐 / 花园 / 名册 / 日志 22 张截图，共 43 张（历史对拍档案；现验收看 `docs/aesthetic/` 三档图） |
-| `tools/` | `json_to_tres.gd`（JSON → `.tres`）、`migrate_node_lists.gd`（把正文标签冻结成节点清单，一次性）、`pixeldiff/`（历史对拍工具，已退役） |
+| `tools/` | `run_tests.sh`（无头回归总入口）、`test_audit.py`（测试私有访问守卫）、`mono_audit.py`（配色守卫）、`json_to_tres.gd`（JSON → `.tres`）、`migrate_node_lists.gd`（把正文标签冻结成节点清单，一次性）、`pixeldiff/`（历史对拍工具，已退役） |
 
 ## 已做 / 明确没做
 

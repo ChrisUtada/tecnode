@@ -1,24 +1,11 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P0 无头回归：只要逻辑链断了就红。
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_p0.gd
-
-var fails := 0
-var total := 0
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P0 垂直切片回归 ===")
 	var c := CaseLoader.new()
-	check("装载 data/case-a001.json", c.load_case(), c.load_error)
+	check("装载案件数据", c.load_case(), c.load_error)
 	check("案件有 11 个场景 / 35 件物品 / 28 条证据",
 		c.scenes.size() == 11 and c.items.size() == 35 and c.evidences.size() == 28,
 		"%d/%d/%d" % [c.scenes.size(), c.items.size(), c.evidences.size()])
@@ -73,5 +60,4 @@ func _initialize() -> void:
 	check("重复照亮仍返回成功（幂等，不重复建节点）", bool(again.get("ok", false)))
 	check("尸体场景没有被建两遍", g.nodes.keys().count("loc:SCENES_body") == 1)
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()

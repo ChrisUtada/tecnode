@@ -334,22 +334,24 @@ scene.dbg_expand("SCENES_garden")
 
 17 个测试脚本 + 1 个基准脚本各自复制了同一份 `check()/fails/total`，`_finish/_cleanup` 也有多份。
 
-**动作**：新增 `tests/headless/test_base.gd`：
+**动作**：新增 `tests/headless/_test_base.gd`（下划线前缀，避免被运行器当成用例）：
 
 ```gdscript
-# tests/headless/test_base.gd
+# tests/headless/_test_base.gd
 extends SceneTree
 
 var fails := 0
 var total := 0
 
 func check(name: String, cond: bool, detail: String = "") -> void: ...
+func _cleanup() -> void: pass          # 子类覆盖
 func _finish() -> void:
+    _cleanup()
     print("=== %d 项，失败 %d ===" % [total, fails])
     quit(0 if fails == 0 else 1)
 ```
 
-测试改为 `extends "res://tests/headless/test_base.gd"`，只实现 `_run()`。P28 的自行退出逻辑也由基类统一。
+测试改为 `extends "res://tests/headless/_test_base.gd"`，保留 `_initialize()`，结束时调 `_finish()`；需要删临时档时覆盖 `_cleanup()`。P28 的自行退出逻辑也由基类统一。
 
 ---
 
@@ -434,7 +436,7 @@ tools/           迁移 / 基准 / 截图 / 审计
 | 批次 | 内容 | 风险 | 验收标准 |
 |---|---|---|---|
 | **0 · 卫生** | 提交术语改动；删调试残留；修 6 个 UID；更新 README | 极低 | 装载无 UID 警告；17 脚本全绿；工作区干净 |
-| **1 · 测试基建** | `test_base.gd` + 统一运行器 + CI + `test_audit.py` | 低 | 一条命令跑完全部；失败必返回非 0；README 不再手写计数；测试不新增私有字段访问 |
+| **1 · 测试基建** | `_test_base.gd` + 统一运行器 + CI + `test_audit.py` | 低 | 一条命令跑完全部；失败必返回非 0；README 不再手写计数；测试不新增私有字段访问 |
 | **2 · Debug 抽离** | `DesktopDebug` + `tools/shot_flow.gd` | 低-中 | Desktop 减少约 1150 行；17 个测试改为 `desk.debug.*`；发布构建不实例化 |
 | **3 · Desktop 拆分** | Canvas → DragDrop → Tec → Matrix/Garden → People → Tutorial → CaseSession | 中 | 每步 17 脚本全绿；`Desktop.gd` ≤ 1200 行 |
 | **4 · 模型收敛** | GraphState 领域拆分 + NodeState 类型化 | 中-高（动存档） | `test_p15` 全绿；旧档可读；魔法字符串显著减少 |

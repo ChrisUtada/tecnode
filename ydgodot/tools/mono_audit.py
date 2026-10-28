@@ -34,6 +34,11 @@ import re
 import sys
 from collections import defaultdict
 
+# Windows 控制台默认 GBK，打印 ✅ / 中文会直接抛 UnicodeEncodeError；CI 与本地统一成 UTF-8。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 

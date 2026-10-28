@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P1.4 回归：五感槽位 / 推演桌布 / 结局判定与真名遮罩
 ##
 ## 覆盖：
@@ -10,19 +10,7 @@ extends SceneTree
 ##
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_p14.gd
 
-var fails := 0
-var total := 0
 var c: CaseLoader
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P1.4 推演桌布 / 结局判定 ===")
@@ -36,8 +24,7 @@ func _initialize() -> void:
 	_test_recipe_exact()
 	await _test_desktop_flow()
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 # ── 1. 初始五个空槽 ────────────────────────────────────────────────────

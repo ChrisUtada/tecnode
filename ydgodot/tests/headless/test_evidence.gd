@@ -1,24 +1,12 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## ZHENG_MODEL_PLAN §8：物 / 词 / 证 数据、合成、字牌、词卡掉落、落点规则、
 ## 档案主张与 TEC 批量核对、快照与盖章。全部走真实 Desktop 入口。
 
 const TEMP_PROGRESS := "user://test_evidence_progress.json"
 const TEMP_SAVE := "user://test_evidence_case.save"
 
-var fails := 0
-var total := 0
 var c: CaseLoader
 var scene: Control
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== 证据模型（物 / 词 / 证）===")
@@ -34,12 +22,10 @@ func _initialize() -> void:
 	_finish()
 
 
-func _finish() -> void:
+func _cleanup() -> void:
 	for p in [TEMP_PROGRESS, TEMP_SAVE]:
 		if FileAccess.file_exists(p):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
 
 
 func _test_data() -> void:

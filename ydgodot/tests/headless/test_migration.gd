@@ -1,21 +1,9 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P1.1 迁移回归：`.tres` 与 JSON **逐字段**对照（不是抽查几项，是把每个字段都归一化后整包比）。
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_migration.gd
 
-var fails := 0
-var total := 0
 var jd: Dictionary = {}
 var c: CaseDef
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P1.1 迁移回归（JSON ↔ Resource）===")
@@ -37,7 +25,7 @@ func _initialize() -> void:
 	c = load("res://cases/a001/case.tres") as CaseDef
 	check("case.tres 可加载", c != null)
 	if c == null:
-		quit(1)
+		_finish()
 		return
 
 	check("实体数量一致（场景/物品/人物/证据/配方/回忆/对话/结局）",
@@ -189,8 +177,7 @@ func _initialize() -> void:
 			same = true
 	check("跨实体引用指向同一资源（不是内联副本）", same)
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 # ── 归一化（两边用同一套形状，才能整包比）──────────────────────────────

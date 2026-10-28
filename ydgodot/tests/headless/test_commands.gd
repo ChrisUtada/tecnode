@@ -1,22 +1,10 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P1.2 / P1.3 回归：容器展开链 + 六型命令的完整行为（对齐 Web 版 09-commands.js）
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_commands.gd
 
-var fails := 0
-var total := 0
 var c: CaseLoader
 var g: GraphState
 var cs: CommandSystem
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P1.2 / P1.3 容器与六型命令 ===")
@@ -34,8 +22,7 @@ func _initialize() -> void:
 	_test_collapse_store()
 	_test_use_item_via_combo()
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 # ── 1. 容器链：花园 → 书桌 → 抽屉（容器物品也能展开）────────────────────

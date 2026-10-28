@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P1.2 图状态全量 + P1.3 命令行为补充回归
 ##
 ## 覆盖这一轮补齐的四处口径（都与 Web 版 02-state.js / 06-storage.js / 09-commands.js 对齐）：
@@ -9,21 +9,9 @@ extends SceneTree
 ##
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_p12.gd
 
-var fails := 0
-var total := 0
 var c: CaseLoader
 var g: GraphState
 var cs: CommandSystem
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P1.2 图状态全量 + P1.3 命令行为 ===")
@@ -41,8 +29,7 @@ func _initialize() -> void:
 	_test_consume()
 	_test_delete_node()
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 # ── 1. 物品：收物与词（容器除外），记来源 ────────────────────────────

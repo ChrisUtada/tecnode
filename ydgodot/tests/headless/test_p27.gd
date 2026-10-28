@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## 批 2 交互四项回归：N5 线索双击捕获 / V1 选中环 / V2 点亮 / V3 已捕获 / C4 场景通路。
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_p27.gd
 ##
@@ -6,19 +6,7 @@ extends SceneTree
 ## 断言刻意走界面入口（真鼠标事件 / `_on_card_combo`），而不是直接调 GraphState：
 ## 只有这样才证明「玩家点得到、且落到了正确数据」。
 
-var fails := 0
-var total := 0
 var scene: Control
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== 批 2 交互四项（N5 / V1 / V2 / V3 / C4）===")
@@ -46,8 +34,7 @@ func _initialize() -> void:
 	var clue: NodeCard = _cards().get(ck)
 	check("前提：证卡在画布上", clue != null, ck)
 	if clue == null:
-		print("=== %d 项，失败 %d ===" % [total, fails])
-		quit(1)
+		_finish()
 		return
 
 	check("前提：还没捕获",
@@ -174,8 +161,7 @@ func _initialize() -> void:
 		(scene.graph.tried as Dictionary).size() == tried_before2,
 		str(scene.graph.tried.keys()))
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 func _log_has(needle: String) -> bool:

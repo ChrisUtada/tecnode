@@ -1,28 +1,14 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 
 const TEMP_PROGRESS := "user://test_p22_progress.json"
 const TEMP_SAVE := "user://test_p22_case.save"
-
-var fails := 0
-var total := 0
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P2.2 TEC 对话 / 分析 / 助手卡片 / 档案解读 ===")
 	_test_data()
 	await _test_desktop()
 	_cleanup()
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 func _cleanup() -> void:

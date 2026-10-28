@@ -1,25 +1,13 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P0 界面级回归：真的往 NodeCard 里塞鼠标事件，验证「拖拽 = 组合 / 双击 = 点亮」这条接线。
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_ui.gd
 
 const StartScreenScript := preload("res://ui/StartScreen.gd")
 
-var fails := 0
-var total := 0
 var scene: Control
 
 const TORCH := "item:ITEM_shoudiantong"
 const SHADOW := "item:ITEM_something"
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P0 界面级回归（拖拽 / 双击）===")
@@ -2351,8 +2339,7 @@ func _initialize() -> void:
 			scene._goal.text.contains("已记录") and scene._goal.text.contains("真名"),
 			scene._goal.text)
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 func _last_line(tec: TecWindow) -> String:

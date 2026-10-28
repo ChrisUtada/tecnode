@@ -1,22 +1,9 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P2.5 音乐播放器 / 花园彩蛋：唱针解锁、播放 / 暂停 / 收起、真名种子、
 ## 真实时间生长、旁白分段、老档迁移与存档。
 
 const TEMP_PROGRESS := "user://test_p25_progress.json"
 const TEMP_SAVE := "user://test_p25_case.save"
-
-var fails := 0
-var total := 0
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P2.5 音乐播放器 / 花园彩蛋 ===")
@@ -29,13 +16,6 @@ func _initialize() -> void:
 	_test_migration(c)
 	await _test_desktop(c)
 	_finish()
-
-
-func _finish() -> void:
-	_cleanup()
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
-
 
 func _cleanup() -> void:
 	for path in [TEMP_PROGRESS, TEMP_SAVE]:

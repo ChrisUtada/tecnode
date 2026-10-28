@@ -1,20 +1,7 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 
 const TEMP_INV := "user://test_p16_investigator.json"
 const TEMP_INV_DESK := "user://test_p16_desktop_investigator.json"
-
-var fails := 0
-var total := 0
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P1.6 开场适性测试 / 调查员证 ===")
@@ -24,8 +11,7 @@ func _initialize() -> void:
 	await _test_intro_ui()
 	await _test_desktop()
 	_cleanup()
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 func _test_sense() -> void:

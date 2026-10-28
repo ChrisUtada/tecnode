@@ -1,30 +1,15 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P2.3 第 1 步：时间轴 / 时刻图层 / 登场门控 / 回忆匹配（纯逻辑）。
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_p23.gd
 
 const TEMP_SAVE := "user://test_p23_case.save"
-
-var fails := 0
-var total := 0
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P2.3 时间轴 / 时刻图层 / 登场门控 ===")
 	var c := CaseLoader.new(CaseCatalog.path_of("A001"))
 	check("案件数据装载", c.load_case(), c.load_error)
 	if c.case_def == null:
-		_cleanup()
-		print("=== %d 项，失败 %d ===" % [total, fails])
-		quit(1)
+		_finish()
 		return
 	_test_data(c)
 	_test_timeline(c)
@@ -35,8 +20,7 @@ func _initialize() -> void:
 	_test_save(c)
 	await _test_ui()
 	_cleanup()
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 func _cleanup() -> void:

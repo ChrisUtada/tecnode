@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P1.5 回归：快照 / 撤销栈 / 案件存档
 ##
 ## 覆盖：
@@ -10,19 +10,7 @@ extends SceneTree
 ##
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_p15.gd
 
-var fails := 0
-var total := 0
 var c: CaseLoader
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P1.5 快照 / 撤销 / 存档 ===")
@@ -37,8 +25,7 @@ func _initialize() -> void:
 	await _test_desktop()
 	_cleanup()
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 func _populate(g: GraphState) -> void:
