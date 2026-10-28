@@ -26,7 +26,7 @@
 - **1158 行** —— 藏在产品类里的测试/截图代码（143 个 `dbg_*` = 805 行，6 个 `_shot_*` = 353 行）。
 - **18 份** —— 测试脚本各自复制的 `check()/fails/total` 脚手架与退出逻辑。
 
-> 以上为**批次执行前**的体检快照，用于说明改造动机。批次 0–2 完成后的实时数字与验证结果见 §7。
+> 以上为**批次执行前**的体检快照，用于说明改造动机。批次 0–3 完成后的实时数字与验证结果见 §7。
 
 ### 0.3 建议的 Top 5 动作
 
@@ -442,7 +442,7 @@ tools/           迁移 / 基准 / 截图 / 审计
 | **0 · 卫生** | 提交术语改动；删调试残留；修 6 个 UID；更新 README | 极低 | 装载无 UID 警告；17 脚本全绿；工作区干净 |
 | **1 · 测试基建** | `_test_base.gd` + 统一运行器 + CI + `test_audit.py` | 低 | 一条命令跑完全部；失败必返回非 0；README 不再手写计数；测试不新增私有字段访问 |
 | **2 · Debug 抽离** | `DesktopDebug`（含截图流程） | 低-中 | Desktop 减少约 1150 行；17 个测试改为 `desk.debug.*`；发布构建不实例化 |
-| **3 · Desktop 拆分** | Canvas → DragDrop → Tec → Matrix/Garden → People → Tutorial → CaseSession | 中 | 每步 17 脚本全绿；`Desktop.gd` ≤ 1200 行 |
+| **3 · Desktop 拆分** | 边界清晰者优先：Garden/Music → People → Tec → Matrix → Tutorial → CaseSession → Canvas → DragDrop → Launcher → Narrative → CardUi → Windows → Chrome | 中 | 每步 17 脚本全绿；`Desktop.gd` ≤ 1200 行 |
 | **4 · 模型收敛** | GraphState 领域拆分 + NodeState 类型化 | 中-高（动存档） | `test_p15` 全绿；旧档可读；魔法字符串显著减少 |
 | **5 · 表现层收尾** | `ListPanel` / `FloatingPanel`；`_process` 门控；测试私有访问清零 | 低 | 重复 helper 归零；空闲帧无 `_process`；测试只走公开接缝 |
 
@@ -568,7 +568,7 @@ if OS.is_debug_build() or _shot_mode():
 | **0 · 卫生** | ✅ | 术语统一（`e6130ea`）、清理调试残留与失效 UID（`ca84a8d`）、体检文档（`b77ce61`） | 装载无 UID 警告；17 脚本全绿 |
 | **1 · 测试基建** | ✅ | `tests/headless/_test_base.gd`；`tools/run_tests.sh`；`tools/test_audit.py` + 124 条基线；`mono_audit.py` UTF-8 修复；GitHub Actions；README 去手写计数（`1196076`） | **1865 项 / 0 失败**；两项审计通过 |
 | **2 · Debug 抽离** | ✅ | 新增 `scenes/debug/DesktopDebug.gd`；`Desktop.gd` 8358 → 6807 行；`class_name Desktop`；测试 776 处改为 `scene.debug.dbg_*` | **1865 项 / 0 失败**；发布构建不实例化；审计 124 条无新增 |
-| **3 · Desktop 拆分** | ⏳ | 待执行：Canvas → DragDrop → Tec → Matrix/Garden → People → Tutorial → CaseSession | `Desktop.gd` ≤ 1200 行 |
+| **3 · Desktop 拆分** | ✅ | 13 个子系统控制器；`Desktop.gd` 6807 → 1022 行；测试私有访问审计扩到 `scene.<controller>._` | **1865 项 / 0 失败**；`Desktop.gd` ≤ 1200 行 |
 | **4 · 模型收敛** | ⏳ | 待执行：`GraphState` 领域拆分 + 节点模型类型化 | 旧档可读（`format: 1`） |
 | **5 · 表现层收尾** | ⏳ | 待执行：UI 组件复用、`_process` 门控、测试私有访问清零 | 审计基线归零 |
 
@@ -579,20 +579,55 @@ if OS.is_debug_build() or _shot_mode():
 - 未新增长期转发 shim：测试一次性机械替换完成，`Desktop` 上不保留 `dbg_*` 入口。
 - 截图流程留在 `DesktopDebug` 内，`tools/shoot_aesthetic.gd` 改走 `scene.debug.dbg_*`。
 
-**当前规模**
+**批次 3 的实际结果**
 
-| 文件 | 行数 |
-|---|---:|
-| `scenes/Desktop.gd` | 6807 |
-| `scenes/debug/DesktopDebug.gd` | 1198 |
+拆分顺序从「低耦合 → 高耦合」推进，而不是照 §5 从 Canvas 开始：先搬边界清晰的 Garden/Music、People、Tec、Matrix、Tutorial、CaseSession，再搬 Canvas、DragDrop、Launcher、Narrative、CardUi、Windows、Chrome。每一步只搬一个子系统并跑全套，避免在最大依赖块上同时引入两类风险。
+
+| 控制器 | 行数 | 职责 |
+|---|---:|---|
+| `scenes/Desktop.gd` | 1022 | 生命周期、根布局、输入路由、toast、日志、`_process` 编排 |
+| `scenes/desktop/CanvasController.gd` | 870 | 相机、卡片同步、连线、力导向、布局、命中查询 |
+| `scenes/desktop/CaseSession.gd` | 759 | 进案 / 停靠 / 重置 / 续档 / 存档 / 撤销 / 开局 |
+| `scenes/desktop/DragDropController.gd` | 676 | 卡片拖拽、收纳行拖拽、落点表、drop 分派 |
+| `scenes/desktop/CardUiController.gd` | 584 | 详情窗、右键菜单、容器展开、密码、组合、叙事卡 |
+| `scenes/desktop/TutorialFlow.gd` | 522 | 6 幕教学 |
+| `scenes/desktop/TecController.gd` | 459 | TEC 窗、分析、提示、反应表 |
+| `scenes/desktop/NarrativeController.gd` | 457 | 时间轴、档案、放映卡、对话 / 独白 |
+| `scenes/desktop/PeopleController.gd` | 406 | 名册、档案卡、主张 / 字段 / 盖章 |
+| `scenes/desktop/ChromeController.gd` | 402 | 页眉、调试面板、面包屑 / 目标、聚焦选项 |
+| `scenes/desktop/LauncherController.gd` | 372 | 图标栏、角标、app 开窗 |
+| `scenes/desktop/WindowController.gd` | 297 | 主窗、z 序、提层、浮窗落点 |
+| `scenes/desktop/MatrixController.gd` | 239 | 桌布、归位 / 取回、推演、结局 |
+| `scenes/desktop/GardenMusicController.gd` | 224 | 音乐播放器、花园、种子、收幕 |
+| `scenes/debug/DesktopDebug.gd` | 1246 | 测试 / 截图 API（批次 2 的 1198 + 本批新增查询） |
+
+**结构约定（过渡期）**
+
+- 每个控制器都是 `Desktop` 的 `Node` 子节点，由 `_mount_parts()` 在 `_build_ui()` 之前挂载，`desk` 注入宿主引用。
+- 控制器之间不互相持有；跨子系统调用统一走 `desk.<controller>.<method>`，宿主仍是唯一装配点，后续可逐步收窄成显式接口 / signal。
+- 搬出的函数名保持原样（`_open_tec` 等），减少测试与调用点的一次性改动。
+- 仍直接访问 `desk._field` 是**有意保留的过渡态**：它把耦合显式化、可审计，但不等于最终形态。批次 4/5 再把「共享状态」收进 `DesktopContext` 与领域对象。
+
+**本批踩到并修正的坑**
+
+- 原 `Desktop.gd` 里有若干**声明夹在函数之间**（`_move_twens`、`_follow_frames`、`_layout_job`、`_layout_sig`、`_fresh_spawns`、`_last_rebuild_stats`、`_mem_anchor_key`、`ZR_*`、`ICON_*`、`ForceLayoutScript`）。按顶层函数切块时会把这些声明误并入前一个函数，必须逐个确认归属：画布状态归 `CanvasController`，层级 / 图标常量归 `Desktop`，放映锚点归 `NarrativeController`。
+- 控制器从 `Control` 变成 `Node` 后，`accept_event()` 这类控件方法要显式走 `desk._stage.`；`add_child()` 建页眉时也必须挂回 `desk`，否则 `scene.get_node("header/...")` 与锚点布局都会偏。
+- `Callable(self, "_handle_card_drop")` 在搬家后会指向控制器自身；改为 `Callable(desk.drag, ...)`。
+- 用 `:=` 接收 `desk.<controller>.method()` 的返回值会因宿主无类型而推断失败，统一补显式类型。
+- 前缀替换不能只按子串：`_autosave` 会误伤 `_autosave_due_msec`，`_undo` 会误伤 `_undo_btn`。批量改写后需再做一次「引用是否真实存在」的静态核对。
+
+**测试基建补强**
+
+- `tools/run_tests.sh` 现在把 `SCRIPT ERROR` / `Parse Error` / `Failed to load script` 直接判失败。此前 Desktop 解析失败时测试会少跑一大段却仍报「0 失败」，本批前半程真实踩到过。
+- `tools/test_audit.py` 的扫描口径扩到 `scene.<controller>._xxx`。基线从 124 条收敛到 **108 条**（其中 50 条是控制器私有访问）；口径变宽而总数下降，说明批次 3 本身没有增加测试对私有的新依赖。
 
 **仍待收敛的测试接缝**
 
-- 窗口 / 画布组件里还有 **45 个 `dbg_*`**（`IntroWin` 10、`CertWin` 6、`EdgeLayer` 4、`GardenWin` 4、`LogWin` 4、`CaseMapWin` 3 等）。它们位于组件边界，不在 `Desktop` 内，暂不阻塞批次 3；批次 5 统一评估：能由真实输入驱动的删掉，其余改名为 `test_*` 或并入 `DesktopDebug` 的查询层。
-- `Desktop.gd:966` 把调试面板按钮命名为 `dbg_btn_*`，`test_ui.gd` 依赖该名称查找。批次 3 搬动页眉代码时一并改为按文案查找。
+- 窗口 / 画布组件里还有 **45 个 `dbg_*`**（`IntroWin` 10、`CertWin` 6、`EdgeLayer` 4、`GardenWin` 4、`LogWin` 4、`CaseMapWin` 3 等）。它们位于组件边界，不在 `Desktop` 内；批次 5 统一评估：能由真实输入驱动的删掉，其余改名为 `test_*` 或并入 `DesktopDebug` 的查询层。
+- `ChromeController` 把调试面板按钮命名为 `dbg_btn_*`，`test_ui.gd` 仍依赖该名称查找；批次 5 改为按文案查找。
 
-**下一步**：批次 3 从 `CanvasController` 开始，先搬相机 / 卡片同步 / 连线 / 布局等无状态纯逻辑；每搬一个子系统提交一次，保持 1865 项全绿，并以 §6.C.2 的私有访问基线只减不增为约束。
+**下一步**：批次 4 拆 `GraphState`（`MatrixState` / `TimelineState` / `PersonaState` / `GardenState`）并类型化节点模型，保持 `format: 1` 存档可读；每步以 `test_p15` + 全量回归为门槛。
 
 ---
 
-> 本报告起初只描述现状与建议；批次 0–2 已按 §5 落地，现状与本节的差异以本节为准。
+> 本报告起初只描述现状与建议；批次 0–3 已按 §5 落地，现状与本节的差异以本节为准。

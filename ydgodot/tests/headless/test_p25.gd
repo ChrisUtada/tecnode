@@ -316,7 +316,7 @@ func _test_desktop(c: CaseLoader) -> void:
 		check("U7 音乐坞拖动后仍在桌面内",
 			scene._desk.get_global_rect().encloses(dock.get_global_rect()), str(dock.get_global_rect()))
 		var dock_dragged: Vector2 = dock.position
-		scene._place_music_windows()
+		scene.debug.dbg_layout_music_windows()
 		check("U7 音乐坞 resize 不被吸回", dock.position == dock_dragged,
 			str(dock.position) + " / " + str(dock_dragged))
 		var dock_click: Vector2 = dock.get_global_rect().get_center()
@@ -511,11 +511,11 @@ func _test_desktop(c: CaseLoader) -> void:
 					scene.graph.link(probe.card_key, other.card_key, "entity")
 					probe_has_edges = true
 					break
-		scene._repaint_edges()
+		scene.canvas._repaint_edges()
 		var segs_before: int = scene._edge_layer.segment_count()
 		probe.global_position = matrix.global_position + Vector2(20, 20)
-		scene._sync_matrix_occlusion()
-		scene._repaint_edges()
+		scene.debug.dbg_matrix_sync_occlusion()
+		scene.canvas._repaint_edges()
 		if probe_has_edges and segs_before > 0:
 			check("A7 淡出卡不再画连线",
 				scene._edge_layer.segment_count() < segs_before,

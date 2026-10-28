@@ -15,7 +15,8 @@
     python tools/test_audit.py --check    # 门槛：出现基线外的新访问 → 退出码 1
     python tools/test_audit.py --update   # 重建基线（只应在明确接受现状时跑）
 
-扫描口径：`tests/**/*.gd` 中 `scene._xxx` / `desk._xxx`（Desktop 实例的私有成员）。
+扫描口径：`tests/**/*.gd` 中 `scene._xxx` / `desk._xxx`，以及批次 3 之后的
+`scene.<controller>._xxx`（Desktop 仍持有状态，控制器只是宿主）。
 窗口 / 卡片的视觉断言（如 `card._gui_input`）不在本守卫范围；等 Desktop 拆分完成后再逐类收紧。
 """
 
@@ -36,7 +37,14 @@ TESTS = os.path.join(ROOT, "tests")
 BASELINE = os.path.join(HERE, "test_audit_baseline.txt")
 
 # Desktop 实例在测试里通常叫 scene；保留 desk 以便后续重命名。
-TARGET_RE = re.compile(r"\b(?:scene|desk)\.(_[A-Za-z0-9_]+)")
+# 拆分后私有成员可能挂在 scene.<controller> 下，同样算「测试直连私有实现」。
+CONTROLLERS = (
+    "garden_music", "people", "tec", "matrix", "tutorial", "session", "canvas",
+    "drag", "launcher", "narrative", "card_ui", "windows", "chrome",
+)
+TARGET_RE = re.compile(
+    r"\b(?:scene|desk)\.(?:(?:" + "|".join(CONTROLLERS) + r")\.)?(_[A-Za-z0-9_]+)"
+)
 
 
 def collect() -> dict[str, list[tuple[str, int]]]:

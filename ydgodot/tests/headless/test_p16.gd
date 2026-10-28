@@ -173,15 +173,15 @@ func _test_desktop() -> void:
 	scene._view_user = true
 	scene._view_k = 1.8
 	scene._view_pos = Vector2(-4000.0, -4000.0)
-	scene._apply_view()
-	scene._reset_case()
+	scene.canvas._apply_view()
+	scene.debug.dbg_reset_case()
 	await process_frame
 	check("重置先弹确认", scene._confirm_win != null and scene._confirm_win.visible)
 	if scene._confirm_win != null:
 		scene._confirm_win.dbg_cancel()
 	await process_frame
 	check("取消后确认窗关闭", scene._confirm_win == null)
-	scene._reset_case(true)
+	scene.debug.dbg_reset_case(true)
 	await process_frame
 	await process_frame
 	check("S1 重置后镜头回到自动档", not scene._view_user)

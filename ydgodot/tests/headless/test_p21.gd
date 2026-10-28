@@ -130,12 +130,12 @@ func _test_desktop() -> void:
 		str(scene._dock_card.get_global_rect()))
 	var desk_old: Vector2 = scene._desk.size
 	scene._desk.size = Vector2(960.0, 508.0)
-	scene._place_case_dock()
+	scene.session._place_case_dock()
 	check("U6 960×560 下 dock 仍在桌面内",
 		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
 		str(scene._dock_card.get_global_rect()))
 	scene._desk.size = desk_old
-	scene._place_case_dock()
+	scene.session._place_case_dock()
 	check("dock 模式无图标角标", not bool(info["badge_visible"]))
 	check("dock 卡片有内容", scene._dock_title.text != "" and scene._dock_sub.text != "")
 	var dock_glyph := scene._dock_card.find_child("case_glyph", true, false) as Label
@@ -176,7 +176,7 @@ func _test_desktop() -> void:
 		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
 		str(scene._dock_card.get_global_rect()))
 	var dock_dragged: Vector2 = scene._dock_card.position
-	scene._place_case_dock()
+	scene.session._place_case_dock()
 	check("U7 案件卡片重排不被吸回", scene._dock_card.position == dock_dragged,
 		str(scene._dock_card.position) + " / " + str(dock_dragged))
 	var dock_click: Vector2 = scene._dock_card.get_global_rect().get_center()
@@ -229,7 +229,7 @@ func _test_desktop() -> void:
 	scene.debug.dbg_ending_finish()
 
 	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
-	scene._sync_case_progress_from_graph()
+	scene.session._sync_case_progress_from_graph()
 	info = scene.debug.dbg_case_info()
 	check("旧存档补记完成", (info["completed"] as Array).has("A001"), str(info["completed"]))
 	check("旧存档补解锁 A002", (info["unlocked"] as Array).has("A002"), str(info["unlocked"]))

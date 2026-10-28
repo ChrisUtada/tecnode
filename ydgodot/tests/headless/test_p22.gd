@@ -143,11 +143,11 @@ func _test_desktop() -> void:
 	check("U7 TEC 胶囊拖动后仍在桌面内",
 		scene._desk.get_global_rect().encloses(chip.get_global_rect()), str(chip.get_global_rect()))
 	var chip_dragged_pos: Vector2 = chip.position
-	scene._place_floating_windows()
+	scene.windows._place_floating_windows()
 	check("U7 TEC 胶囊 resize 不被吸回", chip.position == chip_dragged_pos,
 		str(chip.position) + " / " + str(chip_dragged_pos))
 	chip.reset_place()
-	scene._place_floating_windows()
+	scene.windows._place_floating_windows()
 	var chip_click: Vector2 = chip.get_global_rect().get_center()
 	var chip_cdown := InputEventMouseButton.new()
 	chip_cdown.button_index = MOUSE_BUTTON_LEFT
@@ -393,7 +393,7 @@ func _test_desktop() -> void:
 
 	# G7：双击场景（`_toggle_container`）这条首次展开路径也要有 TEC 引导。
 	var lines_before_expand: int = scene.debug.dbg_tec_win().line_count()
-	scene._toggle_container("loc", "SCENES_garden")
+	scene.card_ui._toggle_container("loc", "SCENES_garden")
 	check("G7 首次展开场景时 TEC 主动提示",
 		scene.debug.dbg_tec_win().line_count() == lines_before_expand + 1,
 		str(scene.debug.dbg_tec_win().line_count() - lines_before_expand))
@@ -401,16 +401,16 @@ func _test_desktop() -> void:
 		String(scene.debug.dbg_tec_win().dbg_lines()[-1]).contains("档案"),
 		String(scene.debug.dbg_tec_win().dbg_lines()[-1]))
 	var lines_after_first: int = scene.debug.dbg_tec_win().line_count()
-	scene._toggle_container("loc", "SCENES_garden")   # 收起
-	scene._toggle_container("loc", "SCENES_garden")   # 再展开
+	scene.card_ui._toggle_container("loc", "SCENES_garden")   # 收起
+	scene.card_ui._toggle_container("loc", "SCENES_garden")   # 再展开
 	check("G7 再次展开/收起不重复提示",
 		scene.debug.dbg_tec_win().line_count() == lines_after_first,
 		str(scene.debug.dbg_tec_win().line_count() - lines_after_first))
 
 	# 回归：花园与书桌都展开后先后折叠，不能把所有卡片（包括花园场景卡）藏光。
-	scene._toggle_container("item", "ITEM_shuzhuo")   # 展开书桌
-	scene._toggle_container("loc", "SCENES_garden")   # 折叠花园
-	scene._toggle_container("item", "ITEM_shuzhuo")   # 折叠书桌
+	scene.card_ui._toggle_container("item", "ITEM_shuzhuo")   # 展开书桌
+	scene.card_ui._toggle_container("loc", "SCENES_garden")   # 折叠花园
+	scene.card_ui._toggle_container("item", "ITEM_shuzhuo")   # 折叠书桌
 	var reg_garden: NodeCard = scene._cards.get("loc:SCENES_garden", null)
 	check("连续折叠花园/书桌：花园场景卡仍在",
 		reg_garden != null and reg_garden.visible,
@@ -420,14 +420,14 @@ func _test_desktop() -> void:
 		if (scene._cards[raw_key] as NodeCard).visible:
 			reg_visible += 1
 	check("连续折叠花园/书桌：画布没有清空", reg_visible > 0, str(reg_visible))
-	scene._toggle_container("loc", "SCENES_garden")   # 恢复展开，后续 TEC 用例继续
+	scene.card_ui._toggle_container("loc", "SCENES_garden")   # 恢复展开，后续 TEC 用例继续
 
 	# W26：同文本提示不重复追加。
 	scene.debug.dbg_tec_win().finish_typing()
 	var dup0: int = scene.debug.dbg_tec_win().line_count()
-	scene._tec_hint("W26-重复提示")
+	scene.debug.dbg_tec_hint("W26-重复提示")
 	scene.debug.dbg_tec_win().finish_typing()
-	scene._tec_hint("W26-重复提示")
+	scene.debug.dbg_tec_hint("W26-重复提示")
 	check("W26 同文本提示只追加一次", scene.debug.dbg_tec_win().line_count() == dup0 + 1,
 		"%d -> %d" % [dup0, scene.debug.dbg_tec_win().line_count()])
 
@@ -435,7 +435,7 @@ func _test_desktop() -> void:
 	check("分析中", bool(scene.debug.dbg_tec_info()["win"]["analyzing"]))
 	scene.debug.dbg_tec_open()
 	await process_frame
-	scene._reset_case(true)
+	scene.debug.dbg_reset_case(true)
 	await process_frame
 	await process_frame
 	info = scene.debug.dbg_tec_info()

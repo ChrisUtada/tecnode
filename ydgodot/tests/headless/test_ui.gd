@@ -34,7 +34,7 @@ func _initialize() -> void:
 	scene._view_k = 1.0
 	scene._view_pos = Vector2.ZERO
 	scene._view_user = true
-	scene._apply_view()
+	scene.canvas._apply_view()
 
 	scene.debug.dbg_expand("SCENES_garden")
 	await process_frame
@@ -211,7 +211,7 @@ func _initialize() -> void:
 	# K6：拒收话术按目标分派，场景拖到证据不能再报「收纳袋」，且必须写日志。
 	scene._hide_toast()
 	var k6_log0: int = scene.graph.log_count()
-	scene._store_into(GraphState.LEDGER, "loc:SCENES_garden")
+	scene.drag._store_into(GraphState.LEDGER, "loc:SCENES_garden")
 	check("K6 场景拖证据话术按目标",
 		scene.debug.dbg_toast_text().contains("证据") and not scene.debug.dbg_toast_text().contains("收纳袋"),
 		scene.debug.dbg_toast_text())
@@ -262,7 +262,7 @@ func _initialize() -> void:
 	# 页眉拉满视口宽：不缩放之后它是自适应的，1280 口径下必须正好 1280
 	check("页眉宽 = 视口宽（自适应）", head != null and absf(head.size.x - scene._vw()) < 0.5,
 		str(head.size.x) if head != null else "null")
-	scene._open_debug_panel()
+	scene.chrome._open_debug_panel()
 	await process_frame
 	var dbg_pop := scene.get_node_or_null("debug_pop") as Control
 	check("调试面板可打开", dbg_pop != null and dbg_pop.visible)
@@ -285,7 +285,7 @@ func _initialize() -> void:
 		and tog_img.get_size() == Vector2i(13, 13)
 		and tog_img.get_pixel(0, 0).a == 0.0 and tog_img.get_pixel(2, 0).a > 0.0,
 		str(tog_img.get_size()) if tog_img != null else "null")
-	scene._close_debug_panel()
+	scene.chrome._close_debug_panel()
 	check("调试面板可关闭", dbg_pop != null and not dbg_pop.visible)
 	check("A4 调试影随面板隐藏", dbg_shadow == null or not dbg_shadow.visible)
 	# 主窗跟着桌面长：1280×720 下画布必须是 1162 × 608（Web 标题栏 28px 口径）
@@ -410,8 +410,8 @@ func _initialize() -> void:
 		pos_struct[String(k)] = (_cards()[k] as Control).position
 	scene.debug.dbg_activate(TORCH)                 # 点亮 / 熄灭手电筒 = 纯状态变化，结构没变
 	await process_frame
-	scene._relayout()                         # 结构没变的普通重排
-	scene._relayout()
+	scene.canvas._relayout()                         # 结构没变的普通重排
+	scene.canvas._relayout()
 	await process_frame
 	var drift_max := 0.0
 	for k in pos_struct.keys():
@@ -510,7 +510,7 @@ func _initialize() -> void:
 		var before_explored: Array = (scene.debug.dbg_state()["explored"] as Array).duplicate()
 		var k_goto := "loc:SCENES_garden"
 		check("K5 拖场景到档案被拦截",
-			scene._handle_card_drop(k_goto, goto_icon.get_global_rect().get_center()))
+			scene.drag._handle_card_drop(k_goto, goto_icon.get_global_rect().get_center()))
 		check("K5 档案拒收不改探索状态",
 			(scene.debug.dbg_state()["explored"] as Array) == before_explored)
 		check("K5 档案拒收给 warning toast",
@@ -562,22 +562,22 @@ func _initialize() -> void:
 	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
 	wheel.pressed = true
 	wheel.position = Vector2(500, 300)
-	scene._on_stage_input(wheel)
+	scene.canvas._on_stage_input(wheel)
 	check("滚轮放大", scene._view_k > k0 + 0.001, "%f -> %f" % [k0, scene._view_k])
 	var wheel2 := InputEventMouseButton.new()
 	wheel2.button_index = MOUSE_BUTTON_WHEEL_DOWN
 	wheel2.pressed = true
 	wheel2.position = Vector2(500, 300)
-	scene._on_stage_input(wheel2)
+	scene.canvas._on_stage_input(wheel2)
 	check("滚轮缩小", absf(scene._view_k - k0) < 0.005, "%f" % scene._view_k)
 
 	# 7b) 连续缩放的下限：「看全貌」靠缩到 1x 以下，不是靠 1x/2x 两档
 	for i in 14:
-		scene._on_stage_input(wheel2)
+		scene.canvas._on_stage_input(wheel2)
 	check("滚轮能一直缩到 0.45（连滚 14 格）", absf(scene._view_k - 0.45) < 0.001,
 		"%f" % scene._view_k)
 	for i in 14:
-		scene._on_stage_input(wheel)
+		scene.canvas._on_stage_input(wheel)
 	check("滚轮能一直放大到 2.0", absf(scene._view_k - 2.0) < 0.001, "%f" % scene._view_k)
 
 	# 7c) 卡面只有名字：类型靠左侧类型色符号，状态靠边框与填充
@@ -604,18 +604,18 @@ func _initialize() -> void:
 		str(KindGlyph.GLYPH_TEXT))
 	## U1：0.95 以下直接切纯符号档。0.9x 不再显示被重采样的标题。
 	scene._view_k = 0.9
-	scene._apply_view()
+	scene.canvas._apply_view()
 	check("U1 0.9x：标题退场、只留放大符号", lod_card != null and not lod_card._title.visible
 		and lod_card._glyph.visible and lod_card._glyph.size.x > 60.0,
 		"null" if lod_card == null else "%s/%.0f" % [lod_card._title.visible,
 			lod_card._glyph.size.x])
 	scene._view_k = 0.96
-	scene._apply_view()
+	scene.canvas._apply_view()
 	check("U1 0.96x：标题回来", lod_card != null and lod_card._title.visible,
 		"null" if lod_card == null else str(lod_card._title.visible))
 	## 0.88x 实测标题已缺笔（「注射器」被压成「注器」）⇒ 再往下只留放大的类型符号
 	scene._view_k = 0.6
-	scene._apply_view()
+	scene.canvas._apply_view()
 	check("0.6x：文字退场、符号放大铺满", lod_card != null and not lod_card._title.visible
 		and lod_card._glyph.visible and lod_card._glyph.size.x > 60.0,
 		"null" if lod_card == null else "%s/%.0f" % [lod_card._title.visible,
@@ -625,7 +625,7 @@ func _initialize() -> void:
 	check("0.6x：连线收到了倍率", edges != null and absf(edges._zoom - 0.6) < 0.001,
 		"%f" % edges._zoom if edges != null else "null")
 	scene._view_k = 1.0
-	scene._apply_view()
+	scene.canvas._apply_view()
 	check("1x：标题回来、符号缩回左侧", lod_card != null and lod_card._title.visible
 		and lod_card._glyph.size.x <= NodeCard.GLYPH_BOX,
 		"null" if lod_card == null else "%.0f" % lod_card._glyph.size.x)
@@ -777,7 +777,7 @@ func _initialize() -> void:
 		lod_card.set_shell_state(true, true, false, false)
 	# 7d) 「适应窗口」按包围盒缩放：装不下才缩，且真的写进图层变换
 	scene._view_user = false
-	scene._fit_cards()
+	scene.canvas._fit_cards()
 	check("U1 适应窗口落在 0.45~1.0（只缩不放）",
 		scene._view_k >= 0.45 - 0.001 and scene._view_k <= 1.0 + 0.001,
 		"%f" % scene._view_k)
@@ -788,7 +788,7 @@ func _initialize() -> void:
 	scene._view_k = k0
 	scene._view_pos = pos0
 	scene._view_user = true
-	scene._apply_view()
+	scene.canvas._apply_view()
 
 	# 8) 点空白 = 清选中 + 收起详情窗
 	var vis_card: NodeCard = null
@@ -805,12 +805,12 @@ func _initialize() -> void:
 	blank.button_index = MOUSE_BUTTON_LEFT
 	blank.pressed = true
 	blank.position = Vector2(420, 260)
-	scene._on_stage_input(blank)
+	scene.canvas._on_stage_input(blank)
 	var blank_up := InputEventMouseButton.new()
 	blank_up.button_index = MOUSE_BUTTON_LEFT
 	blank_up.pressed = false
 	blank_up.position = Vector2(420, 260)
-	scene._on_stage_input(blank_up)
+	scene.canvas._on_stage_input(blank_up)
 	await process_frame
 	check("点空白清选中", String(scene.debug.dbg_state()["selected"]) == "")
 
@@ -840,15 +840,15 @@ func _initialize() -> void:
 		check("W6 关闭后实例保留（可再次打开）", is_instance_valid(dw))
 		var commit_before: Dictionary = scene._save.snapshot()
 		scene.graph.mark_fresh(vis_card.card_key)
-		scene._commit(commit_before)
+		scene.debug.dbg_commit(commit_before)
 		await process_frame
 		check("W6 任意操作不复活已关闭详情", not dw.visible)
-		scene._on_card_selected(vis_card.card_key)
+		scene.card_ui._on_card_selected(vis_card.card_key)
 		await process_frame
 		check("W6 再点卡片可重新打开详情", dw.visible)
 
 		# U2 收敛：叙事卡在屏上时详情完全让位；关闭叙事卡后才切到详情。
-		scene._show_narr("SCENES_garden")
+		scene.card_ui._show_narr("SCENES_garden")
 		await process_frame
 		var u2_narr: NarrCard = scene._narr
 		var u2_para: TypewriterLabel = null
@@ -856,7 +856,7 @@ func _initialize() -> void:
 			u2_para = dw.find_child("dt_desc", true, false) as TypewriterLabel
 		check("U2 叙事卡开始打字", u2_narr != null and u2_narr.is_typing())
 		check("U2 打字中详情先收起", not dw.visible)
-		scene._refresh_detail()
+		scene.card_ui._refresh_detail()
 		await process_frame
 		check("U2 打字中后台刷新不弹详情", not dw.visible)
 		if u2_narr != null:
@@ -878,10 +878,10 @@ func _initialize() -> void:
 			"null" if u2_para == null else str(u2_para.is_typing()))
 
 		# 玩家明确点另一张卡：收掉叙事卡再切详情，不能并排。
-		scene._show_narr("SCENES_garden")
+		scene.card_ui._show_narr("SCENES_garden")
 		await process_frame
 		check("U2 再次开叙事：详情重新让位", not dw.visible and scene._narr != null)
-		scene._on_card_selected(vis_card.card_key)
+		scene.card_ui._on_card_selected(vis_card.card_key)
 		await process_frame
 		await process_frame
 		check("U2 点节点 = 收叙事、切详情",
@@ -914,7 +914,7 @@ func _initialize() -> void:
 		str(back.get_global_rect()) if back != null else "null")
 
 	# K4/K6：收纳行拖到「另一扇收纳图标」必须被分派器接住并拒绝，不能掉回画布取回。
-	scene._store_into(GraphState.BAG, TORCH)
+	scene.drag._store_into(GraphState.BAG, TORCH)
 	check("K4 先把物品收进物品窗", String(scene.graph.stored.get(TORCH, "")) == GraphState.BAG)
 	scene._hide_toast()
 	scene.debug.dbg_storage_drag(TORCH, (scene.get_node("desk/icons/icon_clue") as Control).get_global_rect().get_center())
@@ -926,8 +926,8 @@ func _initialize() -> void:
 		scene.debug.dbg_toast_text().contains("证据") and scene.debug.dbg_toast_text().contains("物是原料"),
 		scene.debug.dbg_toast_text())
 	scene.graph.take_back(TORCH)
-	scene._apply_hidden()
-	scene._refresh_or_spawn_card(TORCH)
+	scene.card_ui._apply_hidden()
+	scene.canvas._refresh_or_spawn_card(TORCH)
 	await process_frame
 	check("K4 复原手电筒到画布", not scene.graph.stored.has(TORCH))
 
@@ -1035,7 +1035,7 @@ func _initialize() -> void:
 	# 15) V4 pop：fresh 节点初生 0.4→1.12→1（0.45s）；fresh 一次性消费、「新」角标保留
 	## 推演窗还开着时，新卡可能被遮挡层冻结 process；先收掉再验入场动画。
 	if scene._matrix_win != null and is_instance_valid(scene._matrix_win):
-		scene._toggle_matrix()
+		scene.debug.dbg_matrix_toggle()
 		await process_frame
 	scene._hide_toast()
 	var pop_key: String = scene.debug.dbg_ensure("evidence", "CLUES_wmhj")
@@ -1145,11 +1145,11 @@ func _initialize() -> void:
 	# 收掉推演窗与两扇收纳窗（S6/S7 起开着）：后面的交互章节要用整块画布，
 	# 别让 mx-board / bag-win / clue-win 拦走 _drop_targets 里的落点
 	if scene._matrix_win != null and is_instance_valid(scene._matrix_win):
-		scene._toggle_matrix()
+		scene.debug.dbg_matrix_toggle()
 	if scene._bag_win != null and is_instance_valid(scene._bag_win):
-		scene._toggle_storage(GraphState.BAG)
+		scene.drag._toggle_storage(GraphState.BAG)
 	if scene._ledger_win != null and is_instance_valid(scene._ledger_win):
-		scene._toggle_storage(GraphState.LEDGER)
+		scene.drag._toggle_storage(GraphState.LEDGER)
 	mw = null
 	await process_frame
 
@@ -1162,18 +1162,18 @@ func _initialize() -> void:
 	var far20: Vector2 = start20 + Vector2(480.0, -260.0)
 	scene.graph.node(TORCH)["x"] = far20.x
 	scene.graph.node(TORCH)["y"] = far20.y
-	scene._relayout(true, true)
+	scene.canvas._relayout(true, true)
 	var target20: Vector2 = Vector2(float(scene.graph.node(TORCH)["x"]), float(scene.graph.node(TORCH)["y"]))
 	check("重排：搬家目标离原位很远", target20.distance_to(start20) > 2.0,
 		str(target20) + " / " + str(start20))
 	await process_frame
-	check("过渡：补间已挂上", scene._move_twens.has(TORCH))
+	check("过渡：补间已挂上", scene.canvas._move_twens.has(TORCH))
 	check("过渡：动画在路上（未到终点）", tk20.position.distance_to(target20) > 1.0,
 		str(tk20.position) + " → " + str(target20))
-	check("过渡：连线跟随窗口开着", scene._follow_frames > 0, str(scene._follow_frames))
+	check("过渡：连线跟随窗口开着", scene.canvas._follow_frames > 0, str(scene.canvas._follow_frames))
 	await create_timer(0.55).timeout
 	check("过渡：收尾到位", tk20.position.distance_to(target20) < 1.0, str(tk20.position))
-	check("过渡：补间已清空", scene._move_twens.is_empty(), str(scene._move_twens.keys()))
+	check("过渡：补间已清空", scene.canvas._move_twens.is_empty(), str(scene.canvas._move_twens.keys()))
 	var uc20 := ""
 	for cid20 in ["CLUES_qsan", "CLUES_mgd", "CLUES_wmhj"]:
 		if not scene.graph.has("evidence", cid20):
@@ -1185,7 +1185,7 @@ func _initialize() -> void:
 	check("新节点：直接落位（不播过渡）",
 		new_card20 != null and new_card20.position.is_equal_approx(
 			Vector2(float(scene.graph.node(new_key20)["x"]), float(scene.graph.node(new_key20)["y"])))
-		and not scene._move_twens.has(new_key20))
+		and not scene.canvas._move_twens.has(new_key20))
 
 	# 21) 反应表三条产出来源（Web 05-combine.js:112-123，A-001 反应表全是纯文本 —— 注入验证接线）：
 	#     A) 真拖到陆珩松：results.scene + results.items 长出卡片（「新」角标）；
@@ -1276,7 +1276,7 @@ func _initialize() -> void:
 	# 22) z 序：新打开 / 被点击的系统窗提到浮动窗栈顶；
 	# icons 在浮动窗之下；toast(30) 在 TEC(28) 之上；镜像(40) 在 toast 之上
 	var desk22: Control = scene.get_node("desk")
-	scene._toggle_case_map()
+	scene.session._toggle_case_map()
 	await process_frame
 	scene._toggle_log()
 	await process_frame
@@ -1304,16 +1304,16 @@ func _initialize() -> void:
 	check("A2：非激活窗 1px 框", map_sb.border_width_top == 1, str(map_sb.border_width_top))
 	check("A2：非激活标题降到 INK_FAINT",
 		map_w._title_label.get_theme_color("font_color") == TecTheme.INK_FAINT)
-	scene._ensure_detail()
+	scene.card_ui._ensure_detail()
 	scene._detail_win.show()
-	scene._raise_to_front(scene._detail_win)
+	scene.windows._raise_to_front(scene._detail_win)
 	await process_frame
 	var e_detail: Control = scene._detail_win
 	var detail_sb := ((e_detail as SysWindow).get_node("bg") as Panel).get_theme_stylebox("panel") as StyleBoxFlat
 	check("z：详情窗提到 icons 之上", e_icons.get_index() < e_detail.get_index())
 	check("z：详情窗提到日志之上", e_log.get_index() < e_detail.get_index())
 	check("A2：详情窗成为当前窗", (e_detail as SysWindow).is_window_active())
-	scene._open_tec()
+	scene.debug.dbg_tec_open()
 	await process_frame
 	check("z：TEC 提到地图之上", scene._map_win.get_index() < scene._tec.get_index())
 	check("z：TEC 提到详情之上", e_detail.get_index() < scene._tec.get_index())
@@ -1321,13 +1321,13 @@ func _initialize() -> void:
 	check("A2：TEC 开窗后接管激活态", (scene._tec as SysWindow).is_window_active())
 	check("A2：详情转非激活", not (e_detail as SysWindow).is_window_active())
 	check("A2：详情框降回 1px", detail_sb.border_width_top == 1, str(detail_sb.border_width_top))
-	scene._hide_tec()
+	scene.debug.dbg_tec_hide()
 	await process_frame
 	check("A2：TEC 收起后详情恢复激活", (e_detail as SysWindow).is_window_active())
 	check("A2：收起后的 TEC 为非激活", not (scene._tec as SysWindow).is_window_active())
 	check("A2：详情框恢复 2px", detail_sb.border_width_top == 2, str(detail_sb.border_width_top))
 	check("点地图正文把地图提到 TEC 之上",
-		scene._raise_window_at(scene._map_win.get_global_rect().get_center())
+		scene.windows._raise_window_at(scene._map_win.get_global_rect().get_center())
 			and scene._map_win.get_index() > scene._tec.get_index())
 	check("点地图正文后地图重新成为当前窗", map_w.is_window_active())
 
@@ -1348,17 +1348,17 @@ func _initialize() -> void:
 	var far23: Vector2 = tk23.position + Vector2(420.0, -240.0)
 	scene.graph.node(TORCH)["x"] = far23.x
 	scene.graph.node(TORCH)["y"] = far23.y
-	scene._relayout(true, true)
+	scene.canvas._relayout(true, true)
 	await process_frame
-	check("前提：卡正处在飞行补间里", scene._move_twens.has(TORCH))
+	check("前提：卡正处在飞行补间里", scene.canvas._move_twens.has(TORCH))
 	_press(tk23, tk23.get_global_rect().get_center())
-	check("按下杀掉落位补间", not scene._move_twens.has(TORCH))
+	check("按下杀掉落位补间", not scene.canvas._move_twens.has(TORCH))
 	_release(tk23, tk23.get_global_rect().get_center())
 	var frozen23: Vector2 = tk23.position
 	await create_timer(0.2).timeout
 	check("按下后卡不再自己漂", tk23.position.is_equal_approx(frozen23),
 		str(tk23.position) + " / " + str(frozen23))
-	scene._relayout(false, true)   # 数据位照旧收干净
+	scene.canvas._relayout(false, true)   # 数据位照旧收干净
 	# 窗口点击提层：点正文也要把窗提到浮动窗栈顶，并成为当前激活窗。
 	# 先把日志窗关到已知态（S22 里开着），再开一份新的
 	if scene._log_win != null and is_instance_valid(scene._log_win):
@@ -1368,10 +1368,10 @@ func _initialize() -> void:
 	await process_frame
 	var e_icons23: Control = scene.get_node("desk/icons")
 	var d23b: Vector2 = (scene._log_win as Control).get_global_rect().get_center() - Vector2(0, 80)
-	scene._raise_to_front(scene._map_win)
+	scene.windows._raise_to_front(scene._map_win)
 	check("前提：地图窗先压住日志", scene._map_win.get_index() > scene._log_win.get_index())
 	check("前提：地图为当前窗", (scene._map_win as SysWindow).is_window_active())
-	check("点日志正文后提到地图之上", scene._raise_window_at(d23b)
+	check("点日志正文后提到地图之上", scene.windows._raise_window_at(d23b)
 		and scene._log_win.get_index() > scene._map_win.get_index())
 	check("点正文提层后也在 icons 之上", scene._log_win.get_index() > e_icons23.get_index(),
 		str(scene._log_win.get_index()) + " / " + str(e_icons23.get_index()))
@@ -1401,7 +1401,7 @@ func _initialize() -> void:
 	up23.global_position = mot23.global_position
 	(scene._log_win as Control)._on_bar_input(up23)
 	scene._tec.position = Vector2(9999.0, 9999.0)
-	scene._open_tec()
+	scene.debug.dbg_tec_open()
 	var tr23: Rect2 = scene._tec.get_global_rect()
 	check("W4 TEC 重开时被钳回桌面",
 		tr23.position.x <= desk23.end.x - 40.0 and tr23.position.y <= desk23.end.y - 40.0,
@@ -1415,7 +1415,7 @@ func _initialize() -> void:
 		str(scene._tec.position))
 	scene._desk.size = desk23_old
 	scene._tec.clamp_into_parent()
-	scene._hide_tec()
+	scene.debug.dbg_tec_hide()
 	scene._toggle_log()
 	await process_frame
 
@@ -1426,7 +1426,7 @@ func _initialize() -> void:
 	# 先把它们收掉，让画布露出来（这一段只关心事件路由，不关心窗口）
 	scene.debug.dbg_close_mem()
 	if scene._map_win != null and is_instance_valid(scene._map_win):
-		scene._toggle_case_map()
+		scene.session._toggle_case_map()
 	for ch in scene._desk.get_children():
 		if ch is NarrCard and (ch as Control).is_visible_in_tree():
 			ch.queue_free()
@@ -1434,7 +1434,7 @@ func _initialize() -> void:
 	scene.debug.dbg_expand("SCENES_garden")
 	await process_frame
 	# 前面的用例把卡片挪得很远；真实事件按屏幕坐标投递，先让画布回到「适应窗口」
-	scene._relayout()
+	scene.canvas._relayout()
 	scene._fit_view()
 	await process_frame
 	await process_frame
@@ -1447,7 +1447,7 @@ func _initialize() -> void:
 	if c24 != null:
 		# 1x 的「适应窗口」只居中不缩小；卡片多时目标可能落在画布外。
 		# 这里只测事件路由，先把目标卡平移到画布中央，保证按点真的落在它身上。
-		scene._center_on(c24)
+		scene.canvas._center_on(c24)
 		await process_frame
 		var r24: Vector2 = c24.get_global_rect().get_center()
 		# 1x 下卡片会互相压住；真实事件命中的是最上面那张，先把目标提到最前
@@ -1705,7 +1705,7 @@ func _initialize() -> void:
 	scene._hide_toast()
 	var detail_key: String = scene.debug.dbg_ensure("item", "ITEM_shuzhuo")
 	scene.graph.explored["ITEM_shuzhuo"] = true
-	scene._on_card_selected(detail_key)
+	scene.card_ui._on_card_selected(detail_key)
 	await process_frame
 	await process_frame
 	await process_frame
@@ -1764,12 +1764,12 @@ func _initialize() -> void:
 	# 第 0 幕与 Desktop 接线：开始后撤掉开始界面并进入第 1 幕（空白桌面 + TEC + 调查员）。
 	scene._inv_path = "user://test_ui_tutorial_inv.json"
 	Investigator.clear(scene._inv_path)
-	scene._open_start_screen()
+	scene.debug.dbg_open_start_screen()
 	await process_frame
 	check("G0 Desktop 能挂开始界面", scene._start_screen != null)
 	if scene._start_screen != null:
 		scene._investigator = {"name": "保留的调查员"}
-		scene._on_start_continue()
+		scene.debug.dbg_start_continue()
 		await process_frame
 		check("C8 读档失败仍留在开始界面", scene._start_screen != null)
 		check("C8 读档失败不清调查员证",
@@ -1781,7 +1781,7 @@ func _initialize() -> void:
 		await process_frame
 	check("G1 开始后进入空白桌面", scene._start_screen == null and scene._tutorial_active)
 	check("G1 图表隐藏、TEC 常驻、TEC办公室节点已出现",
-		not scene._icon_layer().visible and scene._tec.visible
+		not scene.launcher._icon_layer().visible and scene._tec.visible
 			and scene._cards.has("loc:SCENES_TEC_OFFICE"))
 	var office_g1: NodeCard = scene._cards["loc:SCENES_TEC_OFFICE"]
 	check("G1 TEC办公室没有无文本入口角标",
@@ -1799,16 +1799,16 @@ func _initialize() -> void:
 			and (scene._tec.get_node("bar/min") as Control).visible)
 	var tec_home: Vector2 = scene._tec.position
 	scene._tec.position = Vector2(40, 120)
-	scene._place_floating_windows()
+	scene.windows._place_floating_windows()
 	check("G1 TEC 拖动后不被重排拉回", scene._tec.position == Vector2(40, 120))
 	scene._tec.position = tec_home
-	scene._place_floating_windows()
-	scene._close_tec()
+	scene.windows._place_floating_windows()
+	scene.debug.dbg_tec_close()
 	await process_frame
-	check("G1 关掉 TEC 后出现 TEC 图标", scene._icon_by_app("tec").visible)
-	scene._open_tec()
+	check("G1 关掉 TEC 后出现 TEC 图标", scene.launcher._icon_by_app("tec").visible)
+	scene.debug.dbg_tec_open()
 	await process_frame
-	check("G1 重开 TEC 后图标收起", not scene._icon_by_app("tec").visible)
+	check("G1 重开 TEC 后图标收起", not scene.launcher._icon_by_app("tec").visible)
 
 	# ── 第 2 幕：TEC办公室 → 调查员证 → 证件交给 TEC 核对 ──
 	var tut_office_key := "loc:SCENES_TEC_OFFICE"
@@ -1816,7 +1816,7 @@ func _initialize() -> void:
 	var tut_cert_clue_key := "evidence:CLUES_INVESTIGATOR_CERT"
 	check("G2 从第①步开始", scene._tutorial_step == 0)
 	var tec_target := Rect2()
-	for t in scene._drop_targets():
+	for t in scene.drag._drop_targets():
 		if String(t["id"]) == "tec-dock":
 			tec_target = t["rect"]
 	check("G2 整个 TEC 窗体都是落点", tec_target == scene._tec.get_global_rect())
@@ -1845,7 +1845,7 @@ func _initialize() -> void:
 			and _last_line(scene._tec).contains("双击"))
 	check("G2 分析后办公室节点仍在", tut_office_card.visible)
 	# 调查员证由 TEC办公室节点本身产出，TEC 分析不产出证件。
-	scene._on_card_activated(tut_office_key)
+	scene.card_ui._on_card_activated(tut_office_key)
 	check("G2 双击办公室产出调查员证",
 		scene._cards.has(tut_cert_key) and scene._tutorial_step == 1)
 	check("G2 证件连线来自 TEC办公室", scene.graph.has_edge(tut_office_key, tut_cert_key))
@@ -1854,29 +1854,29 @@ func _initialize() -> void:
 			and not scene.graph.nodes.has("evidence:CLUES_INVESTIGATOR"))
 	check("G2 办公室→证件一条线", scene._edge_layer.segment_count() == 1)
 	tut_office_card.modulate.a = 0.0
-	scene._repaint_edges()
+	scene.canvas._repaint_edges()
 	check("U5 透明卡不再画连线", scene._edge_layer.segment_count() == 0)
 	tut_office_card.modulate.a = 1.0
-	scene._repaint_edges()
+	scene.canvas._repaint_edges()
 	check("U5 恢复可见后连线回来", scene._edge_layer.segment_count() == 1)
 	check("G2 TEC 提示把证件拖过去", _last_line(scene._tec).contains("调查员证"))
-	scene._on_card_selected(tut_cert_key)
+	scene.card_ui._on_card_selected(tut_cert_key)
 	check("G2 选中节点显示详情窗",
 		scene._detail_win != null and scene._detail_win.visible)
 	check("G2 详情窗压在 TEC 之上",
 		scene._detail_win.get_index() > scene._tec.get_index())
 	# 证件已出现后再双击办公室不会重复产出。
-	scene._on_card_activated(tut_office_key)
+	scene.card_ui._on_card_activated(tut_office_key)
 	check("G2 双击办公室不重复产证件",
 		scene.graph.nodes.size() == 2 and scene._tutorial_step == 1)
 	check("G2 双击后 TEC 仍指向证件", _last_line(scene._tec).contains("调查员证"))
-	scene._apply_drop("tec-avatar", tut_office_key)
+	scene.drag._apply_drop("tec-avatar", tut_office_key)
 	check("G2 办公室不再交给 TEC", not scene._tec.is_analyzing())
 	check("G2 错拖由 TEC 口头纠正", _last_line(scene._tec).contains("调查员证"))
 	check("G2 错拖不弹系统 toast", not scene._toast_active)
-	scene._tec_talk()
+	scene.debug.dbg_tec_talk()
 	check("G2 点 TEC 仍只指证件", _last_line(scene._tec).contains("调查员证"))
-	scene._apply_drop("tec-avatar", tut_cert_key)
+	scene.drag._apply_drop("tec-avatar", tut_cert_key)
 	check("G2 证件拖给 TEC 开始分析", scene._tec.is_analyzing())
 	scene.debug.dbg_tec_complete()
 	for i in 6:
@@ -1889,63 +1889,63 @@ func _initialize() -> void:
 
 	# ── 第 3 幕：三枚 app 解锁 + 物与词进物品 / 证进证据 ──
 	check("G3 图标栏解锁",
-		scene._icon_layer().visible and scene._icon_by_app("bag").visible
-			and scene._icon_by_app("clue").visible and scene._icon_by_app("infer").visible)
+		scene.launcher._icon_layer().visible and scene.launcher._icon_by_app("bag").visible
+			and scene.launcher._icon_by_app("clue").visible and scene.launcher._icon_by_app("infer").visible)
 	var bag_rect := Rect2()
-	for t in scene._drop_targets():
+	for t in scene.drag._drop_targets():
 		if String(t["id"]) == "bag-dock":
 			bag_rect = t["rect"]
-	scene._update_drop_over(bag_rect.get_center())
+	scene.drag._update_drop_over(bag_rect.get_center())
 	check("G3 收纳图标也显示统一虚线框", scene._drop_outline.visible)
-	scene._clear_drop_over()
-	scene._toggle_storage("BAG")
+	scene.drag._clear_drop_over()
+	scene.drag._toggle_storage("BAG")
 	await process_frame
 	var bag_empty := scene._bag_win._rows.get_child(0) as Label
 	check("G3 空物品有收纳指引",
 		bag_empty != null and bag_empty.text.contains("拖"))
-	scene._update_drop_over(scene._bag_win.get_global_rect().get_center())
+	scene.drag._update_drop_over(scene._bag_win.get_global_rect().get_center())
 	check("G3 收纳窗口也显示统一虚线框", scene._drop_outline.visible)
 	check("G3 窗口虚线框在窗框外 4px",
 		scene._drop_outline.outline_rect().size == scene._bag_win.size - Vector2(20.0, 20.0))
-	scene._toggle_storage("BAG")
+	scene.drag._toggle_storage("BAG")
 	await process_frame
-	scene._update_drop_over(tut_office_card.get_global_rect().get_center())
+	scene.drag._update_drop_over(tut_office_card.get_global_rect().get_center())
 	check("G3 卡片目标也显示统一虚线框", scene._drop_outline.visible)
-	scene._update_drop_over(Vector2(8.0, 8.0))
+	scene.drag._update_drop_over(Vector2(8.0, 8.0))
 	check("G3 移出落点虚线框收起", not scene._drop_outline.visible)
 	var ghost_at := Vector2(520.0, 330.0)
 	check("G3 收纳拖拽幽灵使用视口坐标",
-		scene._sdrag_ghost_position(ghost_at) == ghost_at)
+		scene.drag._sdrag_ghost_position(ghost_at) == ghost_at)
 	check("G3 地图 / 档案未出，TEC 图标按普通 app 常驻",
-		not scene._icon_by_app("map").visible and scene._icon_by_app("tec").visible
-			and not scene._icon_by_app("goto").visible)
+		not scene.launcher._icon_by_app("map").visible and scene.launcher._icon_by_app("tec").visible
+			and not scene.launcher._icon_by_app("goto").visible)
 	# C5：教学期错收由 TEC 口头纠正，不弹系统 toast。
 	var tutorial_soft := _last_line(scene._tec)
 	check("G3 TEC 只提醒整理、不强制", tutorial_soft.contains("不整理"), tutorial_soft)
 	scene._hide_toast()
-	scene._apply_drop("clue-icon", tut_cert_key)
+	scene.drag._apply_drop("clue-icon", tut_cert_key)
 	check("G3 物品不能进证据", not scene.graph.stored.has(tut_cert_key))
 	check("C5 教学期错收走 TEC，不弹 toast", not scene._toast_active)
 	check("C5 物品进证据由 TEC 纠正", _last_line(scene._tec).contains("证据"),
 		_last_line(scene._tec))
 	scene._hide_toast()
-	scene._apply_drop("bag-dock", tut_cert_clue_key)
+	scene.drag._apply_drop("bag-dock", tut_cert_clue_key)
 	check("G3 证不能进物品", not scene.graph.stored.has(tut_cert_clue_key))
 	check("C5 证进物品也不弹 toast", not scene._toast_active)
 	check("C5 证进物品由 TEC 纠正", _last_line(scene._tec).contains("物品"),
 		_last_line(scene._tec))
 	# C5：非证拖到推演图标也只走 TEC。
 	scene._hide_toast()
-	scene._apply_drop("infer-icon", tut_office_key)
+	scene.drag._apply_drop("infer-icon", tut_office_key)
 	check("C5 非证上桌布不弹 toast", not scene._toast_active)
 	check("C5 非证上桌布由 TEC 纠正", _last_line(scene._tec).contains("推演桌布"),
 		_last_line(scene._tec))
 	# 非落点窗体也要拦截卡片，不能穿透去碰窗体下面的节点。
 	check("G3 非落点窗体拦截卡片",
-		scene._handle_card_drop(tut_cert_key, scene._detail_win.get_global_rect().get_center()))
+		scene.drag._handle_card_drop(tut_cert_key, scene._detail_win.get_global_rect().get_center()))
 	check("G3 拦截后物品没被误收", not scene.graph.stored.has(tut_cert_key))
 	# 收纳是可选的：不把两样东西收起来，直接打开推演也要能进入下一幕。
-	scene._toggle_matrix()
+	scene.debug.dbg_matrix_toggle()
 	await process_frame
 	check("G3 不收纳也能打开推演", scene._matrix_win != null)
 	check("G3 打开推演即进入推演步", scene._tutorial_step == 3)
@@ -1955,26 +1955,26 @@ func _initialize() -> void:
 	var old_mx_pos: Vector2 = scene._matrix_win.position
 	scene._tec.position = Vector2(400.0, 120.0)
 	scene._matrix_win.position = Vector2(450.0, 150.0)
-	scene._raise_to_front(scene._matrix_win)
+	scene.windows._raise_to_front(scene._matrix_win)
 	var overlap_pt: Vector2 = scene._tec.get_global_rect() \
 		.intersection(scene._matrix_win.get_global_rect()).get_center()
-	var top_target: Dictionary = scene._drop_target_at(overlap_pt)
+	var top_target: Dictionary = scene.drag._drop_target_at(overlap_pt)
 	check("G3 重叠落点命中上层推演窗",
 		not top_target.is_empty() and String(top_target["id"]) == "mx-board")
-	scene._update_drop_over(overlap_pt)
+	scene.drag._update_drop_over(overlap_pt)
 	check("G3 重叠区域虚线框贴合上层推演窗",
 		scene._drop_outline.outline_rect().size == scene._matrix_win.size - Vector2(20.0, 20.0))
-	scene._clear_drop_over()
+	scene.drag._clear_drop_over()
 	scene._tec.position = old_tec_pos
 	scene._matrix_win.position = old_mx_pos
-	scene._toggle_matrix()
+	scene.debug.dbg_matrix_toggle()
 	await process_frame
 	# 正常收纳继续可用，并且不再反过来推进/卡住教学步骤。
-	scene._apply_drop("bag-dock", tut_cert_key)
+	scene.drag._apply_drop("bag-dock", tut_cert_key)
 	for i in 2:
 		await process_frame
 	check("G3 物卡进物品", String(scene.graph.stored.get(tut_cert_key, "")) == GraphState.BAG)
-	scene._apply_drop("clue-icon", tut_cert_clue_key)
+	scene.drag._apply_drop("clue-icon", tut_cert_clue_key)
 	for i in 4:
 		await process_frame
 	check("G3 证卡进证据", String(scene.graph.stored.get(tut_cert_clue_key, "")) == GraphState.LEDGER)
@@ -1986,22 +1986,22 @@ func _initialize() -> void:
 
 	# C6：证据行内「去推演」也必须走 STORE_SUPPLIES → INFER 的教学守卫。
 	scene._tutorial_step = 2
-	scene._on_ledger_to_matrix(tut_cert_clue_key)
+	scene.debug.dbg_ledger_to_matrix(tut_cert_clue_key)
 	check("C6 证据按钮推进到推演步", scene._tutorial_step == 3,
 		str(scene._tutorial_step))
 	check("C6 证据按钮由 TEC 提示桌布",
 		_last_line(scene._tec).contains("桌布") or _last_line(scene._tec).contains("推演"),
 		_last_line(scene._tec))
 	scene.graph.matrix_take(tut_cert_clue_key)
-	scene._apply_hidden()
-	scene._refresh_matrix_views()
-	scene._store_into(GraphState.LEDGER, tut_cert_clue_key)
+	scene.card_ui._apply_hidden()
+	scene.debug.dbg_matrix_refresh()
+	scene.drag._store_into(GraphState.LEDGER, tut_cert_clue_key)
 	check("C6 测试后证回证据", String(scene.graph.stored.get(tut_cert_clue_key, "")) == GraphState.LEDGER,
 		String(scene.graph.stored.get(tut_cert_clue_key, "")))
 
 	# ── 第 4 幕：玩家自己双击推演 / 证据，再上桌布 ──
-	scene._toggle_matrix()
-	scene._toggle_storage(GraphState.LEDGER)
+	scene.debug.dbg_matrix_toggle()
+	scene.drag._toggle_storage(GraphState.LEDGER)
 	for i in 2:
 		await process_frame
 	check("G4 双击推演打开桌布", scene._matrix_win != null)
@@ -2016,12 +2016,12 @@ func _initialize() -> void:
 	check("G4 桌布口头纠正",
 		scene._matrix_win.dbg_hint().contains("配方不对"))
 	var mx_target := Rect2()
-	for t in scene._drop_targets():
+	for t in scene.drag._drop_targets():
 		if String(t["id"]) == "mx-board":
 			mx_target = t["rect"]
 	check("G4 整扇推演窗都是证落点", mx_target == scene._matrix_win.get_global_rect())
 	var mx_title: Vector2 = scene._matrix_win.get_global_rect().position + Vector2(40.0, 10.0)
-	check("G4 拖到推演标题栏也归位", scene._handle_card_drop(tut_cert_clue_key, mx_title))
+	check("G4 拖到推演标题栏也归位", scene.drag._handle_card_drop(tut_cert_clue_key, mx_title))
 	check("G4 单条调查员证上桌布", scene.graph.matrix_count() == 1)
 	check("G4 桌布提示长按", scene._matrix_win.dbg_hint().contains("长按"))
 	scene._matrix_win.finish_charge()
@@ -2031,13 +2031,13 @@ func _initialize() -> void:
 		scene._tutorial_step == 4 and scene._tutorial_cert_win != null)
 	check("G4 桌布窗已收起", scene._matrix_win == null)
 	check("G4 教学推演后桌布清空", scene.graph.matrix_count() == 0)
-	scene._toggle_matrix()
+	scene.debug.dbg_matrix_toggle()
 	await process_frame
 	scene._matrix_win.finish_charge()
 	await process_frame
 	check("G4 领证期重开推演不弹正式结局",
 		not scene._ending.visible and scene._tutorial_step == 4)
-	scene._toggle_matrix()
+	scene.debug.dbg_matrix_toggle()
 	await process_frame
 
 	# ── 第 5 幕：姓名 / 编号 / 日期 / 照片 ──
@@ -2084,7 +2084,7 @@ func _initialize() -> void:
 	check("C4 读盘证件不含 sense", not saved.has("sense"))
 	check("G5 领证窗关闭", scene._tutorial_cert_win == null)
 	check("G5 案件窗弹出", scene._map_win != null)
-	check("G5 地图图标解锁", scene._icon_by_app("map").visible)
+	check("G5 地图图标解锁", scene.launcher._icon_by_app("map").visible)
 	check("G5 TEC 提示选案",
 		scene._tec.visible and _last_line(scene._tec).contains("选择"))
 
@@ -2102,15 +2102,15 @@ func _initialize() -> void:
 		not scene._tutorial_active and scene._active_case == "A001"
 			and scene.case_def.case_def.id == "a001")
 	check("G6 起始场景已上桌", scene.graph.nodes.has("loc:SCENES_garden"))
-	scene._on_card_selected("loc:SCENES_garden")
+	scene.card_ui._on_card_selected("loc:SCENES_garden")
 	await process_frame
 	check("G6 换案后节点详情仍可用",
 		scene._detail_win != null and scene._detail_win.visible
 			and scene._detail_win._graph == scene.graph)
 	check("G6 完整图标栏恢复",
-		scene._icon_layer().visible and scene._icon_by_app("goto").visible
-			and scene._icon_by_app("people").visible and scene._icon_by_app("tec").visible
-			and scene._icon_by_app("log").visible)
+		scene.launcher._icon_layer().visible and scene.launcher._icon_by_app("goto").visible
+			and scene.launcher._icon_by_app("people").visible and scene.launcher._icon_by_app("tec").visible
+			and scene.launcher._icon_by_app("log").visible)
 	check("G6 顶栏恢复",
 		(scene.get_node("header/brand_sub") as Control).visible
 			and (scene.get_node("header/btn_撤销") as Control).visible
@@ -2125,7 +2125,7 @@ func _initialize() -> void:
 			and (scene._tec.get_node("bar/min") as Control).visible)
 
 	# 签发后的证件复核：内容不溢出，并能更换照片。
-	scene._open_cert_review()
+	scene.session._open_cert_review()
 	await process_frame
 	var review = scene._cert_win
 	check("G6 证件复核窗打开", review != null)
@@ -2156,14 +2156,14 @@ func _initialize() -> void:
 		await process_frame
 		scene._view_k = 1.0
 		scene._view_user = true
-		scene._apply_view()
+		scene.canvas._apply_view()
 		var stable_before: Dictionary = {}
 		for key in _cards().keys():
 			var c := _cards()[key] as NodeCard
 			if c != null and c.visible:
 				stable_before[String(key)] = c.position
 		var stable_k: float = scene._view_k
-		scene._toggle_container("loc", stable_sid)
+		scene.card_ui._toggle_container("loc", stable_sid)
 		await process_frame
 		await process_frame
 		var moved_cards: int = 0
@@ -2213,19 +2213,19 @@ func _initialize() -> void:
 
 	# ── W 组收口：图标边界 / 重叠命中 / 键盘 / 平移边界 / 镜像 LOD / G14 ──
 	# W7：窗口尺寸变化只同步拖动边界，不把玩家摆好的图标归位。
-	var w7_icon := scene._icon_by_app("tec") as DeskIcon
+	var w7_icon: DeskIcon = scene.launcher._icon_by_app("tec") as DeskIcon
 	var w7_pos: Vector2 = w7_icon.position if w7_icon != null else Vector2.ZERO
 	if w7_icon != null:
 		w7_icon.position = Vector2(700.0, 500.0)
 		scene._desk.size = Vector2(960.0, 700.0)
-		scene._sync_icon_bounds()
+		scene.launcher._sync_icon_bounds()
 		check("W7 resize 后图标夹回可见区",
 			w7_icon.position.x <= 960.0 - w7_icon.size.x + 0.01
 				and w7_icon.position.y <= 700.0 - w7_icon.size.y + 0.01,
 			str(w7_icon.position))
 		scene._desk.size = Vector2(1280.0, 720.0)
 		w7_icon.position = w7_pos
-		scene._sync_icon_bounds()
+		scene.launcher._sync_icon_bounds()
 
 	# W8：悬停高亮与组合命中都取「最上层」那张卡。
 	var w8_cards: Array = []
@@ -2242,19 +2242,19 @@ func _initialize() -> void:
 		w8_b.move_to_front()
 		var w8_pt: Vector2 = w8_b.get_global_rect().get_center()
 		for _i8 in 6:
-			if scene._floating_window_at(w8_pt) == null:
+			if scene.canvas._floating_window_at(w8_pt) == null:
 				break
-			scene._close_top_window()
+			scene.windows._close_top_window()
 		await process_frame
 		check("W8 重叠命中与高亮同为最上层卡",
 			w8_a._card_under(w8_pt) == w8_b.card_key
-				and scene._card_key_at(w8_pt) == w8_b.card_key,
-			"%s / %s" % [w8_a._card_under(w8_pt), scene._card_key_at(w8_pt)])
+				and scene.canvas._card_key_at(w8_pt) == w8_b.card_key,
+			"%s / %s" % [w8_a._card_under(w8_pt), scene.canvas._card_key_at(w8_pt)])
 		w8_a.position = w8_a_pos
 		w8_b.position = w8_b_pos
 
 	# W11：Esc 关最上层窗，Ctrl+Z 撤销。
-	scene._toggle_storage(GraphState.LEDGER)
+	scene.drag._toggle_storage(GraphState.LEDGER)
 	await process_frame
 	check("W11 前置：证据已打开", scene._ledger_win != null)
 	var w11_esc := InputEventKey.new()
@@ -2267,7 +2267,7 @@ func _initialize() -> void:
 		var w11_key: String = w11_card.card_key
 		var w11_pin_before: bool = bool(scene.graph.node(w11_key).get("pinned", false))
 		var w11_hist: int = scene.debug.dbg_history_size()
-		scene._on_card_pin_toggled(w11_key)
+		scene.card_ui._on_card_pin_toggled(w11_key)
 		check("W11 前置：置钉进入撤销栈", scene.debug.dbg_history_size() > w11_hist)
 		var w11_undo := InputEventKey.new()
 		w11_undo.keycode = KEY_Z
@@ -2279,8 +2279,8 @@ func _initialize() -> void:
 
 	# W12：平移边界至少留 80px 世界可见，且按下载入拖动光标。
 	var w12_stage := scene.get_node("desk/case_win/body/stage") as Control
-	var w12_far: Vector2 = scene._clamp_view_pos(Vector2(99999.0, 99999.0))
-	var w12_near: Vector2 = scene._clamp_view_pos(Vector2(-99999.0, -99999.0))
+	var w12_far: Vector2 = scene.canvas._clamp_view_pos(Vector2(99999.0, 99999.0))
+	var w12_near: Vector2 = scene.canvas._clamp_view_pos(Vector2(-99999.0, -99999.0))
 	check("W12 平移右上边界留出世界",
 		w12_far.x <= w12_stage.size.x - 80.0 + 0.01
 			and w12_far.y <= w12_stage.size.y - 80.0 + 0.01, str(w12_far))
@@ -2298,8 +2298,8 @@ func _initialize() -> void:
 	if w14_card != null:
 		var w14_old_k: float = scene._view_k
 		scene._view_k = 0.6
-		scene._apply_view()
-		scene._on_card_dragged(w14_card.card_key)
+		scene.canvas._apply_view()
+		scene.drag._on_card_dragged(w14_card.card_key)
 		var w14_mirror: NodeCard = scene._card_mirror
 		check("W14 镜像跟随缩放倍率",
 			w14_mirror != null and absf(w14_mirror.scale.x - 0.6) < 0.01,
@@ -2308,10 +2308,10 @@ func _initialize() -> void:
 			w14_mirror != null and not w14_mirror._title.visible
 				and w14_mirror._glyph.size.x > 60.0,
 			"null" if w14_mirror == null else str(w14_mirror._title.visible))
-		scene._drop_card_mirror(w14_card)
+		scene.drag._drop_card_mirror(w14_card)
 		scene._drag_key = ""
 		scene._view_k = w14_old_k
-		scene._apply_view()
+		scene.canvas._apply_view()
 
 	# G14：真名线索行反白 + 强调青首符号 + 打字机停顿。
 	var g14: EndingDef = scene.case_def.ending_by_id("TRUE_E")
@@ -2334,7 +2334,7 @@ func _initialize() -> void:
 	if normal_end != null:
 		scene.graph.mark_ending(normal_end.id)
 		scene._last_ending_id = normal_end.id
-		scene._refresh_crumbs()
+		scene.chrome._refresh_crumbs()
 		check("G6 普通结局后显示已记录 X/Y 与真名",
 			scene._goal.text.contains("已记录") and scene._goal.text.contains("真名"),
 			scene._goal.text)
@@ -2365,9 +2365,9 @@ func _empty_canvas_point(scene: Control) -> Vector2:
 		var x := r.position.x + 12.0
 		while x < r.end.x - 12.0:
 			var p := Vector2(x, y)
-			var clear: bool = scene._card_key_at(p) == ""
+			var clear: bool = scene.canvas._card_key_at(p) == ""
 			if clear:
-				for t in scene._drop_targets():
+				for t in scene.drag._drop_targets():
 					if (t["rect"] as Rect2).has_point(p):
 						clear = false
 						break
@@ -2386,13 +2386,13 @@ func _blank_point_near(scene: Control, card: NodeCard) -> Vector2:
 	for off in [Vector2(-40, 30), Vector2(70, 45), Vector2(-80, -55), Vector2(95, -35), Vector2(0, 90)]:
 		var p: Vector2 = base + off
 		var clear := true
-		for t in scene._drop_targets():
+		for t in scene.drag._drop_targets():
 			if (t["rect"] as Rect2).has_point(p):
 				clear = false
 				break
 		if not clear:
 			continue
-		if scene._floating_window_at(p) != null:
+		if scene.canvas._floating_window_at(p) != null:
 			continue
 		for k in scene._cards.keys():
 			var c: NodeCard = scene._cards[k]

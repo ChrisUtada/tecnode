@@ -8,7 +8,7 @@ var desk: Desktop
 
 
 func dbg_undo() -> bool:
-	return desk._undo()
+	return desk.session._undo()
 
 
 func dbg_history_size() -> int:
@@ -16,7 +16,7 @@ func dbg_history_size() -> int:
 
 
 func dbg_last_rebuild_stats() -> Dictionary:
-	return desk._last_rebuild_stats.duplicate(true)
+	return desk.canvas._last_rebuild_stats.duplicate(true)
 
 
 func dbg_save() -> bool:
@@ -26,7 +26,7 @@ func dbg_save() -> bool:
 func dbg_load() -> bool:
 	if desk._save == null or not desk._save.load_from_disk():
 		return false
-	desk._rebuild_from_graph(true)
+	desk.canvas._rebuild_from_graph(true)
 	return true
 
 
@@ -40,7 +40,7 @@ func dbg_save_path() -> String:
 
 
 func dbg_use_temp_save(p_path: String) -> void:
-	desk._save = SaveSystem.new(desk.graph, desk._case_id(), p_path)
+	desk._save = SaveSystem.new(desk.graph, desk.session._case_id(), p_path)
 	desk._save.clear_save()
 	desk._save.clear_history()
 
@@ -50,9 +50,9 @@ func dbg_use_temp_save(p_path: String) -> void:
 func dbg_storage_drag(key: String, at_global: Vector2) -> void:
 	if not desk.graph.stored.has(key):
 		return
-	desk._on_row_pressed(key, String(desk.graph.stored.get(key, "")), at_global)
+	desk.drag._on_row_pressed(key, String(desk.graph.stored.get(key, "")), at_global)
 	desk._sdrag_started = true
-	desk._finish_sdrag(at_global)
+	desk.drag._finish_sdrag(at_global)
 
 
 ## 探针：当前落点表的 id 列表（保持顺序）。
@@ -60,7 +60,7 @@ func dbg_storage_drag(key: String, at_global: Vector2) -> void:
 ## 悬停高亮、松手分派共用同一份，不可能出现"高亮了但不生效"。
 func dbg_drop_target_ids() -> Array:
 	var out: Array = []
-	for t in desk._drop_targets():
+	for t in desk.drag._drop_targets():
 		out.append(String(t["id"]))
 	return out
 
@@ -69,7 +69,7 @@ func dbg_store(kind: String) -> bool:
 	if desk._selected == "":
 		return false
 	if kind == GraphState.MATRIX:
-		return desk._assign_to_matrix(desk._selected)
+		return desk.matrix._assign_to_matrix(desk._selected)
 	var before: Dictionary = desk._save.snapshot()
 	var ok := false
 	if kind == GraphState.BAG:
@@ -78,9 +78,9 @@ func dbg_store(kind: String) -> bool:
 		ok = desk.graph.ledger_store(desk._selected)
 	if not ok:
 		return false
-	desk._apply_hidden()
-	desk._refresh_matrix_views()
-	desk._commit(before)
+	desk.card_ui._apply_hidden()
+	desk.matrix._refresh_matrix_views()
+	desk.session._commit(before)
 	return true
 
 
@@ -126,7 +126,7 @@ func _lit_map() -> Dictionary:
 
 
 func dbg_expand(sid: String) -> void:
-	desk._expand_scene(sid, false)
+	desk.card_ui._expand_scene(sid, false)
 
 
 func dbg_combo(tool_id: String, target_id: String) -> Dictionary:
@@ -137,26 +137,26 @@ func dbg_combo(tool_id: String, target_id: String) -> Dictionary:
 
 ## 双击某张卡（跑第一条命令 / 展开容器，与真实双击同一条路）
 func dbg_activate(key: String) -> void:
-	desk._on_card_activated(key)
+	desk.card_ui._on_card_activated(key)
 
 
 ## 建节点并上卡片（等价 Web 的 __ensure）
 func dbg_ensure(kind: String, id: String) -> String:
 	var n: Dictionary = desk.graph.add_node(kind, id)
-	desk._spawn_card(String(n["key"]))
-	desk._relayout()
+	desk.canvas._spawn_card(String(n["key"]))
+	desk.canvas._relayout()
 	return String(n["key"])
 
 
 func dbg_pw_open(node_key: String) -> void:
-	desk._open_password(node_key)
+	desk.card_ui._open_password(node_key)
 
 
 func dbg_password(node_key: String, value: String) -> void:
 	# 已经为这个节点开着窗就直接提交（模拟「在同一个弹窗里改输入再点确定」）
 	if desk._pw_pop == null or not is_instance_valid(desk._pw_pop) or String(desk._pw_ctx.get("node_key", "")) != node_key:
-		desk._open_password(node_key)
-	desk._submit_password(value)
+		desk.card_ui._open_password(node_key)
+	desk.card_ui._submit_password(value)
 
 
 func dbg_toggle_light(id: String) -> Dictionary:
@@ -171,11 +171,27 @@ func dbg_select(key: String) -> void:
 
 ## 打开某个收纳窗
 func dbg_open_storage(kind: String) -> void:
-	desk._toggle_storage(kind)
+	desk.drag._toggle_storage(kind)
 
 
 func dbg_tec_analyze(sid: String) -> void:
-	desk._start_tec_analysis(desk._tec_key(sid))
+	desk.tec._start_tec_analysis(desk.tec._tec_key(sid))
+
+
+func dbg_reset_case(force: bool = false) -> void:
+	desk.session._reset_case(force)
+
+
+func dbg_commit(before: Dictionary) -> void:
+	desk.session._commit(before)
+
+
+func dbg_open_start_screen() -> void:
+	desk.session._open_start_screen()
+
+
+func dbg_start_continue() -> void:
+	desk.session._on_start_continue()
 
 
 func dbg_tec_finish() -> int:
@@ -188,15 +204,23 @@ func dbg_tec_complete() -> void:
 
 
 func dbg_tec_open() -> void:
-	desk._open_tec()
+	desk.tec._open_tec()
 
 
 func dbg_tec_close() -> void:
-	desk._close_tec()
+	desk.tec._close_tec()
 
 
 func dbg_tec_minimize() -> void:
-	desk._minimize_tec()
+	desk.tec._minimize_tec()
+
+
+func dbg_tec_hide() -> void:
+	desk.tec._hide_tec()
+
+
+func dbg_tec_hint(text: String) -> void:
+	desk.tec._tec_hint(text, false)
 
 
 func dbg_tec_win() -> TecWindow:
@@ -208,19 +232,19 @@ func dbg_tec_chip() -> TecChip:
 
 
 func dbg_tec_talk() -> void:
-	desk._tec_talk()
+	desk.tec._tec_talk()
 
 
 func dbg_tec_analyze_key(key: String) -> bool:
-	return desk._start_tec_analysis(key)
+	return desk.tec._start_tec_analysis(key)
 
 
 func dbg_tec_drop_hit(at_global: Vector2) -> bool:
-	return desk._tec_drop_hit(at_global)
+	return desk.tec._tec_drop_hit(at_global)
 
 
 func dbg_tec_drop(key: String, at_global: Vector2) -> void:
-	desk._on_card_drag_released(key, at_global)
+	desk.drag._on_card_drag_released(key, at_global)
 
 
 func dbg_tec_icon_rect() -> Rect2:
@@ -246,7 +270,7 @@ func dbg_tec_info() -> Dictionary:
 
 func dbg_open_archive() -> ArchiveWin:
 	if desk._archive_win == null or not is_instance_valid(desk._archive_win):
-		desk._toggle_archive()
+		desk.narrative._toggle_archive()
 	return desk._archive_win
 
 
@@ -291,7 +315,7 @@ func dbg_chat_drop(kind: String, id: String) -> bool:
 
 
 func dbg_chat_drop_key(key: String) -> bool:
-	return desk._chat_drop(key)
+	return desk.narrative._chat_drop(key)
 
 
 func dbg_chat_hint() -> String:
@@ -310,17 +334,17 @@ func dbg_chat_rect() -> Rect2:
 
 
 func dbg_chat_close() -> void:
-	desk._close_chat()
+	desk.narrative._close_chat()
 
 
 func dbg_open_dialogue(id: String, ids: Array) -> bool:
 	if desk.dialogues == null:
 		return false
-	return desk._open_chat(desk.dialogues.by_id(id), ids)
+	return desk.narrative._open_chat(desk.dialogues.by_id(id), ids)
 
 
 func dbg_open_monologue(char_id: String) -> bool:
-	return desk._open_monologue(char_id)
+	return desk.narrative._open_monologue(char_id)
 
 
 func dbg_dialogues() -> DialogueSystem:
@@ -340,7 +364,7 @@ func dbg_time_known() -> Array:
 
 
 func dbg_set_time(tid: String) -> bool:
-	return desk._select_time(tid)
+	return desk.narrative._select_time(tid)
 
 
 func dbg_mem_card() -> MemCard:
@@ -352,7 +376,7 @@ func dbg_mem_advance() -> bool:
 
 
 func dbg_close_mem() -> void:
-	desk._close_mem_card()
+	desk.narrative._close_mem_card()
 
 
 func dbg_card_visible(key: String) -> bool:
@@ -387,7 +411,7 @@ func dbg_mem_global() -> Rect2:
 func dbg_combo_ui(tool_id: String, target_id: String) -> void:
 	if desk.graph == null:
 		return
-	desk._on_card_combo(_dbg_node_key(tool_id), _dbg_node_key(target_id))
+	desk.card_ui._on_card_combo(_dbg_node_key(tool_id), _dbg_node_key(target_id))
 
 
 func _dbg_node_key(id: String) -> String:
@@ -404,7 +428,7 @@ func dbg_toast_text() -> String:
 
 func dbg_open_people() -> PeopleWin:
 	if desk._people_win == null or not is_instance_valid(desk._people_win):
-		desk._toggle_people()
+		desk.people._toggle_people()
 	return desk._people_win
 
 
@@ -413,14 +437,14 @@ func dbg_people_win() -> PeopleWin:
 
 
 func dbg_close_people() -> void:
-	desk._close_person_card()
+	desk.people._close_person_card()
 	if desk._people_win != null and is_instance_valid(desk._people_win):
 		desk._people_win.queue_free()
 	desk._people_win = null
 
 
 func dbg_people_row(id: String) -> void:
-	desk._on_people_row(id)
+	desk.people._on_people_row(id)
 
 
 func dbg_person_card() -> Control:
@@ -428,7 +452,7 @@ func dbg_person_card() -> Control:
 
 
 func dbg_person_payload(id: String) -> Dictionary:
-	return desk._person_payload(id)
+	return desk.people._person_payload(id)
 
 
 func dbg_person_id() -> String:
@@ -440,29 +464,29 @@ func dbg_person_action(id: String = "") -> void:
 	if target == "" and desk._people_card != null and is_instance_valid(desk._people_card):
 		target = desk._people_card.person_id
 	if target != "":
-		desk._on_person_action(target)
+		desk.people._on_person_action(target)
 
 
 func dbg_person_note(id: String, text: String) -> void:
-	desk._on_person_note_committed(id, text)
+	desk.people._on_person_note_committed(id, text)
 	if desk._people_card != null and is_instance_valid(desk._people_card) and desk._people_card.person_id == id:
 		desk._people_card.set_note_text(text)
 
 
 func dbg_person_fields(person_id: String) -> Array:
-	return desk._person_field_payload(person_id)
+	return desk.people._person_field_payload(person_id)
 
 
 func dbg_person_field_word(person_id: String, field_id: String, value: String) -> void:
-	desk._on_person_field_word(person_id, field_id, value)
+	desk.people._on_person_field_word(person_id, field_id, value)
 
 
 func dbg_person_field_drop(person_id: String, field_id: String, key: String) -> bool:
-	return desk._assign_evidence_to_field(person_id, field_id, key, "canvas")
+	return desk.people._assign_evidence_to_field(person_id, field_id, key, "canvas")
 
 
 func dbg_person_check(person_id: String) -> bool:
-	return desk._check_person_claims(person_id)
+	return desk.people._check_person_claims(person_id)
 
 
 func dbg_person_field_state(field_id: String) -> String:
@@ -470,7 +494,11 @@ func dbg_person_field_state(field_id: String) -> String:
 
 
 func dbg_close_person_card() -> void:
-	desk._close_person_card()
+	desk.people._close_person_card()
+
+
+func dbg_place_person_card() -> void:
+	desk.people._place_person_card()
 
 
 func dbg_open_log() -> LogWin:
@@ -503,19 +531,19 @@ func dbg_add_log(text: String, kind: String = "") -> void:
 
 ## 图标栏：位置 / 顺序 / 角标文字（都是玩家可见的状态，不碰内部缓存）
 func dbg_icon_pos(app: String) -> Vector2:
-	var b: Button = desk._icon_by_app(app)
+	var b: Button = desk.launcher._icon_by_app(app)
 	return b.position if b != null else Vector2(-1, -1)
 
 
 func dbg_icon_visible(app: String) -> bool:
-	var b: Button = desk._icon_by_app(app)
+	var b: Button = desk.launcher._icon_by_app(app)
 	return b != null and b.visible
 
 
 ## 图标栏（只列当前可见的 —— 播放器 / 花园解锁前不算占位）
 func dbg_icon_apps() -> Array:
 	var out: Array = []
-	for c in desk._icon_layer().get_children():
+	for c in desk.launcher._icon_layer().get_children():
 		if c is DeskIcon and (c as DeskIcon).visible:
 			out.append(String(c.name).trim_prefix("icon_"))
 	return out
@@ -523,7 +551,7 @@ func dbg_icon_apps() -> Array:
 
 ## 模拟一次图标拖动（不吃输入事件，直接走同一段位移逻辑）
 func dbg_drag_icon(app: String, at: Vector2) -> void:
-	var b: Button = desk._icon_by_app(app)
+	var b: Button = desk.launcher._icon_by_app(app)
 	if b != null:
 		b.position = Vector2(clampf(at.x, 0.0, desk._desk.size.x - b.size.x),
 			clampf(at.y, 0.0, desk._desk.size.y - b.size.y))
@@ -545,21 +573,37 @@ func dbg_log_unread() -> int:
 
 ## 模拟双击图标（两次点击必须落在 300ms 判决窗内，见 _on_icon_pressed）
 func dbg_double_click_icon(app: String) -> void:
-	var b: Button = desk._icon_by_app(app)
+	var b: Button = desk.launcher._icon_by_app(app)
 	if b == null:
 		return
-	desk._on_icon_pressed(app, b)
-	desk._on_icon_pressed(app, b)
+	desk.launcher._on_icon_pressed(app, b)
+	desk.launcher._on_icon_pressed(app, b)
 
 
 func dbg_open_matrix() -> MatrixWin:
 	if desk._matrix_win == null or not is_instance_valid(desk._matrix_win):
-		desk._toggle_matrix()
+		desk.matrix._toggle_matrix()
 	return desk._matrix_win
 
 
 func dbg_matrix_assign(key: String) -> bool:
-	return desk._assign_to_matrix(key)
+	return desk.matrix._assign_to_matrix(key)
+
+
+func dbg_matrix_toggle() -> void:
+	desk.matrix._toggle_matrix()
+
+
+func dbg_matrix_refresh() -> void:
+	desk.matrix._refresh_matrix_views()
+
+
+func dbg_matrix_sync_occlusion() -> void:
+	desk.matrix._sync_matrix_occlusion()
+
+
+func dbg_ledger_to_matrix(key: String) -> void:
+	desk.matrix._on_ledger_to_matrix(key)
 
 
 func dbg_matrix_win() -> MatrixWin:
@@ -572,7 +616,7 @@ func dbg_matrix_charge() -> void:
 
 
 func dbg_matrix_take(key: String) -> void:
-	desk._on_matrix_took(key)
+	desk.matrix._on_matrix_took(key)
 
 
 func dbg_ending() -> EndingOverlay:
@@ -620,24 +664,24 @@ func dbg_music_dock() -> MusicDock:
 
 func dbg_click_music_icon() -> void:
 	if desk._music_btn != null and is_instance_valid(desk._music_btn):
-		desk._on_icon_pressed("music", desk._music_btn)
+		desk.launcher._on_icon_pressed("music", desk._music_btn)
 
 
 func dbg_open_music() -> MusicWin:
-	desk._open_music()
+	desk.garden_music._open_music()
 	return dbg_music_win()
 
 
 func dbg_minimize_music() -> void:
-	desk._minimize_music()
+	desk.garden_music._minimize_music()
 
 
 func dbg_restore_music() -> void:
-	desk._restore_music()
+	desk.garden_music._restore_music()
 
 
 func dbg_close_music() -> void:
-	desk._on_music_closed()
+	desk.garden_music._on_music_closed()
 
 
 func dbg_music_play(id: String) -> bool:
@@ -652,7 +696,7 @@ func dbg_music_toggle() -> bool:
 
 
 func dbg_music_stop() -> void:
-	desk._stop_music()
+	desk.garden_music._stop_music()
 
 
 func dbg_music_state() -> Dictionary:
@@ -665,13 +709,17 @@ func dbg_music_state() -> Dictionary:
 	return s
 
 
+func dbg_layout_music_windows() -> void:
+	desk.garden_music._place_music_windows()
+
+
 func dbg_garden_win() -> GardenWin:
 	return desk._garden_win if desk._garden_win != null and is_instance_valid(desk._garden_win) else null
 
 
 func dbg_open_garden() -> GardenWin:
 	if desk._garden_win == null or not is_instance_valid(desk._garden_win):
-		desk._open_garden()
+		desk.garden_music._open_garden()
 	return dbg_garden_win()
 
 
@@ -693,7 +741,7 @@ func dbg_garden_icon_rect() -> Rect2:
 
 
 func dbg_drop_seed(at_global: Vector2) -> bool:
-	return desk._drop_seed(at_global)
+	return desk.garden_music._drop_seed(at_global)
 
 
 func dbg_play_true_ending() -> void:
@@ -721,7 +769,7 @@ func dbg_use_temp_progress(path: String) -> void:
 	desk._progress_read_only = false
 	desk._catalog.clear_progress(path)
 	desk._catalog = CaseCatalog.new(path)
-	desk._update_case_park_ui()
+	desk.session._update_case_park_ui()
 
 
 func dbg_case_info() -> Dictionary:
@@ -742,16 +790,16 @@ func dbg_case_info() -> Dictionary:
 
 
 func dbg_park_case(where: String) -> bool:
-	return desk._park_case(where)
+	return desk.session._park_case(where)
 
 
 func dbg_reopen_case() -> void:
-	desk._reopen_case()
+	desk.session._reopen_case()
 
 
 func dbg_open_case_map() -> CaseMapWin:
 	if desk._map_win == null or not is_instance_valid(desk._map_win):
-		desk._toggle_case_map()
+		desk.session._toggle_case_map()
 	return desk._map_win
 
 
@@ -770,12 +818,12 @@ func dbg_case_map_state(id: String) -> String:
 
 
 func dbg_enter_case(id: String) -> bool:
-	return desk._enter_case(id)
+	return desk.session._enter_case(id)
 
 
 func dbg_catalog_unlock(id: String) -> bool:
 	var ok: bool = desk._catalog.unlock(id)
-	desk._update_case_park_ui()
+	desk.session._update_case_park_ui()
 	return ok
 
 
@@ -785,20 +833,20 @@ func dbg_catalog() -> CaseCatalog:
 
 func dbg_catalog_unlock_next(id: String) -> bool:
 	var ok: bool = desk._catalog.unlock_next(id)
-	desk._update_case_park_ui()
+	desk.session._update_case_park_ui()
 	return ok
 
 
 func dbg_use_temp_investigator(path: String) -> void:
 	desk._inv_path = path
 	desk._investigator = Investigator.load_from(path)
-	desk._refresh_chip()
+	desk.session._refresh_chip()
 
 
 func dbg_clear_investigator() -> void:
 	Investigator.clear(desk._inv_path)
 	desk._investigator = {}
-	desk._refresh_chip()
+	desk.session._refresh_chip()
 
 
 func dbg_investigator() -> Dictionary:
@@ -806,7 +854,7 @@ func dbg_investigator() -> Dictionary:
 
 
 func dbg_open_intro() -> IntroWin:
-	return desk._open_intro()
+	return desk.session._open_intro()
 
 
 func dbg_intro_open() -> bool:
@@ -814,7 +862,7 @@ func dbg_intro_open() -> bool:
 
 
 func dbg_open_cert() -> void:
-	desk._open_cert_review()
+	desk.session._open_cert_review()
 
 
 func dbg_cert_open() -> bool:
@@ -836,28 +884,28 @@ func _shot_flow() -> void:
 	await _wait(0.6)
 	await _shot("res://docs/p0_1_desktop.png")
 
-	desk._expand_scene("SCENES_garden", true)
+	desk.card_ui._expand_scene("SCENES_garden", true)
 	await _wait(0.5)
 	await _shot("res://docs/p0_2_garden.png")
 
 	# 开局不再直接给手电筒（对齐 Web）：截图流程走真实链路 书桌 → 抽屉 → 左侧抽屉
-	desk._on_card_activated("item:ITEM_shuzhuo")
+	desk.card_ui._on_card_activated("item:ITEM_shuzhuo")
 	await _wait(0.25)
-	desk._on_card_activated("item:ITEM_chouti")
+	desk.card_ui._on_card_activated("item:ITEM_chouti")
 	await _wait(0.25)
-	desk._on_card_activated("loc:SCENES_choutiyi")
+	desk.card_ui._on_card_activated("loc:SCENES_choutiyi")
 	await _wait(0.25)
 
 	desk.combos.toggle_light("item:ITEM_shoudiantong")
 	if desk._cards.has("item:ITEM_shoudiantong"):
 		desk._cards["item:ITEM_shoudiantong"].refresh()
-		desk._sync_card_shell(desk._cards["item:ITEM_shoudiantong"])
-	desk._on_card_combo("item:ITEM_shoudiantong", "item:ITEM_something")
+		desk.canvas._sync_card_shell(desk._cards["item:ITEM_shoudiantong"])
+	desk.card_ui._on_card_combo("item:ITEM_shoudiantong", "item:ITEM_something")
 	await _wait(0.5)
 	await _shot("res://docs/p0_3_body.png")
 
-	desk._toggle_tec()
-	desk._start_tec_analysis("loc:SCENES_body")
+	desk.tec._toggle_tec()
+	desk.tec._start_tec_analysis("loc:SCENES_body")
 	await _wait(1.1)                      # 分析进行中（真实 5–8 秒，这里取中段）
 	await _shot("res://docs/p0_4_tec.png")
 	desk._tec.finish_now()
@@ -872,35 +920,35 @@ func _shot_flow() -> void:
 
 	# ── P1 新特性：容器展开 / 选项节点 / 密码弹窗 / 折叠 ──
 	desk._ending.visible = false
-	desk._start_slice()
+	desk.session._start_slice()
 	await _wait(0.3)
-	desk._expand_scene("SCENES_garden", false)
+	desk.card_ui._expand_scene("SCENES_garden", false)
 	await _wait(0.2)
 	_ensure_card("item", "ITEM_shuzhuo")
-	desk._toggle_container("item", "ITEM_shuzhuo")
+	desk.card_ui._toggle_container("item", "ITEM_shuzhuo")
 	await _wait(0.35)
 	await _shot("res://docs/p1_1_container.png")
 
-	desk._toggle_container("item", "ITEM_chouti")    # choice：两个抽屉一起上画布
+	desk.card_ui._toggle_container("item", "ITEM_chouti")    # choice：两个抽屉一起上画布
 	await _wait(0.35)
 	await _shot("res://docs/p1_2_choice.png")
 
 	_ensure_card("item", "ITEMS_jzmh")
-	desk._open_password(desk.graph.key_of("item", "ITEMS_jzmh"))
+	desk.card_ui._open_password(desk.graph.key_of("item", "ITEMS_jzmh"))
 	await _wait(0.35)
 	await _shot("res://docs/p1_3_password.png")
-	desk._submit_password("0321")
+	desk.card_ui._submit_password("0321")
 	await _wait(0.35)
 	await _shot("res://docs/p1_4_unlocked.png")
 
-	desk._toggle_container("item", "ITEM_shuzhuo")   # 再双击 = 收起
+	desk.card_ui._toggle_container("item", "ITEM_shuzhuo")   # 再双击 = 收起
 	await _wait(0.35)
 	await _shot("res://docs/p1_5_collapsed.png")
 
 	# ── 收纳三态（P1.2）：物品 / 证据两扇窗 ──
-	desk._start_slice()
+	desk.session._start_slice()
 	await _wait(0.3)
-	desk._expand_scene("SCENES_garden", false)
+	desk.card_ui._expand_scene("SCENES_garden", false)
 	await _wait(0.2)
 	_ensure_card("item", "ITEM_taideng")
 	dbg_select("item:ITEM_taideng")
@@ -908,11 +956,11 @@ func _shot_flow() -> void:
 	_ensure_card("clue", "CLUES_nm")
 	dbg_select("clue:CLUES_nm")
 	dbg_store("LEDGER")
-	desk._toggle_storage(GraphState.BAG)
+	desk.drag._toggle_storage(GraphState.BAG)
 	await _wait(0.35)
 	await _shot("res://docs/p1_6_bag.png")
 
-	desk._toggle_storage(GraphState.LEDGER)
+	desk.drag._toggle_storage(GraphState.LEDGER)
 	await _wait(0.35)
 	await _shot("res://docs/p1_7_ledger.png")
 
@@ -920,7 +968,7 @@ func _shot_flow() -> void:
 	var true_e: EndingDef = desk.case_def.ending_by_id("TRUE_E")
 	for clue in true_e.recipe:
 		_ensure_card("clue", clue.id)
-		desk._assign_to_matrix(desk.graph.key_of("clue", clue.id))
+		desk.matrix._assign_to_matrix(desk.graph.key_of("clue", clue.id))
 	dbg_open_matrix()
 	await _wait(0.4)
 	await _shot("res://docs/p1_8_matrix.png")
@@ -938,8 +986,8 @@ func _shot_intro_flow() -> void:
 	desk._inv_path = "user://shot_investigator.json"
 	Investigator.clear(desk._inv_path)
 	desk._investigator = {}
-	desk._refresh_chip()
-	var w: IntroWin = desk._open_intro()
+	desk.session._refresh_chip()
+	var w: IntroWin = desk.session._open_intro()
 	await _wait(0.4)
 	await _shot("res://docs/p1_10_intro_name.png")
 	w.dbg_set_name("林雾")
@@ -957,7 +1005,7 @@ func _shot_intro_flow() -> void:
 	w.dbg_confirm()
 	await _wait(0.5)
 	await _shot("res://docs/p1_14_investigator.png")
-	desk._open_cert_review()
+	desk.session._open_cert_review()
 	await _wait(0.3)
 	await _shot("res://docs/p1_15_cert.png")
 	Investigator.clear(desk._inv_path)
@@ -968,11 +1016,11 @@ func _shot_p2_flow() -> void:
 	await _wait(0.5)
 	desk._catalog.clear_progress(desk._progress_path)
 	desk._catalog = CaseCatalog.new(desk._progress_path)
-	desk._update_case_park_ui()
+	desk.session._update_case_park_ui()
 
 	# ── P4.2：桌面图标的按下态（只反白标签条，图标本体不垫底板）──
 	# 必须**在流程开头**拍：跑到结尾时图标栏已经切紧凑模式、标签被收掉了。
-	var pressed_icon: Button = desk._icon_by_app("bag")
+	var pressed_icon: Button = desk.launcher._icon_by_app("bag")
 	if pressed_icon != null:
 		pressed_icon.set_selected(true)
 		desk._hide_toast()
@@ -1005,23 +1053,23 @@ func _shot_p2_flow() -> void:
 		desk._map_win.queue_free()
 	desk._map_win = null
 
-	desk._reopen_case()
-	desk._start_slice()
+	desk.session._reopen_case()
+	desk.session._start_slice()
 	await _wait(0.3)
-	desk._expand_scene("SCENES_body", false)
-	desk._open_tec()
-	desk._tec_talk()
-	desk._tec_talk()
+	desk.card_ui._expand_scene("SCENES_body", false)
+	desk.tec._open_tec()
+	desk.tec._tec_talk()
+	desk.tec._tec_talk()
 	desk._tec.finish_typing()
 	desk._hide_toast()
 	await _wait(0.35)
 	await _shot("res://docs/p2_5_tec_chat.png")
 
-	desk._start_tec_analysis("loc:SCENES_body")
+	desk.tec._start_tec_analysis("loc:SCENES_body")
 	await _wait(2.5)
 	await _shot("res://docs/p2_6_tec_analysis.png")
 
-	desk._minimize_tec()
+	desk.tec._minimize_tec()
 	await _wait(0.35)
 	await _shot("res://docs/p2_7_tec_chip.png")
 
@@ -1031,49 +1079,49 @@ func _shot_p2_flow() -> void:
 	await _wait(0.2)
 	await _shot("res://docs/p2_8_tec_chip_done.png")
 
-	desk._open_tec()
+	desk.tec._open_tec()
 	await _wait(0.35)
 	await _shot("res://docs/p2_9_tec_archive.png")
 
-	desk._hide_tec()
-	desk._expand_scene("SCENES_fkjl", false)
+	desk.tec._hide_tec()
+	desk.card_ui._expand_scene("SCENES_fkjl", false)
 	await _wait(0.35)
-	desk._toggle_archive()
+	desk.narrative._toggle_archive()
 	await _wait(0.35)
 	await _shot("res://docs/p2_10_archive.png")
-	desk._toggle_archive()
+	desk.narrative._toggle_archive()
 	await _wait(0.15)
 
-	desk._expand_scene("SCENES_lhsdst", false)
+	desk.card_ui._expand_scene("SCENES_lhsdst", false)
 	await _wait(0.2)
-	desk._select_time("SCENES_0602")
+	desk.narrative._select_time("SCENES_0602")
 	await _wait(0.5)
 	_show_mem_lines(3)
 	await _wait(0.3)
 	await _shot("res://docs/p2_11_memory_card.png")
 
-	desk._close_mem_card()
-	desk._on_card_combo("char:NPC_FB", "loc:SCENES_garden")
+	desk.narrative._close_mem_card()
+	desk.card_ui._on_card_combo("char:NPC_FB", "loc:SCENES_garden")
 	await _wait(0.3)
 	_show_mem_lines(4)
 	await _wait(0.35)
 	await _shot("res://docs/p2_12_memory_play.png")
 
-	desk._close_mem_card()
-	desk._select_time("SCENES_0704")
+	desk.narrative._close_mem_card()
+	desk.narrative._select_time("SCENES_0704")
 	await _wait(0.5)
-	desk._close_mem_card()
+	desk.narrative._close_mem_card()
 	desk._hide_toast()
-	desk._on_card_combo("char:CHARS_zs", "char:CHARS_luhengs")
+	desk.card_ui._on_card_combo("char:CHARS_zs", "char:CHARS_luhengs")
 	await _wait(0.35)
 	_show_chat_lines(5)
 	desk._hide_toast()
 	await _wait(0.35)
 	await _shot("res://docs/p2_13_dialogue.png")
-	desk._close_chat()
+	desk.narrative._close_chat()
 
 	var garden: DialogueDef = desk.dialogues.by_id("DLG_garden_review") if desk.dialogues != null else null
-	desk._open_chat(garden, ["CHARS_zs", "NPC_FB"])
+	desk.narrative._open_chat(garden, ["CHARS_zs", "NPC_FB"])
 	await _wait(0.3)
 	desk._chat_win.finish_line()
 	desk._chat_win.advance()
@@ -1082,15 +1130,15 @@ func _shot_p2_flow() -> void:
 	desk._hide_toast()
 	await _wait(0.35)
 	await _shot("res://docs/p2_14_dialogue_join.png")
-	desk._close_chat()
+	desk.narrative._close_chat()
 
-	desk._open_monologue("CHARS_luhengs")
+	desk.narrative._open_monologue("CHARS_luhengs")
 	await _wait(0.3)
 	_show_chat_lines(4)
 	desk._hide_toast()
 	await _wait(0.35)
 	await _shot("res://docs/p2_15_monologue.png")
-	desk._close_chat()
+	desk.narrative._close_chat()
 
 	# ── P2.5 音乐播放器 / 花园彩蛋 ──
 	_ensure_card("item", "ITEMS_changji")
@@ -1104,12 +1152,12 @@ func _shot_p2_flow() -> void:
 		music.seek_ratio(0.25)
 	await _wait(0.8)
 	await _shot("res://docs/p2_16_music.png")
-	desk._minimize_music()
+	desk.garden_music._minimize_music()
 	await _wait(0.45)
 	await _shot("res://docs/p2_17_music_dock.png")
-	desk._restore_music()
-	desk._stop_music()
-	desk._on_music_closed()
+	desk.garden_music._restore_music()
+	desk.garden_music._stop_music()
+	desk.garden_music._on_music_closed()
 
 	dbg_play_true_ending()
 	dbg_confirm_ending()
@@ -1126,7 +1174,7 @@ func _shot_p2_flow() -> void:
 	await _wait(0.45)
 	await _shot("res://docs/p2_19_garden_seed.png")
 	if gwin != null:
-		desk._drop_seed(gwin.field_global_rect().get_center())
+		desk.garden_music._drop_seed(gwin.field_global_rect().get_center())
 		dbg_touch_garden_plot(0, GardenSystem.now_ms_now() - 181000)
 		gwin._process(1.1)
 		await _wait(0.2)
@@ -1155,17 +1203,17 @@ func _shot_p2_flow() -> void:
 
 func _shot_p3_flow() -> void:
 	await _wait(0.5)
-	desk._new_runtime()
+	desk.session._new_runtime()
 	## 与 Web 侧对拍脚本对齐：那边走完开场适性测试（姓名「陈调整」），页眉才有证章。
 	## 证号写死成 TEC-GD-2160，两边的证章文字才逐字相同。
 	desk._investigator = {"name": "陈调整", "id": "TEC-GD-2160", "sense": ["vision"], "avatarId": "CHARS_EXEC"}
-	desk._refresh_chip()
+	desk.session._refresh_chip()
 	var loc: Dictionary = desk.graph.add_node("loc", desk.SLICE_SCENE)
 	loc["x"] = 40.0
 	loc["y"] = 30.0
 	desk.graph.mark_fresh(String(loc["key"]))
-	desk._spawn_card(loc["key"])
-	desk._relayout()
+	desk.canvas._spawn_card(loc["key"])
+	desk.canvas._relayout()
 	desk._hide_toast()
 	await _wait(0.5)
 	await _shot("res://docs/p3/godot/start.png")
@@ -1194,5 +1242,5 @@ func _show_mem_lines(n: int) -> void:
 
 func _ensure_card(kind: String, id: String) -> void:
 	var n: Dictionary = desk.graph.add_node(kind, id)
-	desk._spawn_card(String(n["key"]))
-	desk._relayout()
+	desk.canvas._spawn_card(String(n["key"]))
+	desk.canvas._relayout()

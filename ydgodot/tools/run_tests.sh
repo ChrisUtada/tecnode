@@ -47,12 +47,14 @@ for t in "${TESTS[@]}"; do
 	code=$?
 
 	summary="$(grep -E '^=== [0-9]+ 项，失败 [0-9]+ ===$' "$out" | tail -1)"
+	# 脚本级错误不会计入 fails，曾经导致「解析失败但汇总 0 失败」的假绿。
+	script_err="$(grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' "$out" | head -3)"
 	if [ -n "$summary" ]; then
 		n="$(printf '%s' "$summary" | sed -E 's/^=== ([0-9]+) 项，失败 ([0-9]+) ===$/\1/')"
 		f="$(printf '%s' "$summary" | sed -E 's/^=== ([0-9]+) 项，失败 ([0-9]+) ===$/\2/')"
 		TOTAL_ITEMS=$((TOTAL_ITEMS + n))
 		TOTAL_FAILS=$((TOTAL_FAILS + f))
-		if [ "$f" -eq 0 ] && [ "$code" -eq 0 ]; then
+		if [ "$f" -eq 0 ] && [ "$code" -eq 0 ] && [ -z "$script_err" ]; then
 			status="PASS"
 		else
 			status="FAIL"

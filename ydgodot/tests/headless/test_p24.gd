@@ -339,7 +339,7 @@ func _test_desktop(c: CaseLoader) -> void:
 		check("非人物不能加入", not scene.debug.dbg_chat_drop("item", "ITEM_shoudiantong"))
 		check("非人物提示", scene.debug.dbg_chat_hint() == "只有人物能加入这段对话", scene.debug.dbg_chat_hint())
 		var key := "char:CHARS_JS"
-		scene._on_card_drag_released(key, scene.debug.dbg_chat_rect().get_center())
+		scene.drag._on_card_drag_released(key, scene.debug.dbg_chat_rect().get_center())
 		await process_frame
 		state = scene.debug.dbg_chat_state()
 		check("拖对人加入", (state["joined"] as Array).has("CHARS_JS"), str(state["joined"]))

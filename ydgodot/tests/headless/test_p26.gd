@@ -189,7 +189,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("1px 抖动 = 点击", int(hits["n"]) == 1, str(hits["n"]))
 	check("点击不挪位置", ic.position == base, str(ic.position))
 	check("单击图标进入选中", bool(ic.get("_selected")))
-	scene._clear_selection()
+	scene.canvas._clear_selection()
 	check("空白点击清图标选中", not bool(ic.get("_selected")))
 
 	_icon_press(ic, at, true)
@@ -385,9 +385,9 @@ func _test_desktop(c: CaseLoader) -> void:
 		and pw.row_state("CHARS_EXEC") == "推演",
 		pw.row_state("CHARS_TEC") + " / " + pw.row_state("CHARS_EXEC"))
 	# K3：再次打开名册仍是同一扇窗；点击行只开档案卡，不关名册。
-	scene._open_icon_app("people")
+	scene.launcher._open_icon_app("people")
 	check("K3 再次打开名册不关窗", scene._people_win != null and scene._people_win.visible)
-	scene._on_people_row("CHARS_TEC")
+	scene.debug.dbg_people_row("CHARS_TEC")
 	await process_frame
 	check("K3 名册点 TEC 行打开档案卡",
 		scene.debug.dbg_person_card() != null and scene.debug.dbg_person_id() == "CHARS_TEC")
@@ -458,12 +458,12 @@ func _test_desktop(c: CaseLoader) -> void:
 		str(card.get_global_rect()) if card != null else "null")
 	var desk_old: Vector2 = scene._desk.size
 	scene._desk.size = Vector2(960.0, 508.0)
-	scene._place_person_card()
+	scene.debug.dbg_place_person_card()
 	check("960 宽下档案卡仍不出桌面",
 		card != null and scene._desk.get_global_rect().encloses(card.get_global_rect()),
 		str(card.get_global_rect()) if card != null else "null")
 	scene._desk.size = desk_old
-	scene._place_person_card()
+	scene.debug.dbg_place_person_card()
 
 	# 档案卡可自由拖动；拖过之后 resize / 重排只钳边界，不贴回右上。
 	if card != null:
@@ -489,7 +489,7 @@ func _test_desktop(c: CaseLoader) -> void:
 		check("人物卡可自由拖动", card.position.distance_to(old_pos) > 20.0 and card.user_placed(),
 			"%s -> %s" % [old_pos, card.position])
 		var dragged_pos: Vector2 = card.position
-		scene._place_person_card()
+		scene.debug.dbg_place_person_card()
 		check("拖动后重排不贴回右上", card.position.is_equal_approx(dragged_pos),
 			"%s -> %s" % [dragged_pos, card.position])
 

@@ -13,18 +13,18 @@ func _initialize() -> void:
 	scene._view_k = 1.0
 	scene._view_pos = Vector2.ZERO
 	scene._view_user = true
-	scene._apply_view()
+	scene.canvas._apply_view()
 	scene.debug.dbg_expand("SCENES_garden")
 	await process_frame
 
 	# 双击书桌：选中 + 激活交错触发两次 _rebuild，是溢出的历史路径
-	scene._on_card_selected("item:ITEM_shuzhuo")
-	scene._on_card_activated("item:ITEM_shuzhuo")
+	scene.card_ui._on_card_selected("item:ITEM_shuzhuo")
+	scene.card_ui._on_card_activated("item:ITEM_shuzhuo")
 	for i in 20:
 		await process_frame
 	await _assert_fit("书桌（容器 + 重看叙事按钮）")
 
-	scene._on_card_selected("loc:SCENES_garden")
+	scene.card_ui._on_card_selected("loc:SCENES_garden")
 	for i in 20:
 		await process_frame
 	await _assert_fit("花园（场景 + 重看场景叙事按钮）")
@@ -33,7 +33,7 @@ func _initialize() -> void:
 	var char_key: String = scene.debug.dbg_ensure("char", "CHARS_luhengs")
 	for i in 20:
 		await process_frame
-	scene._on_card_selected(char_key)
+	scene.card_ui._on_card_selected(char_key)
 	for i in 20:
 		await process_frame
 	await _assert_fit("人物节点")
