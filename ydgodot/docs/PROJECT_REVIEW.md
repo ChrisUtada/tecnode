@@ -26,7 +26,7 @@
 - **1158 行** —— 藏在产品类里的测试/截图代码（143 个 `dbg_*` = 805 行，6 个 `_shot_*` = 353 行）。
 - **18 份** —— 测试脚本各自复制的 `check()/fails/total` 脚手架与退出逻辑。
 
-> 以上为**批次执行前**的体检快照，用于说明改造动机。批次 0–3 完成后的实时数字与验证结果见 §7。
+> 以上为**批次执行前**的体检快照，用于说明改造动机。批次 0–4 完成后的实时数字与验证结果见 §7。
 
 ### 0.3 建议的 Top 5 动作
 
@@ -399,7 +399,7 @@ func _finish() -> void:
 ```
 core/            纯领域逻辑（RefCounted，可无头测）
   defs/          typed Resource
-  state/         GraphState + MatrixState / TimelineState / PersonaState / GardenState
+  state/         GraphState + NodeState / MatrixState / TimelineState / PersonaState / GardenState
   services/      CaseLoader / ComboSystem / CommandSystem / SaveSystem / DialogueSystem
 
 scenes/          表现层
@@ -569,7 +569,7 @@ if OS.is_debug_build() or _shot_mode():
 | **1 · 测试基建** | ✅ | `tests/headless/_test_base.gd`；`tools/run_tests.sh`；`tools/test_audit.py` + 124 条基线；`mono_audit.py` UTF-8 修复；GitHub Actions；README 去手写计数（`1196076`） | **1865 项 / 0 失败**；两项审计通过 |
 | **2 · Debug 抽离** | ✅ | 新增 `scenes/debug/DesktopDebug.gd`；`Desktop.gd` 8358 → 6807 行；`class_name Desktop`；测试 776 处改为 `scene.debug.dbg_*` | **1865 项 / 0 失败**；发布构建不实例化；审计 124 条无新增 |
 | **3 · Desktop 拆分** | ✅ | 13 个子系统控制器；`Desktop.gd` 6807 → 1022 行；测试私有访问审计扩到 `scene.<controller>._` | **1865 项 / 0 失败**；`Desktop.gd` ≤ 1200 行 |
-| **4 · 模型收敛** | ⏳ | 待执行：`GraphState` 领域拆分 + 节点模型类型化 | 旧档可读（`format: 1`） |
+| **4 · 模型收敛** | ✅ | 拆出 `MatrixState` / `TimelineState` / `PersonaState` / `GardenState`（`2753a3b`）；新增 `NodeState` 统一节点字段模式（`62fd2b0`） | **1874 项 / 0 失败**；旧档可读（`format: 1`） |
 | **5 · 表现层收尾** | ⏳ | 待执行：UI 组件复用、`_process` 门控、测试私有访问清零 | 审计基线归零 |
 
 **批次 2 的实际结果与预估差异**
@@ -626,8 +626,40 @@ if OS.is_debug_build() or _shot_mode():
 - 窗口 / 画布组件里还有 **45 个 `dbg_*`**（`IntroWin` 10、`CertWin` 6、`EdgeLayer` 4、`GardenWin` 4、`LogWin` 4、`CaseMapWin` 3 等）。它们位于组件边界，不在 `Desktop` 内；批次 5 统一评估：能由真实输入驱动的删掉，其余改名为 `test_*` 或并入 `DesktopDebug` 的查询层。
 - `ChromeController` 把调试面板按钮命名为 `dbg_btn_*`，`test_ui.gd` 仍依赖该名称查找；批次 5 改为按文案查找。
 
-**下一步**：批次 4 拆 `GraphState`（`MatrixState` / `TimelineState` / `PersonaState` / `GardenState`）并类型化节点模型，保持 `format: 1` 存档可读；每步以 `test_p15` + 全量回归为门槛。
+**批次 4 的实际结果**
+
+分两步落地，每步都以 `test_p15` + 全量回归收口。
+
+*4a · 领域状态拆分（`2753a3b`）*
+
+| 文件 | 行数 | 职责 |
+|---|---:|---|
+| `core/state/MatrixState.gd` | 125 | 五感槽位、归位去重、配方命中、结局记录 |
+| `core/state/PersonaState.gd` | 114 | 备注、待核对主张、已核准字段、对话进度 |
+| `core/state/TimelineState.gd` | 46 | 当前时刻、放映卡阅知、人物登场置位 |
+| `core/state/GardenState.gd` | 39 | 种子与花圃（规格仍归 `GardenSystem`） |
+| `core/GraphState.gd` | 1166 | 节点 / 边 / 收纳 / 可见性 / 与 case_def 相关的派生查询 |
+| `core/SaveSystem.gd` | 342 | 快照组装、撤销栈、读写盘 |
+
+- `GraphState` 保留 `time` / `matrix` / `endings` / `garden` / `notes` / `claims` / `confirmed_fields` / `talk_prog` / `card_seen` / `debuted` 同名属性，内部用 Getter/Setter 委托到领域状态。112 处 `graph.<字段>` 外部调用点因此零改动。
+- 存档字段名与结构完全不变，`format: 1`；`restore()` 改为调用各状态的 `from_dict()`，`snapshot()` 仍按原键组合。
+- 判定逻辑下沉：`MatrixState.match_ending()`、`PersonaState.confirm_field()` 等不再依赖 `case_def` 以外的上下文；`GraphState` 只留「需要案例数据」的薄包装。
+- 踩坑：GDScript 的 `const X := OtherClass.CONST` 不是常量表达式，会报 `Could not resolve external class member`。五感词表因此在 `GraphState` 与 `MatrixState` 各留一份，`test_p14` 增加一致性断言防漂移。
+
+*4b · `NodeState` 类型化边界（`62fd2b0`）*
+
+- `core/state/NodeState.gd` 成为节点字段名 / 类型 / 默认值的唯一来源：`make_new()` 建节点（坐标 -1 = 未落位）、`from_dict()` 读档归一化（坐标缺省 0）、`to_dict()` 回写字典。
+- `GraphState.add_node()` 与 `SaveSystem.restore()` 都改走它，删掉两份互相独立的手工字段表；`restore()` 少了约 20 行。
+- 未知字段收进 `_extra` 原样带回，旧档 / 前瞻字段不丢；证据专属字段只在源数据确实有时才写回，不会凭空给旧档加键。
+- 落盘仍是字典，`format: 1`；`p15` 新增 8 项断言（默认值、类型纠偏、未知字段保留、证据字段不污染普通节点）。
+
+**批次 4 留下的尾巴**
+
+- `graph.nodes` 仍是 `Dictionary[str, Dictionary]`：全项目约 714 处 `n["x"]` / `n.get("x")` 读点尚未迁移到 `NodeState.from_value()`。这一步改动面横跨 45 个文件（含测试与 addon），放在批次 4 里做会把「模型收敛」和「全量读点改写」两类风险叠在一起；按 §6 P2-4 的第 3 步，留到批次 5 按文件推进，`NodeState` 已提供入口。
+- 五感词表双份是 GDScript 常量表达式的限制，已有断言兜底；等 `GraphState.SENSES` 的外部读点收敛后，可只保留 `MatrixState` 一份。
+
+**下一步**：批次 5 收表现层——`ListPanel` / `FloatingPanel` 复用、`_process` 空闲门控、测试私有访问基线归零，并按文件把节点读点迁到 `NodeState`。
 
 ---
 
-> 本报告起初只描述现状与建议；批次 0–3 已按 §5 落地，现状与本节的差异以本节为准。
+> 本报告起初只描述现状与建议；批次 0–4 已按 §5 落地，现状与本节的差异以本节为准。
