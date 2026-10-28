@@ -193,11 +193,7 @@ func _fit_to_content() -> void:
 	if _rows == null:
 		return
 	var rows_h := _rows.get_combined_minimum_size().y
-	var vh := 720.0
-	if is_inside_tree():
-		var raw := get_viewport_rect().size.y
-		if raw >= 320.0:
-			vh = raw
+	var vh := FloatingPanel.viewport_height(self)
 	var inner := rows_h + SysWindow.BAR_H + 20.0 + 8.0
 	## 不设滚动条（用户口径）：窗高封顶在视口内，超高内容时窗口上移而不是出滚动条。
 	inner = minf(inner, maxf(160.0, vh - TOP - 8.0 - SysWindow.PAD * 2.0))

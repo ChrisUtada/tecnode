@@ -316,9 +316,8 @@ func set_hint(text: String) -> void:
 func _fit_height() -> void:
 	if content == null or body == null or _line_box == null:
 		return
-	if not is_inside_tree():
-		await tree_entered
-	await get_tree().process_frame
+	if not await FloatingPanel.settle(self):
+		return
 	var lines_h := _line_box.get_combined_minimum_size().y
 	var hint_h := 0.0
 	if _hint_box != null and _hint_box.visible:
@@ -332,12 +331,7 @@ func _fit_height() -> void:
 
 
 func _scroll_to_end() -> void:
-	if _scroll == null or not is_instance_valid(_scroll) or not is_inside_tree():
-		return
-	await get_tree().process_frame
-	if not is_inside_tree() or _scroll == null or not is_instance_valid(_scroll):
-		return
-	_scroll.set_deferred("scroll_vertical", 1 << 20)
+	await ScrollBox.to_bottom(_scroll)
 
 
 func hint_text() -> String:

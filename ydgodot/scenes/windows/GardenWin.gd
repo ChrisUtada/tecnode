@@ -463,13 +463,7 @@ func _fit_height() -> void:
 	var inner := maxf(BASE_INNER_H, content_h + 10.0 + BAR_H + 22.0)
 	set_inner_height(inner)
 	## 和详情窗一样按视口收底，避免 960×560 下窗底/按钮落到屏幕外。
-	var vh := 720.0
-	if is_inside_tree():
-		var raw := get_viewport_rect().size.y
-		if raw >= 320.0:
-			vh = raw
-	if position.y + size.y > vh - 8.0:
-		position.y = maxf(8.0, vh - 8.0 - size.y)
+	FloatingPanel.keep_bottom_visible(self)
 
 
 func dbg_state() -> Dictionary:

@@ -284,18 +284,14 @@ func _append_label(l: Label) -> void:
 
 
 func _scroll_to_end() -> void:
-	if _scroll == null or not is_instance_valid(_scroll):
-		return
-	await get_tree().process_frame
-	_scroll.set_deferred("scroll_vertical", 1 << 20)
+	await ScrollBox.to_bottom(_scroll)
 
 
 func _fit_height() -> void:
 	if content == null:
 		return
-	if not is_inside_tree():
-		await tree_entered
-	await get_tree().process_frame
+	if not await FloatingPanel.settle(self):
+		return
 	var content_h := content_min_height()
 	var target := clampf(maxf(240.0, SysWindow.BAR_H + 20.0 + content_h), 240.0, 360.0)
 	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:

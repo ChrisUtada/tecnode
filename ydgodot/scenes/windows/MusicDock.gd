@@ -110,7 +110,7 @@ func _on_gui_input(event: InputEvent) -> void:
 		if not _dragged:
 			_dragged = true
 			move_to_front()
-		position = _clamp_pos(_grab + d)
+		position = FloatingPanel.clamp_pos(self, _grab + d)
 		_user_placed = true
 		moved.emit()
 		accept_event()
@@ -121,16 +121,7 @@ func user_placed() -> bool:
 
 
 func clamp_into_parent() -> void:
-	position = _clamp_pos(position)
-
-
-func _clamp_pos(p: Vector2) -> Vector2:
-	var parent := get_parent() as Control
-	if parent == null:
-		return p
-	return Vector2(
-		clampf(p.x, 0.0, maxf(0.0, parent.size.x - size.x)),
-		clampf(p.y, 0.0, maxf(0.0, parent.size.y - size.y)))
+	position = FloatingPanel.clamp_pos(self, position)
 
 
 func update_state(s: Dictionary) -> void:

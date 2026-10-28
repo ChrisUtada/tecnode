@@ -45,20 +45,13 @@ func _gui_input(event: InputEvent) -> void:
 func _fit_height() -> void:
 	if _text == null:
 		return
-	if not is_inside_tree():
-		await tree_entered
-	await get_tree().process_frame
+	if not await FloatingPanel.settle(self):
+		return
 	var target := SysWindow.BAR_H + 20.0 + _text.get_combined_minimum_size().y
 	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:
 		set_inner_height(target)
 	## W22：长旁白把窗口撑出视口时把顶边提上来，按真实视口而不是写死 740。
-	var vh := 720.0
-	if is_inside_tree():
-		var raw := get_viewport_rect().size.y
-		if raw >= 320.0:
-			vh = raw
-	if position.y + size.y > vh - 8.0:
-		position.y = maxf(8.0, vh - 8.0 - size.y)
+	FloatingPanel.keep_bottom_visible(self)
 
 
 func text_of() -> String:
