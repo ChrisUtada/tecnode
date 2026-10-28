@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P1.2 图状态全量 + P1.3 命令行为补充回归
 ##
 ## 覆盖这一轮补齐的四处口径（都与 Web 版 02-state.js / 06-storage.js / 09-commands.js 对齐）：
@@ -9,21 +9,9 @@ extends SceneTree
 ##
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_p12.gd
 
-var fails := 0
-var total := 0
 var c: CaseLoader
 var g: GraphState
 var cs: CommandSystem
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P1.2 图状态全量 + P1.3 命令行为 ===")
@@ -41,41 +29,40 @@ func _initialize() -> void:
 	_test_consume()
 	_test_delete_node()
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
-# ── 1. 证物袋：什么都收（容器除外），记来源 ────────────────────────────
+# ── 1. 物品：收物与词（容器除外），记来源 ────────────────────────────
 func _test_bag() -> void:
 	g.reveal_container("loc", "SCENES_garden")
 	g.reveal_container("item", "ITEM_shuzhuo")
 	var lamp := g.key_of("item", "ITEM_taideng")
-	check("袋：普通物品属性允许", g.can_bag(lamp))
-	check("袋：普通物品收得进", g.bag_store(lamp))
-	check("袋：收进去后不可见", not g.is_visible(lamp))
-	check("袋：记账去向 BAG", String(g.stored.get(lamp, "")) == GraphState.BAG)
-	check("袋：记下来源容器", String(g.node(lamp).get("bag_from", "")) == "ITEM_shuzhuo")
-	check("袋：容器收不进（书桌是落脚点）", not g.bag_store(g.key_of("item", "ITEM_shuzhuo")))
-	var drawer := String(g.add_node("item", "ITEM_chouti")["key"])
-	check("袋：抽屉也按 baggable=false 拒收", not g.bag_store(drawer))
-	check("袋：can_bag 与物品属性同源", not g.can_bag(drawer))
-	check("袋：已收纳的不重复收", not g.bag_store(lamp))
-	check("袋：取回后重新可见", g.take_back(lamp) and g.is_visible(lamp))
+	check("物品：普通物品属性允许", g.can_bag(lamp))
+	check("物品：普通物品收得进", g.bag_store(lamp))
+	check("物品：收进去后不可见", not g.is_visible(lamp))
+	check("物品：记账去向 BAG", String(g.stored.get(lamp, "")) == GraphState.BAG)
+	check("物品：记下来源容器", g.node(lamp).bag_from == "ITEM_shuzhuo")
+	check("物品：容器收不进（书桌是落脚点）", not g.bag_store(g.key_of("item", "ITEM_shuzhuo")))
+	var drawer := g.add_node("item", "ITEM_chouti").key
+	check("物品：抽屉也按 baggable=false 拒收", not g.bag_store(drawer))
+	check("物品：can_bag 与物品属性同源", not g.can_bag(drawer))
+	check("物品：已收纳的不重复收", not g.bag_store(lamp))
+	check("物品：取回后重新可见", g.take_back(lamp) and g.is_visible(lamp))
 
 
-# ── 2. 线索册：只有线索能进 ────────────────────────────────────────────
+# ── 2. 证据：只收证 ──────────────────────────────────────────────────
 func _test_ledger() -> void:
-	var clue: String = String(g.add_node("clue", "CLUES_nm")["key"])
-	var item: String = String(g.add_node("item", "ITEMS_bd")["key"])
-	check("册：证收得进", g.ledger_store(clue))
-	check("册：普通物品收不进", not g.ledger_store(item))
-	check("册：记账去向 LEDGER", String(g.stored.get(clue, "")) == GraphState.LEDGER)
-	check("册：取回后可见", g.take_back(clue) and g.is_visible(clue))
+	var clue: String = g.add_node("clue", "CLUES_nm").key
+	var item: String = g.add_node("item", "ITEMS_bd").key
+	check("证据：证收得进", g.ledger_store(clue))
+	check("证据：普通物品收不进", not g.ledger_store(item))
+	check("证据：记账去向 LEDGER", String(g.stored.get(clue, "")) == GraphState.LEDGER)
+	check("证据：取回后可见", g.take_back(clue) and g.is_visible(clue))
 
 
 # ── 3. 推演桌布：按感官归位，感官不对不收 ────────────────────────────
 func _test_matrix() -> void:
-	var clue: String = String(g.add_node("clue", "CLUES_nm")["key"])
+	var clue: String = g.add_node("clue", "CLUES_nm").key
 	var sense := c.clue_of("CLUES_nm").sense
 	check("桌布：感官对的证能归位", g.matrix_assign(clue, sense))
 	check("桌布：记账去向 MATRIX", String(g.stored.get(clue, "")) == GraphState.MATRIX)
@@ -83,15 +70,15 @@ func _test_matrix() -> void:
 	check("桌布：能取回画布", g.matrix_take(clue) and g.is_visible(clue))
 
 
-# ── 4. 跨窗搬运：袋（物/词）与册（证）不再互通 ──────────────────────────
+# ── 4. 跨窗搬运：物品（物/词）与证据（证）不再互通 ──────────────────────
 func _test_restash() -> void:
 	var word: String = String(g.add_node("evidence", "EVID_CI_lhs_word")["key"])
-	check("词进证物袋", g.bag_store(word))
-	check("词不能搬进证据册", not g.restash(word, GraphState.BAG, GraphState.LEDGER))
+	check("词进物品", g.bag_store(word))
+	check("词不能搬进证据", not g.restash(word, GraphState.BAG, GraphState.LEDGER))
 	var zheng: String = String(g.add_node("evidence", "CLUES_JS")["key"])
-	check("证不进证物袋", not g.bag_store(zheng))
-	check("证进证据册", g.ledger_store(zheng))
-	check("证不能搬进证物袋", not g.restash(zheng, GraphState.LEDGER, GraphState.BAG))
+	check("证不进物品", not g.bag_store(zheng))
+	check("证卡进证据", g.ledger_store(zheng))
+	check("证不能搬进物品", not g.restash(zheng, GraphState.LEDGER, GraphState.BAG))
 	check("搬运：搬到同一个地方算无效", not g.restash(zheng, GraphState.LEDGER, GraphState.LEDGER))
 
 
@@ -109,7 +96,7 @@ func _test_collapse_hidden() -> void:
 	check("折叠后：容器本身还在", g2.is_visible(g2.key_of("item", "ITEM_shuzhuo")))
 
 	# 钉住 → 不跟着藏
-	g2.node(lamp)["pinned"] = true
+	g2.node(lamp).pinned = true
 	g2.recompute_hidden()
 	check("钉住的节点：折叠也不藏", g2.is_visible(lamp))
 
@@ -132,7 +119,7 @@ func _test_collapse_hidden() -> void:
 	g9.reveal_scene("SCENES_garden")
 	g9.reveal_container("item", "ITEM_shuzhuo")
 	check("场景通路不反向改 home_scene",
-		String(g9.node("loc:SCENES_garden").get("home_scene", "")) == "",
+		g9.node("loc:SCENES_garden").home_scene == "",
 		str(g9.node("loc:SCENES_garden")))
 	g9.collapse("SCENES_garden")
 	g9.collapse("ITEM_shuzhuo")
@@ -143,15 +130,15 @@ func _test_collapse_hidden() -> void:
 	# 旧存档可能已经写成环：场景节点的 home_scene 被误记成物品。重算时场景仍必须当根。
 	var g10 := GraphState.new(c)
 	var old_garden := g10.add_node("loc", "SCENES_garden")
-	old_garden["home_scene"] = "ITEM_shuzhuo"
+	old_garden.home_scene = "ITEM_shuzhuo"
 	g10.add_node("item", "ITEM_shuzhuo")
-	g10.add_node("item", "ITEM_taideng")["home_scene"] = "ITEM_shuzhuo"
+	g10.add_node("item", "ITEM_taideng").home_scene = "ITEM_shuzhuo"
 	g10.collapse("SCENES_garden")
 	g10.collapse("ITEM_shuzhuo")
 	check("旧存档成环数据：场景卡仍不消失", g10.is_visible("loc:SCENES_garden"),
 		str(g10.hidden.keys()))
 	check("旧存档场景归属被顺手修正",
-		String(g10.node("loc:SCENES_garden").get("home_scene", "")) == "",
+		g10.node("loc:SCENES_garden").home_scene == "",
 		str(g10.node("loc:SCENES_garden")))
 
 	check("数据层：容器 node_items 无包含环", c.containment_cycles().is_empty(),
@@ -161,25 +148,25 @@ func _test_collapse_hidden() -> void:
 	var g11 := GraphState.new(c)
 	var desk11 := g11.add_node("item", "ITEM_shuzhuo")
 	var trash11 := g11.add_node("item", "ITEMS_ljt")
-	desk11["home_scene"] = "ITEMS_ljt"
-	trash11["home_scene"] = "ITEM_shuzhuo"
+	desk11.home_scene = "ITEMS_ljt"
+	trash11.home_scene = "ITEM_shuzhuo"
 	g11.collapse("ITEM_shuzhuo")
 	g11.collapse("ITEMS_ljt")
 	check("物品 home 成环：两张卡都不会消失",
-		g11.is_visible(String(desk11["key"])) and g11.is_visible(String(trash11["key"])),
+		g11.is_visible(desk11.key) and g11.is_visible(trash11.key),
 		str(g11.hidden.keys()))
 	check("物品 home 成环：旧数据被改成根",
-		String(desk11.get("home_scene", "")) == "" and String(trash11.get("home_scene", "")) == "",
-		"%s / %s" % [desk11.get("home_scene", ""), trash11.get("home_scene", "")])
+		desk11.home_scene == "" and trash11.home_scene == "",
+		"%s / %s" % [desk11.home_scene, trash11.home_scene])
 
 	# 新写入归属时也要挡住环：书桌已经属于垃圾桶时，不能再把垃圾桶挂回书桌下。
 	var g12 := GraphState.new(c)
 	var desk12 := g12.add_node("item", "ITEM_shuzhuo")
-	desk12["home_scene"] = "ITEMS_ljt"
+	desk12.home_scene = "ITEMS_ljt"
 	var trash12 := g12.add_node("item", "ITEMS_ljt")
-	g12._assign_home(trash12, String(desk12["key"]))
-	check("新归属不会写成环", String(trash12.get("home_scene", "")) == "",
-		str(trash12.get("home_scene", "")))
+	g12._assign_home(trash12, desk12.key)
+	check("新归属不会写成环", trash12.home_scene == "",
+		trash12.home_scene)
 
 
 # ── 6. useItem 判定顺序：先零件，后发光 ───────────────────────────────
@@ -195,7 +182,7 @@ func _test_use_item_order() -> void:
 		if x is UseItemCommandDef and (x as UseItemCommandDef).requires.size() > 0:
 			play = x as UseItemCommandDef
 	# 唱针本身要发光？—— 唱针不发光的道具，测试只验「缺零件」优先于其他门
-	g4.node(g4.key_of("item", "ITEMS_cz"))["lit"] = true
+	g4.node(g4.key_of("item", "ITEMS_cz")).lit = true
 	var res := cs4.execute(changji, play)
 	check("缺零件时先报缺零件（不是别的原因）",
 		bool(res.get("blocked", false)) and String(res.get("message", "")).contains("唱针"),
@@ -229,7 +216,7 @@ func _test_consume() -> void:
 	for x in c.item_of("ITEM_something").commands:
 		if x is UseItemCommandDef:
 			c2 = x as UseItemCommandDef
-	g6.node(g6.key_of("item", "ITEM_shoudiantong"))["lit"] = true
+	g6.node(g6.key_of("item", "ITEM_shoudiantong")).lit = true
 	cs6.execute(g6.key_of("item", "ITEM_something"), c2)
 	check("可复用工具用完还在", g6.has("item", "ITEM_shoudiantong"))
 

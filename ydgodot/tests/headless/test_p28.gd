@@ -1,20 +1,8 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## 详情窗自适应增高回归：内容（含按钮）不许溢出窗框、不设滚动条。
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_p28.gd
 
-var fails := 0
-var total := 0
 var scene: Control
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P28 详情窗自适应增高 ===")
@@ -22,44 +10,40 @@ func _initialize() -> void:
 	root.add_child(scene)
 	await process_frame
 	await process_frame
-	scene._view_k = 1.0
-	scene._view_pos = Vector2.ZERO
-	scene._view_user = true
-	scene._apply_view()
-	scene.dbg_expand("SCENES_garden")
+	scene.debug.dbg_set_view_k(1.0)
+	scene.debug.dbg_set_view_pos(Vector2.ZERO)
+	scene.debug.dbg_set_view_user(true)
+	scene.debug.dbg_apply_view()
+	scene.debug.dbg_expand("SCENES_garden")
 	await process_frame
 
 	# 双击书桌：选中 + 激活交错触发两次 _rebuild，是溢出的历史路径
-	scene._on_card_selected("item:ITEM_shuzhuo")
-	scene._on_card_activated("item:ITEM_shuzhuo")
+	scene.debug.dbg_card_selected("item:ITEM_shuzhuo")
+	scene.debug.dbg_activate("item:ITEM_shuzhuo")
 	for i in 20:
 		await process_frame
-	_assert_fit("书桌（容器 + 重看叙事按钮）")
+	await _assert_fit("书桌（容器 + 重看叙事按钮）")
 
-	scene._on_card_selected("loc:SCENES_garden")
+	scene.debug.dbg_card_selected("loc:SCENES_garden")
 	for i in 20:
 		await process_frame
-	_assert_fit("花园（场景 + 重看场景叙事按钮）")
+	await _assert_fit("花园（场景 + 重看场景叙事按钮）")
 
-	var char_key := ""
-	for k in scene._cards.keys():
-		if String(k).begins_with("char:"):
-			char_key = k
-			break
-	if char_key != "":
-		scene._on_card_selected(char_key)
-		for i in 20:
-			await process_frame
-		_assert_fit("人物节点")
+	# 花园场景没有人物节点：显式造一张，保证「人物详情」这条路径也被覆盖
+	var char_key: String = scene.debug.dbg_ensure("char", "CHARS_luhengs")
+	for i in 20:
+		await process_frame
+	scene.debug.dbg_card_selected(char_key)
+	for i in 20:
+		await process_frame
+	await _assert_fit("人物节点")
 
-	print("---")
-	print("P28: %d/%d 通过" % [total - fails, total])
-	quit(1 if fails > 0 else 0)
+	_finish()
 
 
 ## 不变量：rows 内容底边不许越过窗框 bg 底边；窗口整体不许越出视口
 func _assert_fit(tag: String) -> void:
-	var w: DetailWin = scene._detail_win
+	var w: DetailWin = scene.debug.dbg_detail_win()
 	if w == null or not is_instance_valid(w) or not w.visible:
 		check(tag + "：详情窗可见", false, "window not visible")
 		return

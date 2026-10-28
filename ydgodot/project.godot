@@ -8,6 +8,12 @@
 
 config_version=5
 
+[debug]
+
+gdscript/warnings/unused_parameter=1
+gdscript/warnings/shadowed_variable=1
+gdscript/warnings/unsafe_property_access=1
+
 [application]
 
 config/name="T.E.C-OS"

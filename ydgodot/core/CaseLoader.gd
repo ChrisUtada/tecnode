@@ -142,9 +142,17 @@ func _cycle_dfs(v: String, adj: Dictionary, color: Dictionary, stack: Array[Stri
 ## 返回问题列表；空 = 通过。运行时只警告，迁移测试会判死。
 func validate_evidence() -> Array:
 	var out: Array = []
+	_validate_evidence_defs(out)
+	var available := _collect_available_evidence()
+	_validate_recipes(out, available)
+	_validate_endings(out, available)
+	_validate_evidence_fields(out, available)
+	return out
+
+
+func _validate_evidence_defs(out: Array) -> void:
 	var valid_tiers := ["wu", "ci", "zheng"]
 	var valid_origins := ["tec", "synth", "deduce"]
-	var available := {}
 	for ev in evidences.values():
 		if ev == null or ev.id == "":
 			out.append("证据定义缺 id")
@@ -153,10 +161,16 @@ func validate_evidence() -> Array:
 			out.append("%s 的 tier 非法：%s" % [ev.id, ev.tier])
 		if not valid_origins.has(String(ev.origin)):
 			out.append("%s 的 origin 非法：%s" % [ev.id, ev.origin])
-		if String(ev.tier) == "zheng" and not GraphState.SENSES.has(String(ev.sense)):
+		if String(ev.tier) == "zheng" and not MatrixState.SENSES.has(String(ev.sense)):
 			out.append("%s 的 sense 非法：%s" % [ev.id, ev.sense])
 		if ev.label.strip_edges() == "":
 			out.append("%s 缺 label" % ev.id)
+
+
+## 收集所有可达证据：TEC 产出、对话 / 回忆掉落、命令 / 反应产出，
+## 再让配方产物迭代到稳定（产物可继续作为下一层原料）。
+func _collect_available_evidence() -> Dictionary:
+	var available := {}
 	# TEC 产出：物品 / 场景 / 人物的 hidden_clue（字段名沿用）里列出的证。
 	for it in case_def.items:
 		if it.hidden_clue != null:
@@ -202,7 +216,7 @@ func validate_evidence() -> Array:
 		for row in ch.item_reactions:
 			for ev in row.clues:
 				if ev != null: available[ev.id] = true
-	# 配方产出可以继续作为下一层原料：迭代到稳定。物品本体天然算「物」原料。
+	# 物品本体天然算「物」原料。
 	var changed := true
 	while changed:
 		changed = false
@@ -213,6 +227,10 @@ func validate_evidence() -> Array:
 					and not available.has(r.evidence.id):
 				available[r.evidence.id] = true
 				changed = true
+	return available
+
+
+func _validate_recipes(out: Array, available: Dictionary) -> void:
 	for r in case_def.evidence_recipes:
 		if r == null or r.a == null or r.b == null or r.evidence == null:
 			out.append("配方缺 a / b / evidence")
@@ -221,14 +239,17 @@ func validate_evidence() -> Array:
 			out.append("配方 %s 的两端是同一张原料" % r.id)
 		if String(r.evidence.tier) != "zheng":
 			out.append("配方 %s 的产物不是「证」：%s" % [r.id, r.evidence.tier])
-		if not GraphState.SENSES.has(String(r.sense)):
+		if not MatrixState.SENSES.has(String(r.sense)):
 			out.append("配方 %s 的 sense 非法：%s" % [r.id, r.sense])
 		for raw in [r.a, r.b]:
 			if not _recipe_side_available(raw, available):
 				out.append("配方 %s 的「%s」没有可达来源" % [r.id, _raw_id(raw)])
 		if not available.has(r.evidence.id):
 			out.append("配方 %s 的产物「%s」不可达" % [r.id, r.evidence.id])
-	# 结局配方必须覆盖它需要的五感：每个 sense 至少要有一张可达的证。
+
+
+## 结局配方必须覆盖它需要的五感：每个 sense 至少要有一张可达的证。
+func _validate_endings(out: Array, available: Dictionary) -> void:
 	var sense_ok := {}
 	for eid in available.keys():
 		var ev := evidence_of(String(eid))
@@ -240,6 +261,9 @@ func validate_evidence() -> Array:
 				out.append("结局 %s 的「%s」不可达" % [end.id, _raw_id(ev)])
 			elif not sense_ok.has(String(ev.sense)):
 				out.append("结局 %s 的「%s」缺少同感官可达证据" % [end.id, ev.id])
+
+
+func _validate_evidence_fields(out: Array, available: Dictionary) -> void:
 	for ch in case_def.chars:
 		for f in ch.evidence_fields:
 			if f == null:
@@ -254,7 +278,6 @@ func validate_evidence() -> Array:
 					out.append("%s / %s 的支撑证据不可达或不是证" % [ch.id, f.id])
 			if f.drop_clue == null:
 				out.append("%s / %s 没有完成掉落证据" % [ch.id, f.id])
-	return out
 
 
 func _recipe_side_available(raw: Resource, available: Dictionary) -> bool:

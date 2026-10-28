@@ -415,7 +415,7 @@ func _sync_frame(inner: Vector2) -> void:
 
 func enable_case_controls() -> void:
 	enable_controls("收起：缩成桌面右下角的案件卡片（进度会保存）",
-		"关闭：放进左侧「案件地图」图标（进度会保存）")
+		"关闭：放进左侧「案件」图标（进度会保存）")
 
 
 func enable_controls(min_tip: String, close_tip: String = "", show_min := true) -> void:

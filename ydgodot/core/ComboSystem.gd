@@ -21,28 +21,28 @@ func _init(p_case: CaseLoader, p_graph: GraphState) -> void:
 ## 工具是否「要发光才能用」
 func needs_lit(tool_key: String) -> bool:
 	var n := graph.node(tool_key)
-	if n.is_empty() or n["kind"] != "item":
+	if n.is_empty() or n.kind != "item":
 		return false
-	var it := case_def.item_of(String(n["id"]))
+	var it := case_def.item_of(n.id)
 	return it != null and it.needs_lit_to_use
 
 
 ## 开关灯（手电筒这类 toggleLight 物品）。返回 {changed, lit, message} 或空字典。
 func toggle_light(node_key: String) -> Dictionary:
 	var n := graph.node(node_key)
-	if n.is_empty() or n["kind"] != "item":
+	if n.is_empty() or n.kind != "item":
 		return {}
-	var it := case_def.item_of(String(n["id"]))
+	var it := case_def.item_of(n.id)
 	if it == null or not it.toggle_light:
 		return {}
-	n["lit"] = not bool(n.get("lit", false))
-	var msg := it.lit_on_message if n["lit"] else it.lit_off_message
-	return {"changed": true, "lit": n["lit"], "message": msg}
+	n.lit = not n.lit
+	var msg := it.lit_on_message if n.lit else it.lit_off_message
+	return {"changed": true, "lit": n.lit, "message": msg}
 
 
 ## 是不是「场景类」节点（loc / time / 旧版 scene）。场景⇄场景的判定只认这个。
-func _is_scene(n: Dictionary) -> bool:
-	return not n.is_empty() and GraphState.is_scene_kind(String(n["kind"]))
+func _is_scene(n: NodeState) -> bool:
+	return not n.is_empty() and GraphState.is_scene_kind(n.kind)
 
 
 ## 把一个节点拖到另一个节点上。返回：
@@ -59,8 +59,8 @@ func use_item(tool_key: String, target_key: String) -> Dictionary:
 	var target := graph.node(target_key)
 	if tool.is_empty() or target.is_empty() or tool_key == target_key:
 		return {"ok": false, "message": ""}
-	var tool_id := String(tool["id"])
-	var target_id := String(target["id"])
+	var tool_id := tool.id
+	var target_id := target.id
 
 	# ⓪ 场景通路（Web `05-combine.js:15`）：把容器拖到场景上，只要**容器正文里 `[loc:对方]`**
 	#    列着对方，就等于「前往」。书桌 / 垃圾桶不是场景，但它们 content 里的
@@ -77,17 +77,17 @@ func use_item(tool_key: String, target_key: String) -> Dictionary:
 			"message": "这两个场景之间没有直接通路"}
 
 	# ⓪.5 配方：物 = 物品本体，词 / 证 = 证据卡。物品×物品、物×词、证×物都由配方表定义。
-	var recipe := case_def.evidence_recipe_for(String(tool["kind"]), tool_id,
-		String(target["kind"]), target_id)
+	var recipe := case_def.evidence_recipe_for(tool.kind, tool_id,
+		target.kind, target_id)
 	if recipe != null:
 		return _apply_evidence_recipe(recipe, target_key)
 
 	# ① 目标自己有反应表（人物对「你手上的东西」说一句话）
-	var hit := lookup_reaction(String(target["kind"]), target_id, tool_id)
+	var hit := lookup_reaction(target.kind, target_id, tool_id)
 	var owner_key := target_key
 	# ② 反向：工具自己是反应表的所有者（把人拖到东西上）
 	if hit.is_empty():
-		var rev := lookup_reaction(String(tool["kind"]), tool_id, target_id)
+		var rev := lookup_reaction(tool.kind, tool_id, target_id)
 		if not rev.is_empty():
 			hit = rev
 			owner_key = tool_key
@@ -122,7 +122,7 @@ func use_item(tool_key: String, target_key: String) -> Dictionary:
 	return {
 		"ok": false,
 		"tried": tried,
-		"message": "「%s」对「%s」没有反应" % [target["label"], tool["label"]],
+		"message": "「%s」对「%s」没有反应" % [target.label, tool.label],
 	}
 
 
@@ -154,7 +154,7 @@ func _scan_container_reaction(container_key: String, other_id: String) -> Dictio
 	var n := graph.node(container_key)
 	if n.is_empty() or not graph.is_container_node(container_key):
 		return {}
-	for tag in case_def.container_nodes(String(n["kind"]), String(n["id"])):
+	for tag in case_def.container_nodes(n.kind, n.id):
 		var h := lookup_reaction(String(tag["kind"]), String(tag["id"]), other_id)
 		if not h.is_empty():
 			h["via"] = container_key
@@ -173,16 +173,16 @@ func _apply_evidence_recipe(recipe: EvidenceRecipeDef, target_key: String) -> Di
 		return {"ok": false, "matched": true, "no_tried": true,
 			"message": "「%s」已经在画布上了" % ev.label}
 	var tn := graph.node(target_key)
-	var sx := float(tn.get("x", -1.0))
-	var sy := float(tn.get("y", -1.0))
+	var sx := tn.x
+	var sy := tn.y
 	if sx < 0.0:
 		sx = 900.0
 	if sy < 0.0:
 		sy = 600.0
 	var key := graph.capture_evidence(ev.id, target_key, sx + 60.0, sy + 60.0, "synth")
 	var evn := graph.node(key)
-	evn["origin"] = "synth"
-	evn["sense"] = recipe.sense
+	evn.origin = "synth"
+	evn.sense = recipe.sense
 	return {
 		"ok": true,
 		"matched": true,
@@ -215,10 +215,10 @@ func _apply_reaction(hit: Dictionary, owner_key: String) -> Dictionary:
 	if scene_id != "" and case_def.scene_of(scene_id) != null:
 		var scene_existed := graph.has("loc", scene_id)   # normalize 会把时刻 id 归到 time
 		var sn := graph.add_node("loc", scene_id)
-		graph.mark_fresh(String(sn["key"]))
+		graph.mark_fresh(sn.key)
 		if not scene_existed:
-			graph.link(owner_key, String(sn["key"]), "cond")
-		reveal.append(String(sn["key"]))
+			graph.link(owner_key, sn.key, "cond")
+		reveal.append(sn.key)
 
 	# results.items + onSuccess.items 合并 → spawnItems（Web 04-graph.js:127 同一公式）
 	var new_items: Array = []
@@ -227,22 +227,22 @@ func _apply_reaction(hit: Dictionary, owner_key: String) -> Dictionary:
 		new_items.append_array(hit["on_success_items"])
 	if not new_items.is_empty():
 		var src := graph.node(owner_key)
-		var sx := 900.0 if float(src.get("x", -1.0)) < 0.0 else float(src["x"])
-		var sy := 600.0 if float(src.get("x", -1.0)) < 0.0 else float(src["y"])
-		var home := String(src.get("home_scene", ""))
+		var sx := 900.0 if src.x < 0.0 else src.x
+		var sy := 600.0 if src.x < 0.0 else src.y
+		var home := src.home_scene
 		for i in new_items.size():
 			var iid := String(new_items[i])
 			var existed_item := graph.has("item", iid)
 			var iv := graph.add_node("item", iid)
-			if String(iv.get("home_scene", "")) == "":
-				iv["home_scene"] = home
+			if iv.home_scene == "":
+				iv.home_scene = home
 			if existed_item:
-				iv["fresh"] = false        # 本来就在画布上：不抢镜头、不重挂「新」
+				iv.fresh = false        # 本来就在画布上：不抢镜头、不重挂「新」
 			else:
-				graph.mark_fresh(String(iv["key"]))
-				iv["x"] = sx + 60.0 + float(i) * 26.0
-				iv["y"] = sy + 60.0 + float(i) * 26.0
-				reveal.append(String(iv["key"]))
+				graph.mark_fresh(iv.key)
+				iv.x = sx + 60.0 + float(i) * 26.0
+				iv.y = sy + 60.0 + float(i) * 26.0
+				reveal.append(iv.key)
 
 	return {
 		"ok": true,
@@ -263,13 +263,13 @@ func activate(node_key: String) -> Dictionary:
 	if n.is_empty():
 		return {}
 	var cmds: Array = []
-	match String(n["kind"]):
+	match n.kind:
 		"item":
-			var it := case_def.item_of(String(n["id"]))
+			var it := case_def.item_of(n.id)
 			if it != null:
 				cmds = it.commands
 		"loc":
-			var sc := case_def.scene_of(String(n["id"]))
+			var sc := case_def.scene_of(n.id)
 			if sc != null:
 				cmds = sc.commands
 	if cmds.is_empty():

@@ -1,28 +1,14 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 
 const TEMP_PROGRESS := "user://test_p21_progress.json"
 const TEMP_SAVE := "user://test_p21_case.save"
 
-var fails := 0
-var total := 0
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
-
 func _initialize() -> void:
-	print("=== P2.1 案件地图 / 停车 / 续档 / 角标 ===")
+	print("=== P2.1 案件 / 停车 / 续档 / 角标 ===")
 	_test_catalog()
 	await _test_desktop()
 	_cleanup()
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 func _file_text(path: String) -> String:
@@ -94,8 +80,8 @@ func _test_desktop() -> void:
 	root.add_child(scene)
 	await process_frame
 	await process_frame
-	scene.dbg_use_temp_progress(TEMP_PROGRESS)
-	var info: Dictionary = scene.dbg_case_info()
+	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
+	var info: Dictionary = scene.debug.dbg_case_info()
 	check("桌面当前案件 A001", info["id"] == "A001", str(info["id"]))
 	check("桌面案件窗默认展开", bool(info["open"]))
 	check("桌面无 dock", not bool(info["dock_visible"]))
@@ -103,56 +89,57 @@ func _test_desktop() -> void:
 	check("桌面标题含案件 A-001", String(info["title"]).contains("案件 A-001"), String(info["title"]))
 	check("桌面进度为临时路径", info["progress_path"] == TEMP_PROGRESS)
 
-	var map: CaseMapWin = scene.dbg_open_case_map()
+	var map: CaseMapWin = scene.debug.dbg_open_case_map()
 	await process_frame
-	check("案件地图可打开", map != null and map.visible)
-	check("案件地图 2 行", map != null and map.dbg_row_count() == 2, str(map.dbg_row_count() if map != null else -1))
-	check("W28 A001 当前状态", scene.dbg_case_map_state("A001") == "进行中", scene.dbg_case_map_state("A001"))
-	check("A002 锁定状态", scene.dbg_case_map_state("A002") == "锁定", scene.dbg_case_map_state("A002"))
-	check("当前案件不可重复进入", not scene.dbg_case_map_click("A001"))
-	check("锁定案件不可点击", not scene.dbg_case_map_click("A002"))
+	check("案件可打开", map != null and map.visible)
+	check("案件窗标题", map != null and map.title == "案件", map.title if map != null else "null")
+	check("案件 2 行", map != null and map.dbg_row_count() == 2, str(map.dbg_row_count() if map != null else -1))
+	check("W28 A001 当前状态", scene.debug.dbg_case_map_state("A001") == "进行中", scene.debug.dbg_case_map_state("A001"))
+	check("A002 锁定状态", scene.debug.dbg_case_map_state("A002") == "锁定", scene.debug.dbg_case_map_state("A002"))
+	check("当前案件不可重复进入", not scene.debug.dbg_case_map_click("A001"))
+	check("锁定案件不可点击", not scene.debug.dbg_case_map_click("A002"))
 
-	scene._save.path = TEMP_SAVE
-	scene._save_enabled = true
-	check("× 收起进案件图标", scene.dbg_park_case("icon"))
+	scene.debug.dbg_save_system().path = TEMP_SAVE
+	scene.debug.dbg_set_save_enabled(true)
+	check("× 收起进案件图标", scene.debug.dbg_park_case("icon"))
 	await process_frame
-	info = scene.dbg_case_info()
+	info = scene.debug.dbg_case_info()
 	check("收起后案件窗关闭", not bool(info["open"]))
 	check("收起后图标角标显示", bool(info["badge_visible"]))
 	check("收起后无 dock", not bool(info["dock_visible"]))
 	check("收起时自动存档", FileAccess.file_exists(TEMP_SAVE) and _file_text(TEMP_SAVE) != "")
-	check("案件窗隐藏", not scene._case_win.visible)
-	scene._save_enabled = false
+	check("案件窗隐藏", not scene.debug.dbg_case_win().visible)
+	scene.debug.dbg_set_save_enabled(false)
 
-	scene.dbg_open_case_map()
+	scene.debug.dbg_open_case_map()
 	await process_frame
-	check("W28 收起后地图仍显示进行中", scene.dbg_case_map_state("A001") == "进行中", scene.dbg_case_map_state("A001"))
-	check("点击本案行重新展开", scene.dbg_case_map_click("A001"))
+	check("W28 收起后地图仍显示进行中", scene.debug.dbg_case_map_state("A001") == "进行中", scene.debug.dbg_case_map_state("A001"))
+	check("点击本案行重新展开", scene.debug.dbg_case_map_click("A001"))
 	await process_frame
-	info = scene.dbg_case_info()
-	check("重开后案件窗可见", bool(info["open"]) and scene._case_win.visible)
+	info = scene.debug.dbg_case_info()
+	check("重开后案件窗可见", bool(info["open"]) and scene.debug.dbg_case_win().visible)
 	check("重开后角标隐藏", not bool(info["badge_visible"]))
-	check("重开后地图关闭", scene.dbg_case_map_win() == null)
+	check("重开后地图关闭", scene.debug.dbg_case_map_win() == null)
 
-	check("– 收进 dock", scene.dbg_park_case("dock"))
+	check("– 收进 dock", scene.debug.dbg_park_case("dock"))
 	await process_frame
-	info = scene.dbg_case_info()
+	info = scene.debug.dbg_case_info()
 	check("dock 可见", bool(info["dock"]) and bool(info["dock_visible"]))
 	check("U6 dock 卡片完整落在桌面内",
-		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
-		str(scene._dock_card.get_global_rect()))
-	var desk_old: Vector2 = scene._desk.size
-	scene._desk.size = Vector2(960.0, 508.0)
-	scene._place_case_dock()
+		scene.debug.dbg_desk().get_global_rect().encloses(scene.debug.dbg_dock_card().get_global_rect()),
+		str(scene.debug.dbg_dock_card().get_global_rect()))
+	var desk_old: Vector2 = scene.debug.dbg_desk().size
+	scene.debug.dbg_desk().size = Vector2(960.0, 508.0)
+	scene.debug.dbg_place_case_dock()
 	check("U6 960×560 下 dock 仍在桌面内",
-		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
-		str(scene._dock_card.get_global_rect()))
-	scene._desk.size = desk_old
-	scene._place_case_dock()
+		scene.debug.dbg_desk().get_global_rect().encloses(scene.debug.dbg_dock_card().get_global_rect()),
+		str(scene.debug.dbg_dock_card().get_global_rect()))
+	scene.debug.dbg_desk().size = desk_old
+	scene.debug.dbg_place_case_dock()
 	check("dock 模式无图标角标", not bool(info["badge_visible"]))
-	check("dock 卡片有内容", scene._dock_title.text != "" and scene._dock_sub.text != "")
-	var dock_glyph := scene._dock_card.find_child("case_glyph", true, false) as Label
-	var dock_glyph_box := scene._dock_card.find_child("case_glyph_box", true, false) as Control
+	check("dock 卡片有内容", scene.debug.dbg_dock_title().text != "" and scene.debug.dbg_dock_sub().text != "")
+	var dock_glyph := scene.debug.dbg_dock_card().find_child("case_glyph", true, false) as Label
+	var dock_glyph_box := scene.debug.dbg_dock_card().find_child("case_glyph_box", true, false) as Control
 	check("dock 标记为「案」字 + 外框",
 		dock_glyph != null and dock_glyph.text == "案" and dock_glyph_box != null
 			and dock_glyph.get_theme_color("font_color").is_equal_approx(TecTheme.TEXT),
@@ -160,90 +147,90 @@ func _test_desktop() -> void:
 	check("dock 标记不贴边",
 		dock_glyph_box != null
 			and dock_glyph_box.get_global_rect().position.x
-				- scene._dock_card.get_global_rect().position.x >= 8.0,
-		"null" if dock_glyph_box == null else str(dock_glyph_box.get_global_rect()) + " / dock " + str(scene._dock_card.get_global_rect()))
+				- scene.debug.dbg_dock_card().get_global_rect().position.x >= 8.0,
+		"null" if dock_glyph_box == null else str(dock_glyph_box.get_global_rect()) + " / dock " + str(scene.debug.dbg_dock_card().get_global_rect()))
 	# U7：案件卡片可拖，重排不吸回；未拖动松手才展开。
-	var dock_home: Vector2 = scene._dock_card.position
-	var dock_at: Vector2 = scene._dock_card.get_global_rect().get_center()
+	var dock_home: Vector2 = scene.debug.dbg_dock_card().position
+	var dock_at: Vector2 = scene.debug.dbg_dock_card().get_global_rect().get_center()
 	var dock_down := InputEventMouseButton.new()
 	dock_down.button_index = MOUSE_BUTTON_LEFT
 	dock_down.pressed = true
 	dock_down.position = dock_at
 	dock_down.global_position = dock_at
-	scene._dock_card.gui_input.emit(dock_down)
+	scene.debug.dbg_dock_card().gui_input.emit(dock_down)
 	var dock_move := InputEventMouseMotion.new()
 	dock_move.button_mask = MOUSE_BUTTON_MASK_LEFT
 	dock_move.position = dock_at + Vector2(-140, -90)
 	dock_move.global_position = dock_at + Vector2(-140, -90)
-	scene._dock_card.gui_input.emit(dock_move)
+	scene.debug.dbg_dock_card().gui_input.emit(dock_move)
 	var dock_up := InputEventMouseButton.new()
 	dock_up.button_index = MOUSE_BUTTON_LEFT
 	dock_up.pressed = false
 	dock_up.position = dock_at + Vector2(-140, -90)
 	dock_up.global_position = dock_at + Vector2(-140, -90)
-	scene._dock_card.gui_input.emit(dock_up)
+	scene.debug.dbg_dock_card().gui_input.emit(dock_up)
 	await process_frame
-	check("U7 案件卡片可拖动", scene._dock_card.position != dock_home,
-		str(scene._dock_card.position) + " / " + str(dock_home))
+	check("U7 案件卡片可拖动", scene.debug.dbg_dock_card().position != dock_home,
+		str(scene.debug.dbg_dock_card().position) + " / " + str(dock_home))
 	check("U7 案件卡片拖动后仍在桌面内",
-		scene._desk.get_global_rect().encloses(scene._dock_card.get_global_rect()),
-		str(scene._dock_card.get_global_rect()))
-	var dock_dragged: Vector2 = scene._dock_card.position
-	scene._place_case_dock()
-	check("U7 案件卡片重排不被吸回", scene._dock_card.position == dock_dragged,
-		str(scene._dock_card.position) + " / " + str(dock_dragged))
-	var dock_click: Vector2 = scene._dock_card.get_global_rect().get_center()
+		scene.debug.dbg_desk().get_global_rect().encloses(scene.debug.dbg_dock_card().get_global_rect()),
+		str(scene.debug.dbg_dock_card().get_global_rect()))
+	var dock_dragged: Vector2 = scene.debug.dbg_dock_card().position
+	scene.debug.dbg_place_case_dock()
+	check("U7 案件卡片重排不被吸回", scene.debug.dbg_dock_card().position == dock_dragged,
+		str(scene.debug.dbg_dock_card().position) + " / " + str(dock_dragged))
+	var dock_click: Vector2 = scene.debug.dbg_dock_card().get_global_rect().get_center()
 	var dock_cdown := InputEventMouseButton.new()
 	dock_cdown.button_index = MOUSE_BUTTON_LEFT
 	dock_cdown.pressed = true
 	dock_cdown.position = dock_click
 	dock_cdown.global_position = dock_click
-	scene._dock_card.gui_input.emit(dock_cdown)
+	scene.debug.dbg_dock_card().gui_input.emit(dock_cdown)
 	var dock_cup := InputEventMouseButton.new()
 	dock_cup.button_index = MOUSE_BUTTON_LEFT
 	dock_cup.pressed = false
 	dock_cup.position = dock_click
 	dock_cup.global_position = dock_click
-	scene._dock_card.gui_input.emit(dock_cup)
-	info = scene.dbg_case_info()
+	scene.debug.dbg_dock_card().gui_input.emit(dock_cup)
+	info = scene.debug.dbg_case_info()
 	check("点 dock 重新展开", bool(info["open"]) and not bool(info["dock_visible"]))
 
-	scene.dbg_park_case("icon")
+	scene.debug.dbg_park_case("icon")
 	await process_frame
-	scene.dbg_open_case_map()
+	scene.debug.dbg_open_case_map()
 	await process_frame
-	check("未解锁 A002 不可进入", not scene.dbg_enter_case("A002"))
-	check("未解锁不切换案件", String(scene.dbg_case_info()["id"]) == "A001")
-	check("解锁 A002", scene.dbg_catalog_unlock("A002"))
-	check("地图 A002 待接入", scene.dbg_case_map_state("A002") == "待接入", scene.dbg_case_map_state("A002"))
-	check("A002 无数据不可切换", not scene.dbg_enter_case("A002"))
-	check("切换失败保持 A001", String(scene.dbg_case_info()["id"]) == "A001")
+	check("未解锁 A002 不可进入", not scene.debug.dbg_enter_case("A002"))
+	check("未解锁不切换案件", String(scene.debug.dbg_case_info()["id"]) == "A001")
+	check("解锁 A002", scene.debug.dbg_catalog_unlock("A002"))
+	check("地图 A002 待接入", scene.debug.dbg_case_map_state("A002") == "待接入", scene.debug.dbg_case_map_state("A002"))
+	check("A002 无数据不可切换", not scene.debug.dbg_enter_case("A002"))
+	check("切换失败保持 A001", String(scene.debug.dbg_case_info()["id"]) == "A001")
 	check("进度已写入临时档", CaseCatalog.new(TEMP_PROGRESS).is_unlocked("A002"))
-	check("重复解锁 A002 返回 false", not scene.dbg_catalog_unlock("A002"))
-	check("A001 下一案已解锁", not scene.dbg_catalog_unlock_next("A001"))
+	check("重复解锁 A002 返回 false", not scene.debug.dbg_catalog_unlock("A002"))
+	check("A001 下一案已解锁", not scene.debug.dbg_catalog_unlock_next("A001"))
 
-	scene.dbg_use_temp_progress(TEMP_PROGRESS)
-	scene.dbg_reopen_case()
+	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
+	scene.debug.dbg_reopen_case()
 	var true_e = scene.case_def.ending_by_id("TRUE_E")
 	var assigned := true
 	for clue in true_e.recipe:
-		scene.dbg_ensure("clue", clue.id)
-		if not scene.dbg_matrix_assign("evidence:" + clue.id):
+		scene.debug.dbg_ensure("clue", clue.id)
+		if not scene.debug.dbg_matrix_assign("evidence:" + clue.id):
 			assigned = false
-	check("配方证全部归位", assigned and (scene.dbg_state()["matrix_ids"] as Array).size() == 5,
-		str(scene.dbg_state()["matrix_ids"]))
-	scene.dbg_open_matrix()
-	scene.dbg_matrix_charge()
+	check("配方证全部归位", assigned and (scene.debug.dbg_state()["matrix_ids"] as Array).size() == 5,
+		str(scene.debug.dbg_state()["matrix_ids"]))
+	scene.debug.dbg_open_matrix()
+	scene.debug.dbg_matrix_charge()
 	await process_frame
-	info = scene.dbg_case_info()
+	info = scene.debug.dbg_case_info()
 	check("真名结局标记完成", (info["completed"] as Array).has("A001"), str(info["completed"]))
 	check("真名结局解锁 A002", (info["unlocked"] as Array).has("A002"), str(info["unlocked"]))
 	check("解锁进度已落盘", CaseCatalog.new(TEMP_PROGRESS).is_unlocked("A002"))
-	scene.dbg_ending_finish()
+	scene.debug.dbg_ending_finish()
 
-	scene.dbg_use_temp_progress(TEMP_PROGRESS)
-	scene._sync_case_progress_from_graph()
-	info = scene.dbg_case_info()
+	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
+	scene.debug.dbg_sync_case_progress()
+	info = scene.debug.dbg_case_info()
 	check("旧存档补记完成", (info["completed"] as Array).has("A001"), str(info["completed"]))
 	check("旧存档补解锁 A002", (info["unlocked"] as Array).has("A002"), str(info["unlocked"]))
 

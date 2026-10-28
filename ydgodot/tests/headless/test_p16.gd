@@ -1,20 +1,7 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 
 const TEMP_INV := "user://test_p16_investigator.json"
 const TEMP_INV_DESK := "user://test_p16_desktop_investigator.json"
-
-var fails := 0
-var total := 0
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P1.6 开场适性测试 / 调查员证 ===")
@@ -24,16 +11,20 @@ func _initialize() -> void:
 	await _test_intro_ui()
 	await _test_desktop()
 	_cleanup()
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 func _test_sense() -> void:
 	check("三问（2 视觉 1 听觉）→ 视觉", Investigator.pick_sense(["vision", "vision", "hearing"]) == "vision")
 	check("平局取先达到的", Investigator.pick_sense(["hearing", "vision", "touch"]) == "hearing")
 	check("空答案回退视觉", Investigator.pick_sense([]) == "vision")
-	check("五感名称齐全", Investigator.SENSE_NAMES.size() == 5)
-	check("五感描述齐全", Investigator.SENSE_FLAVOR.size() == 5)
+	check("五感名称齐全", MatrixState.SENSE_NAMES.size() == 5)
+	check("五感描述齐全", Investigator.SENSE_FLAVOR.size() == MatrixState.SENSE_NAMES.size())
+	var flavor_aligned := true
+	for sense in MatrixState.SENSES:
+		if not Investigator.SENSE_FLAVOR.has(sense):
+			flavor_aligned = false
+	check("五感描述键与词表一致", flavor_aligned)
 	check("题库 3 问", Investigator.QUIZ.size() == 3)
 	var all_five := true
 	for q in Investigator.QUIZ:
@@ -156,15 +147,15 @@ func _test_desktop() -> void:
 	root.add_child(scene)
 	await process_frame
 	await process_frame
-	check("无头模式不自动弹开场", not scene.dbg_intro_open())
-	scene.dbg_use_temp_investigator(TEMP_INV_DESK)
-	check("临时调查员路径为空", scene.dbg_investigator().is_empty())
+	check("无头模式不自动弹开场", not scene.debug.dbg_intro_open())
+	scene.debug.dbg_use_temp_investigator(TEMP_INV_DESK)
+	check("临时调查员路径为空", scene.debug.dbg_investigator().is_empty())
 	var chip: Button = scene.get_node_or_null("header/inv_chip") as Button
 	check("页眉证件位存在", chip != null)
 	check("无证时不显示证章", chip == null or not chip.visible)
-	var intro: IntroWin = scene.dbg_open_intro()
+	var intro: IntroWin = scene.debug.dbg_open_intro()
 	await process_frame
-	check("可以手动打开开场", scene.dbg_intro_open())
+	check("可以手动打开开场", scene.debug.dbg_intro_open())
 	check("开场仍停在第 0 步", intro.dbg_step() == "name", str(intro.dbg_step()))
 	intro.dbg_set_name("执行者")
 	intro.dbg_begin()
@@ -175,38 +166,38 @@ func _test_desktop() -> void:
 	intro.dbg_confirm_pick()
 	intro.dbg_confirm()
 	await create_timer(0.5).timeout
-	check("领证后开场关闭", not scene.dbg_intro_open())
-	var inv: Dictionary = scene.dbg_investigator()
+	check("领证后开场关闭", not scene.debug.dbg_intro_open())
+	var inv: Dictionary = scene.debug.dbg_investigator()
 	check("桌面记住调查员", String(inv.get("name", "")) == "执行者")
 	check("调查员证持久化", FileAccess.file_exists(TEMP_INV_DESK))
 	check("页眉证章出现", chip != null and chip.visible)
 	check("页眉证章带编号", chip != null and String(chip.text).contains(String(inv.get("id", ""))))
-	scene.dbg_open_cert()
+	scene.debug.dbg_open_cert()
 	await process_frame
-	check("可回看调查员证", scene.dbg_cert_open())
-	scene._view_user = true
-	scene._view_k = 1.8
-	scene._view_pos = Vector2(-4000.0, -4000.0)
-	scene._apply_view()
-	scene._reset_case()
+	check("可回看调查员证", scene.debug.dbg_cert_open())
+	scene.debug.dbg_set_view_user(true)
+	scene.debug.dbg_set_view_k(1.8)
+	scene.debug.dbg_set_view_pos(Vector2(-4000.0, -4000.0))
+	scene.debug.dbg_apply_view()
+	scene.debug.dbg_reset_case()
 	await process_frame
-	check("重置先弹确认", scene._confirm_win != null and scene._confirm_win.visible)
-	if scene._confirm_win != null:
-		scene._confirm_win.dbg_cancel()
+	check("重置先弹确认", scene.debug.dbg_confirm_win() != null and scene.debug.dbg_confirm_win().visible)
+	if scene.debug.dbg_confirm_win() != null:
+		scene.debug.dbg_confirm_win().dbg_cancel()
 	await process_frame
-	check("取消后确认窗关闭", scene._confirm_win == null)
-	scene._reset_case(true)
+	check("取消后确认窗关闭", scene.debug.dbg_confirm_win() == null)
+	scene.debug.dbg_reset_case(true)
 	await process_frame
 	await process_frame
-	check("S1 重置后镜头回到自动档", not scene._view_user)
+	check("S1 重置后镜头回到自动档", not scene.debug.dbg_view_user())
 	var start_slice_key := "loc:SCENES_garden"
 	check("S1 重置后起始节点在可视区",
-		scene._cards.has(start_slice_key)
-			and scene._stage.get_global_rect().intersects(
-				(scene._cards[start_slice_key] as NodeCard).get_global_rect()))
-	check("重来不清调查员", String(scene.dbg_investigator().get("name", "")) == "执行者")
-	scene.dbg_clear_investigator()
-	check("清证后内存为空", scene.dbg_investigator().is_empty())
+		scene.debug.dbg_cards().has(start_slice_key)
+			and scene.debug.dbg_stage().get_global_rect().intersects(
+				(scene.debug.dbg_cards()[start_slice_key] as NodeCard).get_global_rect()))
+	check("重来不清调查员", String(scene.debug.dbg_investigator().get("name", "")) == "执行者")
+	scene.debug.dbg_clear_investigator()
+	check("清证后内存为空", scene.debug.dbg_investigator().is_empty())
 	check("清证后文件删除", not FileAccess.file_exists(TEMP_INV_DESK))
 	check("清证后证章隐藏", chip == null or not chip.visible)
 	scene.queue_free()

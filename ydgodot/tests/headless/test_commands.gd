@@ -1,22 +1,10 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P1.2 / P1.3 回归：容器展开链 + 六型命令的完整行为（对齐 Web 版 09-commands.js）
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_commands.gd
 
-var fails := 0
-var total := 0
 var c: CaseLoader
 var g: GraphState
 var cs: CommandSystem
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P1.2 / P1.3 容器与六型命令 ===")
@@ -34,8 +22,7 @@ func _initialize() -> void:
 	_test_collapse_store()
 	_test_use_item_via_combo()
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 # ── 1. 容器链：花园 → 书桌 → 抽屉（容器物品也能展开）────────────────────
@@ -86,7 +73,7 @@ func _test_reveal_light_gate() -> void:
 	check("被拦下时没有摊出笔记内容", not g.has("item", "ITEMS_dlh"))
 
 	g.add_node("item", "ITEM_taideng")
-	g.node("item:ITEM_taideng")["lit"] = true
+	g.node("item:ITEM_taideng").lit = true
 	var lit := cs.execute(g.key_of("item", "ITEM_sxbj"), cmd)
 	check("点亮台灯后：reveal 成功", bool(lit.get("ok", false)))
 	check("摊出笔记里的 5 件东西", (lit.get("spawn", []) as Array).size() == 5, str(lit.get("spawn")))
@@ -160,7 +147,7 @@ func _test_installs_requires() -> void:
 	var put := cs.execute(g.key_of("item", "ITEMS_changji"), install_cmd)
 	check("装上唱针", bool(put.get("ok", false)))
 	check("零件记账落在节点上",
-		(g.node("item:ITEMS_changji").get("installed", {}) as Dictionary).has("ITEMS_cz"))
+		(g.node("item:ITEMS_changji").installed as Dictionary).has("ITEMS_cz"))
 
 	var play := cs.execute(g.key_of("item", "ITEMS_changji"), play_cmd)
 	check("装了唱针后放黑胶：成功", bool(play.get("ok", false)))
@@ -195,7 +182,7 @@ func _test_collapse_store() -> void:
 	check("取消隐藏后可见", g.is_visible(child))
 
 	g.store("item:ITEM_taideng", "BAG")
-	check("收进证物袋：不可见", not g.is_visible("item:ITEM_taideng"))
+	check("收进物品：不可见", not g.is_visible("item:ITEM_taideng"))
 	check("收进去向记账", String(g.take("item:ITEM_taideng")) == "BAG")
 	check("取回后可见", g.is_visible("item:ITEM_taideng"))
 
@@ -207,7 +194,7 @@ func _test_use_item_via_combo() -> void:
 	g.add_node("item", "ITEM_shoudiantong")
 	var blocked := comb.use_item("item:ITEM_shoudiantong", "item:ITEM_something")
 	check("没点亮的手电筒拖到黑影：发光门拦下", bool(blocked.get("blocked", false)))
-	g.node("item:ITEM_shoudiantong")["lit"] = true
+	g.node("item:ITEM_shoudiantong").lit = true
 	var ok := comb.use_item("item:ITEM_shoudiantong", "item:ITEM_something")
 	check("点亮后拖过去：成功并带出尸体场景",
 		bool(ok.get("ok", false)) and String(ok.get("next_scene", "")) == "SCENES_body")

@@ -31,21 +31,21 @@ func prepare(graph: GraphState, key_list: Array) -> void:
 	var ci := 0
 	for key in keys:
 		var n := graph.node(String(key))
-		first_place[key] = float(n.get("x", -1.0)) < 0.0
-		if float(n.get("x", -1.0)) >= 0.0 and float(n.get("y", -1.0)) >= 0.0:
+		first_place[key] = n.x < 0.0
+		if n.x >= 0.0 and n.y >= 0.0:
 			ci += 1
 			continue
 		if graph.is_container_node(String(key)):
-			n["x"] = 200.0 + float(ci % 5) * 380.0
-			n["y"] = 160.0 + float((ci / 5) as int) * 300.0
+			n.x = 200.0 + float(ci % 5) * 380.0
+			n.y = 160.0 + float((ci / 5) as int) * 300.0
 		else:
-			n["x"] = 700.0 + (_rng.randf() - 0.5) * 420.0
-			n["y"] = 560.0 + (_rng.randf() - 0.5) * 420.0
+			n.x = 700.0 + (_rng.randf() - 0.5) * 420.0
+			n.y = 560.0 + (_rng.randf() - 0.5) * 420.0
 		ci += 1
 	for key in keys:
 		var n := graph.node(String(key))
-		pos[key] = Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
-		free[key] = not bool(n.get("pinned", false))
+		pos[key] = Vector2(n.x, n.y)
+		free[key] = not n.pinned
 		radius[key] = 80.0 if graph.is_container_node(String(key)) else 68.0
 	_edges = graph.edges
 

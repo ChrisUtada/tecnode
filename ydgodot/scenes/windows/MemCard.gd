@@ -268,9 +268,8 @@ func _finish_line() -> void:
 func _fit_height() -> void:
 	if _line_box == null:
 		return
-	if not is_inside_tree():
-		await tree_entered
-	await get_tree().process_frame
+	if not await FloatingPanel.settle(self):
+		return
 	var lines_h := _line_box.get_combined_minimum_size().y
 	var target := SysWindow.BAR_H + 20.0 + lines_h
 	if absf(size.y - (target + SysWindow.PAD * 2.0)) > 0.5:

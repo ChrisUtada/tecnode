@@ -1,22 +1,9 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## P2.5 音乐播放器 / 花园彩蛋：唱针解锁、播放 / 暂停 / 收起、真名种子、
 ## 真实时间生长、旁白分段、老档迁移与存档。
 
 const TEMP_PROGRESS := "user://test_p25_progress.json"
 const TEMP_SAVE := "user://test_p25_case.save"
-
-var fails := 0
-var total := 0
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== P2.5 音乐播放器 / 花园彩蛋 ===")
@@ -29,13 +16,6 @@ func _initialize() -> void:
 	_test_migration(c)
 	await _test_desktop(c)
 	_finish()
-
-
-func _finish() -> void:
-	_cleanup()
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
-
 
 func _cleanup() -> void:
 	for path in [TEMP_PROGRESS, TEMP_SAVE]:
@@ -172,30 +152,30 @@ func _test_desktop(c: CaseLoader) -> void:
 	root.add_child(scene)
 	await process_frame
 	await process_frame
-	scene.dbg_use_temp_progress(TEMP_PROGRESS)
-	scene._save.path = TEMP_SAVE
-	scene._save_enabled = false
+	scene.debug.dbg_use_temp_progress(TEMP_PROGRESS)
+	scene.debug.dbg_save_system().path = TEMP_SAVE
+	scene.debug.dbg_set_save_enabled(false)
 
-	check("音乐图标初始隐藏", not scene.dbg_music_icon_visible())
-	check("花园图标初始隐藏", not scene.dbg_garden_icon_visible())
-	check("音乐窗初始关", scene.dbg_music_win() == null)
+	check("音乐图标初始隐藏", not scene.debug.dbg_music_icon_visible())
+	check("花园图标初始隐藏", not scene.debug.dbg_garden_icon_visible())
+	check("音乐窗初始关", scene.debug.dbg_music_win() == null)
 	check("音乐资源存在", ResourceLoader.exists("res://assets/raw/Air_Bach.ogg"))
 	check("曲目表 1 首", MusicWin.TRACKS.size() == 1)
 	check("曲目名", MusicWin.title_of("Air_Bach") == "Air (Bach)")
 
-	var changji_key: String = scene.dbg_ensure("item", "ITEMS_changji")
-	scene.dbg_ensure("item", "ITEMS_cz")
+	var changji_key: String = scene.debug.dbg_ensure("item", "ITEMS_changji")
+	scene.debug.dbg_ensure("item", "ITEMS_cz")
 	await process_frame
 	check("唱机已在画布", not scene.graph.node(changji_key).is_empty())
-	scene.dbg_combo_ui("ITEMS_cz", "ITEMS_changji")
+	scene.debug.dbg_combo_ui("ITEMS_cz", "ITEMS_changji")
 	await process_frame
-	var ins: Dictionary = scene.graph.node(changji_key).get("installed", {})
+	var ins: Dictionary = scene.graph.node(changji_key).installed
 	check("唱针装上唱机", bool(ins.get("ITEMS_cz", false)), str(ins))
-	check("装针后音乐图标出现", scene.dbg_music_icon_visible())
-	check("装针后花园仍隐藏", not scene.dbg_garden_icon_visible())
-	check("装针进入撤销栈", scene.dbg_history_size() >= 1, str(scene.dbg_history_size()))
+	check("装针后音乐图标出现", scene.debug.dbg_music_icon_visible())
+	check("装针后花园仍隐藏", not scene.debug.dbg_garden_icon_visible())
+	check("装针进入撤销栈", scene.debug.dbg_history_size() >= 1, str(scene.debug.dbg_history_size()))
 
-	var w: MusicWin = scene.dbg_open_music()
+	var w: MusicWin = scene.debug.dbg_open_music()
 	check("打开播放器", w != null and w.visible)
 	if w == null:
 		scene.queue_free()
@@ -203,7 +183,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("播放器标题", w.title == "播放器", w.title)
 	check("播放器位置", w.position == Vector2(906, 414), str(w.position))
 	check("播放器宽度", w.size.x == 360.0, str(w.size))
-	var st: Dictionary = scene.dbg_music_state()
+	var st: Dictionary = scene.debug.dbg_music_state()
 	check("播放器一首曲目", int(st["rows"]) == 1, str(st))
 	check("初始未播放", String(st["current"]) == "" and not bool(st["playing"]))
 	check("E3 播放键是 18×18 自绘键", w._play_btn.size == Vector2(18, 18)
@@ -228,9 +208,9 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("B2 曲目行有音符 glyph", (rec["glyph"] as Control).size == Vector2(12, 12))
 	check("B2 未播放时不亮标记", not bool(rec["mark"].shown))
 
-	check("播放 Air", scene.dbg_music_play("Air_Bach"))
+	check("播放 Air", scene.debug.dbg_music_play("Air_Bach"))
 	await process_frame
-	st = scene.dbg_music_state()
+	st = scene.debug.dbg_music_state()
 	check("正在播放", bool(st["playing"]) and not bool(st["paused"]), str(st))
 	check("E3 播放中图标切成暂停", w._play_btn._mode == "pause", w._play_btn._mode)
 	check("曲目 id", String(st["current"]) == "Air_Bach")
@@ -243,7 +223,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("B2 当前曲目音符转墨色", bool(rec["glyph"].inked))
 	w.seek_ratio(0.5)
 	await process_frame
-	st = scene.dbg_music_state()
+	st = scene.debug.dbg_music_state()
 	check("进度可跳转", float(st["time"]) > float(st["duration"]) * 0.4, str(st))
 	# W18：进度条按住拖动，不是只能点一下。
 	var w18_prog := w.find_child("music_prog", true, false) as ProgressBar
@@ -262,7 +242,7 @@ func _test_desktop(c: CaseLoader) -> void:
 		var w18_move := InputEventMouseMotion.new()
 		w18_move.position = Vector2(w18_prog.size.x * 0.75, 5.0)
 		w._on_prog_input(w18_move)
-		st = scene.dbg_music_state()
+		st = scene.debug.dbg_music_state()
 		check("W18 按住拖动跟手", float(st["time"]) > float(st["duration"]) * 0.6, str(st))
 		var w18_up := InputEventMouseButton.new()
 		w18_up.button_index = MOUSE_BUTTON_LEFT
@@ -270,39 +250,38 @@ func _test_desktop(c: CaseLoader) -> void:
 		w18_up.position = w18_move.position
 		w._on_prog_input(w18_up)
 		check("W18 松手结束拖动", not w._prog_dragging)
-	check("同曲再点暂停", not scene.dbg_music_toggle())
-	st = scene.dbg_music_state()
+	check("同曲再点暂停", not scene.debug.dbg_music_toggle())
+	st = scene.debug.dbg_music_state()
 	check("暂停状态", bool(st["paused"]) and not bool(st["playing"]), str(st))
 	check("E3 暂停后图标切回播放", w._play_btn._mode == "play", w._play_btn._mode)
 	check("B2 暂停时行尾方块转空心", bool(rec["mark"].shown) and not bool(rec["mark"].playing))
-	check("再点续播", scene.dbg_music_toggle())
-	st = scene.dbg_music_state()
+	check("再点续播", scene.debug.dbg_music_toggle())
+	st = scene.debug.dbg_music_state()
 	check("续播状态", bool(st["playing"]) and not bool(st["paused"]))
 
-	scene.dbg_click_music_icon()
-	st = scene.dbg_music_state()
+	scene.debug.dbg_click_music_icon()
+	st = scene.debug.dbg_music_state()
 	check("K9 单击音乐图标不再关窗", bool(st["win_visible"]) and bool(st["playing"]), str(st))
-	scene.dbg_close_music()
-	st = scene.dbg_music_state()
+	scene.debug.dbg_close_music()
+	st = scene.debug.dbg_music_state()
 	check("× 关闭后音频继续", not bool(st["win_visible"]) and bool(st["playing"]), str(st))
-	scene._icon_last_app = ""
-	scene._icon_last_ms = -100000
-	scene.dbg_click_music_icon()
-	st = scene.dbg_music_state()
+	scene.debug.dbg_set_icon_last("", -100000)
+	scene.debug.dbg_click_music_icon()
+	st = scene.debug.dbg_music_state()
 	check("K9 单击音乐图标不直接开窗", not bool(st["win_visible"]), str(st))
-	scene.dbg_double_click_icon("music")
-	st = scene.dbg_music_state()
+	scene.debug.dbg_double_click_icon("music")
+	st = scene.debug.dbg_music_state()
 	check("K9 双击音乐图标开窗", bool(st["win_visible"]) and not bool(st["dock_visible"]), str(st))
 
-	scene.dbg_close_music()
-	st = scene.dbg_music_state()
+	scene.debug.dbg_close_music()
+	st = scene.debug.dbg_music_state()
 	check("关闭窗后音频继续", not bool(st["win_visible"]) and bool(st["playing"]), str(st))
-	w = scene.dbg_open_music()
+	w = scene.debug.dbg_open_music()
 	check("点图标恢复窗", w != null and w.visible)
 
-	scene.dbg_minimize_music()
-	st = scene.dbg_music_state()
-	var dock: MusicDock = scene.dbg_music_dock()
+	scene.debug.dbg_minimize_music()
+	st = scene.debug.dbg_music_state()
+	var dock: MusicDock = scene.debug.dbg_music_dock()
 	check("最小化隐藏窗", not bool(st["win_visible"]))
 	check("最小化出 dock", dock != null and bool(st["dock_visible"]))
 	if dock != null:
@@ -334,9 +313,9 @@ func _test_desktop(c: CaseLoader) -> void:
 		await process_frame
 		check("U7 音乐坞可拖动", dock.position != dock_home, str(dock.position) + " / " + str(dock_home))
 		check("U7 音乐坞拖动后仍在桌面内",
-			scene._desk.get_global_rect().encloses(dock.get_global_rect()), str(dock.get_global_rect()))
+			scene.debug.dbg_desk().get_global_rect().encloses(dock.get_global_rect()), str(dock.get_global_rect()))
 		var dock_dragged: Vector2 = dock.position
-		scene._place_music_windows()
+		scene.debug.dbg_layout_music_windows()
 		check("U7 音乐坞 resize 不被吸回", dock.position == dock_dragged,
 			str(dock.position) + " / " + str(dock_dragged))
 		var dock_click: Vector2 = dock.get_global_rect().get_center()
@@ -353,60 +332,60 @@ func _test_desktop(c: CaseLoader) -> void:
 		dock_cup.global_position = dock_click
 		dock.gui_input.emit(dock_cup)
 	check("收起后音频继续", bool(st["playing"]))
-	st = scene.dbg_music_state()
+	st = scene.debug.dbg_music_state()
 	check("dock 还原窗", bool(st["win_visible"]) and not bool(st["dock_visible"]))
 
-	scene.dbg_music_stop()
-	st = scene.dbg_music_state()
+	scene.debug.dbg_music_stop()
+	st = scene.debug.dbg_music_state()
 	check("停止清空曲目", String(st["current"]) == "" and not bool(st["playing"])
 		and not bool(st["paused"]), str(st))
 
 	# S4：先撤销一个和音乐无关的动作，播放器与音频必须原样保留。
-	check("S4 前置：重新播放", scene.dbg_music_play("Air_Bach"))
+	check("S4 前置：重新播放", scene.debug.dbg_music_play("Air_Bach"))
 	await process_frame
-	var torch_key: String = scene.dbg_ensure("item", "ITEM_shoudiantong")
+	var torch_key: String = scene.debug.dbg_ensure("item", "ITEM_shoudiantong")
 	await process_frame
-	scene.dbg_activate(torch_key)
+	scene.debug.dbg_activate(torch_key)
 	await process_frame
-	check("S4 前置：无关操作进入撤销栈", scene.dbg_history_size() >= 1,
-		str(scene.dbg_history_size()))
-	check("S4 撤销无关操作", scene.dbg_undo())
+	check("S4 前置：无关操作进入撤销栈", scene.debug.dbg_history_size() >= 1,
+		str(scene.debug.dbg_history_size()))
+	check("S4 撤销无关操作", scene.debug.dbg_undo())
 	await process_frame
 	# F3：撤销走 card_key 增量 reconcile，不再把整批卡片销毁重建。
-	var f3_stats: Dictionary = scene.dbg_last_rebuild_stats()
+	var f3_stats: Dictionary = scene.debug.dbg_last_rebuild_stats()
 	check("F3 撤销复用已有卡片", int(f3_stats.get("reused", 0)) > 0, str(f3_stats))
-	st = scene.dbg_music_state()
-	check("S4 撤销无关操作后播放器还在", scene.dbg_music_win() != null)
+	st = scene.debug.dbg_music_state()
+	check("S4 撤销无关操作后播放器还在", scene.debug.dbg_music_win() != null)
 	check("S4 撤销无关操作不掐音乐",
 		bool(st["win_visible"]) and bool(st["playing"]), str(st))
 
 	# 撤销「装针」本身会让音乐重新锁定，此时收起播放器是正确语义；
 	# S4 只保证无关撤销不误伤正在播的歌。
-	check("撤销装针", scene.dbg_undo())
+	check("撤销装针", scene.debug.dbg_undo())
 	await process_frame
-	check("撤销装针后音乐图标隐藏", not scene.dbg_music_icon_visible())
-	check("撤销装针后播放器按锁定态释放", scene.dbg_music_win() == null)
+	check("撤销装针后音乐图标隐藏", not scene.debug.dbg_music_icon_visible())
+	check("撤销装针后播放器按锁定态释放", scene.debug.dbg_music_win() == null)
 
-	check("真名结局可播", scene.dbg_ending() != null)
-	scene._hide_toast()
-	scene.dbg_play_true_ending()
-	check("结局遮罩已开", scene.dbg_ending().visible)
-	scene.dbg_confirm_ending()
+	check("真名结局可播", scene.debug.dbg_ending() != null)
+	scene.debug.dbg_hide_toast()
+	scene.debug.dbg_play_true_ending()
+	check("结局遮罩已开", scene.debug.dbg_ending().visible)
+	scene.debug.dbg_confirm_ending()
 	await process_frame
 	var g: GraphState = scene.graph
 	check("确认捕获后发种子", bool(g.garden.get("seed", false)), str(g.garden))
 	check("narr 是真名说明", String(g.garden.get("narr", "")) == GardenSystem.true_ending_message(c))
-	check("花园图标出现", scene.dbg_garden_icon_visible())
-	check("花园种子角标", scene.dbg_garden_badge_text() == "种子", scene.dbg_garden_badge_text())
+	check("花园图标出现", scene.debug.dbg_garden_icon_visible())
+	check("花园种子角标", scene.debug.dbg_garden_badge_text() == "种子", scene.debug.dbg_garden_badge_text())
 	check("G3 种子提示指向左侧花园图标",
-		scene.dbg_toast_text().contains("拖") and scene.dbg_toast_text().contains("左侧")
-			and scene.dbg_toast_text().contains("花园"), scene.dbg_toast_text())
+		scene.debug.dbg_toast_text().contains("拖") and scene.debug.dbg_toast_text().contains("左侧")
+			and scene.debug.dbg_toast_text().contains("花园"), scene.debug.dbg_toast_text())
 	check("重复确认不再发", not GardenSystem.grant_seed(g, "x", c))
 	check("重复确认不改 narr", String(g.garden.get("narr", "")) == GardenSystem.true_ending_message(c))
 
-	var matrix: MatrixWin = scene.dbg_open_matrix()
+	var matrix: MatrixWin = scene.debug.dbg_open_matrix()
 	check("桌布种子气泡可见", matrix != null and matrix.seed_visible())
-	var garden: GardenWin = scene.dbg_open_garden()
+	var garden: GardenWin = scene.debug.dbg_open_garden()
 	check("花园窗打开", garden != null and garden.visible)
 	if g == null or garden == null or matrix == null:
 		scene.queue_free()
@@ -416,7 +395,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("G3 桌布与花园并排、不互相遮挡",
 		not matrix.get_global_rect().intersects(garden.get_global_rect()),
 		"%s / %s" % [matrix.get_global_rect(), garden.get_global_rect()])
-	var view_rect := Rect2(Vector2.ZERO, Vector2(scene._vw(), scene._vh()))
+	var view_rect := Rect2(Vector2.ZERO, Vector2(scene.debug.dbg_vw(), scene.debug.dbg_vh()))
 	check("G3 桌布与花园都在视口内",
 		view_rect.encloses(matrix.get_global_rect()) and view_rect.encloses(garden.get_global_rect()),
 		"%s / %s" % [matrix.get_global_rect(), garden.get_global_rect()])
@@ -435,7 +414,7 @@ func _test_desktop(c: CaseLoader) -> void:
 		and int(plot["y"]) >= 30 and int(plot["y"]) <= 85)
 	check("拖种后气泡消失", not matrix.seed_visible())
 	check("种下后提示消失", not bool(garden.dbg_state()["hint_visible"]))
-	check("花园角标 1 株", scene.dbg_garden_badge_text() == "1 株", scene.dbg_garden_badge_text())
+	check("花园角标 1 株", scene.debug.dbg_garden_badge_text() == "1 株", scene.debug.dbg_garden_badge_text())
 	var gs: Dictionary = garden.dbg_state()
 	check("花园状态 1 株", (gs["plots"] as Array).size() == 1, str(gs))
 	check("下种即种子档", int((gs["plots"] as Array)[0]["stage"]) == 0)
@@ -443,9 +422,9 @@ func _test_desktop(c: CaseLoader) -> void:
 
 	var base_h := garden.size.y
 	var now := GardenSystem.now_ms_now()
-	check("回拨生长时间", scene.dbg_touch_garden_plot(0, now - 181000))
+	check("回拨生长时间", scene.debug.dbg_touch_garden_plot(0, now - 181000))
 	# P2 Toast 改为同屏一条、后来者排队：先清掉上一条，下面才能立即断言开花提示。
-	scene._hide_toast()
+	scene.debug.dbg_hide_toast()
 	garden._process(1.1)
 	await process_frame
 	gs = garden.dbg_state()
@@ -453,7 +432,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("180s 后开花", int((gs["plots"] as Array)[0]["stage"]) == 4,
 		str((gs["plots"] as Array)[0]))
 	check("开花写入 hit", bool(plot.get("hit", false)))
-	check("开花弹提示", scene.dbg_toast_text() == "花园里的种子开花了", scene.dbg_toast_text())
+	check("开花弹提示", scene.debug.dbg_toast_text() == "花园里的种子开花了", scene.debug.dbg_toast_text())
 	check("旁白段数 > 1", int(gs["narr_segments"]) > 1, str(gs["narr_segments"]))
 
 	check("点花打开旁白", garden.dbg_open_narr(0))
@@ -495,7 +474,7 @@ func _test_desktop(c: CaseLoader) -> void:
 	check("F9 同阶段刷新不重复换装", garden._stage_refreshes == f9_before,
 		"%d -> %d" % [f9_before, garden._stage_refreshes])
 
-	check("写临时存档", scene.dbg_save())
+	check("写临时存档", scene.debug.dbg_save())
 	check("存档文件存在", FileAccess.file_exists(TEMP_SAVE))
 	var g2 := GraphState.new(c)
 	var s2 := SaveSystem.new(g2, "A001", TEMP_SAVE)
@@ -512,8 +491,8 @@ func _test_desktop(c: CaseLoader) -> void:
 	for i in 30:
 		await process_frame
 	var probe: NodeCard = null
-	for key in scene._cards.keys():
-		var c2 := scene._cards[key] as NodeCard
+	for key in scene.debug.dbg_cards().keys():
+		var c2 := scene.debug.dbg_cards()[key] as NodeCard
 		if c2 == null or not c2.visible or c2.modulate.a < 0.99:
 			continue
 		if probe == null:
@@ -525,25 +504,25 @@ func _test_desktop(c: CaseLoader) -> void:
 		var saved_global := probe.global_position
 		var probe_has_edges: bool = not scene.graph.neighbors(probe.card_key).is_empty()
 		if not probe_has_edges:
-			for key in scene._cards.keys():
-				var other := scene._cards[key] as NodeCard
+			for key in scene.debug.dbg_cards().keys():
+				var other := scene.debug.dbg_cards()[key] as NodeCard
 				if other != null and other.visible and other.card_key != probe.card_key:
 					scene.graph.link(probe.card_key, other.card_key, "entity")
 					probe_has_edges = true
 					break
-		scene._repaint_edges()
-		var segs_before: int = scene._edge_layer.segment_count()
+		scene.debug.dbg_repaint_edges()
+		var segs_before: int = scene.debug.dbg_edge_layer().segment_count()
 		probe.global_position = matrix.global_position + Vector2(20, 20)
-		scene._sync_matrix_occlusion()
-		scene._repaint_edges()
+		scene.debug.dbg_matrix_sync_occlusion()
+		scene.debug.dbg_repaint_edges()
 		if probe_has_edges and segs_before > 0:
 			check("A7 淡出卡不再画连线",
-				scene._edge_layer.segment_count() < segs_before,
-				str(segs_before) + " -> " + str(scene._edge_layer.segment_count()))
+				scene.debug.dbg_edge_layer().segment_count() < segs_before,
+				str(segs_before) + " -> " + str(scene.debug.dbg_edge_layer().segment_count()))
 		check("A7 矩阵覆盖的卡淡出", probe.modulate.a == 0.0, str(probe.modulate.a))
 		matrix._on_close_pressed()
 		await process_frame
-		check("A7 关闭矩阵后引用清空", scene.dbg_matrix_win() == null)
+		check("A7 关闭矩阵后引用清空", scene.debug.dbg_matrix_win() == null)
 		check("A7 关闭矩阵后覆盖卡恢复", probe.modulate.a == 1.0, str(probe.modulate.a))
 		probe.global_position = saved_global
 

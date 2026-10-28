@@ -1,13 +1,13 @@
 class_name StorageWin
 extends SysWindow
-## 收纳窗（证物袋 / 线索册共用一个类，只差标题与收录规则）
+## 收纳窗（物品 / 证据共用一个类，只差标题与收录规则）
 ##
 ## 对齐 Web 版的 bag-win / clue-win：窗里是一份清单，每行一条；
 ## 单击一行 = 取回画布（回到窗旁边的位置）。
-## 证物袋什么都收；线索册只有线索能进（规则在 GraphState.ledger_store 里）。
+## 物品收物与词；证据只收证（规则在 GraphState.ledger_store 里）。
 
-signal will_take(key: String)
-signal took(key: String)
+## 请求取回（窗口只表达意图；真正的 graph.take_back 由桌面控制器执行）
+signal take_requested(key: String)
 signal to_matrix(key: String)
 ## 行被按住（Web：按住一行拖走 = 三个落点；单击 = 取回）。桌面侧接管后续手势。
 signal row_pressed(key: String, from_kind: String, at_global: Vector2)
@@ -64,8 +64,8 @@ func refresh_store() -> void:
 	var sig := "v1:"
 	for key in list:
 		var n := graph.node(String(key))
-		sig += String(key) + String.chr(31) + String(n.get("label", "")) + String.chr(31) \
-			+ String(n.get("bag_from", "")) + String.chr(30)
+		sig += String(key) + String.chr(31) + n.label + String.chr(31) \
+			+ n.bag_from + String.chr(30)
 	if sig == _list_sig:
 		return
 	_list_sig = sig
@@ -73,9 +73,9 @@ func refresh_store() -> void:
 		_rows.remove_child(c)
 		c.queue_free()
 	if list.is_empty():
-		var hint := "证物袋是空的。把物品或词拖到左侧「证物袋」图标或窗口上收纳；点一行可取回。"
+		var hint := "「物品」还是空的。把物与词拖到左侧「物品」图标或窗口上收纳；点一行可取回。"
 		if store_kind == GraphState.LEDGER:
-			hint = "证据册是空的。把证拖到左侧「证据册」图标或窗口上收纳；点一行可取回。"
+			hint = "「证据」还是空的。把证拖到左侧「证据」图标或窗口上收纳；点一行可取回。"
 		var empty := TecTheme.label(hint, TecTheme.FS_BODY, TecTheme.MUTED)
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empty.custom_minimum_size = Vector2(180.0, 0)
@@ -88,22 +88,8 @@ func refresh_store() -> void:
 ## 一行：标签 + 「取回」按钮；**整行可按住拖走**（Web `06-storage.js` 的行拖拽）
 func _make_row(key: String) -> Control:
 	var n := graph.node(key)
-	var row := PanelContainer.new()
-	row.name = "row_" + key.replace(":", "_")
-	row.custom_minimum_size = Vector2(0, 30)
-	row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	## D2：清单行不再做成独立盒子，只留底部 1px 发丝线；左右内容缩进 8，
-	## 发丝线也各缩 8（负 expand margin 只影响绘制，不动内容排版）。
-	var sb := TecTheme.flat(TecTheme.NONE, 0, TecTheme.NONE, 0)
-	sb.border_color = TecTheme.edge(0.18)
-	sb.border_width_bottom = 1
-	sb.expand_margin_left = -8.0
-	sb.expand_margin_right = -8.0
-	sb.content_margin_left = 8
-	sb.content_margin_right = 8
-	sb.content_margin_top = 4
-	sb.content_margin_bottom = 4
-	row.add_theme_stylebox_override("panel", sb)
+	## D2：清单行不再做成独立盒子，只留底部 1px 发丝线。
+	var row := ListRow.panel("row_" + key.replace(":", "_"), 30)
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
 	row.gui_input.connect(func(ev: InputEvent): _on_row_input(ev, key))
 	var hb := HBoxContainer.new()
@@ -119,7 +105,7 @@ func _make_row(key: String) -> Control:
 	text_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hb.add_child(text_col)
 
-	var label_text := String(n.get("label", key))
+	var label_text := n.label if n.label != "" else key
 	var label := TecTheme.label(label_text, TecTheme.FS_BODY, TecTheme.TEXT)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.clip_text = true
@@ -131,7 +117,7 @@ func _make_row(key: String) -> Control:
 	# 袋清单标注来源（Web 版 bagFrom 口径）。放第二行：长来源只在自己的
 	# 文本列里省略，不会把「取回 / 上桌布」挤出条目。
 	if store_kind == GraphState.BAG:
-		var from_id := String(n.get("bag_from", ""))
+		var from_id := n.bag_from
 		if from_id != "":
 			var from_text := "来自 " + case_def.label_of(CaseLoader.kind_of_ref(from_id), from_id)
 			var src := TecTheme.label(from_text, TecTheme.FS_BODY, TecTheme.MUTED)
@@ -195,8 +181,4 @@ func _on_row_input(ev: InputEvent, key: String) -> void:
 func _take(key: String) -> void:
 	if not writes_enabled or graph == null or not graph.stored.has(key):
 		return
-	will_take.emit(key)
-	if not graph.take_back(key):
-		return
-	took.emit(key)
-	refresh_store()
+	take_requested.emit(key)

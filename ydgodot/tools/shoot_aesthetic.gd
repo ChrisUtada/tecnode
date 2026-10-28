@@ -17,36 +17,36 @@ func _initialize() -> void:
 	await _wait(1.2)
 	await _shot("desktop")
 
-	scene.dbg_expand("SCENES_garden")
+	scene.debug.dbg_expand("SCENES_garden")
 	await _wait(0.6)
-	scene._open_tec()
+	scene.tec._open_tec()
 	await _wait(0.4)
 	await _shot("tec")
-	scene._close_top_window()
+	scene.windows._close_top_window()
 	await _wait(0.2)
 
-	scene._open_people()
+	scene.launcher._open_people()
 	await _wait(0.4)
 	await _shot("people")
-	scene._close_top_window()
+	scene.windows._close_top_window()
 	await _wait(0.2)
 
-	scene._open_log()
+	scene.launcher._open_log()
 	await _wait(0.4)
 	await _shot("log")
-	scene._close_top_window()
+	scene.windows._close_top_window()
 	await _wait(0.2)
 
-	scene._open_archive()
+	scene.launcher._open_archive()
 	await _wait(0.4)
 	await _shot("archive")
-	scene._close_top_window()
+	scene.windows._close_top_window()
 	await _wait(0.2)
 
 	# 音乐窗：临时给图上一个已装唱针的节点，只为截图解锁。
 	var holder: Dictionary = scene.graph.add_node("item", "ITEMS_changji")
 	holder["installed"] = {"ITEMS_cz": true}
-	scene._open_music()
+	scene.garden_music._open_music()
 	await _wait(0.4)
 	await _shot("music")
 

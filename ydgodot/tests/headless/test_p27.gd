@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/headless/_test_base.gd"
 ## 批 2 交互四项回归：N5 线索双击捕获 / V1 选中环 / V2 点亮 / V3 已捕获 / C4 场景通路。
 ## 运行：godot --headless --path ydgodot --script res://tests/headless/test_p27.gd
 ##
@@ -6,19 +6,7 @@ extends SceneTree
 ## 断言刻意走界面入口（真鼠标事件 / `_on_card_combo`），而不是直接调 GraphState：
 ## 只有这样才证明「玩家点得到、且落到了正确数据」。
 
-var fails := 0
-var total := 0
 var scene: Control
-
-
-func check(name: String, cond: bool, detail: String = "") -> void:
-	total += 1
-	if cond:
-		print("  PASS  ", name)
-	else:
-		fails += 1
-		print("  FAIL  ", name, ("  [" + detail + "]") if detail != "" else "")
-
 
 func _initialize() -> void:
 	print("=== 批 2 交互四项（N5 / V1 / V2 / V3 / C4）===")
@@ -28,12 +16,12 @@ func _initialize() -> void:
 	await process_frame
 
 	# 相机钉在 1x 原生格：后面所有点击都按「世界 → 屏幕」1:1 换算。
-	scene._view_k = 1.0
-	scene._view_pos = Vector2.ZERO
-	scene._view_user = true
-	scene._apply_view()
+	scene.debug.dbg_set_view_k(1.0)
+	scene.debug.dbg_set_view_pos(Vector2.ZERO)
+	scene.debug.dbg_set_view_user(true)
+	scene.debug.dbg_apply_view()
 
-	scene.dbg_expand("SCENES_garden")
+	scene.debug.dbg_expand("SCENES_garden")
 	await process_frame
 	await process_frame
 
@@ -41,18 +29,17 @@ func _initialize() -> void:
 	check("前提：toast 节点在", toast != null)
 
 	# ── N5 + V3：双击证 = 确认，卡面翻成深色反白 ──────────────────
-	var ck: String = scene.dbg_ensure("evidence", "CLUES_nm")
+	var ck: String = scene.debug.dbg_ensure("evidence", "CLUES_nm")
 	await process_frame
 	var clue: NodeCard = _cards().get(ck)
 	check("前提：证卡在画布上", clue != null, ck)
 	if clue == null:
-		print("=== %d 项，失败 %d ===" % [total, fails])
-		quit(1)
+		_finish()
 		return
 
 	check("前提：还没捕获",
-		not (scene.dbg_state()["captured"] as Array).has("CLUES_nm"),
-		str(scene.dbg_state()["captured"]))
+		not (scene.debug.dbg_state()["captured"] as Array).has("CLUES_nm"),
+		str(scene.debug.dbg_state()["captured"]))
 	check("捕获前：普通外观（plain）", clue.look_state() == "plain", clue.look_state())
 
 	_double_click(clue)
@@ -60,8 +47,8 @@ func _initialize() -> void:
 	await process_frame
 	clue = _cards().get(ck)
 	check("双击证：进 graph.captured",
-		(scene.dbg_state()["captured"] as Array).has("CLUES_nm"),
-		str(scene.dbg_state()["captured"]))
+		(scene.debug.dbg_state()["captured"] as Array).has("CLUES_nm"),
+		str(scene.debug.dbg_state()["captured"]))
 	check("V3：卡面翻成 got", clue.look_state() == "got", clue.look_state())
 	var col_hi: Color = clue._mat.get_shader_parameter("col_hi")
 	var col_lo: Color = clue._mat.get_shader_parameter("col_lo")
@@ -75,8 +62,8 @@ func _initialize() -> void:
 	_double_click(clue)
 	await process_frame
 	check("重复双击：不重复记 captured",
-		(scene.dbg_state()["captured"] as Array).count("CLUES_nm") == 1,
-		str(scene.dbg_state()["captured"]))
+		(scene.debug.dbg_state()["captured"] as Array).count("CLUES_nm") == 1,
+		str(scene.debug.dbg_state()["captured"]))
 	check("重复双击：案卷留一条「已经确认过了」", _log_has("已经确认过了"))
 	check("重复双击：仍不弹提示条", toast != null and not toast.visible)
 
@@ -93,7 +80,7 @@ func _initialize() -> void:
 		check("V1：换选后旧卡收环", not clue.is_selected() and not clue._sel.visible)
 
 	# ── V2：双击物品 = 点亮，金框 + 暖白底 + 光晕 ────────────────────
-	var tk: String = scene.dbg_ensure("item", "ITEM_shoudiantong")
+	var tk: String = scene.debug.dbg_ensure("item", "ITEM_shoudiantong")
 	await process_frame
 	var torch: NodeCard = _cards().get(tk)
 	check("前提：手电筒卡在画布上", torch != null, tk)
@@ -104,7 +91,7 @@ func _initialize() -> void:
 		await process_frame
 		torch = _cards().get(tk)
 		check("双击手电筒：数据层点亮",
-			bool(scene.dbg_state()["lit"].get("ITEM_shoudiantong", false)))
+			bool(scene.debug.dbg_state()["lit"].get("ITEM_shoudiantong", false)))
 		check("V2：外观态 = lit", torch.look_state() == "lit", torch.look_state())
 		var edge: Color = torch._mat.get_shader_parameter("edge_col")
 		var mid: Color = torch._mat.get_shader_parameter("col_mid")
@@ -129,20 +116,20 @@ func _initialize() -> void:
 	# 数据里的真实通路：书桌正文「返回 [loc:SCENES_garden]」、尸体正文「返回 [loc:SCENES_garden]」。
 	# 无通路的样本：0602（只有 [loc:SCENES_fkjl]）⇄ 尸体（只有 [loc:SCENES_garden]）。
 	# ⚠ 0602 是**时间类场景**，节点 key 是 `time:SCENES_0602` —— 用 dbg_ensure 的返回值，别手写前缀。
-	var k0602: String = scene.dbg_ensure("loc", "SCENES_0602")
-	var kbody: String = scene.dbg_ensure("loc", "SCENES_body")
-	var kfkjl: String = scene.dbg_ensure("loc", "SCENES_fkjl")
+	var k0602: String = scene.debug.dbg_ensure("loc", "SCENES_0602")
+	var kbody: String = scene.debug.dbg_ensure("loc", "SCENES_body")
+	var kfkjl: String = scene.debug.dbg_ensure("loc", "SCENES_fkjl")
 	await process_frame
 	check("前提：0602 落成时间类节点（time: 前缀）", k0602 == "time:SCENES_0602", k0602)
 
-	var t1: Dictionary = scene.dbg_combo("ITEM_shuzhuo", "SCENES_garden")
+	var t1: Dictionary = scene.debug.dbg_combo("ITEM_shuzhuo", "SCENES_garden")
 	check("C4：书桌正文 [loc:garden] ⇒ 前往花园",
 		String(t1.get("travel", "")) == "SCENES_garden", str(t1))
-	var t2: Dictionary = scene.dbg_combo("SCENES_body", "SCENES_garden")
+	var t2: Dictionary = scene.debug.dbg_combo("SCENES_body", "SCENES_garden")
 	check("C4：尸体正文 [loc:garden] ⇒ 前往花园",
 		String(t2.get("travel", "")) == "SCENES_garden", str(t2))
 	var tried_before: int = (scene.graph.tried as Dictionary).size()
-	var t3: Dictionary = scene.dbg_combo("SCENES_0602", "SCENES_body")
+	var t3: Dictionary = scene.debug.dbg_combo("SCENES_0602", "SCENES_body")
 	check("C4：两场景互不列 loc ⇒ 没有直接通路",
 		String(t3.get("message", "")) == "这两个场景之间没有直接通路", str(t3))
 	check("C4：无通路标记 no_tried（不画 tried 虚线）",
@@ -153,20 +140,20 @@ func _initialize() -> void:
 
 	# ── C4：前往分派（界面层：展场景 + 记 act）────────────────────
 	check("前提：fkjl 还没探索",
-		not (scene.dbg_state()["explored"] as Array).has("SCENES_fkjl"),
-		str(scene.dbg_state()["explored"]))
-	scene._on_card_combo(k0602, kfkjl)
+		not (scene.debug.dbg_state()["explored"] as Array).has("SCENES_fkjl"),
+		str(scene.debug.dbg_state()["explored"]))
+	scene.debug.dbg_card_combo(k0602, kfkjl)
 	await process_frame
 	await process_frame
 	check("C4 分派：目标场景被展开",
-		(scene.dbg_state()["explored"] as Array).has("SCENES_fkjl"),
-		str(scene.dbg_state()["explored"]))
+		(scene.debug.dbg_state()["explored"] as Array).has("SCENES_fkjl"),
+		str(scene.debug.dbg_state()["explored"]))
 	check("C4 分派：案卷记一条「前往场景」", _log_has("前往场景"))
 
 	# 无通路走界面：只留案卷、不弹条
 	var tried_before2: int = (scene.graph.tried as Dictionary).size()
 	var toast_before: bool = toast != null and toast.visible
-	scene._on_card_combo(k0602, kbody)
+	scene.debug.dbg_card_combo(k0602, kbody)
 	await process_frame
 	check("C4 分派：无通路写进案卷", _log_has("没有直接通路"))
 	check("C4 分派：无通路不弹提示条", toast != null and toast.visible == toast_before)
@@ -174,12 +161,11 @@ func _initialize() -> void:
 		(scene.graph.tried as Dictionary).size() == tried_before2,
 		str(scene.graph.tried.keys()))
 
-	print("=== %d 项，失败 %d ===" % [total, fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 func _log_has(needle: String) -> bool:
-	for t in scene.dbg_log_texts():
+	for t in scene.debug.dbg_log_texts():
 		if String(t).find(needle) >= 0:
 			return true
 	return false

@@ -91,7 +91,7 @@ static func _glow_texture() -> Texture2D:
 
 var card_key: String = ""
 var kind: String = ""
-var node_data: Dictionary = {}
+var node_data: NodeState = null
 
 ## ── 缩放分级（LOD）───────────────────────────────────────────────────────
 ## 相机缩到 1x 以下时卡片被整体重采样。实测（`--zoom=` 截图取证）：
@@ -236,7 +236,7 @@ func _ready() -> void:
 		_pin_badge.size = Vector2(48.0, 20.0)
 
 
-func setup(p_key: String, p_kind: String, p_data: Dictionary, w: float, h: float) -> void:
+func setup(p_key: String, p_kind: String, p_data: NodeState, w: float, h: float) -> void:
 	card_key = p_key
 	kind = p_kind
 	node_data = p_data
@@ -247,7 +247,7 @@ func setup(p_key: String, p_kind: String, p_data: Dictionary, w: float, h: float
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	mouse_entered.connect(func() -> void: set_hover_state(true))
 	mouse_exited.connect(func() -> void: set_hover_state(false))
-	_pinned = bool(p_data.get("pinned", false))
+	_pinned = p_data.pinned
 	_build(w, h)
 
 
@@ -306,7 +306,7 @@ func _build(w: float, h: float) -> void:
 	_glyph.kind = kind
 	_glyph.col = TecTheme.kind_color(kind)
 	if kind == "evidence":
-		_glyph.set_evidence_tier(String(node_data.get("tier", "wu")))
+		_glyph.set_evidence_tier(node_data.tier if node_data.tier != "" else "wu")
 	_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_glyph)
 
@@ -369,7 +369,7 @@ func _build(w: float, h: float) -> void:
 
 func refresh() -> void:
 	## 卡面只有名字。类型 → 标题左侧类型色符号；状态 → 边框与填充（见 `_apply_plain_look`）
-	_title.text = String(node_data.get("label", card_key))
+	_title.text = node_data.label if node_data.label != "" else card_key
 	_layout_title()            # 文字宽度变了，符号要重贴到首字左边
 	_apply_shell()
 
@@ -381,7 +381,7 @@ func set_shell_state(container: bool, explored: bool, collapsed: bool, unread: b
 	_collapsed = collapsed
 	_unread = unread
 	_hub = hub
-	_pinned = bool(node_data.get("pinned", false))
+	_pinned = node_data.pinned
 	refresh()
 
 
@@ -395,9 +395,9 @@ func _apply_shell() -> void:
 	if _over:
 		_apply_over_look()
 		return
-	var got := kind == "evidence" and String(node_data.get("tier", "")) == "zheng" \
-		and bool(node_data.get("captured", false))
-	var lit := kind == "item" and bool(node_data.get("lit", false))
+	var got := kind == "evidence" and node_data.tier == "zheng" \
+		and node_data.captured
+	var lit := kind == "item" and node_data.lit
 	if got:
 		_apply_got_look()
 	elif lit:
@@ -627,10 +627,10 @@ func is_selected() -> bool:
 func look_state() -> String:
 	if _over:
 		return "over"
-	if kind == "evidence" and String(node_data.get("tier", "")) == "zheng" \
-			and bool(node_data.get("captured", false)):
+	if kind == "evidence" and node_data.tier == "zheng" \
+			and node_data.captured:
 		return "got"
-	if kind == "item" and bool(node_data.get("lit", false)):
+	if kind == "item" and node_data.lit:
 		return "lit"
 	return "plain"
 
@@ -649,8 +649,6 @@ func set_over(on: bool) -> void:
 ## 直接把卡片放到某处（收纳取回 / 布局）。**必须掐掉还在跑的弹回补间** ——
 ## 否则补间每帧继续往旧 `_home` 写位置，刚摆好的落点当场被拽回去（实测差 60×27px）。
 func set_home(p: Vector2) -> void:
-	_debug_event("set_home key=%s p=%s old_home=%s spring=%s pos=%s" % [
-		card_key, p, _home, str(_spring != null and _spring.is_valid()), position])
 	if _spring != null and _spring.is_valid():
 		_spring.kill()
 	_spring = null
@@ -770,8 +768,6 @@ func _release_drop(at_global: Vector2) -> void:
 			if _spring != null and _spring.is_valid():
 				_spring.kill()
 			_spring = null
-			_debug_event("drop_handled_hidden key=%s pos=%s home=%s（跳过 spring）" % [
-				card_key, position, _home])
 		drag_finished.emit(card_key, _home, true)
 		return
 	# 2) 落在别的节点上 = 组合，自己也回原位
@@ -799,24 +795,11 @@ func _clamp_pos(p: Vector2) -> Vector2:
 		clampf(q.y, 0.0, maxf(lim_y, 0.0)))
 
 
-## 临时诊断：同时写 Godot 输出面板；Desktop 会把它接到游戏日志（只跟当前诊断节点）。
-var debug_event := Callable()
-
-
-func _debug_event(text: String) -> void:
-	print("DBG 卡片：" + text)
-	if debug_event.is_valid():
-		debug_event.call(text)
-
-
-## 弹回按下时的位置（三次缓出 300ms，对齐 Web 的 springBack）
 func spring_back() -> void:
-	_debug_event("spring_back key=%s target=%s pos=%s" % [card_key, _home, position])
 	_spring_to(_home)
 
 
 func _spring_to(target: Vector2) -> void:
-	_debug_event("spring_start key=%s from=%s target=%s" % [card_key, position, target])
 	if _spring != null and _spring.is_valid():
 		_spring.kill()
 	if position.is_equal_approx(target):
@@ -828,7 +811,6 @@ func _spring_to(target: Vector2) -> void:
 	_spring.finished.connect(func():
 		position = target
 		_home = target
-		_debug_event("spring_end key=%s target=%s" % [card_key, target])
 		spring_finished.emit(card_key))
 
 

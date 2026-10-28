@@ -41,9 +41,9 @@ func _build_graph(c: CaseLoader) -> GraphState:
 	for i in mini(ids.size(), N_NODES):
 		var pair: Array = ids[i]
 		var n := g.add_node(String(pair[0]), String(pair[1]))
-		n["x"] = 120.0 + float(i % 10) * 160.0
-		n["y"] = 100.0 + float(i / 10) * 110.0
-		keys.append(String(n["key"]))
+		n.x = 120.0 + float(i % 10) * 160.0
+		n.y = 100.0 + float(i / 10) * 110.0
+		keys.append(n.key)
 	for i in N_EDGES:
 		g.link(String(keys[i % keys.size()]), String(keys[(i * 7 + 5) % keys.size()]), "entity")
 	var collapsed := {}
@@ -57,10 +57,10 @@ func _build_graph(c: CaseLoader) -> GraphState:
 	# 给折叠场景塞 home_scene，制造 F5 的“容器 × 节点 × 边”扫描。
 	var j := 0
 	for key in g.nodes.keys():
-		var n: Dictionary = g.nodes[key]
-		if String(n.get("kind", "")) == "item":
+		var n := g.node(String(key))
+		if n.kind == "item":
 			var sids: Array = c.scenes.keys()
-			n["home_scene"] = String(sids[j % mini(sids.size(), 4)])
+			n.home_scene = String(sids[j % mini(sids.size(), 4)])
 			j += 1
 	return g
 
@@ -168,14 +168,14 @@ func _legacy_force(g: GraphState, list: Array) -> void:
 	var pos := {}
 	for key in list:
 		var n := g.node(key)
-		var p := Vector2(float(n.get("x", 0.0)), float(n.get("y", 0.0)))
+		var p := Vector2(n.x, n.y)
 		if p.x < 0.0:
 			p = Vector2(rng.randf() * 800.0, rng.randf() * 600.0)
 		pos[key] = p
 	var free := {}
 	var radius := {}
 	for key in list:
-		free[key] = not bool(g.node(key).get("pinned", false))
+		free[key] = not bool(g.node(key).pinned)
 		radius[key] = 80.0 if g.is_container_node(key) else 68.0
 	for _it in 260:
 		for i in list.size():
@@ -248,12 +248,12 @@ func _legacy_hidden(g: GraphState) -> void:
 			if not g.nodes.has(container_key):
 				container_key = g.key_of("item", String(cid))
 			for key in g.nodes.keys():
-				var n: Dictionary = g.nodes[key]
-				if g.stored.has(key) or g.hidden.has(key) or bool(n.get("pinned", false)):
+				var n := g.node(String(key))
+				if g.stored.has(key) or g.hidden.has(key) or n.pinned:
 					continue
 				if key == container_key:
 					continue
-				if String(n.get("home_scene", "")) != String(cid):
+				if n.home_scene != String(cid):
 					continue
 				var exported := false
 				for e in g.edges:
@@ -267,7 +267,7 @@ func _legacy_hidden(g: GraphState) -> void:
 						continue
 					if g.hidden.has(other_key) or g.stored.has(other_key):
 						continue
-					if String(other.get("home_scene", "")) == String(cid):
+					if other.home_scene == String(cid):
 						continue
 					exported = true
 					break

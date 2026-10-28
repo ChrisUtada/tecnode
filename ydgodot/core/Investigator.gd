@@ -4,14 +4,6 @@ extends RefCounted
 const PATH := "user://tec_investigator.json"
 const AVATAR_DEFAULT_ID := "CHARS_EXEC"
 const AVATAR_INITIAL: Array[String] = ["CHARS_EXEC", "CHARS_TEC"]
-const SENSE_ORDER: Array[String] = ["vision", "hearing", "touch", "smell", "taste"]
-const SENSE_NAMES := {
-	"vision": "视觉",
-	"hearing": "听觉",
-	"touch": "触觉",
-	"smell": "嗅觉",
-	"taste": "味觉",
-}
 const SENSE_FLAVOR := {
 	"vision": "你习惯先看清，再行动。",
 	"hearing": "世界的背面，总有声音先抵达你。",
@@ -79,7 +71,7 @@ static func load_from(p_path: String = PATH) -> Dictionary:
 	## C4：新证件不写 sense；旧 IntroWin 档案里若还有，只在读取时原样保留，不补默认值。
 	if d.has("sense"):
 		var sense := String(d.get("sense", ""))
-		if SENSE_NAMES.has(sense):
+		if MatrixState.SENSE_NAMES.has(sense):
 			out["sense"] = sense
 	return out
 
@@ -110,7 +102,7 @@ static func pick_sense(p_answers: Array) -> String:
 		if int(counts[sense]) > best_n:
 			best_n = int(counts[sense])
 			best = sense
-	return best if best != "" else SENSE_ORDER[0]
+	return best if best != "" else MatrixState.SENSES[0]
 
 
 static func gen_id(p_rng: RandomNumberGenerator = null) -> String:

@@ -1,0 +1,2 @@
+# test_audit 基线：允许存在的 Desktop 私有访问。
+# 只允许减少；新增访问请改走 DesktopDebug 或真实输入事件。
