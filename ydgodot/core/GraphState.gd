@@ -18,6 +18,67 @@ const MEM_CAST_DY := 150.0
 const MEM_CAST_STEP := 96.0
 
 var case_def: CaseLoader
+
+## ── 领域状态 ────────────────────────────────────────────────────────
+## 批次 4 起，时间轴 / 推演桌布 / 人物档案 / 花园各自持有数据；
+## GraphState 保留同名属性作为**兼容视图**，存档字段与外部调用点都不变。
+var timeline: TimelineState = TimelineState.new()
+var matrix_state: MatrixState = MatrixState.new()
+var persona: PersonaState = PersonaState.new()
+var garden_state: GardenState = GardenState.new()
+
+## 兼容视图：`graph.time` / `graph.matrix` 等仍是原来的字典 / 字符串。
+var time: String:
+	get:
+		return timeline.time
+	set(value):
+		timeline.time = value
+var card_seen: Dictionary:
+	get:
+		return timeline.card_seen
+	set(value):
+		timeline.card_seen = value
+var debuted: Dictionary:
+	get:
+		return timeline.debuted
+	set(value):
+		timeline.debuted = value
+var matrix: Dictionary:
+	get:
+		return matrix_state.slots
+	set(value):
+		matrix_state.slots = value
+var endings: Dictionary:
+	get:
+		return matrix_state.endings
+	set(value):
+		matrix_state.endings = value
+var notes: Dictionary:
+	get:
+		return persona.notes
+	set(value):
+		persona.notes = value
+var claims: Dictionary:
+	get:
+		return persona.claims
+	set(value):
+		persona.claims = value
+var confirmed_fields: Dictionary:
+	get:
+		return persona.confirmed_fields
+	set(value):
+		persona.confirmed_fields = value
+var talk_prog: Dictionary:
+	get:
+		return persona.talk_prog
+	set(value):
+		persona.talk_prog = value
+var garden: Dictionary:
+	get:
+		return garden_state.data
+	set(value):
+		garden_state.from_dict(value)
+
 var nodes: Dictionary = {}        # key -> {key, kind, id, label, x, y, lit, home_scene, pinned, bag_from}
 var edges: Array = []             # {a: key, b: key, rel: "entity"|"move"|"cond"}
 var explored: Dictionary = {}     # 容器 id -> true（场景与容器物品共用）
@@ -26,14 +87,7 @@ var tec_prog: Dictionary = {}     # scene id -> 已分析条数
 var collapsed: Dictionary = {}    # 容器 id -> true（展开过又收起）
 var stored: Dictionary = {}       # node key -> 收纳去向（"BAG" / "LEDGER" / "MATRIX" / 场景 id）
 var hidden: Dictionary = {}       # node key -> true（被更高层级的动作隐藏）
-var matrix: Dictionary = {}       # 五感槽位：sense -> Array[clue id]（推演桌布）
-var endings: Dictionary = {}      # 已达成结局 id -> true
 var tried: Dictionary = {}        # "tool>target" -> true（失败组合的痕迹，Web 的 tried）
-var talk_prog: Dictionary = {}    # 人物 id -> 对话进度（P2 对话系统用，快照先接住）
-var card_seen: Dictionary = {}    # 时刻 -> true（玩家知识：读过就不再自动重放）
-var debuted: Dictionary = {}      # 人物 id -> true（登场置位）
-var time: String = PRESENT_TIME    # 当前时刻；初始是「现在」
-var garden: Dictionary = {"seed": false, "plots": []}   # 真名结局后的花园
 var selected: String = ""
 var last_scene: String = ""
 ## 因果追踪（SYS_LOGS）的条目：{text, kind}，kind ∈ "" / "sys" / "warn" / "err" / "cap" / "act"。
@@ -41,13 +95,6 @@ var last_scene: String = ""
 var logs: Array = []
 ## F6：日志历史上限。超出后从最旧开始丢，避免长局把 ScrollContainer 撑成无限 DOM。
 const LOG_MAX := 200
-## 人物档案卡备注：id -> 文本（玩家知识，按案件存档；撤销不回滚，读档按存档恢复）。
-var notes: Dictionary = {}
-## 证据主张（待核对）：person_id -> field_id -> {value, evidence_id}。进快照，撤销会回滚。
-var claims: Dictionary = {}
-## 已核准字段：person_id -> field_id -> {value, evidence_id}。
-## 玩家知识：撤销不回滚，读档按存档恢复。
-var confirmed_fields: Dictionary = {}
 
 ## 名册常驻成员（Web `ROSTER_PINNED`）：一进游戏就在册，不靠「已结识」判定；
 ## 两者都没有画布节点，点一行 = 打开人物档案卡。
@@ -63,7 +110,9 @@ const BAG := "BAG"                # 物品：收物与词
 const LEDGER := "LEDGER"          # 证据：只收证
 const MATRIX := "MATRIX"          # 推演桌布：归位的证
 
-## 五感顺序与显示名（Web 版 SENSES 的键序 —— 排序、遍历都按它来）
+## 五感顺序与显示名（Web 版 SENSES 的键序 —— 排序、遍历都按它来）。
+## GDScript 不允许把别的类的 const 当作常量表达式，所以这里与 MatrixState 各留一份；
+## `test_p14` 有断言保证两边不漂。
 const SENSES := ["vision", "hearing", "touch", "smell", "taste"]
 const SENSE_NAMES := {
 	"vision": "视觉", "hearing": "听觉", "touch": "触觉",
@@ -77,9 +126,7 @@ func _init(p_case: CaseLoader) -> void:
 
 
 func _blank_matrix() -> void:
-	matrix = {}
-	for sense in SENSES:
-		matrix[sense] = []
+	matrix_state.reset()
 
 
 ## 数据侧的 [loc:SCENES_0602] 与画布侧的 time:SCENES_0602 必须收敛到同一个键。
@@ -492,14 +539,14 @@ func char_debut(id: String) -> String:
 func char_debuted(id: String) -> bool:
 	if char_debut(id) == "":
 		return true
-	return debuted.has(id)
+	return timeline.has_debuted(id)
 
 
 ## 到达 debut（幂等）：展开场景 / 进入回忆时刻时调用。
 func meet_char_at(id: String, sid: String) -> void:
 	if char_debut(id) != sid:
 		return
-	debuted[id] = true
+	timeline.debut(id)
 
 
 ## 人物对话队列（对齐 Web `charTalkQueue`）：基础 talkQueue + 他 **当前所在场景** 的 sceneTalks。
@@ -759,13 +806,8 @@ func matrix_assign(key: String, sense: String = "") -> bool:
 		return false
 	if sense == "":
 		sense = ev.sense
-	if not matrix.has(sense) or ev.sense != sense:
+	if ev.sense != sense or not matrix_state.assign(ev.id, sense):
 		return false
-	var list: Array = matrix[sense]
-	if list.has(ev.id):
-		return false
-	_remove_from_matrix(ev.id)
-	list.append(ev.id)
 	stored[key] = MATRIX
 	hidden.erase(key)
 	n["pinned"] = false
@@ -781,10 +823,7 @@ func matrix_take(key: String, x: float = -1.0, y: float = -1.0) -> bool:
 
 ## 桌布上的线索 id（按五感顺序摊平）
 func matrix_ids() -> Array:
-	var out: Array = []
-	for sense in SENSES:
-		out.append_array(matrix.get(sense, []))
-	return out
+	return matrix_state.ids()
 
 
 ## 桌布上的节点 key（对齐 Web 的 matrixItems）
@@ -797,54 +836,35 @@ func matrix_items() -> Array:
 
 
 func matrix_count() -> int:
-	return matrix_ids().size()
+	return matrix_state.count()
 
 
 ## 清空桌布上的线索（教学推演完成后用；线索仍保留在 stored=MATRIX，不会重新上桌）。
 func clear_matrix() -> void:
-	for sense in SENSES:
-		matrix[sense] = []
+	matrix_state.clear()
 
 
 func matrix_has(id: String) -> bool:
-	return matrix_ids().has(id)
+	return matrix_state.has(id)
 
 
 func matrix_slot_of(id: String) -> String:
-	for sense in SENSES:
-		if (matrix.get(sense, []) as Array).has(id):
-			return sense
-	return ""
+	return matrix_state.slot_of(id)
 
 
 func _remove_from_matrix(id: String) -> void:
-	for sense in SENSES:
-		(matrix[sense] as Array).erase(id)
+	matrix_state.remove(id)
 
 
 ## 推演判定：当前槽位里的线索**恰好**等于某条结局的配方（Web 版 executeInference 同口径）。
 ## 数据顺序优先（ENDINGS.find 的等价实现），返回第一个命中的 EndingDef，否则 null。
 func match_ending() -> EndingDef:
-	var ids := {}
-	for sense in SENSES:
-		for id in matrix[sense]:
-			ids[String(id)] = true
-	for ending in case_def.endings:
-		if ending == null or ending.recipe.size() != ids.size():
-			continue
-		var all := true
-		for clue in ending.recipe:
-			if clue == null or not ids.has(clue.id):
-				all = false
-				break
-		if all:
-			return ending
-	return null
+	return matrix_state.match_ending(case_def)
 
 
 ## 记录结局达成（供 P1.5 快照 / 结局图鉴使用）
 func mark_ending(id: String) -> void:
-	endings[id] = true
+	matrix_state.mark_ending(id)
 
 
 ## 只从显式结构化证据引用落地，不再解析正文标签。
@@ -900,74 +920,40 @@ func capture_evidence(eid: String, from_key: String = "", x: float = -1.0, y: fl
 # ── 档案字段：主张 / 核准 ───────────────────────────────────────────────
 
 func claim_of(person_id: String, field_id: String) -> Dictionary:
-	var row = claims.get(person_id, null)
-	if row is Dictionary:
-		return (row as Dictionary).get(field_id, {})
-	return {}
+	return persona.claim_of(person_id, field_id)
 
 
 func set_claim(person_id: String, field_id: String, value: String = "", evidence_id: String = "") -> void:
-	if not claims.has(person_id):
-		claims[person_id] = {}
-	var row: Dictionary = claims[person_id]
-	var old: Dictionary = row.get(field_id, {})
-	row[field_id] = {
-		"value": value if value != "" else String(old.get("value", "")),
-		"evidence_id": evidence_id if evidence_id != "" else String(old.get("evidence_id", "")),
-	}
+	persona.set_claim(person_id, field_id, value, evidence_id)
 
 
 func clear_claim(person_id: String, field_id: String) -> void:
-	if not claims.has(person_id):
-		return
-	(claims[person_id] as Dictionary).erase(field_id)
-	if (claims[person_id] as Dictionary).is_empty():
-		claims.erase(person_id)
+	persona.clear_claim(person_id, field_id)
 
 
 func pending_claims(person_id: String) -> Dictionary:
-	var out := {}
-	var row = claims.get(person_id, null)
-	if row is Dictionary:
-		for fid in (row as Dictionary).keys():
-			var claim = (row as Dictionary)[fid]
-			if claim is Dictionary and String((claim as Dictionary).get("evidence_id", "")) != "":
-				out[String(fid)] = (claim as Dictionary).duplicate(true)
-	return out
+	return persona.pending_claims(person_id)
 
 
 func pending_claim_count(person_id: String) -> int:
-	return pending_claims(person_id).size()
+	return persona.pending_claim_count(person_id)
 
 
 func confirmed_field_of(person_id: String, field_id: String) -> Dictionary:
-	var row = confirmed_fields.get(person_id, null)
-	if row is Dictionary:
-		return (row as Dictionary).get(field_id, {})
-	return {}
+	return persona.confirmed_field_of(person_id, field_id)
 
 
 func is_field_confirmed(person_id: String, field_id: String) -> bool:
-	return not confirmed_field_of(person_id, field_id).is_empty()
+	return persona.is_field_confirmed(person_id, field_id)
 
 
 func confirm_field(person_id: String, field_id: String, value: String, evidence_id: String) -> void:
-	if not confirmed_fields.has(person_id):
-		confirmed_fields[person_id] = {}
-	(confirmed_fields[person_id] as Dictionary)[field_id] = {
-		"value": value, "evidence_id": evidence_id,
-	}
-	clear_claim(person_id, field_id)
+	persona.confirm_field(person_id, field_id, value, evidence_id)
 
 
 func all_fields_confirmed(person_id: String) -> bool:
 	var ch := case_def.char_of(person_id) if case_def != null else null
-	if ch == null or ch.evidence_fields.is_empty():
-		return false
-	for f in ch.evidence_fields:
-		if f == null or not is_field_confirmed(person_id, f.id):
-			return false
-	return true
+	return persona.all_fields_confirmed(ch, person_id)
 
 
 ## 折叠后的隐藏重算（对齐 Web 的 recomputeHidden）：

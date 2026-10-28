@@ -125,8 +125,7 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 	graph.garden = {"seed": false, "plots": []}
 	graph.selected = ""
 	graph.last_scene = String(s.get("lastScene", s.get("last_scene", "")))
-	for sense in GraphState.SENSES:
-		graph.matrix[sense] = []
+	graph.matrix_state.reset()
 
 	for raw in (s["nodes"] as Dictionary).values():
 		if not (raw is Dictionary):
@@ -192,13 +191,11 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 		graph.debuted[String(key)] = bool((s.get("debuted", {}) as Dictionary)[key])
 	var garden_in = s.get("garden", null)
 	if garden_in is Dictionary:
-		graph.garden = (garden_in as Dictionary).duplicate(true)
-		if not (graph.garden.get("plots", []) is Array):
-			graph.garden["plots"] = []
-		graph.garden["seed"] = bool(graph.garden.get("seed", false))
+		graph.garden_state.from_dict(garden_in)
 	elif _as_array(s.get("endings", [])).has("TRUE_E"):
 		# P2.5 老档迁移：走完真名但存档还没有 garden 字段 → 补一枚种子
-		graph.garden = {"seed": true, "plots": []}
+		graph.garden_state.reset()
+		graph.garden_state.set_seed(true)
 
 	## 人物档案卡备注：读档按存档恢复；撤销（keep_knowledge）保持当前值不覆盖。
 	if not keep_knowledge:
@@ -210,9 +207,7 @@ func restore(s: Dictionary, keep_knowledge := false) -> bool:
 
 	var matrix_in = s.get("matrix", {})
 	if matrix_in is Dictionary:
-		for sense in GraphState.SENSES:
-			var list = (matrix_in as Dictionary).get(sense, [])
-			graph.matrix[sense] = _as_array(list).duplicate()
+		graph.matrix_state.from_dict(matrix_in)
 	for id in _as_array(s.get("endings", [])):
 		graph.endings[String(id)] = true
 	for pid in (s.get("claims", {}) as Dictionary).keys():
@@ -256,10 +251,7 @@ func restore_json(text: String) -> bool:
 
 
 func _matrix_copy() -> Dictionary:
-	var out := {}
-	for sense in GraphState.SENSES:
-		out[sense] = (graph.matrix.get(sense, []) as Array).duplicate()
-	return out
+	return graph.matrix_state.to_dict()
 
 
 func _as_array(value) -> Array:
