@@ -14,6 +14,7 @@ signal start_requested(overwrite: bool)
 signal continue_requested
 signal quit_requested
 
+const GameSettingsScript := preload("res://core/GameSettings.gd")
 const DEMON_ART := "res://assets/raw/executor-avatar.png"
 const BGM_ART := "res://assets/raw/Air_Bach.ogg"
 const DEMON_PX := 72.0
@@ -32,8 +33,10 @@ var _idle_tween: Tween
 var _bgm: AudioStreamPlayer
 var _menu_btns: Array[Button] = []
 var _dialog_layer: Control
+var _dialog_panel: PanelContainer
 var _dialog_title: Label
 var _dialog_body: Label
+var _dialog_extra: VBoxContainer
 var _dialog_actions: HBoxContainer
 
 
@@ -339,6 +342,7 @@ func _build_dialog() -> void:
 	panel.custom_minimum_size = Vector2(360, 0)
 	panel.add_theme_stylebox_override("panel",
 		TecTheme.flat(TecTheme.CARD, TecTheme.R_SM, TecTheme.INK, 1))
+	_dialog_panel = panel
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)
 	margin.add_theme_constant_override("margin_right", 16)
@@ -360,6 +364,12 @@ func _build_dialog() -> void:
 	_dialog_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_dialog_body.custom_minimum_size = Vector2(320, 0)
 	col.add_child(_dialog_body)
+
+	## 设置面板的额外内容（显示 / 声音 / 文本三组）。普通确认框留空。
+	_dialog_extra = VBoxContainer.new()
+	_dialog_extra.name = "dialog_extra"
+	_dialog_extra.add_theme_constant_override("separation", 8)
+	col.add_child(_dialog_extra)
 
 	_dialog_actions = HBoxContainer.new()
 	_dialog_actions.name = "dialog_actions"
@@ -383,17 +393,165 @@ func _on_start_pressed() -> void:
 func _show_settings() -> void:
 	if _booting:
 		return
-	var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-	_open_dialog("设置", "当前显示：%s。切换后界面会自动重排。" % ("全屏" if fullscreen else "窗口"),
-		[["切换全屏", false, _toggle_fullscreen],
-		 ["返回", true, _close_dialog]])
+	_open_dialog("设置", "修改即时生效，并自动保存。",
+		[["恢复默认", false, _reset_settings],
+		 ["返回", true, _close_dialog]],
+		_build_settings_content())
 
 
-func _toggle_fullscreen() -> void:
-	var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fullscreen
-		else DisplayServer.WINDOW_MODE_FULLSCREEN)
+func _reset_settings() -> void:
+	GameSettingsScript.reset_defaults()
+	GameSettingsScript.apply_audio()
+	GameSettingsScript.apply_display(get_window())
+	GameSettingsScript.save_settings()
 	_show_settings()
+
+
+func _set_fullscreen(on: bool) -> void:
+	GameSettingsScript.fullscreen = on
+	GameSettingsScript.apply_display(get_window())
+	GameSettingsScript.save_settings()
+	_show_settings()
+
+
+func _set_window_preset(idx: int) -> void:
+	GameSettingsScript.fullscreen = false
+	GameSettingsScript.window_preset = idx
+	GameSettingsScript.apply_display(get_window())
+	GameSettingsScript.save_settings()
+	_show_settings()
+
+
+func _set_volume(v: int) -> void:
+	GameSettingsScript.volume = clampi(v, 0, 100)
+	GameSettingsScript.apply_audio()
+	GameSettingsScript.save_settings()
+	_show_settings()
+
+
+func _set_text_speed(idx: int) -> void:
+	GameSettingsScript.text_speed = clampi(idx, 0, GameSettingsScript.TEXT_SPEEDS.size() - 1)
+	GameSettingsScript.save_settings()
+	_show_settings()
+
+
+func _build_settings_content() -> VBoxContainer:
+	var root := VBoxContainer.new()
+	root.name = "settings_content"
+	root.custom_minimum_size = Vector2(420, 0)
+	root.add_theme_constant_override("separation", 12)
+
+	# ── 显示 ──
+	var display := _settings_section(root, "settings_display", "显示")
+	var mode := _settings_row(display, "settings_mode_row", "窗口模式")
+	var win_btn := _settings_choice("窗口", not GameSettingsScript.fullscreen,
+		func(): _set_fullscreen(false))
+	win_btn.name = "settings_mode_window"
+	mode.add_child(win_btn)
+	var full_btn := _settings_choice("全屏", GameSettingsScript.fullscreen,
+		func(): _set_fullscreen(true))
+	full_btn.name = "settings_mode_fullscreen"
+	mode.add_child(full_btn)
+
+	var size := _settings_row(display, "settings_size_row", "窗口尺寸")
+	for i in GameSettingsScript.WINDOW_PRESETS.size():
+		var size_idx := i
+		var preset: Dictionary = GameSettingsScript.WINDOW_PRESETS[i]
+		var size_btn := _settings_choice(String(preset["label"]),
+			not GameSettingsScript.fullscreen and GameSettingsScript.window_preset == size_idx,
+			func(): _set_window_preset(size_idx))
+		size_btn.name = "settings_size_%d" % size_idx
+		size.add_child(size_btn)
+	var fit_btn := _settings_choice("适应屏幕",
+		not GameSettingsScript.fullscreen and GameSettingsScript.window_preset < 0,
+		func(): _set_window_preset(-1))
+	fit_btn.name = "settings_size_fit"
+	size.add_child(fit_btn)
+
+	# ── 声音 ──
+	var audio := _settings_section(root, "settings_audio", "声音")
+	var vol := _settings_row(audio, "settings_volume_row", "主音量")
+	var down := _settings_choice("-", false, func(): _set_volume(GameSettingsScript.volume - 10))
+	down.name = "settings_volume_down"
+	down.custom_minimum_size = Vector2(34, 26)
+	down.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	down.disabled = GameSettingsScript.volume <= 0
+	vol.add_child(down)
+	var percent := TecTheme.label("%d%%" % GameSettingsScript.volume, TecTheme.FS_BODY, TecTheme.TEXT)
+	percent.name = "settings_volume_value"
+	percent.custom_minimum_size = Vector2(52, 0)
+	percent.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	percent.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	vol.add_child(percent)
+	var up := _settings_choice("+", false, func(): _set_volume(GameSettingsScript.volume + 10))
+	up.name = "settings_volume_up"
+	up.custom_minimum_size = Vector2(34, 26)
+	up.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	up.disabled = GameSettingsScript.volume >= 100
+	vol.add_child(up)
+
+	# ── 文本 ──
+	var text_box := _settings_section(root, "settings_text", "文本")
+	var speed := _settings_row(text_box, "settings_speed_row", "文字速度")
+	for i in GameSettingsScript.TEXT_SPEEDS.size():
+		var speed_idx := i
+		var speed_btn := _settings_choice(GameSettingsScript.TEXT_SPEEDS[i],
+			GameSettingsScript.text_speed == speed_idx,
+			func(): _set_text_speed(speed_idx))
+		speed_btn.name = "settings_speed_%d" % speed_idx
+		speed.add_child(speed_btn)
+
+	return root
+
+
+func _settings_section(parent: VBoxContainer, node_name: String, title: String) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.name = node_name
+	box.add_theme_constant_override("separation", 5)
+	var head := TecTheme.label(title, TecTheme.FS_BODY, TecTheme.MUTED)
+	head.name = node_name + "_title"
+	box.add_child(head)
+	var rule := ColorRect.new()
+	rule.color = TecTheme.EDGE_SOFT
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(rule)
+	parent.add_child(box)
+	return box
+
+
+func _settings_row(parent: VBoxContainer, node_name: String, title: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = node_name
+	row.add_theme_constant_override("separation", 6)
+	var l := TecTheme.label(title, TecTheme.FS_BODY, TecTheme.MUTED)
+	l.custom_minimum_size = Vector2(64, 0)
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(l)
+	parent.add_child(row)
+	return row
+
+
+## 选项键：选中项直接反白（黑底白字），与全站的「按下 = 反白」是同一套语法。
+func _settings_choice(text: String, selected: bool, on_pressed: Callable) -> Button:
+	var b := TecTheme.button(text)
+	b.custom_minimum_size = Vector2(0, 26)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if selected:
+		## 用 button_style 而不是 flat：保留 12/6 的内容边距，选中前后键宽不跳。
+		var normal := TecTheme.button_style(false, false)
+		normal.bg_color = TecTheme.INK
+		normal.border_color = TecTheme.INK
+		var hover := TecTheme.button_style(true, false)
+		hover.bg_color = TecTheme.INK
+		hover.border_color = TecTheme.INK
+		b.add_theme_stylebox_override("normal", normal)
+		b.add_theme_stylebox_override("hover", hover)
+		b.add_theme_color_override("font_color", TecTheme.TEXT_ON_DARK)
+		b.add_theme_color_override("font_hover_color", TecTheme.TEXT_ON_DARK)
+	b.pressed.connect(on_pressed)
+	return b
 
 
 ## 读档失败等外部错误：留在开始界面给玩家一个可读提示，不关闭界面。
@@ -403,20 +561,35 @@ func show_notice(title: String, body: String) -> void:
 	_open_dialog(title, body, [["知道了", true, _close_dialog]])
 
 
-func _open_dialog(title: String, body: String, actions: Array) -> void:
+func _open_dialog(title: String, body: String, actions: Array,
+		extra: Control = null) -> void:
 	_dialog_title.text = title
 	_dialog_body.text = body
-	for c in _dialog_actions.get_children():
-		c.queue_free()
+	_dialog_body.visible = body != ""
+	_clear_children(_dialog_actions)
+	_clear_children(_dialog_extra)
+	if _dialog_panel != null:
+		_dialog_panel.custom_minimum_size = Vector2(460 if extra != null else 360, 0)
+	if extra != null:
+		_dialog_extra.add_child(extra)
 	for item in actions:
 		var btn := TecTheme.button(String(item[0]))
 		btn.name = "dialog_btn_" + String(item[0])
 		if bool(item[1]):
-			btn.add_theme_stylebox_override("normal",
-				TecTheme.flat(TecTheme.CARD, TecTheme.R_BTN, TecTheme.INK, 2))
+			## 不能直接用 flat()：它没有 12/6 的内容边距，短文案（如「返回」）
+			## 会被压成贴边的窄方块。改为在标准键样式上只把键线加到 2px。
+			var primary := TecTheme.button_style(false, false)
+			primary.set_border_width_all(2)
+			btn.add_theme_stylebox_override("normal", primary)
 		btn.pressed.connect(item[2])
 		_dialog_actions.add_child(btn)
 	_dialog_layer.visible = true
+
+
+func _clear_children(parent: Node) -> void:
+	for c in parent.get_children():
+		parent.remove_child(c)
+		c.queue_free()
 
 
 func _close_dialog() -> void:

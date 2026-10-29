@@ -241,7 +241,7 @@ func _debug_event(text: String) -> void:
 | `scenes/systems/PeopleController.gd` | 名册、档案卡、主张 / 字段 / 盖章 | `_toggle_people / _open_person_card / _person_*_field*` |
 | `scenes/flows/TutorialFlow.gd` | 6 幕教学 | `_begin_tutorial / _tutorial_*` |
 | `scenes/flows/CaseSession.gd` | 进案 / 停靠 / 重置 / 续档 / 自动存档 / 撤销 | `_enter_case / _park_case / _reset_case / _commit / _undo` |
-| `scenes/debug/DesktopDebug.gd` | `dbg_*` + 截图流程 | 约 1150 行测试专用代码 |
+| `scenes/debug/DesktopDebug*.gd` | `dbg_*` + 截图流程 | Base / Query / Action / Windows / Apps / 截图六层；268 个接缝，最大 442 行 |
 
 **目标**：`Desktop.gd` 收敛到 **800–1200 行**。
 
@@ -695,10 +695,10 @@ if OS.is_debug_build() or _shot_mode():
 
 **仍未做（明确不在本轮范围）**
 
-- `DesktopDebug` 仍是单文件约 1700 行 / 268 个接缝。它是调试专用代码，拆分会带来大量纯委托；等接缝 API 稳定后再按 query / action / screenshot 分组。
-- `.tscn` 迁移（P3-4）按原计划保持延后：当前 UI 仍以代码搭建，迁移需要逐屏对照，不属于低风险清理。
+- `DesktopDebug` 分组已落地（2026-10-29）：268 个 `dbg_*` 保持原名，按 Base / Query / Action / Windows / Apps / 截图拆成 6 个继承层（最大 442 行）；测试调用方式不变，全套 1895 项 0 失败。
+- `.tscn` 迁移（P3-4）按原计划保持延后，但已落地三步低风险基础：dev-only 的 `scenes/dev/WindowGallery.tscn` 预览场景（真实 Desktop + 调试接缝切换 10 个代表性窗口，不改产品路径）；`TitleStripes` 抽成独立 `ui/TitleStripes.gd`；公共壳 `scenes/windows/SysWindowShell.tscn` 接入 `SysWindow._build()`（保留 `bg/bar/body/content` 节点路径）。首个试点窗口 `PasswordPop` 已迁成继承壳场景的 `scenes/windows/PasswordPop.tscn`，`CardUiController` 改走 `instantiate()`；第一个文本窗 `LogWin` 也已迁成 `scenes/windows/LogWin.tscn`（`Desktop._toggle_log()` 走 `instantiate()`，`log_scroll` / `log_list` 保留节点名），bench 同步改为场景实例化；列表窗 `StorageWin` 也已迁成 `scenes/windows/StorageWin.tscn`（物品 / 证据两处 `DragDropController` 构造点改走 `instantiate()`，`store_scroll` / `rows` 保留节点名）。其余窗口仍保持代码构建，逐屏迁移继续延后。
 - `refactor/desktop-split` 分支尚未合并 / 开 PR；合并属于对外动作，等确认后执行。
 
 ---
 
-> 本报告起初只描述现状与建议；批次 0–5 与「遗留收尾」均已落地，仅剩 `DesktopDebug` 分组、`.tscn` 迁移与分支合并三项明确延后，现状与本节的差异以本节为准。
+> 本报告起初只描述现状与建议；批次 0–5 与「遗留收尾」均已落地，仅剩 `.tscn` 迁移与分支合并两项明确延后，现状与本节的差异以本节为准。

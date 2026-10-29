@@ -30,18 +30,16 @@ func setup_store(p_title: String, p_kind: String, p_graph: GraphState, p_case: C
 	setup(p_title, w, h)
 
 	content.add_theme_constant_override("separation", 0)
-	_scroll = ScrollContainer.new()
-	_scroll.name = "store_scroll"
+	_scroll = get_node_or_null("body/content/store_scroll") as ScrollContainer
+	_rows = _scroll.get_node_or_null("rows") as VBoxContainer if _scroll != null else null
+	if _scroll == null or _rows == null:
+		push_error("StorageWin.tscn 缺少 store_scroll / rows")
+		return
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	content.add_child(_scroll)
-
-	_rows = VBoxContainer.new()
-	_rows.name = "rows"
 	_rows.add_theme_constant_override("separation", 4)
 	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_scroll.add_child(_rows)
 	refresh_store()
 
 

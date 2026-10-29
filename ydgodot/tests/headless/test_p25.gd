@@ -370,6 +370,9 @@ func _test_desktop(c: CaseLoader) -> void:
 	scene.debug.dbg_hide_toast()
 	scene.debug.dbg_play_true_ending()
 	check("结局遮罩已开", scene.debug.dbg_ending().visible)
+	var end_dim := scene.debug.dbg_ending().find_child("dim", true, false) as ColorRect
+	check("P6.4 结局遮罩走网点 shader",
+		end_dim != null and end_dim.material is ShaderMaterial)
 	scene.debug.dbg_confirm_ending()
 	await process_frame
 	var g: GraphState = scene.graph

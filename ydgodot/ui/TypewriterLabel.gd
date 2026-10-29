@@ -1,6 +1,9 @@
 class_name TypewriterLabel
 extends Label
 
+## 显式 preload，别依赖新 class_name 的全局缓存（编辑器没重扫时会报未声明）。
+const GameSettingsScript := preload("res://core/GameSettings.gd")
+
 signal typing_finished
 
 const CHAR_MS := 45.0
@@ -126,10 +129,15 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	if not _typing:
 		return
+	## 设置里的文字速度是全局倍率；「瞬间」= 0，直接补全（连重点行的停顿也跳过）。
+	var factor: float = GameSettingsScript.text_speed_factor()
+	if factor <= 0.0:
+		finish_typing()
+		return
 	if _delay_left > 0.0:
 		_delay_left = maxf(0.0, _delay_left - delta)
 		return
-	_shown += delta * (1000.0 / char_ms)
+	_shown += delta * (1000.0 / (char_ms * factor))
 	var n := int(_shown)
 	if n >= text.length():
 		finish_typing()

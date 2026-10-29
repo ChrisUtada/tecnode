@@ -5,6 +5,7 @@ extends SceneTree
 
 const N_NODES := 60
 const N_EDGES := 90
+const LogWinScene := preload("res://scenes/windows/LogWin.tscn")
 
 var fail := false
 
@@ -131,7 +132,7 @@ func _bench_f6(g: GraphState) -> void:
 	g.clear_logs()
 	for i in 100:
 		g.add_log("F6 history line %d" % i, "sys")
-	var lw := LogWin.new()
+	var lw := LogWinScene.instantiate() as LogWin
 	lw.setup_log(g)
 	var built := lw._rows_built
 	g.add_log("F6 append probe", "sys")

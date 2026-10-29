@@ -3,6 +3,8 @@ extends Node
 ## 由 Desktop 挂载的子系统控制器。
 ## 过渡期直接通过注入的 `desk` 访问宿主成员；搬出的函数名保持不变。
 
+const PasswordPopScene := preload("res://scenes/windows/PasswordPop.tscn")
+
 var desk: Desktop
 
 
@@ -387,7 +389,7 @@ func _open_password(node_key: String) -> void:
 			desk._pw_pop.get_parent().remove_child(desk._pw_pop)
 		desk._pw_pop.queue_free()
 	var card: NodeCard = desk._cards.get(node_key, null)
-	desk._pw_pop = PasswordPop.new()
+	desk._pw_pop = PasswordPopScene.instantiate() as PasswordPop
 	desk._pw_pop.name = "pw_pop"
 	desk._pw_pop.setup_password(it.label, cmd.label)
 	var base := Vector2(300, 300)

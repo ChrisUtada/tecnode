@@ -292,6 +292,10 @@ static func build() -> Theme:
 	var t := Theme.new()
 	t.default_font = font()
 	t.default_font_size = FS_BODY
+	## 输入光标：默认主题是白色，在浅色纸面上几乎看不见；
+	## 文本已是墨色，光标也统一跟字色（姓名输入 / 密码 / 档案备注都走这一条）。
+	for cls in ["LineEdit", "TextEdit"]:
+		t.set_color("caret_color", cls, INK)
 	_style_scrollbars(t)
 	return t
 
@@ -510,6 +514,13 @@ static func mini_button(text: String, tip: String = "") -> Button:
 static func button(text: String) -> Button:
 	var b := Button.new()
 	b.text = text
+	style_button(b)
+	return b
+
+
+## 给已经存在的 Button（例如 .tscn 里的节点）套上全站统一键位样式。
+## `.tscn` 只存结构，样式仍从 TecTheme 单一来源取，不在场景里硬写颜色。
+static func style_button(b: Button) -> void:
 	b.add_theme_font_override("font", font())
 	b.add_theme_font_size_override("font_size", FS_BODY)
 	## 字色只跟着填充走：白底黑字 / 按下反白时白字。悬停**不改字色**——
@@ -526,7 +537,6 @@ static func button(text: String) -> Button:
 	b.add_theme_stylebox_override("hover_pressed", button_style(true, true))
 	b.add_theme_stylebox_override("disabled", flat(CARD, R_BTN, INK_FAINT, 1))
 	b.focus_mode = Control.FOCUS_NONE
-	return b
 
 
 static func primary_button(text: String) -> Button:

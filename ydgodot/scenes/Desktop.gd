@@ -67,6 +67,8 @@ const AUTOSAVE_DELAY_MSEC := 180
 const LAYOUT_QUICK_ROUNDS := 8
 const LAYOUT_FRAME_ROUNDS := 5
 const StartScreenScript := preload("res://ui/StartScreen.gd")
+const GameSettingsScript := preload("res://core/GameSettings.gd")
+const LogWinScene := preload("res://scenes/windows/LogWin.tscn")
 
 ## ── 开场教学（第 1–6 幕）───────────────────────────────────────────────────
 ## 第 2 幕只在教学迷你案件里跑，不碰 A-001 的存档与节点。数据在
@@ -346,13 +348,7 @@ func _setup_window_scale() -> void:
 		## 对拍要 1:1 像素口径：截图窗口必须正好等于设计基准。
 		win.size = Vector2i(int(DESIGN_W), int(DESIGN_H))
 		return
-	var usable := DisplayServer.screen_get_usable_rect()
-	var avail: Vector2i = usable.size
-	if avail.x < MIN_W or avail.y < MIN_H:
-		win.size = Vector2i(int(DESIGN_W), int(DESIGN_H))
-		return
-	win.size = avail
-	win.position = usable.position
+	GameSettingsScript.apply_display(win)
 
 # ── 自适应布局（不缩放的配套）────────────────────────────────────────────
 ## `content_scale_mode` 是 DISABLED，所以视口尺寸就是窗口像素。凡是「贴着窗口右/下边」
@@ -428,6 +424,11 @@ func _layout_header_right(vw: float) -> void:
 			c.position.x = vw - float(pair[1])
 
 func _ready() -> void:
+	## 无头回归 / 截图对拍不读玩家本地设置：否则上次存的「瞬间」会让依赖打字过程的
+	## 断言与截图状态失稳；正常启动才载入。
+	if DisplayServer.get_name() != "headless" and not _shot_mode():
+		GameSettingsScript.load_settings()
+		GameSettingsScript.apply_audio()
 	_setup_window_scale()
 	theme = TecTheme.build()
 	_progress_path = "user://shot_progress.json" if _shot_mode() else CaseCatalog.PROGRESS_PATH
@@ -947,7 +948,7 @@ func _toggle_log() -> void:
 		_log_win.queue_free()
 		_log_win = null
 		return
-	_log_win = LogWin.new()
+	_log_win = LogWinScene.instantiate() as LogWin
 	_log_win.name = "log_win"
 	_log_win.setup_log(graph)
 	_log_win.position = Vector2(_vw() - 14.0 - _log_win.size.x + SysWindow.PAD,

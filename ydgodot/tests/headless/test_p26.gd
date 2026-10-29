@@ -123,8 +123,8 @@ func _test_desktop(c: CaseLoader) -> void:
 	scene.debug.dbg_set_save_enabled(false)
 
 	var win_bar := scene.get_node_or_null("desk/case_win/bar") as Control
-	check("主窗标题栏内高 27（Web 28 - 1 分隔线）",
-		win_bar != null and win_bar.size.y == 27.0,
+	check("主窗标题栏内高 23（24 - 1 分隔线）",
+		win_bar != null and win_bar.size.y == 23.0,
 		str(win_bar.size) if win_bar != null else "null")
 	var close := scene.get_node_or_null("desk/case_win/bar/close") as Button
 	check("关闭按钮实际 18×18（字形不再撑高）",

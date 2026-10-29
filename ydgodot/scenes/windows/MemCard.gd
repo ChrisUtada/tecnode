@@ -130,6 +130,9 @@ func _apply_memory_skin() -> void:
 		bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		bar.add_child(bar_bg)
 		bar.move_child(bar_bg, 0)
+	var plate := get_node_or_null("bar/title_plate") as ColorRect
+	if plate != null:
+		plate.color = TecTheme.INK
 	var title := get_node_or_null("bar/win_title") as Label
 	if title != null:
 		title.add_theme_color_override("font_color", TecTheme.TEXT_ON_DARK)

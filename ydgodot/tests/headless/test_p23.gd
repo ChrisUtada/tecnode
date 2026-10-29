@@ -272,6 +272,9 @@ func _test_ui() -> void:
 	check("6/2 首次进入自动开放映卡", card != null and is_instance_valid(card))
 	check("卡已读记进状态", bool(scene.graph.card_seen.get("SCENES_0602", false)))
 	check("放映卡标题", card != null and String(card.title).contains("6月2日"))
+	var mem_plate := card.get_node_or_null("bar/title_plate") as ColorRect if card != null else null
+	check("MemCard 标题衬底跟黑标题条",
+		mem_plate != null and mem_plate.color.is_equal_approx(TecTheme.INK))
 	check("正文从日期场景正文起", card != null and card.line_count() > 0
 		and card.line_at(0).contains("6月2日"), card.line_at(0) if card != null and card.line_count() > 0 else "")
 	var has_talk := false

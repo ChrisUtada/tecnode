@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/windows/SysWindowShell.tscn" id="1_shell"]
+[ext_resource type="Script" path="res://scenes/windows/LogWin.gd" id="2_log"]
+
+[node name="LogWin" instance=ExtResource("1_shell")]
+script = ExtResource("2_log")
+
+[node name="log_scroll" type="ScrollContainer" parent="body/content"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="log_list" type="VBoxContainer" parent="body/content/log_scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0

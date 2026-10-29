@@ -11,6 +11,7 @@ extends SceneTree
 ##     旧路径 = 每条边每帧重采 24 点；新路径 = 只重采移动的 5 条。
 ## 时间只统计 CPU 侧 set_segments / _process 热路径；headless 不产生真实 GPU 帧。
 
+const LogWinScene := preload("res://scenes/windows/LogWin.tscn")
 const FRAMES := 600
 const EDGE_FRAMES := 120
 const EDGE_COUNT := 60
@@ -79,7 +80,7 @@ func _bench_logwin() -> void:
 	for i in 8:
 		g.add_log("第 %d 条测试日志：用于验证日志窗打字机只在整数档位变化时更新并滚动。" % i, "sys")
 	g.add_log("日志性能回归测试文本。".repeat(36), "sys")
-	var lw := LogWin.new()
+	var lw := LogWinScene.instantiate() as LogWin
 	lw.setup_log(g)
 	root.add_child(lw)
 	lw.set_process(false)          # 基准自己驱动，避免引擎额外推进

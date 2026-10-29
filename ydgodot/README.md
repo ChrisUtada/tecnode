@@ -186,7 +186,7 @@
 - **不做整体缩放**：`window/stretch/mode="disabled"` + `content_scale_mode = DISABLED`，逻辑尺寸 = 窗口像素。
   为什么放弃「Win95 整体放大」：`font.ttf` 是 VonwaonBitmap 12px 点阵字，只在 12 / 24 / 36px 落得下原字格。1920×1080 的可用区（1920×1040）算出的等比系数是 **1.444x** —— 非整数倍，整屏字重采样后同时变粗变糊（证据 `docs/font_scale.png`）。
   **点阵字体 + 任意缩放无解**，只能二选一：锁整数倍（1080p 只剩 1x，界面小一圈）或干脆不缩放。本项目选后者。
-- **窗口**：`_setup_window_scale()` 铺满 `screen_get_usable_rect()`，最小 960×560；`--win=1920x1040` 可钉死尺寸（排查某个尺寸下布局崩了、或换截图口径都用它）。
+- **窗口**：默认「适应屏幕」铺满 `screen_get_usable_rect()`，最小 960×560；开始页设置可选 1280×720 / 1600×900 / 1920×1080 / 全屏，连同主音量、文字速度写入 `user://settings.cfg`，下次启动先于布局生效。`--win=1920x1040` 仍优先，可钉死尺寸（排查某个尺寸下布局崩了、或换截图口径都用它）。
 - **布局自适应**：`_layout_root()` 挂在 `NOTIFICATION_RESIZED` 上 —— 页眉拉满视口宽、工具组贴右（flex `margin-left:auto` 语义）、主窗按「视口 − 86 图标列 − 2×PAD」重算、toast 与贴右浮窗重新对边。画布若还在「适应窗口」自动档（`_view_user == false`）就重新 fit，玩家手动调过镜头则只做中心补偿。
 - **画布连续缩放 0.45–2.0**（滚轮 ×1.12，以光标为锚；`_on_stage_input`）。世界 2000×1300、画布约 1174×648，花园 5 个节点的包围盒实测 **682×851** —— **不缩到 0.62x 根本装不进一屏**，所以「只许整数倍」这条纪律在看全貌这件事上让路。
   - 「适应窗口」按包围盒算 `k`（clamp 0.45–1.3），`_relayout` 只在 `_view_user == false` 时自动 fit（玩家调过镜头就不抢）。
@@ -262,7 +262,8 @@ GODOT="$GODOT" ./ydgodot/tools/run_tests.sh ydgodot/tests/headless/test_p0.gd
 | 路径 | 内容 |
 |---|---|
 | `core/` | 纯逻辑（不挂场景树，可无头测）：`CaseLoader` / `GraphState` / `ComboSystem` / `SaveSystem` / `Investigator` / `CaseCatalog` / `DialogueSystem` / `DialogueSession` / `GardenSystem` |
-| `scenes/` | `Desktop.tscn` + `Desktop.gd`（壳与接线）、`cards/NodeCard.gd`（节点卡与指针手势）、`canvas/EdgeLayer.gd`（连线层）、`windows/*` |
+| `scenes/` | `Desktop.tscn` + `Desktop.gd`（壳与接线）、`cards/NodeCard.gd`（节点卡与指针手势）、`canvas/EdgeLayer.gd`（连线层）、`windows/*`（公共窗壳 `SysWindowShell.tscn`；场景化试点 `PasswordPop.tscn` / `LogWin.tscn` / `StorageWin.tscn`） |
+| `scenes/dev/` | `WindowGallery.tscn` — dev-only 窗口预览：F6 运行，顶部工具栏切换 10 个代表性系统窗；不写存档、不挂主场景、不改产品窗口创建路径 |
 | `ui/` | `TecTheme.gd`（配色/字体/StyleBox）、`shaders/surface.gdshader`（浮雕）、`shaders/paper.gdshader`（纸纹） |
 | `cases/a001/` | **内容数据（唯一形态）**：`case.tres` 索引 + `scenes/` `items/` `chars/` `clues/` `memories/` `dialogues/` `endings/`，一实体一文件。**场景 / 容器物品的「画布节点」在 Godot 检查器的四栏里维护**（`node_items` / `node_chars` / `node_locs` / `node_clues`，每栏一行摘要 + 「编辑…」开弹窗），正文只负责文字 |
 | `core/defs/` | 25 个自定义 Resource 类（`SceneDef` / `ItemDef` / `CommandDef` 六子类 / `CharDef` …） |

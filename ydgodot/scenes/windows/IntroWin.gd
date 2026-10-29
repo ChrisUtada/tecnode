@@ -3,6 +3,7 @@ extends Control
 
 signal finished(card: Dictionary)
 
+const DitherMaskScript := preload("res://ui/DitherMask.gd")
 const WIDTH := 420.0
 const TOP := 90.0
 const AVATAR_ART := {
@@ -40,9 +41,11 @@ func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var dim := ColorRect.new()
+	var dim := DitherMaskScript.new()
 	dim.name = "dim"
-	dim.color = TecTheme.scrim(0.45)
+	## 开场是模态窗：中心保持接近旧 45% 遮罩的密度，只在屏幕边缘加深，
+	## 避免中心出现大块浅色椭圆、把背后的桌面 UI 读成画面主体。
+	dim.configure(0.42, 0.60, 0.90, 1.35)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(dim)

@@ -8,8 +8,12 @@ signal closed
 signal minimized
 
 const PAD := 14.0
-const BAR_H := 28.0
+const BAR_H := 24.0
 const CTRL := 18.0
+## 标题栏横纹：独立脚本，方便下一步把 SysWindow 壳搬进 .tscn。
+const TitleStripesScript := preload("res://ui/TitleStripes.gd")
+## 公共窗壳：只提供节点结构，位置 / 尺寸 / 样式仍由本脚本按真实尺寸现算。
+const ShellScene := preload("res://scenes/windows/SysWindowShell.tscn")
 ## 1-bit 浮层投影：右下 3px 的纯黑实块（System 1–6 的菜单/弹窗语法）。
 ## 只由浮层显式打开；普通窗口保持平面，避免满屏黑边。
 const OFFSET_SHADOW := Vector2(3, 3)
@@ -41,6 +45,7 @@ var _over_ring: Control = null
 var _active := true
 var _rules: Array[Control] = []
 var _title_stripes: Control = null
+var _title_plate: ColorRect = null
 var _drag_enabled := true
 
 
@@ -75,7 +80,14 @@ func _build_baked_frame() -> void:
 	frame.size = Vector2(size.x - PAD * 2.0 + BLEED * 2.0, size.y - PAD * 2.0 + BLEED * 2.0)
 	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	## 烘焙框替代壳里的程序化 bg；壳的 offset_shadow 也不参与这条路径。
+	var bg := get_node_or_null("bg") as Control
+	if bg != null:
+		bg.visible = false
+	if _offset_shadow != null and is_instance_valid(_offset_shadow):
+		_offset_shadow.visible = false
 	add_child(frame)
+	move_child(frame, 0)
 
 
 ## 窗框底色：与外壳同一块灰。**框不发白** —— 白框包灰画布会读成「纸边的窗」，
@@ -88,17 +100,18 @@ func _frame_fill() -> Color:
 ## 位置仍从 `PAD` 起算、尺寸扣掉两倍 `PAD`，所以调用方的坐标一个都不用改
 ## —— 窗框依旧落在原来的 PAD 处，只是外面那圈「投影 / 圆角」没了。
 func _build_shader_bg(radius: int) -> void:
-	if offset_shadow:
-		_offset_shadow = ColorRect.new()
-		_offset_shadow.name = "offset_shadow"
-		_offset_shadow.color = TecTheme.shadow(1.0)
-		_offset_shadow.position = Vector2(PAD, PAD) + OFFSET_SHADOW
-		_offset_shadow.size = Vector2(size.x - PAD * 2.0, size.y - PAD * 2.0)
-		_offset_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(_offset_shadow)
+	if _offset_shadow != null and is_instance_valid(_offset_shadow):
+		_offset_shadow.visible = offset_shadow
+		if offset_shadow:
+			_offset_shadow.color = TecTheme.shadow(1.0)
+			_offset_shadow.position = Vector2(PAD, PAD) + OFFSET_SHADOW
+			_offset_shadow.size = Vector2(size.x - PAD * 2.0, size.y - PAD * 2.0)
+			_offset_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var bg := Panel.new()
-	bg.name = "bg"
+	var bg := get_node_or_null("bg") as Panel
+	if bg == null:
+		return
+	bg.visible = true
 	bg.position = Vector2(PAD, PAD)
 	bg.size = Vector2(size.x - PAD * 2.0, size.y - PAD * 2.0)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -111,7 +124,21 @@ func _build_shader_bg(radius: int) -> void:
 	sb.set_border_width_all(2)
 	sb.set_corner_radius_all(0)
 	bg.add_theme_stylebox_override("panel", sb)
-	add_child(bg)
+
+
+## 把公共壳场景的子节点搬进本窗，保留 `bg` / `bar` / `body` / `content`
+## 这些旧节点路径；测试和子类都不需要改。
+func _adopt_shell() -> void:
+	if get_node_or_null("bg") != null:
+		return
+	var shell := ShellScene.instantiate()
+	if shell == null:
+		return
+	for child in shell.get_children():
+		shell.remove_child(child)
+		child.owner = null
+		add_child(child)
+	shell.free()
 
 
 func _build(radius: int) -> void:
@@ -119,53 +146,62 @@ func _build(radius: int) -> void:
 	_inner_w = inner_w
 	var inner_h: float = size.y - PAD * 2.0
 
+	_adopt_shell()
+	_offset_shadow = get_node_or_null("offset_shadow") as ColorRect
 	if _uses_baked_frame() and ResourceLoader.exists(FRAME_TEX):
 		_build_baked_frame()
 	else:
 		_build_shader_bg(radius)
 
-	var bar := Control.new()
-	bar.name = "bar"
+	var bar := get_node_or_null("bar") as Control
+	if bar == null:
+		push_error("SysWindowShell.tscn 缺少 bar 节点")
+		return
 	bar.position = Vector2(PAD, PAD + 1.0)
 	bar.size = Vector2(inner_w, BAR_H - 1.0)
 	bar.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(bar)
 	_bar_nodes.append(bar)
 
 	## 顶栏统一语法：三道横纹铺满整条栏，标题文字居中并留出左右缺口；
 	## 标题宽度按文字实测，窄窗只收窄标题，不会压到右侧按钮或把横纹挤出栏外。
-	_title_stripes = TitleStripes.new()
-	_title_stripes.name = "title_stripes"
-	_title_stripes.position = Vector2.ZERO
-	_title_stripes.size = Vector2(inner_w, BAR_H - 1.0)
-	_title_stripes.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	## C-B：新窗默认激活，横纹走强调青；非激活时由 set_active 换回墨色。
-	(_title_stripes as TitleStripes).col = TecTheme.SPOT_ACCENT
-	bar.add_child(_title_stripes)
-	_rules.append(_title_stripes)
+	_title_stripes = bar.get_node_or_null("title_stripes") as Control
+	if _title_stripes != null:
+		_title_stripes.position = Vector2.ZERO
+		_title_stripes.size = Vector2(inner_w, BAR_H - 1.0)
+		_title_stripes.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		## C-B：新窗默认激活，横纹走强调青；非激活时由 set_active 换回墨色。
+		var stripes = _title_stripes
+		stripes.col = TecTheme.SPOT_ACCENT
+		_rules.append(_title_stripes)
 
-	_title_label = TecTheme.label(title, TecTheme.FS_BODY, TecTheme.TEXT)
-	_title_label.name = "win_title"
-	var spaced := FontVariation.new()
-	spaced.base_font = TecTheme.font()
-	## 字距 2 → 1：换字体后 12px 黑体的西文本身比点阵宋体宽，再 +2 就散了。
-	spaced.set_spacing(TextServer.SPACING_GLYPH, 1)
-	_title_label.add_theme_font_override("font", spaced)
-	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_title_label.clip_text = true
-	_title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.add_child(_title_label)
+	_title_plate = bar.get_node_or_null("title_plate") as ColorRect
+	if _title_plate != null:
+		_title_plate.color = TecTheme.CARD
+		_title_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var sep := ColorRect.new()
-	sep.name = "sep"
-	## 1-bit 的分隔线就是黑线，不用半透明 —— 白底上 35% 的黑读作「灰」
-	sep.color = TecTheme.INK
-	sep.position = Vector2(PAD, PAD + BAR_H)
-	sep.size = Vector2(inner_w, 1.0)
-	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(sep)
+	_title_label = bar.get_node_or_null("win_title") as Label
+	if _title_label != null:
+		_title_label.text = title
+		var spaced := FontVariation.new()
+		spaced.base_font = TecTheme.font()
+		## 字距 2 → 1：换字体后 12px 黑体的西文本身比点阵宋体宽，再 +2 就散了。
+		spaced.set_spacing(TextServer.SPACING_GLYPH, 1)
+		_title_label.add_theme_font_override("font", spaced)
+		_title_label.add_theme_font_size_override("font_size", TecTheme.FS_BODY)
+		_title_label.add_theme_color_override("font_color", TecTheme.TEXT)
+		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_title_label.clip_text = true
+		_title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var sep := get_node_or_null("sep") as ColorRect
+	if sep != null:
+		## 1-bit 的分隔线就是黑线，不用半透明 —— 白底上 35% 的黑读作「灰」
+		sep.color = TecTheme.INK
+		sep.position = Vector2(PAD, PAD + BAR_H)
+		sep.size = Vector2(inner_w, 1.0)
+		sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var close := _mini_button("×")
 	close.name = "close"
@@ -175,21 +211,28 @@ func _build(radius: int) -> void:
 	bar.add_child(close)
 
 	bar.gui_input.connect(_on_bar_input)
-	_sync_title_area()
 
-	body = Control.new()
-	body.name = "body"
+	body = get_node_or_null("body") as Control
+	if body == null:
+		push_error("SysWindowShell.tscn 缺少 body 节点")
+		return
 	body.position = Vector2(PAD + 12.0, PAD + BAR_H + 10.0)
 	body.size = Vector2(inner_w - 24.0, inner_h - BAR_H - 20.0)
 	body.mouse_filter = Control.MOUSE_FILTER_PASS
-	add_child(body)
 
-	content = VBoxContainer.new()
-	content.name = "content"
+	content = body.get_node_or_null("content") as VBoxContainer
+	if content == null:
+		push_error("SysWindowShell.tscn 缺少 body/content 节点")
+		return
 	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	## 内容最小高度可以大于 body（由 _fit_height 再把窗长高）；grow 必须是 END，
+	## 否则 Godot 会按 BOTH 往上下同时撑，内容会盖到标题栏上、吞掉标题栏点击。
+	content.grow_horizontal = Control.GROW_DIRECTION_END
+	content.grow_vertical = Control.GROW_DIRECTION_END
 	content.add_theme_constant_override("separation", 7)
 	content.mouse_filter = Control.MOUSE_FILTER_PASS
-	body.add_child(content)
+
+	_sync_title_area()
 
 
 ## 内容流的最小高度。`get_combined_minimum_size()` 在刚增删子节点、还没排下一帧时
@@ -239,31 +282,17 @@ func _sync_title_area() -> void:
 	_title_label.size = Vector2(w, BAR_H - 1.0)
 	_title_stripes.position = Vector2.ZERO
 	_title_stripes.size = Vector2(_inner_w, BAR_H - 1.0)
-	var stripes := _title_stripes as TitleStripes
+	var plate_left := clampf(x - 7.0, 0.0, _inner_w)
+	var plate_right := clampf(x + w + 7.0, 0.0, _inner_w)
+	var stripes = _title_stripes
 	stripes.line_left = 10.0
 	stripes.line_right = maxf(_inner_w - controls - (8.0 if controls > 0.0 else 2.0), 10.0)
-	stripes.gap_left = x - 7.0
-	stripes.gap_right = x + w + 7.0
+	stripes.gap_left = plate_left
+	stripes.gap_right = plate_right
 	stripes.queue_redraw()
-
-
-## 标题栏横纹：三道 1px 线，按标题区留出中间缺口；整条 Control 参与
-## 激活 / 非激活切换（非激活时隐藏，与 System 6 一致）。
-class TitleStripes extends Control:
-	var line_left := 10.0
-	var line_right := 10.0
-	var gap_left := 0.0
-	var gap_right := 0.0
-	var col := TecTheme.SPOT_ACCENT
-
-	func _draw() -> void:
-		var mid := size.y * 0.5
-		for i in 3:
-			var y := mid - 4.5 + float(i) * 4.0
-			if gap_left > line_left:
-				draw_line(Vector2(line_left, y), Vector2(gap_left, y), col, 1.0)
-			if line_right > gap_right:
-				draw_line(Vector2(gap_right, y), Vector2(line_right, y), col, 1.0)
+	if _title_plate != null and is_instance_valid(_title_plate):
+		_title_plate.position = Vector2(plate_left, 0.0)
+		_title_plate.size = Vector2(maxf(plate_right - plate_left, 0.0), BAR_H - 1.0)
 
 
 func _mini_button(text: String) -> Button:
@@ -330,8 +359,9 @@ func set_active(on: bool) -> void:
 	_active = on
 	## C-B：横纹始终保留；激活 = 强调青，非激活 = 墨色。A2 的层次改由颜色承担。
 	if _title_stripes != null and is_instance_valid(_title_stripes):
-		(_title_stripes as TitleStripes).col = TecTheme.SPOT_ACCENT if on else TecTheme.INK
-		(_title_stripes as TitleStripes).queue_redraw()
+		var stripes = _title_stripes
+		stripes.col = TecTheme.SPOT_ACCENT if on else TecTheme.INK
+		stripes.queue_redraw()
 	if _title_label != null:
 		_title_label.add_theme_color_override("font_color",
 			TecTheme.TEXT if on else TecTheme.INK_FAINT)
@@ -381,9 +411,6 @@ func resize_to(w: float, h: float) -> void:
 	if bar != null:
 		bar.size.x = iw
 		_sync_title_area()
-		var hl := bar.get_node_or_null("top_hl") as Control
-		if hl != null:
-			hl.size.x = iw
 		if _close_btn != null and is_instance_valid(_close_btn):
 			_close_btn.position.x = iw - 24.0
 		# 最小化按钮在 enable_controls() 后加的，resize_to() 也得把它一起推回右沿；

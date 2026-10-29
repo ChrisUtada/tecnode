@@ -3,6 +3,8 @@ extends Node
 ## 由 Desktop 挂载的子系统控制器。
 ## 过渡期直接通过注入的 `desk` 访问宿主成员；搬出的函数名保持不变。
 
+const StorageWinScene := preload("res://scenes/windows/StorageWin.tscn")
+
 var desk: Desktop
 
 
@@ -630,7 +632,7 @@ func _toggle_storage(kind: String) -> void:
 			desk._bag_win.queue_free()
 			desk._bag_win = null
 			return
-		desk._bag_win = StorageWin.new()
+		desk._bag_win = StorageWinScene.instantiate() as StorageWin
 		desk._bag_win.name = "bag_win"
 		desk._bag_win.setup_store("物品", GraphState.BAG, desk.graph, desk.case_def)
 		desk._bag_win.writes_enabled = desk._case_open
@@ -645,7 +647,7 @@ func _toggle_storage(kind: String) -> void:
 		desk._ledger_win.queue_free()
 		desk._ledger_win = null
 		return
-	desk._ledger_win = StorageWin.new()
+	desk._ledger_win = StorageWinScene.instantiate() as StorageWin
 	desk._ledger_win.name = "clue_win"
 	desk._ledger_win.setup_store("证据", GraphState.LEDGER, desk.graph, desk.case_def)
 	desk._ledger_win.writes_enabled = desk._case_open

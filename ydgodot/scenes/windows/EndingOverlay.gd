@@ -7,6 +7,8 @@ extends Control
 
 signal finished
 
+const DitherMaskScript := preload("res://ui/DitherMask.gd")
+
 var _fast := false
 var _lines: Array = []
 var _idx := 0
@@ -32,9 +34,11 @@ func setup_overlay() -> void:
 	z_index = 100
 	visible = false
 
-	var dim := ColorRect.new()
+	var dim := DitherMaskScript.new()
 	dim.name = "dim"
-	dim.color = TecTheme.DIM_HEAVY
+	## 结局主文案压在中心：中心密、边缘略疏，保证浅色字的对比；
+	## 渐隐收在屏幕边缘（radius 0.9→1.35），避免中间出现一个明显的黑色椭圆。
+	dim.configure(0.90, 0.70, 0.90, 1.35)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(dim)

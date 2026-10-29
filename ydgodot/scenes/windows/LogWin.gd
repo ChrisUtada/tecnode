@@ -39,18 +39,16 @@ var _rows_built := 0
 func setup_log(p_graph: GraphState, w: float = 320.0, h: float = 383.0) -> void:
 	graph = p_graph
 	setup("日志", w, h)
-	_scroll = ScrollContainer.new()
-	_scroll.name = "log_scroll"
+	_scroll = get_node_or_null("body/content/log_scroll") as ScrollContainer
+	_list = _scroll.get_node_or_null("log_list") as VBoxContainer if _scroll != null else null
+	if _scroll == null or _list == null:
+		push_error("LogWin.tscn 缺少 log_scroll / log_list")
+		return
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_child(_scroll)
-
-	_list = VBoxContainer.new()
-	_list.name = "log_list"
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_theme_constant_override("separation", 0)
-	_scroll.add_child(_list)
 	refresh_log()
 
 

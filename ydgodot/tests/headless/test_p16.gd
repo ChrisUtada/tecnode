@@ -156,6 +156,9 @@ func _test_desktop() -> void:
 	var intro: IntroWin = scene.debug.dbg_open_intro()
 	await process_frame
 	check("可以手动打开开场", scene.debug.dbg_intro_open())
+	var intro_dim := intro.find_child("dim", true, false) as ColorRect
+	check("P6.4 开场遮罩走网点 shader",
+		intro_dim != null and intro_dim.material is ShaderMaterial)
 	check("开场仍停在第 0 步", intro.dbg_step() == "name", str(intro.dbg_step()))
 	intro.dbg_set_name("执行者")
 	intro.dbg_begin()

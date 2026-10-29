@@ -288,9 +288,9 @@ func _initialize() -> void:
 	scene.debug.dbg_close_debug_panel()
 	check("调试面板可关闭", dbg_pop != null and not dbg_pop.visible)
 	check("A4 调试影随面板隐藏", dbg_shadow == null or not dbg_shadow.visible)
-	# 主窗跟着桌面长：1280×720 下画布必须是 1162 × 608（Web 标题栏 28px 口径）
+	# 主窗跟着桌面长：1280×720 下画布必须是 1162 × 612（标题栏 24px 口径）
 	var stage := scene.get_node_or_null("desk/case_win/body/stage") as Control
-	check("画布 1280 口径 = 1162×608", stage != null and stage.size == Vector2(1162, 608),
+	check("画布 1280 口径 = 1162×612", stage != null and stage.size == Vector2(1162, 612),
 		str(stage.size) if stage != null else "null")
 	var chip := scene.get_node_or_null("header/inv_chip") as Button
 	check("证章摆在 318 / 宽 190", chip != null and absf(chip.position.x - 318.0) < 0.5
@@ -310,6 +310,12 @@ func _initialize() -> void:
 			and float(cw_stripes.get("line_left")) >= 0.0
 			and float(cw_stripes.get("line_right")) <= cw_bar.size.x,
 		"%s / bar %s" % [cw_stripes.size, cw_bar.size])
+	var cw_plate := case_win.get_node_or_null("bar/title_plate") as ColorRect
+	check("标题栏白衬底在横纹之上、标题之下",
+		cw_plate != null and cw_plate.color.is_equal_approx(TecTheme.CARD)
+			and cw_plate.mouse_filter == Control.MOUSE_FILTER_IGNORE
+			and is_equal_approx(cw_plate.size.y, SysWindow.BAR_H - 1.0)
+			and cw_plate.size.x <= cw_bar.size.x)
 	var frame_bg := scene.get_node_or_null("desk/case_win/bg") as Panel
 	check("案件窗底板是程序化 Panel", frame_bg != null)
 	if frame_bg != null:
@@ -1454,23 +1460,27 @@ func _initialize() -> void:
 		c24.move_to_front()
 		await process_frame
 		var p24: Vector2 = c24.position
+		## 落点必须避开窗口 / 落点表 / 其他卡；固定 +150,+88 会随标题栏高度
+		## 改变而撞上右下的窗，导致「松手写回」偶发失败。
+		var drop24: Vector2 = _blank_point_near(scene, c24)
+		var delta24: Vector2 = drop24 - r24
 		_vpush_btn(r24, true)
 		await process_frame
-		_vpush_mov(r24 + Vector2(18, 10))
+		_vpush_mov(r24 + delta24 * 0.2)
 		await process_frame
 		check("真实路由：拖动中镜像挂上", scene.debug.dbg_card_mirror() != null and is_instance_valid(scene.debug.dbg_card_mirror()))
 		check("真实路由：原卡全透明（入场 pop 补间不会把透明度抢回去）",
 			c24.modulate.a < 0.01, str(c24.modulate.a))
-		_vpush_mov(r24 + Vector2(90, 52))
+		_vpush_mov(r24 + delta24 * 0.6)
 		await process_frame
-		var want24: Vector2 = p24 + Vector2(90, 52) / scene.debug.dbg_view_k()
+		var want24: Vector2 = p24 + delta24 * 0.6 / scene.debug.dbg_view_k()
 		check("真实路由：第二段 motion 仍跟手（不是只跟第一下）",
 			c24.position.distance_to(want24) < 1.5, str(c24.position) + " / want " + str(want24))
-		_vpush_mov(r24 + Vector2(150, 88))
+		_vpush_mov(drop24)
 		await process_frame
 		check("真实路由：第三段 motion 仍跟手",
-			c24.position.distance_to(p24 + Vector2(150, 88) / scene.debug.dbg_view_k()) < 1.5, str(c24.position))
-		_vpush_btn(r24 + Vector2(150, 88), false)
+			c24.position.distance_to(p24 + delta24 / scene.debug.dbg_view_k()) < 1.5, str(c24.position))
+		_vpush_btn(drop24, false)
 		await process_frame
 		check("真实路由：松手清空拖动会话", scene.debug.dbg_drag_key() == "")
 		check("真实路由：松手镜像退场", scene.debug.dbg_card_mirror() == null)
